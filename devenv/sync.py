@@ -114,6 +114,24 @@ Then, use it to run sync this time:
         reporoot,
     )
 
+    from devenv.lib import node
+
+    node.install(
+        cfg["node"]["version"],
+        cfg["node"][constants.SYSTEM_MACHINE],
+        cfg["node"][f"{constants.SYSTEM_MACHINE}_sha256"],
+        reporoot,
+    )
+
+    from devenv.lib import pnpm
+
+    pnpm.install(
+        cfg["pnpm"]["version"],
+        cfg["pnpm"][constants.SYSTEM_MACHINE],
+        cfg["pnpm"][f"{constants.SYSTEM_MACHINE}_sha256"],
+        reporoot,
+    )
+
     # no more imports from devenv past this point! if the venv is recreated
     # then we won't have access to devenv libs until it gets reinstalled
 

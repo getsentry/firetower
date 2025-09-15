@@ -71,21 +71,21 @@ repos:
         name: eslint
         language: system
         files: \.(ts|js|tsx|jsx|mjs)$
-        entry: bash -c 'cd frontend && bun run eslint --quiet --fix'
+        entry: bash -c 'cd frontend && ./node_modules/.bin/eslint --quiet --fix'
 
       # TODO(keeakita): figure out why this isn't working
       # - id: stylelint
       #   name: stylelint
       #   language: system
       #   files: \.[jt]sx?$
-      #   entry: bash -c 'cd frontend && bun run stylelint --quiet'
+      #   entry: bash -c 'cd frontend && pnpm run stylelint --quiet'
 
       # TODO(keeakita): fix this also
       # - id: prettier
       #   name: prettier
       #   language: system
       #   types_or: [yaml, ts, tsx, javascript, jsx, css]
-      #   entry: bash -c 'cd frontend && bun run prettier --log-level=error --write --experimental-cli --no-cache'
+      #   entry: bash -c 'cd frontend && pnpm run prettier --log-level=error --write --experimental-cli --no-cache'
       #   exclude: |
       #     (?x)^($^
       #       # prettier crashes on some of these, by intent:
