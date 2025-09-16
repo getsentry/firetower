@@ -9,7 +9,7 @@ function Index() {
     <div className="p-2">
       <h3>Home page</h3>
       <p>the incidents list will show here</p>
-      <Link to="/INC-1234" className="underline">See an incident details page</Link>
+      <Link to="/$incidentId" params={{ incidentId: "INC-1234" }} className="underline">See an incident details page</Link>
     </div>
   )
 }
