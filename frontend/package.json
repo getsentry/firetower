@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tanstack/react-router": "^1.131.44",
+    "@tanstack/zod-adapter": "^1.131.44",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "tailwindcss": "^4.1.13",
