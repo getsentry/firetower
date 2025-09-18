@@ -3,15 +3,22 @@ name = "firetower"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "django>=5.2.5",
     "djangorestframework>=3.15.2",
 ]
+
+[build-system]
+requires = ["uv_build>=0.8.2,<0.9.0"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
     "pyupgrade>=3.20.0",
     "ruff>=0.12.11",
     "ty>=0.0.1a19",
+]
+prod = [
+    "granian>=2.5.3",
 ]
