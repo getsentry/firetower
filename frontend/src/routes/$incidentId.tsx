@@ -10,8 +10,8 @@ export const Route = createFileRoute('/$incidentId')({
 });
 
 function Incident() {
-  const {incidentId} = Route.useParams();
-  const {data: incident} = useSuspenseQuery(incidentDetailQueryOptions({incidentId}));
+  const params = Route.useParams();
+  const {data: incident} = useSuspenseQuery(incidentDetailQueryOptions(params));
 
   return (
     <div className="p-2">
