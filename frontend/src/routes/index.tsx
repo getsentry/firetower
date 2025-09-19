@@ -39,6 +39,7 @@ function Index() {
               to="/$incidentId"
               params={{incidentId: incident.id}}
               className="underline"
+              preload={'intent'}
             >
               See incident details
             </Link>
