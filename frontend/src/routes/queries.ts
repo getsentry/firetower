@@ -24,7 +24,7 @@ export function incidentsQueryOptions({status}: IncidentsQueryArgs) {
     queryKey: ['Incidents', status],
     queryFn: ({signal}) =>
       Api.get({
-        path: '/ui/incidents',
+        path: '/ui/incidents/',
         query: {status},
         signal,
         responseSchema: IncidentsListSchema,
@@ -72,7 +72,7 @@ export function incidentDetailQueryOptions({incidentId}: IncidentDetailQueryArgs
     queryKey: ['IncidentDetail', incidentId],
     queryFn: ({signal}) =>
       Api.get({
-        path: `/ui/incidents/${incidentId}`,
+        path: `/ui/incidents/${incidentId}/`,
         signal,
         responseSchema: IncidentDetailSchema,
       }),
