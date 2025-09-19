@@ -1,7 +1,7 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import { tanstackRouter } from '@tanstack/router-plugin/vite'
-import tailwindcss from "@tailwindcss/vite";
+import tailwindcss from '@tailwindcss/vite';
+import {tanstackRouter} from '@tanstack/router-plugin/vite';
+import react from '@vitejs/plugin-react-swc';
+import {defineConfig} from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -9,17 +9,9 @@ export default defineConfig({
     tanstackRouter({
       target: 'react',
       autoCodeSplitting: true,
+      routeFileIgnorePattern: 'queries.ts',
     }),
     tailwindcss(),
-    react()
+    react(),
   ],
-  server: {
-    proxy: {
-      "/api": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
-      },
-    },
-  },
 });
