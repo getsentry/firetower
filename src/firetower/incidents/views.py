@@ -1,6 +1,6 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-
+from integrations.services.jira import JiraService
 
 DUMMY_INCIDENTS = [
     {
@@ -77,6 +77,7 @@ DUMMY_INCIDENT_DETAIL = {
 @api_view(["GET"])
 def incident_list_ui(request):
     """List all incidents"""
+    jira = new Jira
     return Response(DUMMY_INCIDENTS)
 
 
