@@ -9,7 +9,7 @@ export default defineConfig({
     tanstackRouter({
       target: 'react',
       autoCodeSplitting: true,
-      routeFileIgnorePattern: 'queries.ts',
+      routeFileIgnorePattern: 'queries|components',
     }),
     tailwindcss(),
     react(),

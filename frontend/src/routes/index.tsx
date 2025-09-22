@@ -3,7 +3,7 @@ import {createFileRoute, Link} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
 import {z} from 'zod';
 
-import {incidentsQueryOptions} from './queries';
+import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
 
 // Zod schema for search params
 const incidentListSearchSchema = z.object({

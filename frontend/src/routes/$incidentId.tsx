@@ -1,7 +1,7 @@
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 
-import {incidentDetailQueryOptions} from './queries';
+import {incidentDetailQueryOptions} from './queries/incidentDetailQueryOptions';
 
 export const Route = createFileRoute('/$incidentId')({
   component: Incident,
