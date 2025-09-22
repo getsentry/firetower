@@ -5,8 +5,10 @@ import {incidentDetailQueryOptions} from './queries';
 
 export const Route = createFileRoute('/$incidentId')({
   component: Incident,
-  loader: ({params, context}) =>
-    context.queryClient.ensureQueryData(incidentDetailQueryOptions(params)),
+  loader: async ({params, context}) =>
+    await context.queryClient.ensureQueryData(incidentDetailQueryOptions(params)),
+  pendingComponent: () => <p>Loading incident...</p>,
+  errorComponent: () => <p>Something went wrong fetching incident.</p>,
 });
 
 function Incident() {

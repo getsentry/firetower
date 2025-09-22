@@ -18,8 +18,10 @@ export const Route = createFileRoute('/')({
   // Extract search params needed for loader
   loaderDeps: ({search: {status}}) => ({status}),
   // Define loader with loaderDeps and context (context has queryClient)
-  loader: ({deps, context}) =>
-    context.queryClient.ensureQueryData(incidentsQueryOptions(deps)),
+  loader: async ({deps, context}) =>
+    await context.queryClient.ensureQueryData(incidentsQueryOptions(deps)),
+  pendingComponent: () => <p>Loading incidents...</p>,
+  errorComponent: () => <p>Something went wrong fetching incidents.</p>,
 });
 
 function Index() {

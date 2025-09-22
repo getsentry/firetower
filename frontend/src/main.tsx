@@ -14,6 +14,8 @@ const router = createRouter({
   Wrap: ({children}) => {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   },
+  defaultErrorComponent: () => <p>Error</p>,
+  defaultPendingComponent: () => <p>Loading</p>,
 });
 
 declare module '@tanstack/react-router' {
