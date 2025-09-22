@@ -1,6 +1,6 @@
 import {Link} from '@tanstack/react-router';
 
-export const Navigation = () => (
+export const Header = () => (
   <nav className="bg-background-primary border-b border-secondary p-space-md">
     <div className="flex items-center justify-center">
       <Link to="/" className="flex items-center gap-space-sm no-underline">

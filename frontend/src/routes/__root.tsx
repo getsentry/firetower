@@ -2,11 +2,11 @@ import type {QueryClient} from '@tanstack/react-query';
 import {createRootRouteWithContext, Outlet} from '@tanstack/react-router';
 import {TanStackRouterDevtools} from '@tanstack/react-router-devtools';
 
-import {Navigation} from './components/Navigation';
+import {Header} from './components/Header';
 
 const RootLayout = () => (
   <>
-    <Navigation />
+    <Header />
     <Outlet />
     <TanStackRouterDevtools />
   </>
