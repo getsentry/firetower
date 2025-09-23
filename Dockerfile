@@ -1,7 +1,7 @@
 FROM python:3.12-alpine3.22 AS python_base
-COPY --from=ghcr.io/astral-sh/uv:0.8.18 /uv /uvx /bin/
 
 FROM python_base AS build_backend
+COPY --from=ghcr.io/astral-sh/uv:0.8.18 /uv /uvx /bin/
 
 WORKDIR /app
 
@@ -48,4 +48,4 @@ COPY --from=build_frontend --chown=app:app /app/dist /app/static
 USER app
 WORKDIR /app
 
-ENTRYPOINT [ "uv", "run", "--no-cache", "granian", "--interface", "wsgi", "firetower.wsgi:application"]
+ENTRYPOINT [ "/app/.venv/bin/granian", "--interface", "wsgi", "firetower.wsgi:application"]
