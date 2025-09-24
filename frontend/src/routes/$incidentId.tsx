@@ -22,7 +22,31 @@ function Incident() {
       </h3>
       <div>Status: {incident.status}</div>
       <div>Severity: {incident.severity}</div>
+      <div>Created: {incident.created_at}</div>
+      <div>Updated: {incident.updated_at}</div>
       <p>{incident.description}</p>
+      
+      {incident.participants.length > 0 && (
+        <div>
+          <h4>Participants</h4>
+          {incident.participants.map((participant, index) => (
+            <div key={index}>
+              {participant.name} ({participant.role || 'Participant'}) - @{participant.slack}
+            </div>
+          ))}
+        </div>
+      )}
+      
+      <div>
+        <h4>External Links</h4>
+        {incident.external_links.jira && (
+          <div>
+            <a href={incident.external_links.jira} target="_blank" rel="noopener noreferrer">
+              View in Jira
+            </a>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
