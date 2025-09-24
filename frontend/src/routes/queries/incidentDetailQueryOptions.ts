@@ -6,8 +6,8 @@ import {Api} from '../../api';
 const ParticipantSchema = z.object({
   name: z.string(),
   slack: z.string(),
-  avatar_url: z.string(),
-  role: z.enum(['Captain', 'Reporter']).nullable(),
+  avatar_url: z.string().nullable(),
+  role: z.string().nullable(),
 });
 
 const ExternalLinksSchema = z.object({

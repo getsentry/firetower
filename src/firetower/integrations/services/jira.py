@@ -28,12 +28,18 @@ class JiraService:
         # Store config for later use
         self.domain = jira_config['DOMAIN']
         self.project_key = jira_config['PROJECT_KEY']
+        self.severity_field_id = jira_config['SEVERITY_FIELD']
         
         # Initialize Jira client with basic auth
         self.client = JIRA(
             self.domain,
             basic_auth=(jira_config['ACCOUNT'], jira_config['API_KEY'])
         )
+    
+    def _extract_severity(self, issue):
+        """Extract severity from Jira custom field."""
+        severity_field = getattr(issue.fields, self.severity_field_id, None)
+        return getattr(severity_field, 'value', None) if severity_field else None
     
     def get_incident(self, incident_key: str):
         """
@@ -49,12 +55,15 @@ class JiraService:
             # Fetch the issue from Jira
             issue = self.client.issue(incident_key)
             
-            # Return basic incident data (we'll expand this later)
+            # Return incident data using actual Jira schema (matching opsbot)
             return {
                 'id': issue.key,
                 'title': issue.fields.summary,
                 'description': getattr(issue.fields, 'description', '') or '',
                 'status': issue.fields.status.name,
+                'severity': self._extract_severity(issue),
+                'assignee': issue.fields.assignee.displayName if issue.fields.assignee else None,
+                'reporter': issue.fields.reporter.displayName if issue.fields.reporter else None,
                 'created_at': issue.fields.created,
                 'updated_at': issue.fields.updated,
             }
@@ -62,3 +71,57 @@ class JiraService:
         except JIRAError as e:
             # Log the error in a real app, for now just return None
             return None
+    
+    def get_incidents(self, status=None, max_results=50):
+        """
+        Fetch a list of incidents from the Jira project.
+        
+        Args:
+            status (str, optional): Filter by status (e.g., 'Open', 'In Progress', 'Done')
+            max_results (int): Maximum number of incidents to return (default: 50)
+            
+        Returns:
+            list: List of incident data dictionaries
+        """
+        try:
+            # Build the JQL query
+            jql_parts = [f'project = "{self.project_key}"']
+            
+            # Add status filter if provided
+            if status:
+                jql_parts.append(f'status = "{status}"')
+            
+            # Join the query parts
+            jql_query = ' AND '.join(jql_parts)
+            
+            # Add ordering (most recent first)
+            jql_query += ' ORDER BY created DESC'
+            
+            # Fetch issues from Jira
+            issues = self.client.search_issues(
+                jql_query, 
+                maxResults=max_results,
+                expand='changelog'  # Get change history if available
+            )
+            
+            # Transform issues to our incident format
+            incidents = []
+            for issue in issues:
+                incident_data = {
+                    'id': issue.key,
+                    'title': issue.fields.summary,
+                    'description': getattr(issue.fields, 'description', '') or '',
+                    'status': issue.fields.status.name,
+                    'severity': self._extract_severity(issue),
+                    'assignee': issue.fields.assignee.displayName if issue.fields.assignee else None,
+                    'reporter': issue.fields.reporter.displayName if issue.fields.reporter else None,
+                    'created_at': issue.fields.created,
+                    'updated_at': issue.fields.updated,
+                }
+                incidents.append(incident_data)
+            
+            return incidents
+            
+        except JIRAError as e:
+            # Log the error in a real app, for now just return empty list
+            return []
