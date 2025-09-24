@@ -51,26 +51,21 @@ class JiraService:
         Returns:
             dict: Incident data or None if not found
         """
-        try:
-            # Fetch the issue from Jira
-            issue = self.client.issue(incident_key)
-            
-            # Return incident data using actual Jira schema (matching opsbot)
-            return {
-                'id': issue.key,
-                'title': issue.fields.summary,
-                'description': getattr(issue.fields, 'description', '') or '',
-                'status': issue.fields.status.name,
-                'severity': self._extract_severity(issue),
-                'assignee': issue.fields.assignee.displayName if issue.fields.assignee else None,
-                'reporter': issue.fields.reporter.displayName if issue.fields.reporter else None,
-                'created_at': issue.fields.created,
-                'updated_at': issue.fields.updated,
-            }
-            
-        except JIRAError as e:
-            # Log the error in a real app, for now just return None
-            return None
+        # Fetch the issue from Jira
+        issue = self.client.issue(incident_key)
+        
+        # Return incident data using actual Jira schema (matching opsbot)
+        return {
+            'id': issue.key,
+            'title': issue.fields.summary,
+            'description': getattr(issue.fields, 'description', '') or '',
+            'status': issue.fields.status.name,
+            'severity': self._extract_severity(issue),
+            'assignee': issue.fields.assignee.displayName if issue.fields.assignee else None,
+            'reporter': issue.fields.reporter.displayName if issue.fields.reporter else None,
+            'created_at': issue.fields.created,
+            'updated_at': issue.fields.updated,
+        }
     
     def get_incidents(self, status=None, max_results=50):
         """
@@ -83,45 +78,40 @@ class JiraService:
         Returns:
             list: List of incident data dictionaries
         """
-        try:
-            # Build the JQL query
-            jql_parts = [f'project = "{self.project_key}"']
-            
-            # Add status filter if provided
-            if status:
-                jql_parts.append(f'status = "{status}"')
-            
-            # Join the query parts
-            jql_query = ' AND '.join(jql_parts)
-            
-            # Add ordering (most recent first)
-            jql_query += ' ORDER BY created DESC'
-            
-            # Fetch issues from Jira
-            issues = self.client.search_issues(
-                jql_query, 
-                maxResults=max_results,
-                expand='changelog'  # Get change history if available
-            )
-            
-            # Transform issues to our incident format
-            incidents = []
-            for issue in issues:
-                incident_data = {
-                    'id': issue.key,
-                    'title': issue.fields.summary,
-                    'description': getattr(issue.fields, 'description', '') or '',
-                    'status': issue.fields.status.name,
-                    'severity': self._extract_severity(issue),
-                    'assignee': issue.fields.assignee.displayName if issue.fields.assignee else None,
-                    'reporter': issue.fields.reporter.displayName if issue.fields.reporter else None,
-                    'created_at': issue.fields.created,
-                    'updated_at': issue.fields.updated,
-                }
-                incidents.append(incident_data)
-            
-            return incidents
-            
-        except JIRAError as e:
-            # Log the error in a real app, for now just return empty list
-            return []
+        # Build the JQL query
+        jql_parts = [f'project = "{self.project_key}"']
+        
+        # Add status filter if provided
+        if status:
+            jql_parts.append(f'status = "{status}"')
+        
+        # Join the query parts
+        jql_query = ' AND '.join(jql_parts)
+        
+        # Add ordering (most recent first)
+        jql_query += ' ORDER BY created DESC'
+        
+        # Fetch issues from Jira
+        issues = self.client.search_issues(
+            jql_query, 
+            maxResults=max_results,
+            expand='changelog'  # Get change history if available
+        )
+        
+        # Transform issues to our incident format
+        incidents = []
+        for issue in issues:
+            incident_data = {
+                'id': issue.key,
+                'title': issue.fields.summary,
+                'description': getattr(issue.fields, 'description', '') or '',
+                'status': issue.fields.status.name,
+                'severity': self._extract_severity(issue),
+                'assignee': issue.fields.assignee.displayName if issue.fields.assignee else None,
+                'reporter': issue.fields.reporter.displayName if issue.fields.reporter else None,
+                'created_at': issue.fields.created,
+                'updated_at': issue.fields.updated,
+            }
+            incidents.append(incident_data)
+        
+        return incidents
