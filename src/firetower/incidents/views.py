@@ -15,16 +15,9 @@ from .transformers import (
 def incident_list_ui(request):
     """List all incidents from Jira"""
     try:
-        # Initialize Jira service
         jira_service = JiraService()
-        
-        # Get status filter from query params
         status_filter = request.GET.get('status')
-        
-        # Fetch incidents from Jira
         jira_incidents = jira_service.get_incidents(status=status_filter, max_results=50)
-        
-        # Transform to frontend format
         incidents = [transform_jira_incident_for_list(incident) for incident in jira_incidents]
         
         return Response(incidents)
@@ -40,7 +33,6 @@ def incident_list_ui(request):
 @api_view(["GET"])
 def incident_detail_ui(request, incident_id):
     """Get specific incident details from Jira"""
-    # Validate incident ID format before hitting Jira
     project_key = settings.JIRA['PROJECT_KEY']
     incident_pattern = rf"^{re.escape(project_key)}-\d+$"
     
@@ -51,13 +43,8 @@ def incident_detail_ui(request, incident_id):
         )
     
     try:
-        # Initialize Jira service
         jira_service = JiraService()
-        
-        # Fetch incident from Jira
         jira_incident = jira_service.get_incident(incident_id)
-
-        print(jira_incident)
         
         if not jira_incident:
             return Response(
@@ -65,7 +52,6 @@ def incident_detail_ui(request, incident_id):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Transform to frontend format
         incident_detail = transform_jira_incident_for_detail(jira_incident)
         
         return Response(incident_detail)

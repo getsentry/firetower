@@ -51,10 +51,8 @@ class JiraService:
         Returns:
             dict: Incident data or None if not found
         """
-        # Fetch the issue from Jira
         issue = self.client.issue(incident_key)
         
-        # Return incident data using actual Jira schema (matching opsbot)
         return {
             'id': issue.key,
             'title': issue.fields.summary,
@@ -78,27 +76,20 @@ class JiraService:
         Returns:
             list: List of incident data dictionaries
         """
-        # Build the JQL query
         jql_parts = [f'project = "{self.project_key}"']
         
-        # Add status filter if provided
         if status:
             jql_parts.append(f'status = "{status}"')
         
-        # Join the query parts
         jql_query = ' AND '.join(jql_parts)
-        
-        # Add ordering (most recent first)
         jql_query += ' ORDER BY created DESC'
         
-        # Fetch issues from Jira
         issues = self.client.search_issues(
             jql_query, 
             maxResults=max_results,
-            expand='changelog'  # Get change history if available
+            expand='changelog'
         )
         
-        # Transform issues to our incident format
         incidents = []
         for issue in issues:
             incident_data = {
