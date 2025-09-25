@@ -4,9 +4,9 @@ Jira integration service for fetching incident data.
 This service provides a simple interface to interact with Jira's REST API
 and transform Jira issues into our incident data format.
 """
+import re
 from django.conf import settings
 from jira import JIRA
-from jira.exceptions import JIRAError
 
 class JiraService:
     """
@@ -65,12 +65,12 @@ class JiraService:
             'updated_at': issue.fields.updated,
         }
     
-    def get_incidents(self, status=None, max_results=50):
+    def get_incidents(self, status: str = '', max_results=50):
         """
         Fetch a list of incidents from the Jira project.
         
         Args:
-            status (str, optional): Filter by status (e.g., 'Open', 'In Progress', 'Done')
+            status (str, optional): Filter by status (e.g., 'Active', 'Postmortem', 'Actions Pending')
             max_results (int): Maximum number of incidents to return (default: 50)
             
         Returns:
@@ -79,6 +79,8 @@ class JiraService:
         jql_parts = [f'project = "{self.project_key}"']
         
         if status:
+            if not re.match(r'^[A-Za-z\s]+$', status):
+                raise ValueError(f"Invalid status format: {status}. Only alphabetical characters and spaces allowed.")
             jql_parts.append(f'status = "{status}"')
         
         jql_query = ' AND '.join(jql_parts)
