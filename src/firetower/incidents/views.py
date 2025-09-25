@@ -1,90 +1,64 @@
+import re
+from django.conf import settings
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework import status
 
-
-DUMMY_INCIDENTS = [
-    {
-        "id": "INC-1247",
-        "title": "Database Connection Pool Exhausted",
-        "description": "Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout.",
-        "status": "Actions Pending",
-        "severity": "P1",
-        "created_at": "2024-08-27T14:14:00Z",
-        "is_private": False,
-    },
-    {
-        "id": "INC-1246",
-        "title": "SSL Certificate Renewal Failed",
-        "description": "Automated SSL certificate renewal process failed for api.example.com. Manual intervention required to restore HTTPS access.",
-        "status": "Mitigated",
-        "severity": "P2",
-        "created_at": "2024-08-27T11:32:00Z",
-        "is_private": False,
-    },
-    {
-        "id": "INC-1245",
-        "title": "Redis Cache Performance Degradation",
-        "description": "Cache hit rates dropped significantly causing increased database load and slower response times.",
-        "status": "Active",
-        "severity": "P1",
-        "created_at": "2024-08-28T09:15:00Z",
-        "is_private": True,
-    },
-]
-
-DUMMY_INCIDENT_DETAIL = {
-    "id": "INC-1247",
-    "title": "Database Connection Pool Exhausted",
-    "description": "Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout. Investigation shows unusual spike in traffic from API endpoint.",
-    "impact": "500 errors affecting 15% of users attempting to access dashboard. Authentication flow completely blocked for new sign-ups.",
-    "status": "Actions Pending",
-    "severity": "P1",
-    "created_at": "2024-08-27T14:14:00Z",
-    "updated_at": "2024-08-27T16:32:00Z",
-    "is_private": True,
-    "affected_areas": ["API", "Database", "User Dashboard", "Authentication"],
-    "root_causes": ["Resource Exhaustion", "Traffic Spike"],
-    "participants": [
-        {
-            "name": "John Smith",
-            "slack": "john.smith",
-            "avatar_url": "https://ca.slack-edge.com/T025K2Q1T-U123456-abc123def456/192",
-            "role": "Captain",
-        },
-        {
-            "name": "Jane Doe",
-            "slack": "jane.doe",
-            "avatar_url": "https://ca.slack-edge.com/T025K2Q1T-U234567-def456ghi789/192",
-            "role": "Reporter",
-        },
-        {
-            "name": "Alice Brown",
-            "slack": "alice.brown",
-            "avatar_url": "https://ca.slack-edge.com/T025K2Q1T-U345678-ghi789jkl012/192",
-            "role": None,
-        },
-    ],
-    "external_links": {
-        "slack": "https://sentry.slack.com/channels/inc-1247",
-        "jira": "https://sentry.atlassian.net/browse/INC-1247",
-        "datadog": "https://app.datadoghq.com/dashboard/abc-123",
-        "pagerduty": "https://sentry.pagerduty.com/incidents/P1234",
-        "statuspage": "https://status.sentry.io/incidents/xyz-789",
-    },
-}
+from firetower.integrations.services.jira import JiraService
+from .transformers import (
+    transform_jira_incident_for_list,
+    transform_jira_incident_for_detail,
+)
 
 
 @api_view(["GET"])
 def incident_list_ui(request):
-    """List all incidents"""
-    return Response(DUMMY_INCIDENTS)
+    """List all incidents from Jira"""
+    try:
+        jira_service = JiraService()
+        status_filter = request.GET.get('status')
+        jira_incidents = jira_service.get_incidents(status=status_filter, max_results=50)
+        incidents = [transform_jira_incident_for_list(incident) for incident in jira_incidents]
+        
+        return Response(incidents)
+        
+    except Exception as e:
+        print(f"Error fetching incidents: {e}")
+        return Response(
+            {"error": "Failed to fetch incidents"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(["GET"])
 def incident_detail_ui(request, incident_id):
-    """Get specific incident details"""
-    # For now, just return the same detail data regardless of ID
-    detail = DUMMY_INCIDENT_DETAIL.copy()
-    detail["id"] = incident_id
-    detail["title"] = f"Incident {incident_id}"
-    return Response(detail)
+    """Get specific incident details from Jira"""
+    project_key = settings.JIRA['PROJECT_KEY']
+    incident_pattern = rf"^{re.escape(project_key)}-\d+$"
+    
+    if not re.match(incident_pattern, incident_id):
+        return Response(
+            {"error": f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    try:
+        jira_service = JiraService()
+        jira_incident = jira_service.get_incident(incident_id)
+        
+        if not jira_incident:
+            return Response(
+                {"error": f"Incident {incident_id} not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        incident_detail = transform_jira_incident_for_detail(jira_incident)
+        
+        return Response(incident_detail)
+        
+    except Exception as e:
+        print(f"Error fetching incident {incident_id}: {e}")
+        return Response(
+            {"error": f"Failed to fetch incident {incident_id}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
