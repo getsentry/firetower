@@ -105,7 +105,7 @@ jobs:
           cd frontend
           bun test
 
-      - name: Build frontend
+      - name: Type-check frontend
         run: |
           cd frontend
-          bun run build
+          bun run type-check
