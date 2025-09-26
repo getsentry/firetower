@@ -80,10 +80,10 @@ jobs:
           cd frontend
           bun run lint
 
-      - name: Format frontend
+      - name: Check frontend formatting
         run: |
           cd frontend
-          bun run format
+          bun run format --check
 
   frontend-test:
     name: Frontend tests
