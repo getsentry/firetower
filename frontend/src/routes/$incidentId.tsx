@@ -25,7 +25,7 @@ function Incident() {
       <div>Created: {incident.created_at}</div>
       <div>Updated: {incident.updated_at}</div>
       <p>{incident.description}</p>
-      
+
       {incident.participants.length > 0 && (
         <div>
           <h4>Participants</h4>
@@ -36,7 +36,7 @@ function Incident() {
           ))}
         </div>
       )}
-      
+
       <div>
         <h4>External Links</h4>
         {incident.external_links.jira && (

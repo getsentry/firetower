@@ -8,7 +8,7 @@ const twMerge = extendTailwindMerge({
       // Background colors
       'bg-color': [
         'bg-background-primary',
-        'bg-background-secondary', 
+        'bg-background-secondary',
         'bg-background-tertiary',
         'bg-background-accent-vibrant',
         'bg-background-danger-vibrant',
