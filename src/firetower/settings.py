@@ -138,10 +138,6 @@ JIRA = {
     "DOMAIN": os.environ.get("JIRA_DOMAIN", "https://getsentry.atlassian.net"),
     "ACCOUNT": os.environ.get("JIRA_ACCOUNT"),
     "API_KEY": os.environ.get("JIRA_API_KEY"),
-    "PROJECT_KEY": os.environ.get(
-        "JIRA_PROJECT_KEY", "TESTINC"
-    ),  # Default to test project
-    "SEVERITY_FIELD": os.environ.get(
-        "JIRA_SEVERITY_FIELD", "customfield_11023"
-    ),  # Test environment field
+    "PROJECT_KEY": os.environ.get("JIRA_PROJECT_KEY", "TESTINC"),
+    "SEVERITY_FIELD": os.environ.get("JIRA_SEVERITY_FIELD", "customfield_11023"),
 }
