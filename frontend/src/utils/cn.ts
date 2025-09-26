@@ -66,7 +66,7 @@ const twMerge = extendTailwindMerge({
         'border-warning-vibrant',
       ],
       // Border radius
-      'border-radius': [
+      'rounded': [
         'rounded-radius-0',
         'rounded-radius-2xs',
         'rounded-radius-xs',
