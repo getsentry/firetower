@@ -80,17 +80,12 @@ repos:
       #   files: \.[jt]sx?$
       #   entry: bash -c 'cd frontend && bun run stylelint --quiet'
 
-      # TODO(keeakita): fix this also
-      # - id: prettier
-      #   name: prettier
-      #   language: system
-      #   types_or: [yaml, ts, tsx, javascript, jsx, css]
-      #   entry: bash -c 'cd frontend && bun run prettier --log-level=error --write --experimental-cli --no-cache'
-      #   exclude: |
-      #     (?x)^($^
-      #       # prettier crashes on some of these, by intent:
-      #       |fixtures/.*
-      #     )$
+      - id: prettier
+        name: prettier
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|jsx|css|json|md|yaml|yml)$
+        entry: bash -c 'cd frontend && bun run format'
+        pass_filenames: false
 
       - id: knip
         name: knip

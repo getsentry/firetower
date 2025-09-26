@@ -78,7 +78,7 @@ const twMerge = extendTailwindMerge({
         'rounded-radius-full',
       ],
       // Padding
-      'p': [
+      p: [
         'p-space-0',
         'p-space-2xs',
         'p-space-xs',
@@ -91,23 +91,11 @@ const twMerge = extendTailwindMerge({
         'p-space-4xl',
       ],
       // Padding X
-      'px': [
-        'px-space-xs',
-        'px-space-sm',
-        'px-space-md',
-        'px-space-lg',
-        'px-space-xl',
-      ],
+      px: ['px-space-xs', 'px-space-sm', 'px-space-md', 'px-space-lg', 'px-space-xl'],
       // Padding Y
-      'py': [
-        'py-space-xs',
-        'py-space-sm',
-        'py-space-md',
-        'py-space-lg',
-        'py-space-xl',
-      ],
+      py: ['py-space-xs', 'py-space-sm', 'py-space-md', 'py-space-lg', 'py-space-xl'],
       // Margin
-      'm': [
+      m: [
         'm-space-xs',
         'm-space-sm',
         'm-space-md',
@@ -116,7 +104,7 @@ const twMerge = extendTailwindMerge({
         'm-space-2xl',
       ],
       // Margin bottom
-      'mb': [
+      mb: [
         'mb-space-xs',
         'mb-space-sm',
         'mb-space-md',
@@ -125,7 +113,7 @@ const twMerge = extendTailwindMerge({
         'mb-space-2xl',
       ],
       // Margin top
-      'mt': [
+      mt: [
         'mt-space-xs',
         'mt-space-sm',
         'mt-space-md',
@@ -134,7 +122,7 @@ const twMerge = extendTailwindMerge({
         'mt-space-2xl',
       ],
       // Gap
-      'gap': [
+      gap: [
         'gap-space-2xs',
         'gap-space-xs',
         'gap-space-sm',
@@ -143,21 +131,11 @@ const twMerge = extendTailwindMerge({
         'gap-space-xl',
       ],
       // Font weights
-      'font-weight': [
-        'font-regular',
-        'font-medium',
-      ],
+      'font-weight': ['font-regular', 'font-medium'],
       // Font families
-      'font-family': [
-        'font-sans',
-        'font-mono',
-      ],
+      'font-family': ['font-sans', 'font-mono'],
       // Line heights
-      'leading': [
-        'leading-compressed',
-        'leading-default',
-        'leading-comfortable',
-      ],
+      leading: ['leading-compressed', 'leading-default', 'leading-comfortable'],
     },
   },
 });

@@ -31,7 +31,8 @@ function Incident() {
           <h4>Participants</h4>
           {incident.participants.map((participant, index) => (
             <div key={index}>
-              {participant.name} ({participant.role || 'Participant'}) - @{participant.slack}
+              {participant.name} ({participant.role || 'Participant'}) - @
+              {participant.slack}
             </div>
           ))}
         </div>
@@ -41,7 +42,11 @@ function Incident() {
         <h4>External Links</h4>
         {incident.external_links.jira && (
           <div>
-            <a href={incident.external_links.jira} target="_blank" rel="noopener noreferrer">
+            <a
+              href={incident.external_links.jira}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               View in Jira
             </a>
           </div>

@@ -4,33 +4,77 @@
 
 :root {
   --base-color-black: color(srgb 0 0 0);
-  --base-color-blue-dark-opaque-100: color(srgb 0.043137254901960784 0.00784313725490196 0.16470588235294117);
-  --base-color-blue-dark-opaque-200: color(srgb 0.07058823529411765 0.0196078431372549 0.2235294117647059);
-  --base-color-blue-dark-opaque-300: color(srgb 0.09803921568627451 0.03529411764705882 0.2784313725490196);
-  --base-color-blue-dark-opaque-400: color(srgb 0.12941176470588237 0.058823529411764705 0.34509803921568627);
-  --base-color-blue-dark-opaque-500: color(srgb 0.16470588235294117 0.09019607843137255 0.41568627450980394);
-  --base-color-blue-dark-opaque-600: color(srgb 0.20392156862745098 0.12941176470588237 0.49019607843137253);
-  --base-color-blue-dark-opaque-700: color(srgb 0.25098039215686274 0.17254901960784313 0.5686274509803921);
-  --base-color-blue-dark-opaque-800: color(srgb 0.2980392156862745 0.2235294117647059 0.6470588235294118);
+  --base-color-blue-dark-opaque-100: color(
+    srgb 0.043137254901960784 0.00784313725490196 0.16470588235294117
+  );
+  --base-color-blue-dark-opaque-200: color(
+    srgb 0.07058823529411765 0.0196078431372549 0.2235294117647059
+  );
+  --base-color-blue-dark-opaque-300: color(
+    srgb 0.09803921568627451 0.03529411764705882 0.2784313725490196
+  );
+  --base-color-blue-dark-opaque-400: color(
+    srgb 0.12941176470588237 0.058823529411764705 0.34509803921568627
+  );
+  --base-color-blue-dark-opaque-500: color(
+    srgb 0.16470588235294117 0.09019607843137255 0.41568627450980394
+  );
+  --base-color-blue-dark-opaque-600: color(
+    srgb 0.20392156862745098 0.12941176470588237 0.49019607843137253
+  );
+  --base-color-blue-dark-opaque-700: color(
+    srgb 0.25098039215686274 0.17254901960784313 0.5686274509803921
+  );
+  --base-color-blue-dark-opaque-800: color(
+    srgb 0.2980392156862745 0.2235294117647059 0.6470588235294118
+  );
   --base-color-blue-dark-opaque-900: color(srgb 0.4588235294117647 0.3254901960784314 1);
-  --base-color-blue-dark-opaque-1000: color(srgb 0.5411764705882353 0.5098039215686274 0.9098039215686274);
-  --base-color-blue-dark-opaque-1100: color(srgb 0.6039215686274509 0.5803921568627451 0.9450980392156862);
-  --base-color-blue-dark-opaque-1200: color(srgb 0.6705882352941176 0.6588235294117647 0.9725490196078431);
-  --base-color-blue-dark-opaque-1300: color(srgb 0.7372549019607844 0.7294117647058823 0.9921568627450981);
+  --base-color-blue-dark-opaque-1000: color(
+    srgb 0.5411764705882353 0.5098039215686274 0.9098039215686274
+  );
+  --base-color-blue-dark-opaque-1100: color(
+    srgb 0.6039215686274509 0.5803921568627451 0.9450980392156862
+  );
+  --base-color-blue-dark-opaque-1200: color(
+    srgb 0.6705882352941176 0.6588235294117647 0.9725490196078431
+  );
+  --base-color-blue-dark-opaque-1300: color(
+    srgb 0.7372549019607844 0.7294117647058823 0.9921568627450981
+  );
   --base-color-blue-dark-opaque-1400: color(srgb 0.8117647058823529 0.807843137254902 1);
   --base-color-blue-dark-opaque-1500: color(srgb 0.8901960784313725 0.8901960784313725 1);
   --base-color-blue-dark-opaque-1600: color(srgb 0.9686274509803922 0.9725490196078431 1);
-  --base-color-blue-dark-transparent-100: color(srgb 0.25098039215686274 0.03137254901960784 0.9725490196078431 / 0.16862745098039217);
-  --base-color-blue-dark-transparent-200: color(srgb 0.3137254901960784 0.06274509803921569 0.9725490196078431 / 0.23137254901960785);
-  --base-color-blue-dark-transparent-300: color(srgb 0.25098039215686274 0.09411764705882353 0.7529411764705882 / 0.3686274509803922);
-  --base-color-blue-dark-transparent-400: color(srgb 0.34509803921568627 0.1568627450980392 0.9411764705882353 / 0.3686274509803922);
-  --base-color-blue-dark-transparent-500: color(srgb 0.2823529411764706 0.1568627450980392 0.7215686274509804 / 0.5803921568627451);
-  --base-color-blue-dark-transparent-600: color(srgb 0.25098039215686274 0.1568627450980392 0.596078431372549 / 0.8196078431372549);
-  --base-color-blue-dark-transparent-700: color(srgb 0.3764705882352941 0.25098039215686274 0.8470588235294118 / 0.6705882352941176);
-  --base-color-blue-dark-transparent-800: color(srgb 0.3764705882352941 0.2823529411764706 0.8156862745098039 / 0.788235294117647);
+  --base-color-blue-dark-transparent-100: color(
+    srgb 0.25098039215686274 0.03137254901960784 0.9725490196078431 / 0.16862745098039217
+  );
+  --base-color-blue-dark-transparent-200: color(
+    srgb 0.3137254901960784 0.06274509803921569 0.9725490196078431 / 0.23137254901960785
+  );
+  --base-color-blue-dark-transparent-300: color(
+    srgb 0.25098039215686274 0.09411764705882353 0.7529411764705882 / 0.3686274509803922
+  );
+  --base-color-blue-dark-transparent-400: color(
+    srgb 0.34509803921568627 0.1568627450980392 0.9411764705882353 / 0.3686274509803922
+  );
+  --base-color-blue-dark-transparent-500: color(
+    srgb 0.2823529411764706 0.1568627450980392 0.7215686274509804 / 0.5803921568627451
+  );
+  --base-color-blue-dark-transparent-600: color(
+    srgb 0.25098039215686274 0.1568627450980392 0.596078431372549 / 0.8196078431372549
+  );
+  --base-color-blue-dark-transparent-700: color(
+    srgb 0.3764705882352941 0.25098039215686274 0.8470588235294118 / 0.6705882352941176
+  );
+  --base-color-blue-dark-transparent-800: color(
+    srgb 0.3764705882352941 0.2823529411764706 0.8156862745098039 / 0.788235294117647
+  );
   --base-color-blue-dark-transparent-900: var(--base-color-blue-dark-opaque-900);
-  --base-color-blue-dark-transparent-1000: color(srgb 0.5647058823529412 0.5333333333333333 0.9411764705882353 / 0.9607843137254902);
-  --base-color-blue-dark-transparent-1100: color(srgb 0.6274509803921569 0.596078431372549 0.9725490196078431 / 0.9686274509803922);
+  --base-color-blue-dark-transparent-1000: color(
+    srgb 0.5647058823529412 0.5333333333333333 0.9411764705882353 / 0.9607843137254902
+  );
+  --base-color-blue-dark-transparent-1100: color(
+    srgb 0.6274509803921569 0.596078431372549 0.9725490196078431 / 0.9686274509803922
+  );
   --base-color-blue-dark-transparent-1200: var(--base-color-blue-dark-opaque-1200);
   --base-color-blue-dark-transparent-1300: var(--base-color-blue-dark-opaque-1300);
   --base-color-blue-dark-transparent-1400: var(--base-color-blue-dark-opaque-1400);
@@ -45,51 +89,135 @@
   --base-color-blue-light-opaque-700: color(srgb 0.6549019607843137 0.6196078431372549 1);
   --base-color-blue-light-opaque-800: color(srgb 0.596078431372549 0.5411764705882353 1);
   --base-color-blue-light-opaque-900: color(srgb 0.4980392156862745 0.4 1);
-  --base-color-blue-light-opaque-1000: color(srgb 0.4588235294117647 0.3254901960784314 1);
-  --base-color-blue-light-opaque-1100: color(srgb 0.396078431372549 0.23921568627450981 0.9137254901960784);
-  --base-color-blue-light-opaque-1200: color(srgb 0.34509803921568627 0.15294117647058825 0.8392156862745098);
-  --base-color-blue-light-opaque-1300: color(srgb 0.2980392156862745 0.058823529411764705 0.7529411764705882);
-  --base-color-blue-light-opaque-1400: color(srgb 0.24705882352941178 0 0.6549019607843137);
-  --base-color-blue-light-opaque-1500: color(srgb 0.19215686274509805 0 0.5450980392156862);
-  --base-color-blue-light-opaque-1600: color(srgb 0.1411764705882353 0 0.4235294117647059);
-  --base-color-blue-light-transparent-100: color(srgb 0 0 0.9411764705882353 / 0.03137254901960784);
-  --base-color-blue-light-transparent-200: color(srgb 0 0.03137254901960784 0.9411764705882353 / 0.07058823529411765);
-  --base-color-blue-light-transparent-300: color(srgb 0.06274509803921569 0.06274509803921569 0.9725490196078431 / 0.12156862745098039);
-  --base-color-blue-light-transparent-400: color(srgb 0.06274509803921569 0.03137254901960784 0.9725490196078431 / 0.1803921568627451);
-  --base-color-blue-light-transparent-500: color(srgb 0.3137254901960784 0.2823529411764706 0.9725490196078431 / 0.32941176470588235);
-  --base-color-blue-light-transparent-600: color(srgb 0.09411764705882353 0.03137254901960784 0.9725490196078431 / 0.30980392156862746);
-  --base-color-blue-light-transparent-700: color(srgb 0.09411764705882353 0 0.9725490196078431 / 0.3803921568627451);
-  --base-color-blue-light-transparent-800: color(srgb 0.12549019607843137 0 0.9725490196078431 / 0.4588235294117647);
-  --base-color-blue-light-transparent-900: color(srgb 0.18823529411764706 0.03137254901960784 0.9725490196078431 / 0.6196078431372549);
-  --base-color-blue-light-transparent-1000: color(srgb 0.25098039215686274 0.06274509803921569 0.9725490196078431 / 0.7215686274509804);
-  --base-color-blue-light-transparent-1100: color(srgb 0.3764705882352941 0.2196078431372549 0.9098039215686274 / 0.9686274509803922);
-  --base-color-blue-light-transparent-1200: color(srgb 0.25098039215686274 0.03137254901960784 0.8156862745098039 / 0.8784313725490196);
-  --base-color-blue-light-transparent-1300: color(srgb 0.2823529411764706 0.03137254901960784 0.7529411764705882 / 0.9803921568627451);
+  --base-color-blue-light-opaque-1000: color(
+    srgb 0.4588235294117647 0.3254901960784314 1
+  );
+  --base-color-blue-light-opaque-1100: color(
+    srgb 0.396078431372549 0.23921568627450981 0.9137254901960784
+  );
+  --base-color-blue-light-opaque-1200: color(
+    srgb 0.34509803921568627 0.15294117647058825 0.8392156862745098
+  );
+  --base-color-blue-light-opaque-1300: color(
+    srgb 0.2980392156862745 0.058823529411764705 0.7529411764705882
+  );
+  --base-color-blue-light-opaque-1400: color(
+    srgb 0.24705882352941178 0 0.6549019607843137
+  );
+  --base-color-blue-light-opaque-1500: color(
+    srgb 0.19215686274509805 0 0.5450980392156862
+  );
+  --base-color-blue-light-opaque-1600: color(
+    srgb 0.1411764705882353 0 0.4235294117647059
+  );
+  --base-color-blue-light-transparent-100: color(
+    srgb 0 0 0.9411764705882353 / 0.03137254901960784
+  );
+  --base-color-blue-light-transparent-200: color(
+    srgb 0 0.03137254901960784 0.9411764705882353 / 0.07058823529411765
+  );
+  --base-color-blue-light-transparent-300: color(
+    srgb 0.06274509803921569 0.06274509803921569 0.9725490196078431 / 0.12156862745098039
+  );
+  --base-color-blue-light-transparent-400: color(
+    srgb 0.06274509803921569 0.03137254901960784 0.9725490196078431 / 0.1803921568627451
+  );
+  --base-color-blue-light-transparent-500: color(
+    srgb 0.3137254901960784 0.2823529411764706 0.9725490196078431 / 0.32941176470588235
+  );
+  --base-color-blue-light-transparent-600: color(
+    srgb 0.09411764705882353 0.03137254901960784 0.9725490196078431 / 0.30980392156862746
+  );
+  --base-color-blue-light-transparent-700: color(
+    srgb 0.09411764705882353 0 0.9725490196078431 / 0.3803921568627451
+  );
+  --base-color-blue-light-transparent-800: color(
+    srgb 0.12549019607843137 0 0.9725490196078431 / 0.4588235294117647
+  );
+  --base-color-blue-light-transparent-900: color(
+    srgb 0.18823529411764706 0.03137254901960784 0.9725490196078431 / 0.6196078431372549
+  );
+  --base-color-blue-light-transparent-1000: color(
+    srgb 0.25098039215686274 0.06274509803921569 0.9725490196078431 / 0.7215686274509804
+  );
+  --base-color-blue-light-transparent-1100: color(
+    srgb 0.3764705882352941 0.2196078431372549 0.9098039215686274 / 0.9686274509803922
+  );
+  --base-color-blue-light-transparent-1200: color(
+    srgb 0.25098039215686274 0.03137254901960784 0.8156862745098039 / 0.8784313725490196
+  );
+  --base-color-blue-light-transparent-1300: color(
+    srgb 0.2823529411764706 0.03137254901960784 0.7529411764705882 / 0.9803921568627451
+  );
   --base-color-blue-light-transparent-1400: var(--base-color-blue-light-opaque-1400);
   --base-color-blue-light-transparent-1500: var(--base-color-blue-light-opaque-1500);
-  --base-color-blue-light-transparent-1600: color(srgb 0.12549019607843137 0 0.40784313725490196 / 0.9882352941176471);
-  --base-color-categorical-dark-blurple: color(srgb 0.4588235294117647 0.3254901960784314 1);
+  --base-color-blue-light-transparent-1600: color(
+    srgb 0.12549019607843137 0 0.40784313725490196 / 0.9882352941176471
+  );
+  --base-color-categorical-dark-blurple: color(
+    srgb 0.4588235294117647 0.3254901960784314 1
+  );
   --base-color-categorical-dark-green: color(srgb 0.403921568627451 0.7843137254901961 0);
-  --base-color-categorical-dark-indigo: color(srgb 0.3137254901960784 0.12941176470588237 0.611764705882353);
-  --base-color-categorical-dark-lime: color(srgb 0.7294117647058823 0.807843137254902 0.0196078431372549);
-  --base-color-categorical-dark-magenta: color(srgb 0.6901960784313725 0 0.611764705882353);
-  --base-color-categorical-dark-orange: color(srgb 1 0.596078431372549 0.2196078431372549);
-  --base-color-categorical-dark-pink: color(srgb 0.9411764705882353 0.21176470588235294 0.6039215686274509);
-  --base-color-categorical-dark-plum: color(srgb 0.48627450980392156 0.13333333333333333 0.5098039215686274);
-  --base-color-categorical-dark-purple: color(srgb 0.36470588235294116 0.24313725490196078 0.6980392156862745);
-  --base-color-categorical-dark-salmon: color(srgb 0.9803921568627451 0.403921568627451 0.4117647058823529);
-  --base-color-categorical-dark-yellow: color(srgb 1 0.8156862745098039 0.054901960784313725);
-  --base-color-categorical-light-blurple: color(srgb 0.4588235294117647 0.3254901960784314 1);
-  --base-color-categorical-light-green: color(srgb 0.403921568627451 0.7843137254901961 0);
-  --base-color-categorical-light-indigo: color(srgb 0.22745098039215686 0.09411764705882353 0.45098039215686275);
-  --base-color-categorical-light-lime: color(srgb 0.7294117647058823 0.807843137254902 0.0196078431372549);
-  --base-color-categorical-light-magenta: color(srgb 0.7215686274509804 0.17647058823529413 0.5647058823529412);
-  --base-color-categorical-light-orange: color(srgb 1 0.596078431372549 0.2196078431372549);
-  --base-color-categorical-light-pink: color(srgb 0.9411764705882353 0.21176470588235294 0.6039215686274509);
-  --base-color-categorical-light-plum: color(srgb 0.48627450980392156 0.13333333333333333 0.5098039215686274);
-  --base-color-categorical-light-purple: color(srgb 0.3333333333333333 0.2 0.6980392156862745);
-  --base-color-categorical-light-salmon: color(srgb 0.9803921568627451 0.403921568627451 0.4117647058823529);
-  --base-color-categorical-light-yellow: color(srgb 1 0.8156862745098039 0.054901960784313725);
+  --base-color-categorical-dark-indigo: color(
+    srgb 0.3137254901960784 0.12941176470588237 0.611764705882353
+  );
+  --base-color-categorical-dark-lime: color(
+    srgb 0.7294117647058823 0.807843137254902 0.0196078431372549
+  );
+  --base-color-categorical-dark-magenta: color(
+    srgb 0.6901960784313725 0 0.611764705882353
+  );
+  --base-color-categorical-dark-orange: color(
+    srgb 1 0.596078431372549 0.2196078431372549
+  );
+  --base-color-categorical-dark-pink: color(
+    srgb 0.9411764705882353 0.21176470588235294 0.6039215686274509
+  );
+  --base-color-categorical-dark-plum: color(
+    srgb 0.48627450980392156 0.13333333333333333 0.5098039215686274
+  );
+  --base-color-categorical-dark-purple: color(
+    srgb 0.36470588235294116 0.24313725490196078 0.6980392156862745
+  );
+  --base-color-categorical-dark-salmon: color(
+    srgb 0.9803921568627451 0.403921568627451 0.4117647058823529
+  );
+  --base-color-categorical-dark-yellow: color(
+    srgb 1 0.8156862745098039 0.054901960784313725
+  );
+  --base-color-categorical-light-blurple: color(
+    srgb 0.4588235294117647 0.3254901960784314 1
+  );
+  --base-color-categorical-light-green: color(
+    srgb 0.403921568627451 0.7843137254901961 0
+  );
+  --base-color-categorical-light-indigo: color(
+    srgb 0.22745098039215686 0.09411764705882353 0.45098039215686275
+  );
+  --base-color-categorical-light-lime: color(
+    srgb 0.7294117647058823 0.807843137254902 0.0196078431372549
+  );
+  --base-color-categorical-light-magenta: color(
+    srgb 0.7215686274509804 0.17647058823529413 0.5647058823529412
+  );
+  --base-color-categorical-light-orange: color(
+    srgb 1 0.596078431372549 0.2196078431372549
+  );
+  --base-color-categorical-light-pink: color(
+    srgb 0.9411764705882353 0.21176470588235294 0.6039215686274509
+  );
+  --base-color-categorical-light-plum: color(
+    srgb 0.48627450980392156 0.13333333333333333 0.5098039215686274
+  );
+  --base-color-categorical-light-purple: color(
+    srgb 0.3333333333333333 0.2 0.6980392156862745
+  );
+  --base-color-categorical-light-salmon: color(
+    srgb 0.9803921568627451 0.403921568627451 0.4117647058823529
+  );
+  --base-color-categorical-light-yellow: color(
+    srgb 1 0.8156862745098039 0.054901960784313725
+  );
   --base-color-green-dark-opaque-100: color(srgb 0 0.08235294117647059 0);
   --base-color-green-dark-opaque-200: color(srgb 0 0.12156862745098039 0);
   --base-color-green-dark-opaque-300: color(srgb 0 0.1568627450980392 0);
@@ -98,39 +226,95 @@
   --base-color-green-dark-opaque-600: color(srgb 0 0.3058823529411765 0);
   --base-color-green-dark-opaque-700: color(srgb 0 0.36470588235294116 0);
   --base-color-green-dark-opaque-800: color(srgb 0 0.42745098039215684 0);
-  --base-color-green-dark-opaque-900: color(srgb 0 0.6549019607843137 0.09803921568627451);
-  --base-color-green-dark-opaque-1000: color(srgb 0 0.6980392156862745 0.21176470588235294);
-  --base-color-green-dark-opaque-1100: color(srgb 0 0.9490196078431372 0.3803921568627451);
-  --base-color-green-dark-opaque-1200: color(srgb 0.3686274509803922 0.807843137254902 0.45098039215686275);
-  --base-color-green-dark-opaque-1300: color(srgb 0.5137254901960784 0.8549019607843137 0.5647058823529412);
-  --base-color-green-dark-opaque-1400: color(srgb 0.6588235294117647 0.9019607843137255 0.6862745098039216);
-  --base-color-green-dark-opaque-1500: color(srgb 0.803921568627451 0.9450980392156862 0.8156862745098039);
-  --base-color-green-dark-opaque-1600: color(srgb 0.9490196078431372 0.984313725490196 0.9529411764705882);
-  --base-color-green-dark-transparent-100: color(srgb 0 0.9725490196078431 0 / 0.0784313725490196);
-  --base-color-green-dark-transparent-200: color(srgb 0 0.9725490196078431 0 / 0.12156862745098039);
-  --base-color-green-dark-transparent-300: color(srgb 0 0.9725490196078431 0 / 0.1607843137254902);
+  --base-color-green-dark-opaque-900: color(
+    srgb 0 0.6549019607843137 0.09803921568627451
+  );
+  --base-color-green-dark-opaque-1000: color(
+    srgb 0 0.6980392156862745 0.21176470588235294
+  );
+  --base-color-green-dark-opaque-1100: color(
+    srgb 0 0.9490196078431372 0.3803921568627451
+  );
+  --base-color-green-dark-opaque-1200: color(
+    srgb 0.3686274509803922 0.807843137254902 0.45098039215686275
+  );
+  --base-color-green-dark-opaque-1300: color(
+    srgb 0.5137254901960784 0.8549019607843137 0.5647058823529412
+  );
+  --base-color-green-dark-opaque-1400: color(
+    srgb 0.6588235294117647 0.9019607843137255 0.6862745098039216
+  );
+  --base-color-green-dark-opaque-1500: color(
+    srgb 0.803921568627451 0.9450980392156862 0.8156862745098039
+  );
+  --base-color-green-dark-opaque-1600: color(
+    srgb 0.9490196078431372 0.984313725490196 0.9529411764705882
+  );
+  --base-color-green-dark-transparent-100: color(
+    srgb 0 0.9725490196078431 0 / 0.0784313725490196
+  );
+  --base-color-green-dark-transparent-200: color(
+    srgb 0 0.9725490196078431 0 / 0.12156862745098039
+  );
+  --base-color-green-dark-transparent-300: color(
+    srgb 0 0.9725490196078431 0 / 0.1607843137254902
+  );
   --base-color-green-dark-transparent-400: color(srgb 0 0.9725490196078431 0 / 0.2);
-  --base-color-green-dark-transparent-500: color(srgb 0 0.9725490196078431 0 / 0.25882352941176473);
-  --base-color-green-dark-transparent-600: color(srgb 0 0.9725490196078431 0 / 0.30980392156862746);
-  --base-color-green-dark-transparent-700: color(srgb 0 0.9725490196078431 0 / 0.3686274509803922);
-  --base-color-green-dark-transparent-800: color(srgb 0 0.9725490196078431 0 / 0.4392156862745098);
-  --base-color-green-dark-transparent-900: color(srgb 0 0.8470588235294118 0.12549019607843137 / 0.7686274509803922);
-  --base-color-green-dark-transparent-1000: color(srgb 0 0.9411764705882353 0.2823529411764706 / 0.7411764705882353);
+  --base-color-green-dark-transparent-500: color(
+    srgb 0 0.9725490196078431 0 / 0.25882352941176473
+  );
+  --base-color-green-dark-transparent-600: color(
+    srgb 0 0.9725490196078431 0 / 0.30980392156862746
+  );
+  --base-color-green-dark-transparent-700: color(
+    srgb 0 0.9725490196078431 0 / 0.3686274509803922
+  );
+  --base-color-green-dark-transparent-800: color(
+    srgb 0 0.9725490196078431 0 / 0.4392156862745098
+  );
+  --base-color-green-dark-transparent-900: color(
+    srgb 0 0.8470588235294118 0.12549019607843137 / 0.7686274509803922
+  );
+  --base-color-green-dark-transparent-1000: color(
+    srgb 0 0.9411764705882353 0.2823529411764706 / 0.7411764705882353
+  );
   --base-color-green-dark-transparent-1100: var(--base-color-green-dark-opaque-1100);
-  --base-color-green-dark-transparent-1200: color(srgb 0.40784313725490196 0.9098039215686274 0.5019607843137255 / 0.8901960784313725);
-  --base-color-green-dark-transparent-1300: color(srgb 0.5647058823529412 0.9411764705882353 0.6274509803921569 / 0.9098039215686274);
+  --base-color-green-dark-transparent-1200: color(
+    srgb 0.40784313725490196 0.9098039215686274 0.5019607843137255 / 0.8901960784313725
+  );
+  --base-color-green-dark-transparent-1300: color(
+    srgb 0.5647058823529412 0.9411764705882353 0.6274509803921569 / 0.9098039215686274
+  );
   --base-color-green-dark-transparent-1400: var(--base-color-green-dark-opaque-1400);
   --base-color-green-dark-transparent-1500: var(--base-color-green-dark-opaque-1500);
   --base-color-green-dark-transparent-1600: var(--base-color-green-dark-opaque-1600);
-  --base-color-green-light-opaque-100: color(srgb 0.9490196078431372 0.984313725490196 0.9529411764705882);
-  --base-color-green-light-opaque-200: color(srgb 0.8862745098039215 0.9686274509803922 0.8901960784313725);
-  --base-color-green-light-opaque-300: color(srgb 0.807843137254902 0.9450980392156862 0.8196078431372549);
-  --base-color-green-light-opaque-400: color(srgb 0.7098039215686275 0.9176470588235294 0.7333333333333333);
-  --base-color-green-light-opaque-500: color(srgb 0.6039215686274509 0.8862745098039215 0.6392156862745098);
-  --base-color-green-light-opaque-600: color(srgb 0.48627450980392156 0.8470588235294118 0.5411764705882353);
-  --base-color-green-light-opaque-700: color(srgb 0.34509803921568627 0.803921568627451 0.43529411764705883);
-  --base-color-green-light-opaque-800: color(srgb 0 0.9490196078431372 0.3803921568627451);
-  --base-color-green-light-opaque-900: color(srgb 0 0.6549019607843137 0.10196078431372549);
+  --base-color-green-light-opaque-100: color(
+    srgb 0.9490196078431372 0.984313725490196 0.9529411764705882
+  );
+  --base-color-green-light-opaque-200: color(
+    srgb 0.8862745098039215 0.9686274509803922 0.8901960784313725
+  );
+  --base-color-green-light-opaque-300: color(
+    srgb 0.807843137254902 0.9450980392156862 0.8196078431372549
+  );
+  --base-color-green-light-opaque-400: color(
+    srgb 0.7098039215686275 0.9176470588235294 0.7333333333333333
+  );
+  --base-color-green-light-opaque-500: color(
+    srgb 0.6039215686274509 0.8862745098039215 0.6392156862745098
+  );
+  --base-color-green-light-opaque-600: color(
+    srgb 0.48627450980392156 0.8470588235294118 0.5411764705882353
+  );
+  --base-color-green-light-opaque-700: color(
+    srgb 0.34509803921568627 0.803921568627451 0.43529411764705883
+  );
+  --base-color-green-light-opaque-800: color(
+    srgb 0 0.9490196078431372 0.3803921568627451
+  );
+  --base-color-green-light-opaque-900: color(
+    srgb 0 0.6549019607843137 0.10196078431372549
+  );
   --base-color-green-light-opaque-1000: color(srgb 0 0.596078431372549 0);
   --base-color-green-light-opaque-1100: color(srgb 0 0.5372549019607843 0);
   --base-color-green-light-opaque-1200: color(srgb 0 0.47058823529411764 0);
@@ -138,13 +322,27 @@
   --base-color-green-light-opaque-1400: color(srgb 0 0.33725490196078434 0);
   --base-color-green-light-opaque-1500: color(srgb 0 0.26666666666666666 0);
   --base-color-green-light-opaque-1600: color(srgb 0 0.19607843137254902 0);
-  --base-color-green-light-transparent-100: color(srgb 0 0.6588235294117647 0.03137254901960784 / 0.050980392156862744);
-  --base-color-green-light-transparent-200: color(srgb 0 0.7215686274509804 0 / 0.10980392156862745);
-  --base-color-green-light-transparent-300: color(srgb 0.03137254901960784 0.7215686274509804 0.09411764705882353 / 0.2);
-  --base-color-green-light-transparent-400: color(srgb 0 0.7215686274509804 0.06274509803921569 / 0.2901960784313726);
-  --base-color-green-light-transparent-500: color(srgb 0.03137254901960784 0.7215686274509804 0.12549019607843137 / 0.4117647058823529);
-  --base-color-green-light-transparent-600: color(srgb 0.06274509803921569 0.7215686274509804 0.1568627450980392 / 0.5490196078431373);
-  --base-color-green-light-transparent-700: color(srgb 0.06274509803921569 0.7215686274509804 0.18823529411764706 / 0.7019607843137254);
+  --base-color-green-light-transparent-100: color(
+    srgb 0 0.6588235294117647 0.03137254901960784 / 0.050980392156862744
+  );
+  --base-color-green-light-transparent-200: color(
+    srgb 0 0.7215686274509804 0 / 0.10980392156862745
+  );
+  --base-color-green-light-transparent-300: color(
+    srgb 0.03137254901960784 0.7215686274509804 0.09411764705882353 / 0.2
+  );
+  --base-color-green-light-transparent-400: color(
+    srgb 0 0.7215686274509804 0.06274509803921569 / 0.2901960784313726
+  );
+  --base-color-green-light-transparent-500: color(
+    srgb 0.03137254901960784 0.7215686274509804 0.12549019607843137 / 0.4117647058823529
+  );
+  --base-color-green-light-transparent-600: color(
+    srgb 0.06274509803921569 0.7215686274509804 0.1568627450980392 / 0.5490196078431373
+  );
+  --base-color-green-light-transparent-700: color(
+    srgb 0.06274509803921569 0.7215686274509804 0.18823529411764706 / 0.7019607843137254
+  );
   --base-color-green-light-transparent-800: var(--base-color-green-light-opaque-800);
   --base-color-green-light-transparent-900: var(--base-color-green-light-opaque-900);
   --base-color-green-light-transparent-1000: var(--base-color-green-light-opaque-1000);
@@ -154,98 +352,270 @@
   --base-color-green-light-transparent-1400: var(--base-color-green-light-opaque-1400);
   --base-color-green-light-transparent-1500: var(--base-color-green-light-opaque-1500);
   --base-color-green-light-transparent-1600: var(--base-color-green-light-opaque-1600);
-  --base-color-neutral-dark-opaque-100: color(srgb 0.050980392156862744 0.0392156862745098 0.06274509803921569);
-  --base-color-neutral-dark-opaque-200: color(srgb 0.0784313725490196 0.06666666666666667 0.09803921568627451);
-  --base-color-neutral-dark-opaque-300: color(srgb 0.10588235294117647 0.09411764705882353 0.12941176470588237);
-  --base-color-neutral-dark-opaque-400: color(srgb 0.1411764705882353 0.12549019607843137 0.16862745098039217);
-  --base-color-neutral-dark-opaque-500: color(srgb 0.1803921568627451 0.1607843137254902 0.21176470588235294);
-  --base-color-neutral-dark-opaque-600: color(srgb 0.2235294117647059 0.20392156862745098 0.25882352941176473);
-  --base-color-neutral-dark-opaque-700: color(srgb 0.27450980392156865 0.25098039215686274 0.30980392156862746);
-  --base-color-neutral-dark-opaque-800: color(srgb 0.3254901960784314 0.30196078431372547 0.3686274509803922);
-  --base-color-neutral-dark-opaque-900: color(srgb 0.5372549019607843 0.5098039215686274 0.5803921568627451);
-  --base-color-neutral-dark-opaque-1000: color(srgb 0.5843137254901961 0.5568627450980392 0.6235294117647059);
-  --base-color-neutral-dark-opaque-1100: color(srgb 0.6431372549019608 0.6196078431372549 0.6823529411764706);
-  --base-color-neutral-dark-opaque-1200: color(srgb 0.7098039215686275 0.6901960784313725 0.7411764705882353);
-  --base-color-neutral-dark-opaque-1300: color(srgb 0.7686274509803922 0.7529411764705882 0.796078431372549);
-  --base-color-neutral-dark-opaque-1400: color(srgb 0.8352941176470589 0.8235294117647058 0.8549019607843137);
-  --base-color-neutral-dark-opaque-1500: color(srgb 0.9058823529411765 0.8980392156862745 0.9176470588235294);
-  --base-color-neutral-dark-opaque-1600: color(srgb 0.9764705882352941 0.9725490196078431 0.9764705882352941);
-  --base-color-neutral-dark-transparent-100: color(srgb 0.8470588235294118 0.6274509803921569 0.9725490196078431 / 0.058823529411764705);
-  --base-color-neutral-dark-transparent-200: color(srgb 0.7529411764705882 0.6588235294117647 0.9725490196078431 / 0.10196078431372549);
-  --base-color-neutral-dark-transparent-300: color(srgb 0.8156862745098039 0.7215686274509804 0.9725490196078431 / 0.12941176470588237);
-  --base-color-neutral-dark-transparent-400: color(srgb 0.7529411764705882 0.6901960784313725 0.9411764705882353 / 0.1803921568627451);
-  --base-color-neutral-dark-transparent-500: color(srgb 0.7529411764705882 0.6588235294117647 0.8784313725490196 / 0.23921568627450981);
-  --base-color-neutral-dark-transparent-600: color(srgb 0.7215686274509804 0.6588235294117647 0.8470588235294118 / 0.30980392156862746);
-  --base-color-neutral-dark-transparent-700: color(srgb 0.8470588235294118 0.7843137254901961 0.9725490196078431 / 0.3215686274509804);
-  --base-color-neutral-dark-transparent-800: color(srgb 0.8156862745098039 0.7529411764705882 0.9098039215686274 / 0.4);
-  --base-color-neutral-dark-transparent-900: color(srgb 0.8156862745098039 0.7529411764705882 0.8784313725490196 / 0.6784313725490196);
-  --base-color-neutral-dark-transparent-1000: color(srgb 0.7843137254901961 0.7215686274509804 0.8156862745098039 / 0.7686274509803922);
-  --base-color-neutral-dark-transparent-1100: color(srgb 0.8470588235294118 0.8156862745098039 0.8784313725490196 / 0.7019607843137254);
-  --base-color-neutral-dark-transparent-1200: color(srgb 0.8156862745098039 0.7843137254901961 0.8470588235294118 / 0.8784313725490196);
-  --base-color-neutral-dark-transparent-1300: color(srgb 0.8784313725490196 0.8470588235294118 0.9098039215686274 / 0.8901960784313725);
-  --base-color-neutral-dark-transparent-1400: color(srgb 0.8784313725490196 0.8784313725490196 0.9098039215686274 / 0.9411764705882353);
-  --base-color-neutral-dark-transparent-1500: color(srgb 0.9725490196078431 0.9725490196078431 0.9725490196078431 / 0.9294117647058824);
-  --base-color-neutral-dark-transparent-1600: color(srgb 0.9725490196078431 0.9725490196078431 0.9725490196078431 / 0.9803921568627451);
-  --base-color-neutral-light-opaque-100: color(srgb 0.9725490196078431 0.9725490196078431 0.9764705882352941);
-  --base-color-neutral-light-opaque-200: color(srgb 0.9411764705882353 0.9411764705882353 0.9490196078431372);
-  --base-color-neutral-light-opaque-300: color(srgb 0.9019607843137255 0.9019607843137255 0.9137254901960784);
-  --base-color-neutral-light-opaque-400: color(srgb 0.8549019607843137 0.8509803921568627 0.8705882352941177);
-  --base-color-neutral-light-opaque-500: color(srgb 0.803921568627451 0.8 0.8235294117647058);
-  --base-color-neutral-light-opaque-600: color(srgb 0.7529411764705882 0.7450980392156863 0.7764705882352941);
-  --base-color-neutral-light-opaque-700: color(srgb 0.6941176470588235 0.6862745098039216 0.7215686274509804);
-  --base-color-neutral-light-opaque-800: color(srgb 0.6352941176470588 0.6235294117647059 0.6666666666666666);
-  --base-color-neutral-light-opaque-900: color(srgb 0.5294117647058824 0.5176470588235295 0.5647058823529412);
-  --base-color-neutral-light-opaque-1000: color(srgb 0.47058823529411764 0.4588235294117647 0.5058823529411764);
-  --base-color-neutral-light-opaque-1100: color(srgb 0.41568627450980394 0.403921568627451 0.4470588235294118);
-  --base-color-neutral-light-opaque-1200: color(srgb 0.3568627450980392 0.34509803921568627 0.39215686274509803);
-  --base-color-neutral-light-opaque-1300: color(srgb 0.2980392156862745 0.28627450980392155 0.32941176470588235);
-  --base-color-neutral-light-opaque-1400: color(srgb 0.24313725490196078 0.23137254901960785 0.27058823529411763);
-  --base-color-neutral-light-opaque-1500: color(srgb 0.18823529411764706 0.1803921568627451 0.21176470588235294);
-  --base-color-neutral-light-opaque-1600: color(srgb 0.09411764705882353 0.07058823529411765 0.1450980392156863);
-  --base-color-neutral-light-transparent-100: color(srgb 0.06274509803921569 0.06274509803921569 0.18823529411764706 / 0.03137254901960784);
-  --base-color-neutral-light-transparent-200: color(srgb 0 0 0.12549019607843137 / 0.058823529411764705);
-  --base-color-neutral-light-transparent-300: color(srgb 0 0 0.09411764705882353 / 0.10196078431372549);
-  --base-color-neutral-light-transparent-400: color(srgb 0 0 0.12549019607843137 / 0.14901960784313725);
+  --base-color-neutral-dark-opaque-100: color(
+    srgb 0.050980392156862744 0.0392156862745098 0.06274509803921569
+  );
+  --base-color-neutral-dark-opaque-200: color(
+    srgb 0.0784313725490196 0.06666666666666667 0.09803921568627451
+  );
+  --base-color-neutral-dark-opaque-300: color(
+    srgb 0.10588235294117647 0.09411764705882353 0.12941176470588237
+  );
+  --base-color-neutral-dark-opaque-400: color(
+    srgb 0.1411764705882353 0.12549019607843137 0.16862745098039217
+  );
+  --base-color-neutral-dark-opaque-500: color(
+    srgb 0.1803921568627451 0.1607843137254902 0.21176470588235294
+  );
+  --base-color-neutral-dark-opaque-600: color(
+    srgb 0.2235294117647059 0.20392156862745098 0.25882352941176473
+  );
+  --base-color-neutral-dark-opaque-700: color(
+    srgb 0.27450980392156865 0.25098039215686274 0.30980392156862746
+  );
+  --base-color-neutral-dark-opaque-800: color(
+    srgb 0.3254901960784314 0.30196078431372547 0.3686274509803922
+  );
+  --base-color-neutral-dark-opaque-900: color(
+    srgb 0.5372549019607843 0.5098039215686274 0.5803921568627451
+  );
+  --base-color-neutral-dark-opaque-1000: color(
+    srgb 0.5843137254901961 0.5568627450980392 0.6235294117647059
+  );
+  --base-color-neutral-dark-opaque-1100: color(
+    srgb 0.6431372549019608 0.6196078431372549 0.6823529411764706
+  );
+  --base-color-neutral-dark-opaque-1200: color(
+    srgb 0.7098039215686275 0.6901960784313725 0.7411764705882353
+  );
+  --base-color-neutral-dark-opaque-1300: color(
+    srgb 0.7686274509803922 0.7529411764705882 0.796078431372549
+  );
+  --base-color-neutral-dark-opaque-1400: color(
+    srgb 0.8352941176470589 0.8235294117647058 0.8549019607843137
+  );
+  --base-color-neutral-dark-opaque-1500: color(
+    srgb 0.9058823529411765 0.8980392156862745 0.9176470588235294
+  );
+  --base-color-neutral-dark-opaque-1600: color(
+    srgb 0.9764705882352941 0.9725490196078431 0.9764705882352941
+  );
+  --base-color-neutral-dark-transparent-100: color(
+    srgb 0.8470588235294118 0.6274509803921569 0.9725490196078431 / 0.058823529411764705
+  );
+  --base-color-neutral-dark-transparent-200: color(
+    srgb 0.7529411764705882 0.6588235294117647 0.9725490196078431 / 0.10196078431372549
+  );
+  --base-color-neutral-dark-transparent-300: color(
+    srgb 0.8156862745098039 0.7215686274509804 0.9725490196078431 / 0.12941176470588237
+  );
+  --base-color-neutral-dark-transparent-400: color(
+    srgb 0.7529411764705882 0.6901960784313725 0.9411764705882353 / 0.1803921568627451
+  );
+  --base-color-neutral-dark-transparent-500: color(
+    srgb 0.7529411764705882 0.6588235294117647 0.8784313725490196 / 0.23921568627450981
+  );
+  --base-color-neutral-dark-transparent-600: color(
+    srgb 0.7215686274509804 0.6588235294117647 0.8470588235294118 / 0.30980392156862746
+  );
+  --base-color-neutral-dark-transparent-700: color(
+    srgb 0.8470588235294118 0.7843137254901961 0.9725490196078431 / 0.3215686274509804
+  );
+  --base-color-neutral-dark-transparent-800: color(
+    srgb 0.8156862745098039 0.7529411764705882 0.9098039215686274 / 0.4
+  );
+  --base-color-neutral-dark-transparent-900: color(
+    srgb 0.8156862745098039 0.7529411764705882 0.8784313725490196 / 0.6784313725490196
+  );
+  --base-color-neutral-dark-transparent-1000: color(
+    srgb 0.7843137254901961 0.7215686274509804 0.8156862745098039 / 0.7686274509803922
+  );
+  --base-color-neutral-dark-transparent-1100: color(
+    srgb 0.8470588235294118 0.8156862745098039 0.8784313725490196 / 0.7019607843137254
+  );
+  --base-color-neutral-dark-transparent-1200: color(
+    srgb 0.8156862745098039 0.7843137254901961 0.8470588235294118 / 0.8784313725490196
+  );
+  --base-color-neutral-dark-transparent-1300: color(
+    srgb 0.8784313725490196 0.8470588235294118 0.9098039215686274 / 0.8901960784313725
+  );
+  --base-color-neutral-dark-transparent-1400: color(
+    srgb 0.8784313725490196 0.8784313725490196 0.9098039215686274 / 0.9411764705882353
+  );
+  --base-color-neutral-dark-transparent-1500: color(
+    srgb 0.9725490196078431 0.9725490196078431 0.9725490196078431 / 0.9294117647058824
+  );
+  --base-color-neutral-dark-transparent-1600: color(
+    srgb 0.9725490196078431 0.9725490196078431 0.9725490196078431 / 0.9803921568627451
+  );
+  --base-color-neutral-light-opaque-100: color(
+    srgb 0.9725490196078431 0.9725490196078431 0.9764705882352941
+  );
+  --base-color-neutral-light-opaque-200: color(
+    srgb 0.9411764705882353 0.9411764705882353 0.9490196078431372
+  );
+  --base-color-neutral-light-opaque-300: color(
+    srgb 0.9019607843137255 0.9019607843137255 0.9137254901960784
+  );
+  --base-color-neutral-light-opaque-400: color(
+    srgb 0.8549019607843137 0.8509803921568627 0.8705882352941177
+  );
+  --base-color-neutral-light-opaque-500: color(
+    srgb 0.803921568627451 0.8 0.8235294117647058
+  );
+  --base-color-neutral-light-opaque-600: color(
+    srgb 0.7529411764705882 0.7450980392156863 0.7764705882352941
+  );
+  --base-color-neutral-light-opaque-700: color(
+    srgb 0.6941176470588235 0.6862745098039216 0.7215686274509804
+  );
+  --base-color-neutral-light-opaque-800: color(
+    srgb 0.6352941176470588 0.6235294117647059 0.6666666666666666
+  );
+  --base-color-neutral-light-opaque-900: color(
+    srgb 0.5294117647058824 0.5176470588235295 0.5647058823529412
+  );
+  --base-color-neutral-light-opaque-1000: color(
+    srgb 0.47058823529411764 0.4588235294117647 0.5058823529411764
+  );
+  --base-color-neutral-light-opaque-1100: color(
+    srgb 0.41568627450980394 0.403921568627451 0.4470588235294118
+  );
+  --base-color-neutral-light-opaque-1200: color(
+    srgb 0.3568627450980392 0.34509803921568627 0.39215686274509803
+  );
+  --base-color-neutral-light-opaque-1300: color(
+    srgb 0.2980392156862745 0.28627450980392155 0.32941176470588235
+  );
+  --base-color-neutral-light-opaque-1400: color(
+    srgb 0.24313725490196078 0.23137254901960785 0.27058823529411763
+  );
+  --base-color-neutral-light-opaque-1500: color(
+    srgb 0.18823529411764706 0.1803921568627451 0.21176470588235294
+  );
+  --base-color-neutral-light-opaque-1600: color(
+    srgb 0.09411764705882353 0.07058823529411765 0.1450980392156863
+  );
+  --base-color-neutral-light-transparent-100: color(
+    srgb 0.06274509803921569 0.06274509803921569 0.18823529411764706 / 0.03137254901960784
+  );
+  --base-color-neutral-light-transparent-200: color(
+    srgb 0 0 0.12549019607843137 / 0.058823529411764705
+  );
+  --base-color-neutral-light-transparent-300: color(
+    srgb 0 0 0.09411764705882353 / 0.10196078431372549
+  );
+  --base-color-neutral-light-transparent-400: color(
+    srgb 0 0 0.12549019607843137 / 0.14901960784313725
+  );
   --base-color-neutral-light-transparent-500: color(srgb 0 0 0.12549019607843137 / 0.2);
-  --base-color-neutral-light-transparent-600: color(srgb 0.06274509803921569 0.03137254901960784 0.1568627450980392 / 0.27058823529411763); /* Implementation Notes */
-  --base-color-neutral-light-transparent-700: color(srgb 0.06274509803921569 0.03137254901960784 0.1568627450980392 / 0.32941176470588235);
-  --base-color-neutral-light-transparent-800: color(srgb 0.06274509803921569 0.03137254901960784 0.1568627450980392 / 0.38823529411764707);
-  --base-color-neutral-light-transparent-900: color(srgb 0.06274509803921569 0.03137254901960784 0.12549019607843137 / 0.5019607843137255);
-  --base-color-neutral-light-transparent-1000: color(srgb 0.06274509803921569 0.03137254901960784 0.12549019607843137 / 0.5607843137254902);
-  --base-color-neutral-light-transparent-1100: color(srgb 0.25098039215686274 0.2196078431372549 0.2823529411764706 / 0.7686274509803922);
-  --base-color-neutral-light-transparent-1200: color(srgb 0.09411764705882353 0.09411764705882353 0.1568627450980392 / 0.7215686274509804);
-  --base-color-neutral-light-transparent-1300: color(srgb 0.06274509803921569 0.03137254901960784 0.09411764705882353 / 0.7411764705882353);
-  --base-color-neutral-light-transparent-1400: color(srgb 0.1568627450980392 0.1568627450980392 0.18823529411764706 / 0.9019607843137255);
-  --base-color-neutral-light-transparent-1500: color(srgb 0.09411764705882353 0.09411764705882353 0.12549019607843137 / 0.9019607843137255);
-  --base-color-neutral-light-transparent-1600: color(srgb 0.03137254901960784 0 0.09411764705882353 / 0.9294117647058824);
-  --base-color-pink-dark-opaque-100: color(srgb 0.12549019607843137 0 0.054901960784313725);
-  --base-color-pink-dark-opaque-200: color(srgb 0.17647058823529413 0 0.09019607843137255);
+  --base-color-neutral-light-transparent-600: color(
+    srgb 0.06274509803921569 0.03137254901960784 0.1568627450980392 / 0.27058823529411763
+  ); /* Implementation Notes */
+  --base-color-neutral-light-transparent-700: color(
+    srgb 0.06274509803921569 0.03137254901960784 0.1568627450980392 / 0.32941176470588235
+  );
+  --base-color-neutral-light-transparent-800: color(
+    srgb 0.06274509803921569 0.03137254901960784 0.1568627450980392 / 0.38823529411764707
+  );
+  --base-color-neutral-light-transparent-900: color(
+    srgb 0.06274509803921569 0.03137254901960784 0.12549019607843137 / 0.5019607843137255
+  );
+  --base-color-neutral-light-transparent-1000: color(
+    srgb 0.06274509803921569 0.03137254901960784 0.12549019607843137 / 0.5607843137254902
+  );
+  --base-color-neutral-light-transparent-1100: color(
+    srgb 0.25098039215686274 0.2196078431372549 0.2823529411764706 / 0.7686274509803922
+  );
+  --base-color-neutral-light-transparent-1200: color(
+    srgb 0.09411764705882353 0.09411764705882353 0.1568627450980392 / 0.7215686274509804
+  );
+  --base-color-neutral-light-transparent-1300: color(
+    srgb 0.06274509803921569 0.03137254901960784 0.09411764705882353 / 0.7411764705882353
+  );
+  --base-color-neutral-light-transparent-1400: color(
+    srgb 0.1568627450980392 0.1568627450980392 0.18823529411764706 / 0.9019607843137255
+  );
+  --base-color-neutral-light-transparent-1500: color(
+    srgb 0.09411764705882353 0.09411764705882353 0.12549019607843137 / 0.9019607843137255
+  );
+  --base-color-neutral-light-transparent-1600: color(
+    srgb 0.03137254901960784 0 0.09411764705882353 / 0.9294117647058824
+  );
+  --base-color-pink-dark-opaque-100: color(
+    srgb 0.12549019607843137 0 0.054901960784313725
+  );
+  --base-color-pink-dark-opaque-200: color(
+    srgb 0.17647058823529413 0 0.09019607843137255
+  );
   --base-color-pink-dark-opaque-300: color(srgb 0.2235294117647059 0 0.11764705882352941);
   --base-color-pink-dark-opaque-400: color(srgb 0.2784313725490196 0 0.15294117647058825);
   --base-color-pink-dark-opaque-500: color(srgb 0.3411764705882353 0 0.19607843137254902);
-  --base-color-pink-dark-opaque-600: color(srgb 0.40784313725490196 0 0.24313725490196078);
-  --base-color-pink-dark-opaque-700: color(srgb 0.47843137254901963 0.0196078431372549 0.29411764705882354);
-  --base-color-pink-dark-opaque-800: color(srgb 0.5490196078431373 0.09019607843137255 0.34509803921568627);
-  --base-color-pink-dark-opaque-900: color(srgb 0.788235294117647 0.34901960784313724 0.5568627450980392);
-  --base-color-pink-dark-opaque-1000: color(srgb 1 0.27058823529411763 0.6588235294117647);
-  --base-color-pink-dark-opaque-1100: color(srgb 0.8745098039215686 0.49019607843137253 0.6627450980392157);
-  --base-color-pink-dark-opaque-1200: color(srgb 0.9176470588235294 0.5843137254901961 0.7254901960784313);
-  --base-color-pink-dark-opaque-1300: color(srgb 0.9450980392156862 0.6666666666666666 0.7843137254901961);
-  --base-color-pink-dark-opaque-1400: color(srgb 0.9725490196078431 0.7647058823529411 0.8470588235294118);
-  --base-color-pink-dark-opaque-1500: color(srgb 0.9882352941176471 0.8627450980392157 0.9098039215686274);
+  --base-color-pink-dark-opaque-600: color(
+    srgb 0.40784313725490196 0 0.24313725490196078
+  );
+  --base-color-pink-dark-opaque-700: color(
+    srgb 0.47843137254901963 0.0196078431372549 0.29411764705882354
+  );
+  --base-color-pink-dark-opaque-800: color(
+    srgb 0.5490196078431373 0.09019607843137255 0.34509803921568627
+  );
+  --base-color-pink-dark-opaque-900: color(
+    srgb 0.788235294117647 0.34901960784313724 0.5568627450980392
+  );
+  --base-color-pink-dark-opaque-1000: color(
+    srgb 1 0.27058823529411763 0.6588235294117647
+  );
+  --base-color-pink-dark-opaque-1100: color(
+    srgb 0.8745098039215686 0.49019607843137253 0.6627450980392157
+  );
+  --base-color-pink-dark-opaque-1200: color(
+    srgb 0.9176470588235294 0.5843137254901961 0.7254901960784313
+  );
+  --base-color-pink-dark-opaque-1300: color(
+    srgb 0.9450980392156862 0.6666666666666666 0.7843137254901961
+  );
+  --base-color-pink-dark-opaque-1400: color(
+    srgb 0.9725490196078431 0.7647058823529411 0.8470588235294118
+  );
+  --base-color-pink-dark-opaque-1500: color(
+    srgb 0.9882352941176471 0.8627450980392157 0.9098039215686274
+  );
   --base-color-pink-dark-opaque-1600: color(srgb 1 0.9647058823529412 0.9764705882352941);
-  --base-color-pink-dark-transparent-100: color(srgb 0.9411764705882353 0 0.40784313725490196 / 0.12941176470588237);
-  --base-color-pink-dark-transparent-200: color(srgb 0.9725490196078431 0 0.47058823529411764 / 0.1803921568627451);
-  --base-color-pink-dark-transparent-300: color(srgb 0.9725490196078431 0 0.5019607843137255 / 0.23137254901960785);
-  --base-color-pink-dark-transparent-400: color(srgb 0.9411764705882353 0 0.5333333333333333 / 0.2901960784313726);
-  --base-color-pink-dark-transparent-500: color(srgb 0.9725490196078431 0 0.5647058823529412 / 0.34901960784313724);
-  --base-color-pink-dark-transparent-600: color(srgb 0.9411764705882353 0 0.5647058823529412 / 0.43137254901960786);
-  --base-color-pink-dark-transparent-700: color(srgb 0.7215686274509804 0.03137254901960784 0.4392156862745098 / 0.6705882352941176);
-  --base-color-pink-dark-transparent-800: color(srgb 0.9411764705882353 0.1568627450980392 0.596078431372549 / 0.5803921568627451);
-  --base-color-pink-dark-transparent-900: color(srgb 0.8470588235294118 0.3764705882352941 0.596078431372549 / 0.9294117647058824);
+  --base-color-pink-dark-transparent-100: color(
+    srgb 0.9411764705882353 0 0.40784313725490196 / 0.12941176470588237
+  );
+  --base-color-pink-dark-transparent-200: color(
+    srgb 0.9725490196078431 0 0.47058823529411764 / 0.1803921568627451
+  );
+  --base-color-pink-dark-transparent-300: color(
+    srgb 0.9725490196078431 0 0.5019607843137255 / 0.23137254901960785
+  );
+  --base-color-pink-dark-transparent-400: color(
+    srgb 0.9411764705882353 0 0.5333333333333333 / 0.2901960784313726
+  );
+  --base-color-pink-dark-transparent-500: color(
+    srgb 0.9725490196078431 0 0.5647058823529412 / 0.34901960784313724
+  );
+  --base-color-pink-dark-transparent-600: color(
+    srgb 0.9411764705882353 0 0.5647058823529412 / 0.43137254901960786
+  );
+  --base-color-pink-dark-transparent-700: color(
+    srgb 0.7215686274509804 0.03137254901960784 0.4392156862745098 / 0.6705882352941176
+  );
+  --base-color-pink-dark-transparent-800: color(
+    srgb 0.9411764705882353 0.1568627450980392 0.596078431372549 / 0.5803921568627451
+  );
+  --base-color-pink-dark-transparent-900: color(
+    srgb 0.8470588235294118 0.3764705882352941 0.596078431372549 / 0.9294117647058824
+  );
   --base-color-pink-dark-transparent-1000: var(--base-color-pink-dark-opaque-1000);
-  --base-color-pink-dark-transparent-1100: color(srgb 0.9098039215686274 0.5019607843137255 0.6901960784313725 / 0.9607843137254902);
-  --base-color-pink-dark-transparent-1200: color(srgb 0.9411764705882353 0.596078431372549 0.7529411764705882 / 0.9686274509803922);
+  --base-color-pink-dark-transparent-1100: color(
+    srgb 0.9098039215686274 0.5019607843137255 0.6901960784313725 / 0.9607843137254902
+  );
+  --base-color-pink-dark-transparent-1200: color(
+    srgb 0.9411764705882353 0.596078431372549 0.7529411764705882 / 0.9686274509803922
+  );
   --base-color-pink-dark-transparent-1300: var(--base-color-pink-dark-opaque-1300);
   --base-color-pink-dark-transparent-1400: var(--base-color-pink-dark-opaque-1400);
   --base-color-pink-dark-transparent-1500: var(--base-color-pink-dark-opaque-1500);
@@ -257,24 +627,60 @@
   --base-color-pink-light-opaque-500: color(srgb 1 0.6705882352941176 0.8509803921568627);
   --base-color-pink-light-opaque-600: color(srgb 1 0.5764705882352941 0.807843137254902);
   --base-color-pink-light-opaque-700: color(srgb 1 0.4392156862745098 0.7372549019607844);
-  --base-color-pink-light-opaque-800: color(srgb 0.9882352941176471 0.3607843137254902 0.7058823529411765);
-  --base-color-pink-light-opaque-900: color(srgb 0.9098039215686274 0.10196078431372549 0.6078431372549019);
-  --base-color-pink-light-opaque-1000: color(srgb 0.8509803921568627 0 0.5529411764705883);
-  --base-color-pink-light-opaque-1100: color(srgb 0.7843137254901961 0 0.49411764705882355);
-  --base-color-pink-light-opaque-1200: color(srgb 0.7098039215686275 0 0.43529411764705883);
-  --base-color-pink-light-opaque-1300: color(srgb 0.6235294117647059 0 0.37254901960784315);
-  --base-color-pink-light-opaque-1400: color(srgb 0.5333333333333333 0 0.30980392156862746);
-  --base-color-pink-light-opaque-1500: color(srgb 0.43529411764705883 0 0.24313725490196078);
-  --base-color-pink-light-opaque-1600: color(srgb 0.3333333333333333 0 0.1803921568627451);
-  --base-color-pink-light-transparent-100: color(srgb 0.9725490196078431 0 0.47058823529411764 / 0.0392156862745098);
-  --base-color-pink-light-transparent-200: color(srgb 0.9411764705882353 0 0.5647058823529412 / 0.10196078431372549);
-  --base-color-pink-light-transparent-300: color(srgb 0.9725490196078431 0 0.5333333333333333 / 0.1607843137254902);
-  --base-color-pink-light-transparent-400: color(srgb 0.9725490196078431 0.25098039215686274 0.6588235294117647 / 0.3215686274509804);
-  --base-color-pink-light-transparent-500: color(srgb 0.9725490196078431 0.03137254901960784 0.5647058823529412 / 0.3411764705882353);
-  --base-color-pink-light-transparent-600: color(srgb 0.9725490196078431 0.03137254901960784 0.5647058823529412 / 0.4392156862745098);
-  --base-color-pink-light-transparent-700: color(srgb 0.9725490196078431 0 0.5333333333333333 / 0.5607843137254902);
-  --base-color-pink-light-transparent-800: color(srgb 0.9725490196078431 0 0.5333333333333333 / 0.6392156862745098);
-  --base-color-pink-light-transparent-900: color(srgb 0.9098039215686274 0.06274509803921569 0.596078431372549 / 0.9607843137254902);
+  --base-color-pink-light-opaque-800: color(
+    srgb 0.9882352941176471 0.3607843137254902 0.7058823529411765
+  );
+  --base-color-pink-light-opaque-900: color(
+    srgb 0.9098039215686274 0.10196078431372549 0.6078431372549019
+  );
+  --base-color-pink-light-opaque-1000: color(
+    srgb 0.8509803921568627 0 0.5529411764705883
+  );
+  --base-color-pink-light-opaque-1100: color(
+    srgb 0.7843137254901961 0 0.49411764705882355
+  );
+  --base-color-pink-light-opaque-1200: color(
+    srgb 0.7098039215686275 0 0.43529411764705883
+  );
+  --base-color-pink-light-opaque-1300: color(
+    srgb 0.6235294117647059 0 0.37254901960784315
+  );
+  --base-color-pink-light-opaque-1400: color(
+    srgb 0.5333333333333333 0 0.30980392156862746
+  );
+  --base-color-pink-light-opaque-1500: color(
+    srgb 0.43529411764705883 0 0.24313725490196078
+  );
+  --base-color-pink-light-opaque-1600: color(
+    srgb 0.3333333333333333 0 0.1803921568627451
+  );
+  --base-color-pink-light-transparent-100: color(
+    srgb 0.9725490196078431 0 0.47058823529411764 / 0.0392156862745098
+  );
+  --base-color-pink-light-transparent-200: color(
+    srgb 0.9411764705882353 0 0.5647058823529412 / 0.10196078431372549
+  );
+  --base-color-pink-light-transparent-300: color(
+    srgb 0.9725490196078431 0 0.5333333333333333 / 0.1607843137254902
+  );
+  --base-color-pink-light-transparent-400: color(
+    srgb 0.9725490196078431 0.25098039215686274 0.6588235294117647 / 0.3215686274509804
+  );
+  --base-color-pink-light-transparent-500: color(
+    srgb 0.9725490196078431 0.03137254901960784 0.5647058823529412 / 0.3411764705882353
+  );
+  --base-color-pink-light-transparent-600: color(
+    srgb 0.9725490196078431 0.03137254901960784 0.5647058823529412 / 0.4392156862745098
+  );
+  --base-color-pink-light-transparent-700: color(
+    srgb 0.9725490196078431 0 0.5333333333333333 / 0.5607843137254902
+  );
+  --base-color-pink-light-transparent-800: color(
+    srgb 0.9725490196078431 0 0.5333333333333333 / 0.6392156862745098
+  );
+  --base-color-pink-light-transparent-900: color(
+    srgb 0.9098039215686274 0.06274509803921569 0.596078431372549 / 0.9607843137254902
+  );
   --base-color-pink-light-transparent-1000: var(--base-color-pink-light-opaque-1000);
   --base-color-pink-light-transparent-1100: var(--base-color-pink-light-opaque-1100);
   --base-color-pink-light-transparent-1200: var(--base-color-pink-light-opaque-1200);
@@ -289,27 +695,57 @@
   --base-color-red-dark-opaque-500: color(srgb 0.3803921568627451 0 0);
   --base-color-red-dark-opaque-600: color(srgb 0.45098039215686275 0 0.00392156862745098);
   --base-color-red-dark-opaque-700: color(srgb 0.5254901960784314 0 0.03529411764705882);
-  --base-color-red-dark-opaque-800: color(srgb 0.6039215686274509 0.00392156862745098 0.08627450980392157);
+  --base-color-red-dark-opaque-800: color(
+    srgb 0.6039215686274509 0.00392156862745098 0.08627450980392157
+  );
   --base-color-red-dark-opaque-900: color(srgb 1 0 0.16862745098039217);
-  --base-color-red-dark-opaque-1000: color(srgb 0.8862745098039215 0.396078431372549 0.37254901960784315);
-  --base-color-red-dark-opaque-1100: color(srgb 0.9294117647058824 0.4823529411764706 0.4549019607843137);
-  --base-color-red-dark-opaque-1200: color(srgb 0.9647058823529412 0.5764705882352941 0.5490196078431373);
-  --base-color-red-dark-opaque-1300: color(srgb 0.9882352941176471 0.6666666666666666 0.6352941176470588);
+  --base-color-red-dark-opaque-1000: color(
+    srgb 0.8862745098039215 0.396078431372549 0.37254901960784315
+  );
+  --base-color-red-dark-opaque-1100: color(
+    srgb 0.9294117647058824 0.4823529411764706 0.4549019607843137
+  );
+  --base-color-red-dark-opaque-1200: color(
+    srgb 0.9647058823529412 0.5764705882352941 0.5490196078431373
+  );
+  --base-color-red-dark-opaque-1300: color(
+    srgb 0.9882352941176471 0.6666666666666666 0.6352941176470588
+  );
   --base-color-red-dark-opaque-1400: color(srgb 1 0.7607843137254902 0.7372549019607844);
   --base-color-red-dark-opaque-1500: color(srgb 1 0.8627450980392157 0.8470588235294118);
   --base-color-red-dark-opaque-1600: color(srgb 1 0.9647058823529412 0.9607843137254902);
-  --base-color-red-dark-transparent-100: color(srgb 0.9411764705882353 0 0 / 0.14901960784313725);
+  --base-color-red-dark-transparent-100: color(
+    srgb 0.9411764705882353 0 0 / 0.14901960784313725
+  );
   --base-color-red-dark-transparent-200: color(srgb 0.9725490196078431 0 0 / 0.2);
-  --base-color-red-dark-transparent-300: color(srgb 0.9725490196078431 0 0 / 0.25882352941176473);
-  --base-color-red-dark-transparent-400: color(srgb 0.9725490196078431 0 0 / 0.3215686274509804);
-  --base-color-red-dark-transparent-500: color(srgb 0.9725490196078431 0 0 / 0.38823529411764707);
-  --base-color-red-dark-transparent-600: color(srgb 0.9411764705882353 0 0 / 0.47843137254901963);
-  --base-color-red-dark-transparent-700: color(srgb 0.9725490196078431 0 0.06274509803921569 / 0.5411764705882353);
-  --base-color-red-dark-transparent-800: color(srgb 0.6274509803921569 0 0.09411764705882353 / 0.9607843137254902);
+  --base-color-red-dark-transparent-300: color(
+    srgb 0.9725490196078431 0 0 / 0.25882352941176473
+  );
+  --base-color-red-dark-transparent-400: color(
+    srgb 0.9725490196078431 0 0 / 0.3215686274509804
+  );
+  --base-color-red-dark-transparent-500: color(
+    srgb 0.9725490196078431 0 0 / 0.38823529411764707
+  );
+  --base-color-red-dark-transparent-600: color(
+    srgb 0.9411764705882353 0 0 / 0.47843137254901963
+  );
+  --base-color-red-dark-transparent-700: color(
+    srgb 0.9725490196078431 0 0.06274509803921569 / 0.5411764705882353
+  );
+  --base-color-red-dark-transparent-800: color(
+    srgb 0.6274509803921569 0 0.09411764705882353 / 0.9607843137254902
+  );
   --base-color-red-dark-transparent-900: var(--base-color-red-dark-opaque-900);
-  --base-color-red-dark-transparent-1000: color(srgb 0.9725490196078431 0.4392156862745098 0.40784313725490196 / 0.9098039215686274);
-  --base-color-red-dark-transparent-1100: color(srgb 0.9725490196078431 0.5019607843137255 0.47058823529411764 / 0.9607843137254902);
-  --base-color-red-dark-transparent-1200: color(srgb 0.9725490196078431 0.596078431372549 0.5647058823529412 / 0.9803921568627451);
+  --base-color-red-dark-transparent-1000: color(
+    srgb 0.9725490196078431 0.4392156862745098 0.40784313725490196 / 0.9098039215686274
+  );
+  --base-color-red-dark-transparent-1100: color(
+    srgb 0.9725490196078431 0.5019607843137255 0.47058823529411764 / 0.9607843137254902
+  );
+  --base-color-red-dark-transparent-1200: color(
+    srgb 0.9725490196078431 0.596078431372549 0.5647058823529412 / 0.9803921568627451
+  );
   --base-color-red-dark-transparent-1300: var(--base-color-red-dark-opaque-1300);
   --base-color-red-dark-transparent-1400: var(--base-color-red-dark-opaque-1400);
   --base-color-red-dark-transparent-1500: var(--base-color-red-dark-opaque-1500);
@@ -322,7 +758,9 @@
   --base-color-red-light-opaque-600: color(srgb 1 0.592156862745098 0.5607843137254902);
   --base-color-red-light-opaque-700: color(srgb 1 0.49019607843137253 0.4627450980392157);
   --base-color-red-light-opaque-800: color(srgb 1 0.3803921568627451 0.36470588235294116);
-  --base-color-red-light-opaque-900: color(srgb 0.9568627450980393 0.12941176470588237 0.19607843137254902);
+  --base-color-red-light-opaque-900: color(
+    srgb 0.9568627450980393 0.12941176470588237 0.19607843137254902
+  );
   --base-color-red-light-opaque-1000: color(srgb 1 0 0.16862745098039217);
   --base-color-red-light-opaque-1100: color(srgb 0.8352941176470589 0 0);
   --base-color-red-light-opaque-1200: color(srgb 0.7568627450980392 0 0);
@@ -330,15 +768,33 @@
   --base-color-red-light-opaque-1400: color(srgb 0.5725490196078431 0 0);
   --base-color-red-light-opaque-1500: color(srgb 0.47058823529411764 0 0);
   --base-color-red-light-opaque-1600: color(srgb 0.36470588235294116 0 0);
-  --base-color-red-light-transparent-100: color(srgb 0.9411764705882353 0.18823529411764706 0.03137254901960784 / 0.050980392156862744);
-  --base-color-red-light-transparent-200: color(srgb 0.9725490196078431 0.1568627450980392 0.03137254901960784 / 0.10980392156862745);
-  --base-color-red-light-transparent-300: color(srgb 0.9725490196078431 0.18823529411764706 0.06274509803921569 / 0.18823529411764706);
-  --base-color-red-light-transparent-400: color(srgb 0.9725490196078431 0.2823529411764706 0.18823529411764706 / 0.3215686274509804);
-  --base-color-red-light-transparent-500: color(srgb 0.9725490196078431 0.09411764705882353 0 / 0.34901960784313724);
-  --base-color-red-light-transparent-600: color(srgb 0.9725490196078431 0.12549019607843137 0.06274509803921569 / 0.47058823529411764);
-  --base-color-red-light-transparent-700: color(srgb 0.9725490196078431 0.1568627450980392 0.12549019607843137 / 0.611764705882353);
-  --base-color-red-light-transparent-800: color(srgb 0.9725490196078431 0.03137254901960784 0 / 0.6392156862745098);
-  --base-color-red-light-transparent-900: color(srgb 0.9411764705882353 0.03137254901960784 0.09411764705882353 / 0.8901960784313725);
+  --base-color-red-light-transparent-100: color(
+    srgb 0.9411764705882353 0.18823529411764706 0.03137254901960784 / 0.050980392156862744
+  );
+  --base-color-red-light-transparent-200: color(
+    srgb 0.9725490196078431 0.1568627450980392 0.03137254901960784 / 0.10980392156862745
+  );
+  --base-color-red-light-transparent-300: color(
+    srgb 0.9725490196078431 0.18823529411764706 0.06274509803921569 / 0.18823529411764706
+  );
+  --base-color-red-light-transparent-400: color(
+    srgb 0.9725490196078431 0.2823529411764706 0.18823529411764706 / 0.3215686274509804
+  );
+  --base-color-red-light-transparent-500: color(
+    srgb 0.9725490196078431 0.09411764705882353 0 / 0.34901960784313724
+  );
+  --base-color-red-light-transparent-600: color(
+    srgb 0.9725490196078431 0.12549019607843137 0.06274509803921569 / 0.47058823529411764
+  );
+  --base-color-red-light-transparent-700: color(
+    srgb 0.9725490196078431 0.1568627450980392 0.12549019607843137 / 0.611764705882353
+  );
+  --base-color-red-light-transparent-800: color(
+    srgb 0.9725490196078431 0.03137254901960784 0 / 0.6392156862745098
+  );
+  --base-color-red-light-transparent-900: color(
+    srgb 0.9411764705882353 0.03137254901960784 0.09411764705882353 / 0.8901960784313725
+  );
   --base-color-red-light-transparent-1000: var(--base-color-red-light-opaque-1000);
   --base-color-red-light-transparent-1100: var(--base-color-red-light-opaque-1100);
   --base-color-red-light-transparent-1200: var(--base-color-red-light-opaque-1200);
@@ -347,70 +803,172 @@
   --base-color-red-light-transparent-1500: var(--base-color-red-light-opaque-1500);
   --base-color-red-light-transparent-1600: var(--base-color-red-light-opaque-1600);
   --base-color-white: color(srgb 1 1 1);
-  --base-color-yellow-dark-opaque-100: color(srgb 0.10588235294117647 0.0196078431372549 0);
-  --base-color-yellow-dark-opaque-200: color(srgb 0.14901960784313725 0.03529411764705882 0);
-  --base-color-yellow-dark-opaque-300: color(srgb 0.19215686274509805 0.058823529411764705 0);
-  --base-color-yellow-dark-opaque-400: color(srgb 0.24313725490196078 0.08627450980392157 0);
-  --base-color-yellow-dark-opaque-500: color(srgb 0.2980392156862745 0.11764705882352941 0);
-  --base-color-yellow-dark-opaque-600: color(srgb 0.3568627450980392 0.1568627450980392 0);
-  --base-color-yellow-dark-opaque-700: color(srgb 0.4196078431372549 0.20392156862745098 0);
-  --base-color-yellow-dark-opaque-800: color(srgb 0.48627450980392156 0.2549019607843137 0);
-  --base-color-yellow-dark-opaque-900: color(srgb 0.7058823529411765 0.4823529411764706 0);
-  --base-color-yellow-dark-opaque-1000: color(srgb 0.7450980392156863 0.5372549019607843 0);
-  --base-color-yellow-dark-opaque-1100: color(srgb 0.792156862745098 0.6078431372549019 0);
+  --base-color-yellow-dark-opaque-100: color(
+    srgb 0.10588235294117647 0.0196078431372549 0
+  );
+  --base-color-yellow-dark-opaque-200: color(
+    srgb 0.14901960784313725 0.03529411764705882 0
+  );
+  --base-color-yellow-dark-opaque-300: color(
+    srgb 0.19215686274509805 0.058823529411764705 0
+  );
+  --base-color-yellow-dark-opaque-400: color(
+    srgb 0.24313725490196078 0.08627450980392157 0
+  );
+  --base-color-yellow-dark-opaque-500: color(
+    srgb 0.2980392156862745 0.11764705882352941 0
+  );
+  --base-color-yellow-dark-opaque-600: color(
+    srgb 0.3568627450980392 0.1568627450980392 0
+  );
+  --base-color-yellow-dark-opaque-700: color(
+    srgb 0.4196078431372549 0.20392156862745098 0
+  );
+  --base-color-yellow-dark-opaque-800: color(
+    srgb 0.48627450980392156 0.2549019607843137 0
+  );
+  --base-color-yellow-dark-opaque-900: color(
+    srgb 0.7058823529411765 0.4823529411764706 0
+  );
+  --base-color-yellow-dark-opaque-1000: color(
+    srgb 0.7450980392156863 0.5372549019607843 0
+  );
+  --base-color-yellow-dark-opaque-1100: color(
+    srgb 0.792156862745098 0.6078431372549019 0
+  );
   --base-color-yellow-dark-opaque-1200: color(srgb 1 0.807843137254902 0);
-  --base-color-yellow-dark-opaque-1300: color(srgb 0.8784313725490196 0.7529411764705882 0.3686274509803922);
-  --base-color-yellow-dark-opaque-1400: color(srgb 0.9137254901960784 0.8235294117647058 0.5647058823529412);
-  --base-color-yellow-dark-opaque-1500: color(srgb 0.9529411764705882 0.8980392156862745 0.7490196078431373);
-  --base-color-yellow-dark-opaque-1600: color(srgb 0.9882352941176471 0.9725490196078431 0.9333333333333333);
-  --base-color-yellow-dark-transparent-100: color(srgb 0.9411764705882353 0.18823529411764706 0 / 0.10980392156862745);
-  --base-color-yellow-dark-transparent-200: color(srgb 0.9098039215686274 0.2196078431372549 0 / 0.1607843137254902);
-  --base-color-yellow-dark-transparent-300: color(srgb 0.9098039215686274 0.2823529411764706 0 / 0.21176470588235294);
-  --base-color-yellow-dark-transparent-400: color(srgb 0.9725490196078431 0.34509803921568627 0 / 0.25098039215686274);
-  --base-color-yellow-dark-transparent-500: color(srgb 0.9725490196078431 0.3764705882352941 0 / 0.30980392156862746);
-  --base-color-yellow-dark-transparent-600: color(srgb 0.9411764705882353 0.40784313725490196 0 / 0.3803921568627451);
-  --base-color-yellow-dark-transparent-700: color(srgb 0.9725490196078431 0.47058823529411764 0 / 0.43137254901960786);
-  --base-color-yellow-dark-transparent-800: color(srgb 0.9725490196078431 0.5019607843137255 0 / 0.5019607843137255);
-  --base-color-yellow-dark-transparent-900: color(srgb 0.9725490196078431 0.6588235294117647 0 / 0.7294117647058823);
-  --base-color-yellow-dark-transparent-1000: color(srgb 0.9098039215686274 0.6588235294117647 0 / 0.8196078431372549);
-  --base-color-yellow-dark-transparent-1100: color(srgb 0.9411764705882353 0.7215686274509804 0 / 0.8392156862745098);
+  --base-color-yellow-dark-opaque-1300: color(
+    srgb 0.8784313725490196 0.7529411764705882 0.3686274509803922
+  );
+  --base-color-yellow-dark-opaque-1400: color(
+    srgb 0.9137254901960784 0.8235294117647058 0.5647058823529412
+  );
+  --base-color-yellow-dark-opaque-1500: color(
+    srgb 0.9529411764705882 0.8980392156862745 0.7490196078431373
+  );
+  --base-color-yellow-dark-opaque-1600: color(
+    srgb 0.9882352941176471 0.9725490196078431 0.9333333333333333
+  );
+  --base-color-yellow-dark-transparent-100: color(
+    srgb 0.9411764705882353 0.18823529411764706 0 / 0.10980392156862745
+  );
+  --base-color-yellow-dark-transparent-200: color(
+    srgb 0.9098039215686274 0.2196078431372549 0 / 0.1607843137254902
+  );
+  --base-color-yellow-dark-transparent-300: color(
+    srgb 0.9098039215686274 0.2823529411764706 0 / 0.21176470588235294
+  );
+  --base-color-yellow-dark-transparent-400: color(
+    srgb 0.9725490196078431 0.34509803921568627 0 / 0.25098039215686274
+  );
+  --base-color-yellow-dark-transparent-500: color(
+    srgb 0.9725490196078431 0.3764705882352941 0 / 0.30980392156862746
+  );
+  --base-color-yellow-dark-transparent-600: color(
+    srgb 0.9411764705882353 0.40784313725490196 0 / 0.3803921568627451
+  );
+  --base-color-yellow-dark-transparent-700: color(
+    srgb 0.9725490196078431 0.47058823529411764 0 / 0.43137254901960786
+  );
+  --base-color-yellow-dark-transparent-800: color(
+    srgb 0.9725490196078431 0.5019607843137255 0 / 0.5019607843137255
+  );
+  --base-color-yellow-dark-transparent-900: color(
+    srgb 0.9725490196078431 0.6588235294117647 0 / 0.7294117647058823
+  );
+  --base-color-yellow-dark-transparent-1000: color(
+    srgb 0.9098039215686274 0.6588235294117647 0 / 0.8196078431372549
+  );
+  --base-color-yellow-dark-transparent-1100: color(
+    srgb 0.9411764705882353 0.7215686274509804 0 / 0.8392156862745098
+  );
   --base-color-yellow-dark-transparent-1200: var(--base-color-yellow-dark-opaque-1200);
   --base-color-yellow-dark-transparent-1300: var(--base-color-yellow-dark-opaque-1300);
-  --base-color-yellow-dark-transparent-1400: color(srgb 0.9725490196078431 0.8784313725490196 0.596078431372549 / 0.9411764705882353);
-  --base-color-yellow-dark-transparent-1500: color(srgb 0.9725490196078431 0.9098039215686274 0.7529411764705882 / 0.9882352941176471);
+  --base-color-yellow-dark-transparent-1400: color(
+    srgb 0.9725490196078431 0.8784313725490196 0.596078431372549 / 0.9411764705882353
+  );
+  --base-color-yellow-dark-transparent-1500: color(
+    srgb 0.9725490196078431 0.9098039215686274 0.7529411764705882 / 0.9882352941176471
+  );
   --base-color-yellow-dark-transparent-1600: var(--base-color-yellow-dark-opaque-1600);
-  --base-color-yellow-light-opaque-100: color(srgb 0.9921568627450981 0.9725490196078431 0.9215686274509803);
-  --base-color-yellow-light-opaque-200: color(srgb 0.9803921568627451 0.9411764705882353 0.8235294117647058);
-  --base-color-yellow-light-opaque-300: color(srgb 0.9647058823529412 0.8980392156862745 0.7058823529411765);
-  --base-color-yellow-light-opaque-400: color(srgb 0.9490196078431372 0.8470588235294118 0.5568627450980392);
-  --base-color-yellow-light-opaque-500: color(srgb 0.9294117647058824 0.792156862745098 0.3764705882352941);
+  --base-color-yellow-light-opaque-100: color(
+    srgb 0.9921568627450981 0.9725490196078431 0.9215686274509803
+  );
+  --base-color-yellow-light-opaque-200: color(
+    srgb 0.9803921568627451 0.9411764705882353 0.8235294117647058
+  );
+  --base-color-yellow-light-opaque-300: color(
+    srgb 0.9647058823529412 0.8980392156862745 0.7058823529411765
+  );
+  --base-color-yellow-light-opaque-400: color(
+    srgb 0.9490196078431372 0.8470588235294118 0.5568627450980392
+  );
+  --base-color-yellow-light-opaque-500: color(
+    srgb 0.9294117647058824 0.792156862745098 0.3764705882352941
+  );
   --base-color-yellow-light-opaque-600: color(srgb 1 0.807843137254902 0);
-  --base-color-yellow-light-opaque-700: color(srgb 0.8705882352941177 0.6588235294117647 0);
-  --base-color-yellow-light-opaque-800: color(srgb 0.8352941176470589 0.5882352941176471 0);
-  --base-color-yellow-light-opaque-900: color(srgb 0.7529411764705882 0.4588235294117647 0);
-  --base-color-yellow-light-opaque-1000: color(srgb 0.7019607843137254 0.38823529411764707 0);
-  --base-color-yellow-light-opaque-1100: color(srgb 0.6431372549019608 0.3215686274509804 0);
-  --base-color-yellow-light-opaque-1200: color(srgb 0.5764705882352941 0.2549019607843137 0);
-  --base-color-yellow-light-opaque-1300: color(srgb 0.5058823529411764 0.19215686274509805 0);
-  --base-color-yellow-light-opaque-1400: color(srgb 0.42745098039215684 0.13725490196078433 0);
-  --base-color-yellow-light-opaque-1500: color(srgb 0.34509803921568627 0.08627450980392157 0);
-  --base-color-yellow-light-opaque-1600: color(srgb 0.2627450980392157 0.047058823529411764 0);
-  --base-color-yellow-light-transparent-100: color(srgb 0.8784313725490196 0.6274509803921569 0 / 0.0784313725490196);
-  --base-color-yellow-light-transparent-200: color(srgb 0.8784313725490196 0.6901960784313725 0.06274509803921569 / 0.18823529411764706);
-  --base-color-yellow-light-transparent-300: color(srgb 0.8784313725490196 0.6588235294117647 0.03137254901960784 / 0.30196078431372547);
-  --base-color-yellow-light-transparent-400: color(srgb 0.9098039215686274 0.7215686274509804 0.18823529411764706 / 0.5490196078431373);
-  --base-color-yellow-light-transparent-500: color(srgb 0.9098039215686274 0.7215686274509804 0.1568627450980392 / 0.7411764705882353);
+  --base-color-yellow-light-opaque-700: color(
+    srgb 0.8705882352941177 0.6588235294117647 0
+  );
+  --base-color-yellow-light-opaque-800: color(
+    srgb 0.8352941176470589 0.5882352941176471 0
+  );
+  --base-color-yellow-light-opaque-900: color(
+    srgb 0.7529411764705882 0.4588235294117647 0
+  );
+  --base-color-yellow-light-opaque-1000: color(
+    srgb 0.7019607843137254 0.38823529411764707 0
+  );
+  --base-color-yellow-light-opaque-1100: color(
+    srgb 0.6431372549019608 0.3215686274509804 0
+  );
+  --base-color-yellow-light-opaque-1200: color(
+    srgb 0.5764705882352941 0.2549019607843137 0
+  );
+  --base-color-yellow-light-opaque-1300: color(
+    srgb 0.5058823529411764 0.19215686274509805 0
+  );
+  --base-color-yellow-light-opaque-1400: color(
+    srgb 0.42745098039215684 0.13725490196078433 0
+  );
+  --base-color-yellow-light-opaque-1500: color(
+    srgb 0.34509803921568627 0.08627450980392157 0
+  );
+  --base-color-yellow-light-opaque-1600: color(
+    srgb 0.2627450980392157 0.047058823529411764 0
+  );
+  --base-color-yellow-light-transparent-100: color(
+    srgb 0.8784313725490196 0.6274509803921569 0 / 0.0784313725490196
+  );
+  --base-color-yellow-light-transparent-200: color(
+    srgb 0.8784313725490196 0.6901960784313725 0.06274509803921569 / 0.18823529411764706
+  );
+  --base-color-yellow-light-transparent-300: color(
+    srgb 0.8784313725490196 0.6588235294117647 0.03137254901960784 / 0.30196078431372547
+  );
+  --base-color-yellow-light-transparent-400: color(
+    srgb 0.9098039215686274 0.7215686274509804 0.18823529411764706 / 0.5490196078431373
+  );
+  --base-color-yellow-light-transparent-500: color(
+    srgb 0.9098039215686274 0.7215686274509804 0.1568627450980392 / 0.7411764705882353
+  );
   --base-color-yellow-light-transparent-600: var(--base-color-yellow-light-opaque-600);
   --base-color-yellow-light-transparent-700: var(--base-color-yellow-light-opaque-700);
   --base-color-yellow-light-transparent-800: var(--base-color-yellow-light-opaque-800);
   --base-color-yellow-light-transparent-900: var(--base-color-yellow-light-opaque-900);
-  --base-color-yellow-light-transparent-1000: color(srgb 0.6901960784313725 0.3764705882352941 0 / 0.9882352941176471);
-  --base-color-yellow-light-transparent-1100: color(srgb 0.6274509803921569 0.3137254901960784 0 / 0.9882352941176471);
+  --base-color-yellow-light-transparent-1000: color(
+    srgb 0.6901960784313725 0.3764705882352941 0 / 0.9882352941176471
+  );
+  --base-color-yellow-light-transparent-1100: color(
+    srgb 0.6274509803921569 0.3137254901960784 0 / 0.9882352941176471
+  );
   --base-color-yellow-light-transparent-1200: var(--base-color-yellow-light-opaque-1200);
   --base-color-yellow-light-transparent-1300: var(--base-color-yellow-light-opaque-1300);
   --base-color-yellow-light-transparent-1400: var(--base-color-yellow-light-opaque-1400);
   --base-color-yellow-light-transparent-1500: var(--base-color-yellow-light-opaque-1500);
-  --base-color-yellow-light-transparent-1600: color(srgb 0.25098039215686274 0.03137254901960784 0 / 0.9882352941176471);
+  --base-color-yellow-light-transparent-1600: color(
+    srgb 0.25098039215686274 0.03137254901960784 0 / 0.9882352941176471
+  );
   --base-size-0: 0;
   --base-size-1: 1px;
   --base-size-1-5: 1.5px;
@@ -444,12 +1002,24 @@
   --tokens-color-background-secondary: var(--base-color-neutral-light-opaque-100);
   --tokens-color-background-success-vibrant: var(--base-color-green-light-opaque-800);
   --tokens-color-background-tertiary: var(--base-color-neutral-light-opaque-200);
-  --tokens-color-background-transparent-accent-muted: var(--base-color-blue-light-transparent-200);
-  --tokens-color-background-transparent-danger-muted: var(--base-color-red-light-transparent-200);
-  --tokens-color-background-transparent-neutral-muted: var(--base-color-neutral-light-transparent-200);
-  --tokens-color-background-transparent-promotion-muted: var(--base-color-pink-light-transparent-200);
-  --tokens-color-background-transparent-success-muted: var(--base-color-green-light-transparent-200);
-  --tokens-color-background-transparent-warning-muted: var(--base-color-yellow-light-transparent-200);
+  --tokens-color-background-transparent-accent-muted: var(
+    --base-color-blue-light-transparent-200
+  );
+  --tokens-color-background-transparent-danger-muted: var(
+    --base-color-red-light-transparent-200
+  );
+  --tokens-color-background-transparent-neutral-muted: var(
+    --base-color-neutral-light-transparent-200
+  );
+  --tokens-color-background-transparent-promotion-muted: var(
+    --base-color-pink-light-transparent-200
+  );
+  --tokens-color-background-transparent-success-muted: var(
+    --base-color-green-light-transparent-200
+  );
+  --tokens-color-background-transparent-warning-muted: var(
+    --base-color-yellow-light-transparent-200
+  );
   --tokens-color-background-warning-vibrant: var(--base-color-yellow-light-opaque-600);
   --tokens-color-border-accent-moderate: var(--base-color-blue-light-opaque-600);
   --tokens-color-border-accent-muted: var(--base-color-blue-light-opaque-400);
@@ -470,24 +1040,60 @@
   --tokens-color-border-success-moderate: var(--base-color-green-light-opaque-600);
   --tokens-color-border-success-muted: var(--base-color-green-light-opaque-400);
   --tokens-color-border-success-vibrant: var(--base-color-green-light-opaque-800);
-  --tokens-color-border-transparent-accent-moderate: var(--base-color-blue-light-transparent-600);
-  --tokens-color-border-transparent-accent-muted: var(--base-color-blue-light-transparent-400);
-  --tokens-color-border-transparent-accent-vibrant: var(--base-color-blue-light-transparent-1000);
-  --tokens-color-border-transparent-danger-moderate: var(--base-color-red-light-transparent-600);
-  --tokens-color-border-transparent-danger-muted: var(--base-color-red-light-transparent-400);
-  --tokens-color-border-transparent-danger-vibrant: var(--base-color-red-light-transparent-1000);
-  --tokens-color-border-transparent-neutral-moderate: var(--base-color-neutral-light-transparent-600);
-  --tokens-color-border-transparent-neutral-muted: var(--base-color-neutral-light-transparent-400);
-  --tokens-color-border-transparent-neutral-vibrant: var(--base-color-neutral-light-transparent-800);
-  --tokens-color-border-transparent-promotion-moderate: var(--base-color-pink-light-transparent-600);
-  --tokens-color-border-transparent-promotion-muted: var(--base-color-pink-light-transparent-400);
-  --tokens-color-border-transparent-promotion-vibrant: var(--base-color-pink-light-transparent-700);
-  --tokens-color-border-transparent-success-moderate: var(--base-color-green-light-transparent-600);
-  --tokens-color-border-transparent-success-muted: var(--base-color-green-light-transparent-400);
-  --tokens-color-border-transparent-success-vibrant: var(--base-color-green-light-transparent-800);
-  --tokens-color-border-transparent-warning-moderate: var(--base-color-yellow-light-transparent-500);
-  --tokens-color-border-transparent-warning-muted: var(--base-color-yellow-light-transparent-400);
-  --tokens-color-border-transparent-warning-vibrant: var(--base-color-yellow-light-transparent-600);
+  --tokens-color-border-transparent-accent-moderate: var(
+    --base-color-blue-light-transparent-600
+  );
+  --tokens-color-border-transparent-accent-muted: var(
+    --base-color-blue-light-transparent-400
+  );
+  --tokens-color-border-transparent-accent-vibrant: var(
+    --base-color-blue-light-transparent-1000
+  );
+  --tokens-color-border-transparent-danger-moderate: var(
+    --base-color-red-light-transparent-600
+  );
+  --tokens-color-border-transparent-danger-muted: var(
+    --base-color-red-light-transparent-400
+  );
+  --tokens-color-border-transparent-danger-vibrant: var(
+    --base-color-red-light-transparent-1000
+  );
+  --tokens-color-border-transparent-neutral-moderate: var(
+    --base-color-neutral-light-transparent-600
+  );
+  --tokens-color-border-transparent-neutral-muted: var(
+    --base-color-neutral-light-transparent-400
+  );
+  --tokens-color-border-transparent-neutral-vibrant: var(
+    --base-color-neutral-light-transparent-800
+  );
+  --tokens-color-border-transparent-promotion-moderate: var(
+    --base-color-pink-light-transparent-600
+  );
+  --tokens-color-border-transparent-promotion-muted: var(
+    --base-color-pink-light-transparent-400
+  );
+  --tokens-color-border-transparent-promotion-vibrant: var(
+    --base-color-pink-light-transparent-700
+  );
+  --tokens-color-border-transparent-success-moderate: var(
+    --base-color-green-light-transparent-600
+  );
+  --tokens-color-border-transparent-success-muted: var(
+    --base-color-green-light-transparent-400
+  );
+  --tokens-color-border-transparent-success-vibrant: var(
+    --base-color-green-light-transparent-800
+  );
+  --tokens-color-border-transparent-warning-moderate: var(
+    --base-color-yellow-light-transparent-500
+  );
+  --tokens-color-border-transparent-warning-muted: var(
+    --base-color-yellow-light-transparent-400
+  );
+  --tokens-color-border-transparent-warning-vibrant: var(
+    --base-color-yellow-light-transparent-600
+  );
   --tokens-color-border-warning-moderate: var(--base-color-yellow-light-opaque-500);
   --tokens-color-border-warning-muted: var(--base-color-yellow-light-opaque-400);
   --tokens-color-border-warning-vibrant: var(--base-color-yellow-light-opaque-600);
@@ -502,72 +1108,170 @@
   --tokens-color-content-secondary: var(--base-color-neutral-light-opaque-1100);
   --tokens-color-content-success: var(--base-color-green-light-opaque-1100);
   --tokens-color-content-warning: var(--base-color-yellow-light-opaque-1100);
-  --tokens-color-dataviz-categorical-series1-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series2-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series2-2: var(--base-color-categorical-light-indigo);
-  --tokens-color-dataviz-categorical-series3-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series3-2: var(--base-color-categorical-light-indigo);
+  --tokens-color-dataviz-categorical-series1-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series2-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series2-2: var(
+    --base-color-categorical-light-indigo
+  );
+  --tokens-color-dataviz-categorical-series3-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series3-2: var(
+    --base-color-categorical-light-indigo
+  );
   --tokens-color-dataviz-categorical-series3-3: var(--base-color-categorical-light-pink);
-  --tokens-color-dataviz-categorical-series4-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series4-2: var(--base-color-categorical-light-indigo);
+  --tokens-color-dataviz-categorical-series4-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series4-2: var(
+    --base-color-categorical-light-indigo
+  );
   --tokens-color-dataviz-categorical-series4-3: var(--base-color-categorical-light-pink);
-  --tokens-color-dataviz-categorical-series4-4: var(--base-color-categorical-light-orange);
-  --tokens-color-dataviz-categorical-series5-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series5-2: var(--base-color-categorical-light-indigo);
+  --tokens-color-dataviz-categorical-series4-4: var(
+    --base-color-categorical-light-orange
+  );
+  --tokens-color-dataviz-categorical-series5-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series5-2: var(
+    --base-color-categorical-light-indigo
+  );
   --tokens-color-dataviz-categorical-series5-3: var(--base-color-categorical-light-pink);
-  --tokens-color-dataviz-categorical-series5-4: var(--base-color-categorical-light-orange);
-  --tokens-color-dataviz-categorical-series5-5: var(--base-color-categorical-light-yellow);
-  --tokens-color-dataviz-categorical-series6-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series6-2: var(--base-color-categorical-light-indigo);
+  --tokens-color-dataviz-categorical-series5-4: var(
+    --base-color-categorical-light-orange
+  );
+  --tokens-color-dataviz-categorical-series5-5: var(
+    --base-color-categorical-light-yellow
+  );
+  --tokens-color-dataviz-categorical-series6-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series6-2: var(
+    --base-color-categorical-light-indigo
+  );
   --tokens-color-dataviz-categorical-series6-3: var(--base-color-categorical-light-pink);
-  --tokens-color-dataviz-categorical-series6-4: var(--base-color-categorical-light-orange);
-  --tokens-color-dataviz-categorical-series6-5: var(--base-color-categorical-light-yellow);
+  --tokens-color-dataviz-categorical-series6-4: var(
+    --base-color-categorical-light-orange
+  );
+  --tokens-color-dataviz-categorical-series6-5: var(
+    --base-color-categorical-light-yellow
+  );
   --tokens-color-dataviz-categorical-series6-6: var(--base-color-categorical-light-green);
-  --tokens-color-dataviz-categorical-series7-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series7-2: var(--base-color-categorical-light-purple);
-  --tokens-color-dataviz-categorical-series7-3: var(--base-color-categorical-light-indigo);
+  --tokens-color-dataviz-categorical-series7-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series7-2: var(
+    --base-color-categorical-light-purple
+  );
+  --tokens-color-dataviz-categorical-series7-3: var(
+    --base-color-categorical-light-indigo
+  );
   --tokens-color-dataviz-categorical-series7-4: var(--base-color-categorical-light-pink);
-  --tokens-color-dataviz-categorical-series7-5: var(--base-color-categorical-light-orange);
-  --tokens-color-dataviz-categorical-series7-6: var(--base-color-categorical-light-yellow);
+  --tokens-color-dataviz-categorical-series7-5: var(
+    --base-color-categorical-light-orange
+  );
+  --tokens-color-dataviz-categorical-series7-6: var(
+    --base-color-categorical-light-yellow
+  );
   --tokens-color-dataviz-categorical-series7-7: var(--base-color-categorical-light-green);
-  --tokens-color-dataviz-categorical-series8-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series8-2: var(--base-color-categorical-light-purple);
-  --tokens-color-dataviz-categorical-series8-3: var(--base-color-categorical-light-indigo);
+  --tokens-color-dataviz-categorical-series8-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series8-2: var(
+    --base-color-categorical-light-purple
+  );
+  --tokens-color-dataviz-categorical-series8-3: var(
+    --base-color-categorical-light-indigo
+  );
   --tokens-color-dataviz-categorical-series8-4: var(--base-color-categorical-light-plum);
   --tokens-color-dataviz-categorical-series8-5: var(--base-color-categorical-light-pink);
-  --tokens-color-dataviz-categorical-series8-6: var(--base-color-categorical-light-orange);
-  --tokens-color-dataviz-categorical-series8-7: var(--base-color-categorical-light-yellow);
+  --tokens-color-dataviz-categorical-series8-6: var(
+    --base-color-categorical-light-orange
+  );
+  --tokens-color-dataviz-categorical-series8-7: var(
+    --base-color-categorical-light-yellow
+  );
   --tokens-color-dataviz-categorical-series8-8: var(--base-color-categorical-light-green);
-  --tokens-color-dataviz-categorical-series9-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series9-2: var(--base-color-categorical-light-purple);
-  --tokens-color-dataviz-categorical-series9-3: var(--base-color-categorical-light-indigo);
+  --tokens-color-dataviz-categorical-series9-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series9-2: var(
+    --base-color-categorical-light-purple
+  );
+  --tokens-color-dataviz-categorical-series9-3: var(
+    --base-color-categorical-light-indigo
+  );
   --tokens-color-dataviz-categorical-series9-4: var(--base-color-categorical-light-plum);
-  --tokens-color-dataviz-categorical-series9-5: var(--base-color-categorical-light-magenta);
+  --tokens-color-dataviz-categorical-series9-5: var(
+    --base-color-categorical-light-magenta
+  );
   --tokens-color-dataviz-categorical-series9-6: var(--base-color-categorical-light-pink);
-  --tokens-color-dataviz-categorical-series9-7: var(--base-color-categorical-light-orange);
-  --tokens-color-dataviz-categorical-series9-8: var(--base-color-categorical-light-yellow);
+  --tokens-color-dataviz-categorical-series9-7: var(
+    --base-color-categorical-light-orange
+  );
+  --tokens-color-dataviz-categorical-series9-8: var(
+    --base-color-categorical-light-yellow
+  );
   --tokens-color-dataviz-categorical-series9-9: var(--base-color-categorical-light-green);
-  --tokens-color-dataviz-categorical-series10-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series10-2: var(--base-color-categorical-light-purple);
-  --tokens-color-dataviz-categorical-series10-3: var(--base-color-categorical-light-indigo);
+  --tokens-color-dataviz-categorical-series10-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series10-2: var(
+    --base-color-categorical-light-purple
+  );
+  --tokens-color-dataviz-categorical-series10-3: var(
+    --base-color-categorical-light-indigo
+  );
   --tokens-color-dataviz-categorical-series10-4: var(--base-color-categorical-light-plum);
-  --tokens-color-dataviz-categorical-series10-5: var(--base-color-categorical-light-magenta);
+  --tokens-color-dataviz-categorical-series10-5: var(
+    --base-color-categorical-light-magenta
+  );
   --tokens-color-dataviz-categorical-series10-6: var(--base-color-categorical-light-pink);
-  --tokens-color-dataviz-categorical-series10-7: var(--base-color-categorical-light-salmon);
-  --tokens-color-dataviz-categorical-series10-8: var(--base-color-categorical-light-orange);
-  --tokens-color-dataviz-categorical-series10-9: var(--base-color-categorical-light-yellow);
-  --tokens-color-dataviz-categorical-series10-10: var(--base-color-categorical-light-green);
-  --tokens-color-dataviz-categorical-series11-1: var(--base-color-categorical-light-blurple);
-  --tokens-color-dataviz-categorical-series11-2: var(--base-color-categorical-light-purple);
-  --tokens-color-dataviz-categorical-series11-3: var(--base-color-categorical-light-indigo);
+  --tokens-color-dataviz-categorical-series10-7: var(
+    --base-color-categorical-light-salmon
+  );
+  --tokens-color-dataviz-categorical-series10-8: var(
+    --base-color-categorical-light-orange
+  );
+  --tokens-color-dataviz-categorical-series10-9: var(
+    --base-color-categorical-light-yellow
+  );
+  --tokens-color-dataviz-categorical-series10-10: var(
+    --base-color-categorical-light-green
+  );
+  --tokens-color-dataviz-categorical-series11-1: var(
+    --base-color-categorical-light-blurple
+  );
+  --tokens-color-dataviz-categorical-series11-2: var(
+    --base-color-categorical-light-purple
+  );
+  --tokens-color-dataviz-categorical-series11-3: var(
+    --base-color-categorical-light-indigo
+  );
   --tokens-color-dataviz-categorical-series11-4: var(--base-color-categorical-light-plum);
-  --tokens-color-dataviz-categorical-series11-5: var(--base-color-categorical-light-magenta);
+  --tokens-color-dataviz-categorical-series11-5: var(
+    --base-color-categorical-light-magenta
+  );
   --tokens-color-dataviz-categorical-series11-6: var(--base-color-categorical-light-pink);
-  --tokens-color-dataviz-categorical-series11-7: var(--base-color-categorical-light-salmon);
-  --tokens-color-dataviz-categorical-series11-8: var(--base-color-categorical-light-orange);
-  --tokens-color-dataviz-categorical-series11-9: var(--base-color-categorical-light-yellow);
-  --tokens-color-dataviz-categorical-series11-10: var(--base-color-categorical-light-lime);
-  --tokens-color-dataviz-categorical-series11-11: var(--base-color-categorical-light-green);
+  --tokens-color-dataviz-categorical-series11-7: var(
+    --base-color-categorical-light-salmon
+  );
+  --tokens-color-dataviz-categorical-series11-8: var(
+    --base-color-categorical-light-orange
+  );
+  --tokens-color-dataviz-categorical-series11-9: var(
+    --base-color-categorical-light-yellow
+  );
+  --tokens-color-dataviz-categorical-series11-10: var(
+    --base-color-categorical-light-lime
+  );
+  --tokens-color-dataviz-categorical-series11-11: var(
+    --base-color-categorical-light-green
+  );
   --tokens-color-dataviz-semantic-accent: var(--base-color-categorical-light-blurple);
   --tokens-color-dataviz-semantic-bad: var(--tokens-color-border-danger-vibrant);
   --tokens-color-dataviz-semantic-good: var(--tokens-color-border-success-vibrant);
@@ -597,63 +1301,155 @@
   --tokens-color-graphics-warning-moderate: var(--base-color-yellow-light-opaque-500);
   --tokens-color-graphics-warning-muted: var(--base-color-yellow-light-opaque-400);
   --tokens-color-graphics-warning-vibrant: var(--base-color-yellow-light-opaque-600);
-  --tokens-color-interactive-chonky-debossed-neutral-background: var(--base-color-neutral-light-transparent-100);
-  --tokens-color-interactive-chonky-debossed-neutral-chonk: var(--tokens-color-border-primary);
-  --tokens-color-interactive-chonky-debossed-neutral-content-danger: var(--tokens-color-content-danger);
-  --tokens-color-interactive-chonky-debossed-neutral-content-primary: var(--tokens-color-content-headings);
-  --tokens-color-interactive-chonky-debossed-neutral-content-secondary: var(--tokens-color-content-secondary);
-  --tokens-color-interactive-chonky-embossed-accent-background: var(--tokens-color-background-accent-vibrant);
-  --tokens-color-interactive-chonky-embossed-accent-chonk: var(--base-color-blue-light-opaque-1200);
-  --tokens-color-interactive-chonky-embossed-accent-content: var(--tokens-color-content-on-vibrant-light);
-  --tokens-color-interactive-chonky-embossed-danger-background: var(--tokens-color-background-danger-vibrant);
-  --tokens-color-interactive-chonky-embossed-danger-chonk: var(--base-color-red-light-opaque-1200);
-  --tokens-color-interactive-chonky-embossed-danger-content: var(--tokens-color-content-on-vibrant-light);
-  --tokens-color-interactive-chonky-embossed-neutral-background: var(--tokens-color-background-primary);
-  --tokens-color-interactive-chonky-embossed-neutral-chonk: var(--tokens-color-border-primary);
-  --tokens-color-interactive-chonky-embossed-neutral-content-accent: var(--tokens-color-content-accent);
-  --tokens-color-interactive-chonky-embossed-neutral-content-primary: var(--tokens-color-content-headings);
-  --tokens-color-interactive-chonky-embossed-neutral-content-secondary: var(--tokens-color-content-secondary);
-  --tokens-color-interactive-chonky-embossed-promotion-background: var(--tokens-color-background-promotion-vibrant);
-  --tokens-color-interactive-chonky-embossed-promotion-chonk: var(--base-color-pink-light-opaque-1200);
-  --tokens-color-interactive-chonky-embossed-promotion-content: var(--tokens-color-content-on-vibrant-dark);
-  --tokens-color-interactive-chonky-embossed-success-background: var(--tokens-color-background-success-vibrant);
-  --tokens-color-interactive-chonky-embossed-success-chonk: var(--base-color-green-light-opaque-1200);
-  --tokens-color-interactive-chonky-embossed-success-content: var(--tokens-color-content-on-vibrant-dark);
-  --tokens-color-interactive-chonky-embossed-warning-background: var(--tokens-color-background-warning-vibrant);
-  --tokens-color-interactive-chonky-embossed-warning-chonk: var(--base-color-yellow-light-opaque-800);
-  --tokens-color-interactive-chonky-embossed-warning-content: var(--tokens-color-content-on-vibrant-dark);
+  --tokens-color-interactive-chonky-debossed-neutral-background: var(
+    --base-color-neutral-light-transparent-100
+  );
+  --tokens-color-interactive-chonky-debossed-neutral-chonk: var(
+    --tokens-color-border-primary
+  );
+  --tokens-color-interactive-chonky-debossed-neutral-content-danger: var(
+    --tokens-color-content-danger
+  );
+  --tokens-color-interactive-chonky-debossed-neutral-content-primary: var(
+    --tokens-color-content-headings
+  );
+  --tokens-color-interactive-chonky-debossed-neutral-content-secondary: var(
+    --tokens-color-content-secondary
+  );
+  --tokens-color-interactive-chonky-embossed-accent-background: var(
+    --tokens-color-background-accent-vibrant
+  );
+  --tokens-color-interactive-chonky-embossed-accent-chonk: var(
+    --base-color-blue-light-opaque-1200
+  );
+  --tokens-color-interactive-chonky-embossed-accent-content: var(
+    --tokens-color-content-on-vibrant-light
+  );
+  --tokens-color-interactive-chonky-embossed-danger-background: var(
+    --tokens-color-background-danger-vibrant
+  );
+  --tokens-color-interactive-chonky-embossed-danger-chonk: var(
+    --base-color-red-light-opaque-1200
+  );
+  --tokens-color-interactive-chonky-embossed-danger-content: var(
+    --tokens-color-content-on-vibrant-light
+  );
+  --tokens-color-interactive-chonky-embossed-neutral-background: var(
+    --tokens-color-background-primary
+  );
+  --tokens-color-interactive-chonky-embossed-neutral-chonk: var(
+    --tokens-color-border-primary
+  );
+  --tokens-color-interactive-chonky-embossed-neutral-content-accent: var(
+    --tokens-color-content-accent
+  );
+  --tokens-color-interactive-chonky-embossed-neutral-content-primary: var(
+    --tokens-color-content-headings
+  );
+  --tokens-color-interactive-chonky-embossed-neutral-content-secondary: var(
+    --tokens-color-content-secondary
+  );
+  --tokens-color-interactive-chonky-embossed-promotion-background: var(
+    --tokens-color-background-promotion-vibrant
+  );
+  --tokens-color-interactive-chonky-embossed-promotion-chonk: var(
+    --base-color-pink-light-opaque-1200
+  );
+  --tokens-color-interactive-chonky-embossed-promotion-content: var(
+    --tokens-color-content-on-vibrant-dark
+  );
+  --tokens-color-interactive-chonky-embossed-success-background: var(
+    --tokens-color-background-success-vibrant
+  );
+  --tokens-color-interactive-chonky-embossed-success-chonk: var(
+    --base-color-green-light-opaque-1200
+  );
+  --tokens-color-interactive-chonky-embossed-success-content: var(
+    --tokens-color-content-on-vibrant-dark
+  );
+  --tokens-color-interactive-chonky-embossed-warning-background: var(
+    --tokens-color-background-warning-vibrant
+  );
+  --tokens-color-interactive-chonky-embossed-warning-chonk: var(
+    --base-color-yellow-light-opaque-800
+  );
+  --tokens-color-interactive-chonky-embossed-warning-content: var(
+    --tokens-color-content-on-vibrant-dark
+  );
   --tokens-color-interactive-disabled: 0.6;
   --tokens-color-interactive-link-accent-active: var(--base-color-blue-light-opaque-1300);
   --tokens-color-interactive-link-accent-hover: var(--base-color-blue-light-opaque-1200);
   --tokens-color-interactive-link-accent-rest: var(--tokens-color-content-accent);
-  --tokens-color-interactive-link-neutral-active: var(--base-color-neutral-light-opaque-1300);
-  --tokens-color-interactive-link-neutral-hover: var(--base-color-neutral-light-opaque-1200);
+  --tokens-color-interactive-link-neutral-active: var(
+    --base-color-neutral-light-opaque-1300
+  );
+  --tokens-color-interactive-link-neutral-hover: var(
+    --base-color-neutral-light-opaque-1200
+  );
   --tokens-color-interactive-link-neutral-rest: var(--tokens-color-content-secondary);
-  --tokens-color-interactive-transparent-accent-background-active: var(--base-color-blue-light-transparent-200);
-  --tokens-color-interactive-transparent-accent-background-hover: var(--base-color-blue-light-transparent-100);
-  --tokens-color-interactive-transparent-accent-background-rest: color(srgb 0 0 0.9411764705882353 / 0);
-  --tokens-color-interactive-transparent-accent-border: var(--tokens-color-border-transparent-accent-muted);
-  --tokens-color-interactive-transparent-accent-content-headings: var(--tokens-color-content-headings);
-  --tokens-color-interactive-transparent-accent-content-primary: var(--tokens-color-content-accent);
-  --tokens-color-interactive-transparent-accent-content-secondary: var(--tokens-color-content-secondary);
-  --tokens-color-interactive-transparent-accent-selected-background-active: var(--base-color-blue-light-transparent-300);
-  --tokens-color-interactive-transparent-accent-selected-background-hover: var(--base-color-blue-light-transparent-200);
-  --tokens-color-interactive-transparent-accent-selected-background-rest: var(--base-color-blue-light-transparent-100);
-  --tokens-color-interactive-transparent-neutral-background-active: var(--base-color-neutral-light-transparent-200);
-  --tokens-color-interactive-transparent-neutral-background-hover: var(--base-color-neutral-light-transparent-100);
-  --tokens-color-interactive-transparent-neutral-background-rest: color(srgb 0 0 0.12549019607843137 / 0);
-  --tokens-color-interactive-transparent-neutral-border: var(--tokens-color-border-transparent-neutral-muted);
-  --tokens-color-interactive-transparent-neutral-content-headings: var(--tokens-color-content-headings);
-  --tokens-color-interactive-transparent-neutral-content-primary: var(--tokens-color-content-primary);
-  --tokens-color-interactive-transparent-neutral-content-secondary: var(--tokens-color-content-secondary);
+  --tokens-color-interactive-transparent-accent-background-active: var(
+    --base-color-blue-light-transparent-200
+  );
+  --tokens-color-interactive-transparent-accent-background-hover: var(
+    --base-color-blue-light-transparent-100
+  );
+  --tokens-color-interactive-transparent-accent-background-rest: color(
+    srgb 0 0 0.9411764705882353 / 0
+  );
+  --tokens-color-interactive-transparent-accent-border: var(
+    --tokens-color-border-transparent-accent-muted
+  );
+  --tokens-color-interactive-transparent-accent-content-headings: var(
+    --tokens-color-content-headings
+  );
+  --tokens-color-interactive-transparent-accent-content-primary: var(
+    --tokens-color-content-accent
+  );
+  --tokens-color-interactive-transparent-accent-content-secondary: var(
+    --tokens-color-content-secondary
+  );
+  --tokens-color-interactive-transparent-accent-selected-background-active: var(
+    --base-color-blue-light-transparent-300
+  );
+  --tokens-color-interactive-transparent-accent-selected-background-hover: var(
+    --base-color-blue-light-transparent-200
+  );
+  --tokens-color-interactive-transparent-accent-selected-background-rest: var(
+    --base-color-blue-light-transparent-100
+  );
+  --tokens-color-interactive-transparent-neutral-background-active: var(
+    --base-color-neutral-light-transparent-200
+  );
+  --tokens-color-interactive-transparent-neutral-background-hover: var(
+    --base-color-neutral-light-transparent-100
+  );
+  --tokens-color-interactive-transparent-neutral-background-rest: color(
+    srgb 0 0 0.12549019607843137 / 0
+  );
+  --tokens-color-interactive-transparent-neutral-border: var(
+    --tokens-color-border-transparent-neutral-muted
+  );
+  --tokens-color-interactive-transparent-neutral-content-headings: var(
+    --tokens-color-content-headings
+  );
+  --tokens-color-interactive-transparent-neutral-content-primary: var(
+    --tokens-color-content-primary
+  );
+  --tokens-color-interactive-transparent-neutral-content-secondary: var(
+    --tokens-color-content-secondary
+  );
   --tokens-color-shadow-elevation-low: var(--base-color-neutral-light-transparent-200);
   --tokens-color-shadow-elevation-medium: var(--base-color-neutral-light-transparent-100);
   --tokens-color-syntax-base: var(--tokens-color-content-primary);
   --tokens-color-syntax-code-background: var(--tokens-color-background-secondary);
   --tokens-color-syntax-comment: var(--tokens-color-content-secondary);
   --tokens-color-syntax-function: var(--tokens-color-content-accent);
-  --tokens-color-syntax-hightlight-accent: var(--base-color-neutral-light-transparent-400);
-  --tokens-color-syntax-hightlight-background: var(--tokens-color-background-transparent-neutral-muted);
+  --tokens-color-syntax-hightlight-accent: var(
+    --base-color-neutral-light-transparent-400
+  );
+  --tokens-color-syntax-hightlight-background: var(
+    --tokens-color-background-transparent-neutral-muted
+  );
   --tokens-color-syntax-inline-code: var(--tokens-color-content-primary);
   --tokens-color-syntax-key-word: var(--tokens-color-content-danger);
   --tokens-color-syntax-operator: var(--tokens-color-content-accent);
