@@ -1,14 +1,13 @@
-import { cva, VariantProps } from 'class-variance-authority';
 import React from 'react';
+import {cva, type VariantProps} from 'class-variance-authority';
 
-import { cn } from '../../utils/cn';
+import {cn} from '../utils/cn';
 
-// Card styles based on mockup .card class
 const card = cva([
   'bg-background-primary',
-  'rounded-radius-lg', 
+  'rounded-radius-lg',
   'p-space-2xl',
-  'shadow-sm'
+  'shadow-sm',
 ]);
 
 interface CardProps
@@ -16,19 +15,13 @@ interface CardProps
     VariantProps<typeof card> {}
 
 const CardRoot = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn(card({ className }))} {...props} />
+  ({className, ...props}, ref) => (
+    <div ref={ref} className={cn(card({className}))} {...props} />
   )
 );
 CardRoot.displayName = 'Card';
 
-// Card Title styles based on mockup .card-title class
-const title = cva([
-  'text-lg',
-  'font-semibold', 
-  'mb-space-xl',
-  'text-content-headings'
-], {
+const title = cva(['text-lg', 'font-semibold', 'mb-space-xl', 'text-content-headings'], {
   variants: {
     size: {
       sm: ['text-sm'],
@@ -47,8 +40,8 @@ interface TitleProps
     VariantProps<typeof title> {}
 
 const Title = React.forwardRef<HTMLHeadingElement, TitleProps>(
-  ({ className, size, children, ...props }, ref) => (
-    <h3 ref={ref} className={cn(title({ className, size }))} {...props}>
+  ({className, size, children, ...props}, ref) => (
+    <h3 ref={ref} className={cn(title({className, size}))} {...props}>
       {children}
     </h3>
   )

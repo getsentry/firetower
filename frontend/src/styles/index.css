@@ -19,6 +19,27 @@
   .bg-background-danger-vibrant {
     background-color: var(--tokens-color-background-danger-vibrant);
   }
+  .bg-background-success-vibrant {
+    background-color: var(--tokens-color-background-success-vibrant);
+  }
+  .bg-background-warning-vibrant {
+    background-color: var(--tokens-color-background-warning-vibrant);
+  }
+  .bg-background-transparent-accent-muted {
+    background-color: var(--tokens-color-background-transparent-accent-muted);
+  }
+  .bg-background-transparent-danger-muted {
+    background-color: var(--tokens-color-background-transparent-danger-muted);
+  }
+  .bg-background-transparent-success-muted {
+    background-color: var(--tokens-color-background-transparent-success-muted);
+  }
+  .bg-background-transparent-warning-muted {
+    background-color: var(--tokens-color-background-transparent-warning-muted);
+  }
+  .bg-background-transparent-promotion-muted {
+    background-color: var(--tokens-color-background-transparent-promotion-muted);
+  }
 
   /* Text colors */
   .text-content-headings {

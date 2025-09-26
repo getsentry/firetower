@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'bun:test';
-import { render, screen } from '@testing-library/react';
+import {render, screen} from '@testing-library/react';
+import {describe, expect, it} from 'bun:test';
 
-import { Card } from './Card';
+import {Card} from './Card';
 
 describe('Card', () => {
   it('renders arbitrary child', async () => {
