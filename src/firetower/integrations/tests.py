@@ -1,8 +1,7 @@
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
-from django.test import TestCase
 
 from .services.jira import JiraService
 

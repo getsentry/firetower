@@ -19,15 +19,20 @@ def incident_list_ui(request):
     try:
         jira_service = JiraService()
         status_filter = request.GET.get("status")
-        jira_incidents = jira_service.get_incidents(status=status_filter, max_results=50)
-        incidents = [transform_jira_incident_for_list(incident) for incident in jira_incidents]
+        jira_incidents = jira_service.get_incidents(
+            status=status_filter, max_results=50
+        )
+        incidents = [
+            transform_jira_incident_for_list(incident) for incident in jira_incidents
+        ]
 
         return Response(incidents)
 
     except Exception as e:
         print(f"Error fetching incidents: {e}")
         return Response(
-            {"error": "Failed to fetch incidents"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": "Failed to fetch incidents"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
@@ -51,7 +56,8 @@ def incident_detail_ui(request, incident_id):
 
         if not jira_incident:
             return Response(
-                {"error": f"Incident {incident_id} not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": f"Incident {incident_id} not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         incident_detail = transform_jira_incident_for_detail(jira_incident)

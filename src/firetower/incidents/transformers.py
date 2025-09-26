@@ -58,7 +58,9 @@ def extract_participants(jira_incident):
             }
         )
 
-    if jira_incident.get("reporter") and jira_incident["reporter"] != jira_incident.get("assignee"):
+    if jira_incident.get("reporter") and jira_incident["reporter"] != jira_incident.get(
+        "assignee"
+    ):
         participants.append(
             {
                 "name": jira_incident["reporter"],

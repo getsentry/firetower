@@ -34,7 +34,9 @@ class JiraService:
         self.severity_field_id = jira_config["SEVERITY_FIELD"]
 
         # Initialize Jira client with basic auth
-        self.client = JIRA(self.domain, basic_auth=(jira_config["ACCOUNT"], jira_config["API_KEY"]))
+        self.client = JIRA(
+            self.domain, basic_auth=(jira_config["ACCOUNT"], jira_config["API_KEY"])
+        )
 
     def _extract_severity(self, issue):
         """Extract severity from Jira custom field."""
@@ -59,8 +61,12 @@ class JiraService:
             "description": getattr(issue.fields, "description", "") or "",
             "status": issue.fields.status.name,
             "severity": self._extract_severity(issue),
-            "assignee": issue.fields.assignee.displayName if issue.fields.assignee else None,
-            "reporter": issue.fields.reporter.displayName if issue.fields.reporter else None,
+            "assignee": issue.fields.assignee.displayName
+            if issue.fields.assignee
+            else None,
+            "reporter": issue.fields.reporter.displayName
+            if issue.fields.reporter
+            else None,
             "created_at": issue.fields.created,
             "updated_at": issue.fields.updated,
         }
@@ -88,7 +94,9 @@ class JiraService:
         jql_query = " AND ".join(jql_parts)
         jql_query += " ORDER BY created DESC"
 
-        issues = self.client.search_issues(jql_query, maxResults=max_results, expand="changelog")
+        issues = self.client.search_issues(
+            jql_query, maxResults=max_results, expand="changelog"
+        )
 
         incidents = []
         for issue in issues:
@@ -98,8 +106,12 @@ class JiraService:
                 "description": getattr(issue.fields, "description", "") or "",
                 "status": issue.fields.status.name,
                 "severity": self._extract_severity(issue),
-                "assignee": issue.fields.assignee.displayName if issue.fields.assignee else None,
-                "reporter": issue.fields.reporter.displayName if issue.fields.reporter else None,
+                "assignee": issue.fields.assignee.displayName
+                if issue.fields.assignee
+                else None,
+                "reporter": issue.fields.reporter.displayName
+                if issue.fields.reporter
+                else None,
                 "created_at": issue.fields.created,
                 "updated_at": issue.fields.updated,
             }
