@@ -14,7 +14,7 @@ const pill = cva(
     'text-size-sm',
     'font-medium',
     'uppercase',
-    'line-height-compressed',
+    'leading-compressed',
   ],
   {
     variants: {
