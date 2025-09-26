@@ -25,7 +25,9 @@ describe('cn utility', () => {
         null
       );
 
-      expect(className).toEqual('text-size-md text-content-headings bg-background-success-vibrant rounded-radius-lg');
+      expect(className).toEqual(
+        'text-size-md text-content-headings bg-background-success-vibrant rounded-radius-lg'
+      );
     });
 
     it('should flatten arrays with design token classes', () => {
@@ -53,7 +55,9 @@ describe('cn utility', () => {
         'bg-background-accent-vibrant p-space-lg'
       );
 
-      expect(className).toEqual('hover:bg-background-secondary bg-background-accent-vibrant p-space-lg');
+      expect(className).toEqual(
+        'hover:bg-background-secondary bg-background-accent-vibrant p-space-lg'
+      );
     });
 
     it('should merge conflicting text classes', () => {
@@ -66,10 +70,7 @@ describe('cn utility', () => {
     });
 
     it('should merge conflicting spacing classes', () => {
-      const className = cn(
-        'p-space-sm mb-space-md',
-        'p-space-xl mb-space-lg'
-      );
+      const className = cn('p-space-sm mb-space-md', 'p-space-xl mb-space-lg');
 
       expect(className).toEqual('p-space-xl mb-space-lg');
     });
@@ -84,10 +85,7 @@ describe('cn utility', () => {
     });
 
     it('should still merge standard Tailwind classes', () => {
-      const className = cn(
-        'bg-red-500 hover:bg-red-600 px-2 py-1',
-        'bg-blue-500 p-4'
-      );
+      const className = cn('bg-red-500 hover:bg-red-600 px-2 py-1', 'bg-blue-500 p-4');
 
       expect(className).toEqual('hover:bg-red-600 bg-blue-500 p-4');
     });
@@ -107,7 +105,9 @@ describe('cn utility', () => {
         }
       );
 
-      expect(className).toEqual('px-space-lg py-space-md rounded-radius-md text-size-md font-medium bg-background-accent-vibrant text-content-on-vibrant-light');
+      expect(className).toEqual(
+        'px-space-lg py-space-md rounded-radius-md text-size-md font-medium bg-background-accent-vibrant text-content-on-vibrant-light'
+      );
     });
 
     it('should handle card-like component classes', () => {
@@ -122,7 +122,9 @@ describe('cn utility', () => {
         'shadow-sm'
       );
 
-      expect(className).toEqual('bg-background-primary rounded-radius-lg p-space-2xl border-accent-muted shadow-sm');
+      expect(className).toEqual(
+        'bg-background-primary rounded-radius-lg p-space-2xl border-accent-muted shadow-sm'
+      );
     });
   });
 });

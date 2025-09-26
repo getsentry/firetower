@@ -31,7 +31,7 @@ function Index() {
   return (
     <div className="p-2">
       <h3>Incidents list</h3>
-      <ul className="flex flex-col gap-2 list-disc">
+      <ul className="flex list-disc flex-col gap-2">
         {incidents.map(incident => (
           <li key={incident.id}>
             <h4>

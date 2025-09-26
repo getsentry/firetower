@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import importlib.metadata
-import json
 import os
 import shlex
-import shutil
 import subprocess
 
 from devenv import constants
-from devenv.lib import colima, config, fs, limactl, proc
+from devenv.lib import config, proc
 
 
 # TODO: need to replace this with a nicer process executor in devenv.lib
