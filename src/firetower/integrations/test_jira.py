@@ -1,7 +1,18 @@
+"""
+Basic pytest tests for Jira integration service.
+"""
+import os
 import pytest
-from unittest.mock import Mock, patch
-from django.test import TestCase
+from unittest.mock import patch
+
+# Set up Django settings
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'firetower.settings')
+
+import django
 from django.conf import settings
+
+# Setup Django
+django.setup()
 
 from .services.jira import JiraService
 
@@ -10,7 +21,7 @@ class TestJiraService:
     """Test suite for JiraService"""
     
     def test_initialization_requires_credentials(self):
-        """Test that JiraService initialization validates required credentials"""
+        """Test that JiraService initialization validates required credentials."""
         # Mock settings to have empty credentials
         mock_jira_config = {
             'ACCOUNT': '',
