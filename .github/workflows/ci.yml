@@ -83,7 +83,7 @@ jobs:
       - name: Check frontend formatting
         run: |
           cd frontend
-          bun run format --check
+          bun run format:check
 
   frontend-test:
     name: Frontend tests
