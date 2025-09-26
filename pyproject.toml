@@ -5,9 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "black>=25.9.0",
     "django>=5.2.5",
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.15.2",
+    "isort>=6.0.1",
     "jira>=3.5.0",
 ]
 
@@ -26,3 +28,12 @@ dev = [
 prod = [
     "granian>=2.5.3",
 ]
+
+[tool.black]
+line-length = 100
+target-version = ['py313']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+lines_between_sections = 1
