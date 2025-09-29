@@ -1,11 +1,9 @@
 import {useSuspenseQuery} from '@tanstack/react-query';
-import {createFileRoute, Link} from '@tanstack/react-router';
+import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
 import {z} from 'zod';
 
-import {Card} from '../components/Card';
-import {Pill} from '../components/Pill';
-
+import {IncidentCard} from './components/IncidentCard';
 import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
 
 // Zod schema for search params
@@ -34,20 +32,7 @@ function Index() {
   return (
     <div className="flex flex-col gap-space-lg">
       {incidents.map(incident => (
-        <Card key={incident.id}>
-          <Card.Title>
-            {incident.id} {incident.title}
-          </Card.Title>
-          <Pill variant={incident.severity}>{incident.severity}</Pill>
-          <Link
-            to="/$incidentId"
-            params={{incidentId: incident.id}}
-            className="underline"
-            preload={'intent'}
-          >
-            link
-          </Link>
-        </Card>
+        <IncidentCard key={incident.id} incident={incident} />
       ))}
     </div>
   );

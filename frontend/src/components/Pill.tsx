@@ -21,14 +21,17 @@ const pill = cva(
       // might want to tweak how the variants work later once we try using them
       variant: {
         // Status variants
-        active: ['bg-background-transparent-danger-muted', 'text-content-danger'],
-        mitigated: ['bg-background-transparent-accent-muted', 'text-content-accent'],
-        'actions-pending': [
+        Active: ['bg-background-transparent-danger-muted', 'text-content-danger'],
+        Mitigated: ['bg-background-transparent-accent-muted', 'text-content-accent'],
+        'Actions Pending': [
           'bg-background-transparent-warning-muted',
           'text-content-warning',
         ],
-        postmortem: ['bg-background-transparent-promotion-muted', 'text-content-danger'],
-        done: ['bg-background-transparent-success-muted', 'text-content-success'],
+        Postmortem: [
+          'bg-background-transparent-promotion-muted',
+          'text-content-promotion',
+        ],
+        Done: ['bg-background-transparent-success-muted', 'text-content-success'],
         // Severity variants
         P0: ['bg-background-transparent-danger-muted', 'text-content-danger'],
         P1: ['bg-background-transparent-danger-muted', 'text-content-danger'],
@@ -36,7 +39,7 @@ const pill = cva(
         P3: ['bg-background-transparent-accent-muted', 'text-content-accent'],
         P4: ['bg-background-transparent-accent-muted', 'text-content-accent'],
         // Other variants
-        private: ['bg-background-transparent-promotion-muted', 'text-content-danger'],
+        private: ['bg-background-transparent-promotion-muted', 'text-content-promotion'],
         default: ['bg-background-secondary', 'text-content-secondary'],
       },
     },

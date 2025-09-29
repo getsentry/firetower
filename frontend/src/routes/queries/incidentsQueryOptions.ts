@@ -15,6 +15,8 @@ const IncidentListItemSchema = z.object({
 
 const IncidentsListSchema = z.array(IncidentListItemSchema);
 
+export type IncidentListItem = z.infer<typeof IncidentListItemSchema>;
+
 interface IncidentsQueryArgs {
   status?: string;
 }
