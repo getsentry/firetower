@@ -19,9 +19,9 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
     >
       <div className="bg-background-primary rounded-radius-lg p-space-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
         <div className="flex flex-wrap items-center gap-space-xl mb-space-md md:flex-nowrap">
-          <div className="text-size-md text-content-secondary font-regular">
+          <span className="text-size-md text-content-secondary font-regular">
             {incident.id}
-          </div>
+          </span>
           <div className="ml-auto text-size-sm text-content-secondary text-right md:order-last">
             <div>
               {createdAt.toLocaleDateString('en-US', {
@@ -52,9 +52,9 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
           </div>
         </div>
 
-        <div className="text-content-secondary text-size-sm leading-comfortable">
+        <p className="text-content-secondary text-size-sm leading-comfortable">
           {incident.description}
-        </div>
+        </p>
       </div>
     </Link>
   );
