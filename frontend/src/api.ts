@@ -39,7 +39,7 @@ async function _fetch<ResponseSchemaT extends z.ZodType>({
 }: FetchArgsWithMethod<ResponseSchemaT>) {
   // Ensure path has trailing slash
   const normalizedPath = path.endsWith('/') ? path : path + '/';
-  
+
   const queryString = paramsFromObject(query);
   const url = `${env.VITE_API_URL}${normalizedPath}${queryString ? '?' + queryString : ''}`;
 

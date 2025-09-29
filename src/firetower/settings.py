@@ -10,8 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-from pathlib import Path
 import os
+from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,7 +29,7 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
+    "http://localhost:5173",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -135,9 +135,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Jira Integration Configuration
 # Defaults to test environment setup (matching opsbot test config)
 JIRA = {
-    'DOMAIN': os.environ.get('JIRA_DOMAIN', 'https://getsentry.atlassian.net'),
-    'ACCOUNT': os.environ.get('JIRA_ACCOUNT'),
-    'API_KEY': os.environ.get('JIRA_API_KEY'),
-    'PROJECT_KEY': os.environ.get('JIRA_PROJECT_KEY', 'TESTINC'),  # Default to test project
-    'SEVERITY_FIELD': os.environ.get('JIRA_SEVERITY_FIELD', 'customfield_11023'),  # Test environment field
+    "DOMAIN": os.environ.get("JIRA_DOMAIN", "https://getsentry.atlassian.net"),
+    "ACCOUNT": os.environ.get("JIRA_ACCOUNT"),
+    "API_KEY": os.environ.get("JIRA_API_KEY"),
+    "PROJECT_KEY": os.environ.get("JIRA_PROJECT_KEY", "TESTINC"),
+    "SEVERITY_FIELD": os.environ.get("JIRA_SEVERITY_FIELD", "customfield_11023"),
 }

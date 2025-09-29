@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import incident_list_ui, incident_detail_ui
+
+from .views import incident_detail_ui, incident_list_ui
 
 urlpatterns = [
     path("api/ui/incidents/", incident_list_ui, name="incident-list-ui"),
