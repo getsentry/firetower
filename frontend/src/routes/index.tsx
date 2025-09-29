@@ -3,6 +3,9 @@ import {createFileRoute, Link} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
 import {z} from 'zod';
 
+import {Card} from '../components/Card';
+import {Pill} from '../components/Pill';
+
 import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
 
 // Zod schema for search params
@@ -29,25 +32,23 @@ function Index() {
   const {data: incidents} = useSuspenseQuery(incidentsQueryOptions(params));
 
   return (
-    <div className="p-2">
-      <h3>Incidents list</h3>
-      <ul className="flex list-disc flex-col gap-2">
-        {incidents.map(incident => (
-          <li key={incident.id}>
-            <h4>
-              {incident.id} {incident.title}
-            </h4>
-            <Link
-              to="/$incidentId"
-              params={{incidentId: incident.id}}
-              className="underline"
-              preload={'intent'}
-            >
-              See incident details
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <div className="flex flex-col gap-space-lg">
+      {incidents.map(incident => (
+        <Card key={incident.id}>
+          <Card.Title>
+            {incident.id} {incident.title}
+          </Card.Title>
+          <Pill variant={incident.severity}>{incident.severity}</Pill>
+          <Link
+            to="/$incidentId"
+            params={{incidentId: incident.id}}
+            className="underline"
+            preload={'intent'}
+          >
+            link
+          </Link>
+        </Card>
+      ))}
     </div>
   );
 }

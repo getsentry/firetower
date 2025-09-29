@@ -30,11 +30,11 @@ const pill = cva(
         postmortem: ['bg-background-transparent-promotion-muted', 'text-content-danger'],
         done: ['bg-background-transparent-success-muted', 'text-content-success'],
         // Severity variants
-        p0: ['bg-background-transparent-danger-muted', 'text-content-danger'],
-        p1: ['bg-background-transparent-danger-muted', 'text-content-danger'],
-        p2: ['bg-background-transparent-warning-muted', 'text-content-warning'],
-        p3: ['bg-background-transparent-accent-muted', 'text-content-accent'],
-        p4: ['bg-background-transparent-accent-muted', 'text-content-accent'],
+        P0: ['bg-background-transparent-danger-muted', 'text-content-danger'],
+        P1: ['bg-background-transparent-danger-muted', 'text-content-danger'],
+        P2: ['bg-background-transparent-warning-muted', 'text-content-warning'],
+        P3: ['bg-background-transparent-accent-muted', 'text-content-accent'],
+        P4: ['bg-background-transparent-accent-muted', 'text-content-accent'],
         // Other variants
         private: ['bg-background-transparent-promotion-muted', 'text-content-danger'],
         default: ['bg-background-secondary', 'text-content-secondary'],

@@ -1,6 +1,11 @@
 @import 'tailwindcss';
 @import './design-tokens.css';
 
+/* Global styles */
+body {
+  font-family: var(--tokens-typography-font-family-sans);
+}
+
 /* Custom utilities using design tokens */
 @layer utilities {
   /* Background colors */
