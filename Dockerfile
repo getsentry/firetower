@@ -28,7 +28,7 @@ COPY frontend/package.json .
 RUN bun install --frozen-lockfile
 
 COPY frontend/package.json .
-COPY frontend/tsconfig*.json .
+COPY frontend/tsconfig*.json ./
 COPY frontend/vite.config.ts .
 COPY frontend/index.html .
 COPY frontend/env.ts .
