@@ -9,7 +9,10 @@ import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
 
 // Zod schema for search params
 const incidentListSearchSchema = z.object({
-  status: z.enum(['active', 'review', 'closed']).default('active'),
+  status: z
+    .array(z.enum(['Active', 'Mitigated', 'Postmortem', 'Actions Pending', 'Done']))
+    .optional()
+    .default(['Active', 'Mitigated']),
 });
 
 export const Route = createFileRoute('/')({

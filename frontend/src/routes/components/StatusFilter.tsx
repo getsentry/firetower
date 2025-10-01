@@ -2,19 +2,31 @@ import {Link, useSearch} from '@tanstack/react-router';
 
 import {cn} from '../../utils/cn';
 
-type FilterValue = 'active' | 'review' | 'closed';
+type JiraStatus = 'Active' | 'Mitigated' | 'Postmortem' | 'Actions Pending' | 'Done';
 
 interface FilterLinkProps {
-  value: FilterValue;
+  statuses: JiraStatus[];
   label: string;
   isActive: boolean;
 }
 
-function FilterLink({value, label, isActive}: FilterLinkProps) {
+const FILTER_GROUPS = {
+  active: ['Active', 'Mitigated'] as JiraStatus[],
+  review: ['Postmortem', 'Actions Pending'] as JiraStatus[],
+  closed: ['Done'] as JiraStatus[],
+};
+
+function arraysEqual(a: JiraStatus[], b: JiraStatus[]): boolean {
+  if (a.length !== b.length) return false;
+  const setB = new Set(b);
+  return a.every(val => setB.has(val));
+}
+
+function FilterLink({statuses, label, isActive}: FilterLinkProps) {
   return (
     <Link
       to="/"
-      search={{status: value}}
+      search={{status: statuses}}
       preload="intent"
       className={cn(
         'rounded-radius-sm px-space-lg py-space-sm text-size-sm font-medium transition-colors',
@@ -34,9 +46,21 @@ export function StatusFilter() {
 
   return (
     <div className="gap-space-2xs flex">
-      <FilterLink value="active" label="Active" isActive={status === 'active'} />
-      <FilterLink value="review" label="In Review" isActive={status === 'review'} />
-      <FilterLink value="closed" label="Closed" isActive={status === 'closed'} />
+      <FilterLink
+        statuses={FILTER_GROUPS.active}
+        label="Active"
+        isActive={arraysEqual(status, FILTER_GROUPS.active)}
+      />
+      <FilterLink
+        statuses={FILTER_GROUPS.review}
+        label="In Review"
+        isActive={arraysEqual(status, FILTER_GROUPS.review)}
+      />
+      <FilterLink
+        statuses={FILTER_GROUPS.closed}
+        label="Closed"
+        isActive={arraysEqual(status, FILTER_GROUPS.closed)}
+      />
     </div>
   );
 }

@@ -2,13 +2,17 @@ import {z} from 'zod';
 
 import {env} from '../env';
 
-type ParamsObj = Record<string, string | number | undefined>;
+type ParamsObj = Record<string, string | number | undefined | (string | number)[]>;
 
 export function paramsFromObject(params: ParamsObj): URLSearchParams {
   const urlParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value != null) {
-      urlParams.append(key, value.toString());
+      if (Array.isArray(value)) {
+        value.forEach(v => urlParams.append(key, v.toString()));
+      } else {
+        urlParams.append(key, value.toString());
+      }
     }
   });
   return urlParams;
