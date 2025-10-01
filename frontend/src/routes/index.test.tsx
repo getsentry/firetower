@@ -73,7 +73,6 @@ describe('IncidentCard (via Index Route)', () => {
   it('renders incident cards on the index route', async () => {
     renderRoute();
 
-    // Wait for the incidents to load and render
     expect(await screen.findByText('INC-1247')).toBeInTheDocument();
     expect(
       await screen.findByText('Database Connection Pool Exhausted')
@@ -106,11 +105,9 @@ describe('IncidentCard (via Index Route)', () => {
   it('renders incident cards as clickable links', async () => {
     renderRoute();
 
-    // Wait for incident content to load first
     await screen.findByText('INC-1247');
 
     const linkElements = await screen.findAllByRole('link');
-    // Filter out the header link to just get incident links
     const incidentLinks = linkElements.filter(link =>
       link.getAttribute('href')?.startsWith('/INC-')
     );
@@ -123,7 +120,6 @@ describe('IncidentCard (via Index Route)', () => {
   it('calls the incidents API with correct parameters', async () => {
     renderRoute();
 
-    // Wait for component to load
     await screen.findByText('INC-1247');
 
     expect(mockApiGet).toHaveBeenCalledWith({
