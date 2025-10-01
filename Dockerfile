@@ -30,7 +30,10 @@ COPY frontend/tsconfig*.json ./
 COPY frontend/vite.config.ts .
 COPY frontend/index.html .
 COPY frontend/env.ts .
+COPY frontend/public ./public/
 COPY frontend/src ./src/
+
+ENV VITE_API_URL="/api"
 
 RUN bun run build
 
@@ -47,4 +50,6 @@ USER 1100
 
 ENV PORT=8080
 EXPOSE $PORT
+
+ENV GRANIAN_STATIC_PATH_MOUNT="static/"
 ENTRYPOINT [ "sh", "-c", "/app/.venv/bin/granian --interface wsgi --host 0.0.0.0 --port $PORT firetower.wsgi:application"]

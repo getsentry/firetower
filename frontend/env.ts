@@ -5,7 +5,7 @@ export const env = createEnv({
   clientPrefix: 'VITE_',
 
   client: {
-    VITE_API_URL: z.url(), // no trailing slash
+    VITE_API_URL: z.string(), // no trailing slash
   },
 
   runtimeEnv: import.meta.env,
