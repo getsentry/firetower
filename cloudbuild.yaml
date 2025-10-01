@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'us-west1-docker.pkg.dev/285301407591/firetower-docker/firetower:latest', '.']
+options:
+  logging: CLOUD_LOGGING_ONLY
