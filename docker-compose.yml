@@ -1,0 +1,49 @@
+services:
+  firetower:
+    build: .
+    expose:
+      - 8080
+    networks:
+      - firetower
+    # TODO: These shouldn't be in frontend/ ?
+    env_file: frontend/.env
+
+  # Simulates the Global Load Balancer
+  nginx:
+    image: nginx:1.29.1
+    ports:
+      - "8080:80"
+    networks:
+      - firetower
+    command: |
+      bash -c 'bash -s <<EOF
+        cat > /etc/nginx/nginx.conf <<EON
+          daemon off;
+          user www-data;
+          events {
+            worker_connections 768;
+          }
+          http {
+            resolver 127.0.0.11 ipv6=off;
+            gzip on;
+            gzip_disable "msie6";
+            include /etc/nginx/mime.types;
+            server {
+              listen 80;
+              location /api {
+                proxy_pass http://firetower:8080;
+              }
+              location = / {
+                proxy_pass http://firetower:8080/static/index.html;
+              }
+              location / {
+                proxy_pass http://firetower:8080/static/;
+              }
+            }
+          }
+      EON
+      nginx
+      EOF'
+
+networks:
+  firetower:
