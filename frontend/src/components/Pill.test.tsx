@@ -21,7 +21,7 @@ describe('Pill', () => {
 
   it('applies variant classes', () => {
     render(
-      <Pill variant="active" data-testid="pill">
+      <Pill variant="Active" data-testid="pill">
         Active
       </Pill>
     );
