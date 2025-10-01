@@ -1,23 +1,22 @@
 import {Link, useSearch} from '@tanstack/react-router';
 
 import {cn} from '../../utils/cn';
-
-type JiraStatus = 'Active' | 'Mitigated' | 'Postmortem' | 'Actions Pending' | 'Done';
+import {type IncidentStatus} from '../queries/incidentsQueryOptions';
 
 interface FilterLinkProps {
-  statuses: JiraStatus[];
+  statuses: IncidentStatus[];
   label: string;
   isActive: boolean;
   testId?: string;
 }
 
 const FILTER_GROUPS = {
-  active: ['Active', 'Mitigated'] as JiraStatus[],
-  review: ['Postmortem', 'Actions Pending'] as JiraStatus[],
-  closed: ['Done'] as JiraStatus[],
+  active: ['Active', 'Mitigated'] as IncidentStatus[],
+  review: ['Postmortem', 'Actions Pending'] as IncidentStatus[],
+  closed: ['Done'] as IncidentStatus[],
 };
 
-function arraysEqual(a: JiraStatus[], b: JiraStatus[]): boolean {
+function arraysEqual(a: IncidentStatus[], b: IncidentStatus[]): boolean {
   if (a.length !== b.length) return false;
   const setB = new Set(b);
   return a.every(val => setB.has(val));

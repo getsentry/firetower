@@ -7,14 +7,14 @@ import {Spinner} from '../components/Spinner';
 
 import {IncidentCard} from './components/IncidentCard';
 import {StatusFilter} from './components/StatusFilter';
-import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
+import {
+  incidentsQueryOptions,
+  IncidentStatusSchema,
+} from './queries/incidentsQueryOptions';
 
 // Zod schema for search params
 const incidentListSearchSchema = z.object({
-  status: z
-    .array(z.enum(['Active', 'Mitigated', 'Postmortem', 'Actions Pending', 'Done']))
-    .optional()
-    .default(['Active', 'Mitigated']),
+  status: z.array(IncidentStatusSchema).optional().default(['Active', 'Mitigated']),
 });
 
 function IncidentsLayout({children}: {children: React.ReactNode}) {
