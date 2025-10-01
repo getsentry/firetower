@@ -5,11 +5,13 @@ import {TanStackRouterDevtools} from '@tanstack/react-router-devtools';
 import {Header} from './components/Header';
 
 const RootLayout = () => (
-  <>
+  <div className="bg-background-tertiary text-content-primary leading-default min-h-screen">
     <Header />
-    <Outlet />
+    <main className="px-space-md py-space-xl md:px-space-xl mx-auto max-w-6xl">
+      <Outlet />
+    </main>
     <TanStackRouterDevtools />
-  </>
+  </div>
 );
 
 export const Route = createRootRouteWithContext<{queryClient: QueryClient}>()({

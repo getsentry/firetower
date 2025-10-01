@@ -1,6 +1,11 @@
 @import 'tailwindcss';
 @import './design-tokens.css';
 
+/* Global styles */
+body {
+  font-family: var(--tokens-typography-font-family-sans);
+}
+
 /* Custom utilities using design tokens */
 @layer utilities {
   /* Background colors */
@@ -62,6 +67,9 @@
   }
   .text-content-warning {
     color: var(--tokens-color-content-warning);
+  }
+  .text-content-promotion {
+    color: var(--tokens-color-content-promotion);
   }
   .text-content-disabled {
     color: var(--tokens-color-content-disabled);
