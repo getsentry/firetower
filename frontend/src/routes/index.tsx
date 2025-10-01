@@ -4,11 +4,12 @@ import {zodValidator} from '@tanstack/zod-adapter';
 import {z} from 'zod';
 
 import {IncidentCard} from './components/IncidentCard';
+import {StatusFilter} from './components/StatusFilter';
 import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
 
 // Zod schema for search params
 const incidentListSearchSchema = z.object({
-  status: z.string().optional(),
+  status: z.enum(['active', 'review', 'closed']).default('active'),
 });
 
 export const Route = createFileRoute('/')({
@@ -30,10 +31,14 @@ function Index() {
   const {data: incidents} = useSuspenseQuery(incidentsQueryOptions(params));
 
   return (
-    <div className="gap-space-lg flex flex-col">
-      {incidents.map(incident => (
-        <IncidentCard key={incident.id} incident={incident} />
-      ))}
+    <div className="flex flex-col">
+      <StatusFilter />
+      <hr className="mb-space-xl mt-space-lg border-secondary" />
+      <div className="gap-space-lg flex flex-col">
+        {incidents.map(incident => (
+          <IncidentCard key={incident.id} incident={incident} />
+        ))}
+      </div>
     </div>
   );
 }
