@@ -1,7 +1,7 @@
 import React from 'react';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {createMemoryHistory, createRouter, RouterProvider} from '@tanstack/react-router';
-import {render, screen} from '@testing-library/react';
+import {render, screen, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {beforeEach, describe, expect, it, vi} from 'bun:test';
 
@@ -88,12 +88,14 @@ describe('IncidentCard (via Index Route)', () => {
   it('renders severity and status pills for incidents', async () => {
     renderRoute();
 
-    expect(await screen.findByText('P1')).toBeInTheDocument();
-    expect(await screen.findByText('P2')).toBeInTheDocument();
-    expect(await screen.findByText('Mitigated')).toBeInTheDocument();
+    const card1 = await screen.findByTestId('incident-card-INC-1247');
+    const card2 = screen.getByTestId('incident-card-INC-1246');
 
-    const activeElements = await screen.findAllByText('Active');
-    expect(activeElements.length).toBeGreaterThan(0);
+    expect(within(card1).getByText('P1')).toBeInTheDocument();
+    expect(within(card1).getByText('Active')).toBeInTheDocument();
+
+    expect(within(card2).getByText('P2')).toBeInTheDocument();
+    expect(within(card2).getByText('Mitigated')).toBeInTheDocument();
   });
 
   it('renders formatted dates for incidents', async () => {
@@ -106,7 +108,8 @@ describe('IncidentCard (via Index Route)', () => {
   it('shows private pill for private incidents', async () => {
     renderRoute();
 
-    expect(await screen.findByText('Private')).toBeInTheDocument();
+    const card2 = await screen.findByTestId('incident-card-INC-1246');
+    expect(within(card2).getByText('Private')).toBeInTheDocument();
   });
 
   it('renders incident cards as clickable links', async () => {
