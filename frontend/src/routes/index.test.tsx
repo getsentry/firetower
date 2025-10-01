@@ -84,9 +84,11 @@ describe('IncidentCard (via Index Route)', () => {
     renderRoute();
 
     expect(await screen.findByText('P1')).toBeInTheDocument();
-    expect(await screen.findByText('Active')).toBeInTheDocument();
     expect(await screen.findByText('P2')).toBeInTheDocument();
     expect(await screen.findByText('Mitigated')).toBeInTheDocument();
+
+    const activeElements = await screen.findAllByText('Active');
+    expect(activeElements.length).toBeGreaterThan(0);
   });
 
   it('renders formatted dates for incidents', async () => {
@@ -124,7 +126,7 @@ describe('IncidentCard (via Index Route)', () => {
 
     expect(mockApiGet).toHaveBeenCalledWith({
       path: '/ui/incidents/',
-      query: {status: undefined},
+      query: {status: ['Active', 'Mitigated']},
       signal: expect.any(AbortSignal),
       responseSchema: expect.any(Object),
     });
