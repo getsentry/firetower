@@ -45,4 +45,6 @@ COPY --from=build_frontend --chown=1100 /app/dist /app/static
 WORKDIR /app
 USER 1100
 
-ENTRYPOINT [ "/app/.venv/bin/granian", "--interface", "wsgi", "firetower.wsgi:application"]
+ENV PORT=8080
+EXPOSE $PORT
+ENTRYPOINT [ "sh", "-c", "/app/.venv/bin/granian --interface wsgi --host 0.0.0.0 --port $PORT firetower.wsgi:application"]
