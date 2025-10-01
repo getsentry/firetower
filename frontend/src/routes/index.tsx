@@ -30,7 +30,7 @@ function Index() {
   const {data: incidents} = useSuspenseQuery(incidentsQueryOptions(params));
 
   return (
-    <div className="flex flex-col gap-space-lg">
+    <div className="gap-space-lg flex flex-col">
       {incidents.map(incident => (
         <IncidentCard key={incident.id} incident={incident} />
       ))}

@@ -68,6 +68,9 @@ body {
   .text-content-warning {
     color: var(--tokens-color-content-warning);
   }
+  .text-content-promotion {
+    color: var(--tokens-color-content-promotion);
+  }
   .text-content-disabled {
     color: var(--tokens-color-content-disabled);
   }

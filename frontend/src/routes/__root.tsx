@@ -5,9 +5,9 @@ import {TanStackRouterDevtools} from '@tanstack/react-router-devtools';
 import {Header} from './components/Header';
 
 const RootLayout = () => (
-  <div className="min-h-screen bg-background-tertiary text-content-primary leading-default">
+  <div className="bg-background-tertiary text-content-primary leading-default min-h-screen">
     <Header />
-    <main className="max-w-6xl mx-auto px-space-md py-space-xl md:px-space-xl">
+    <main className="px-space-md py-space-xl md:px-space-xl mx-auto max-w-6xl">
       <Outlet />
     </main>
     <TanStackRouterDevtools />
