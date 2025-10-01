@@ -71,12 +71,12 @@ class JiraService:
             "updated_at": issue.fields.updated,
         }
 
-    def get_incidents(self, status: str = "", max_results=50):
+    def get_incidents(self, statuses: list[str] | None = None, max_results=50):
         """
         Fetch a list of incidents from the Jira project.
 
         Args:
-            status (str, optional): Filter by status (e.g., 'Active', 'Postmortem', 'Actions Pending')
+            statuses (list[str], optional): Filter by status values (e.g., ['Active', 'Mitigated'])
             max_results (int): Maximum number of incidents to return (default: 50)
 
         Returns:
@@ -84,12 +84,17 @@ class JiraService:
         """
         jql_parts = [f'project = "{self.project_key}"']
 
-        if status:
-            if not re.match(r"^[A-Za-z\s]+$", status):
-                raise ValueError(
-                    f"Invalid status format: {status}. Only alphabetical characters and spaces allowed."
-                )
-            jql_parts.append(f'status = "{status}"')
+        if statuses:
+            # Validate each status
+            for status in statuses:
+                if not re.match(r"^[A-Za-z\s]+$", status):
+                    raise ValueError(
+                        f"Invalid status format: {status}. Only alphabetical characters and spaces allowed."
+                    )
+
+            # Build IN clause for multiple statuses
+            status_list = ", ".join(f'"{s}"' for s in statuses)
+            jql_parts.append(f"status IN ({status_list})")
 
         jql_query = " AND ".join(jql_parts)
         jql_query += " ORDER BY created DESC"
