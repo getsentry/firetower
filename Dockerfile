@@ -1,6 +1,4 @@
-FROM python:3.12-alpine3.22 AS python_base
-
-FROM python_base AS build_backend
+FROM python:3.12.11-alpine3.22 AS build_backend
 COPY --from=ghcr.io/astral-sh/uv:0.8.18 /uv /uvx /bin/
 
 WORKDIR /app
@@ -36,13 +34,15 @@ COPY frontend/src ./src/
 
 RUN bun run build
 
-FROM python_base
+FROM python:3.12.11-alpine3.22
+
+RUN adduser app -h /app -u 1100 -D && chown -R 1100 /app
 
 # Copy the environment, but not the source code
-COPY --from=build_backend --chown=app:app /app/.venv /app/.venv
-COPY --from=build_frontend --chown=app:app /app/dist /app/static
+COPY --from=build_backend --chown=1100 /app/.venv /app/.venv
+COPY --from=build_frontend --chown=1100 /app/dist /app/static
 
-USER app
 WORKDIR /app
+USER 1100
 
 ENTRYPOINT [ "/app/.venv/bin/granian", "--interface", "wsgi", "firetower.wsgi:application"]
