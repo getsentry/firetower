@@ -1,5 +1,8 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'us-west1-docker.pkg.dev/285301407591/firetower-docker/firetower:latest', '.']
+  args: ['build', '-t', 'us-west1-docker.pkg.dev/$PROJECT_ID/firetower-docker/firetower:$COMMIT_SHA', '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'us-west1-docker.pkg.dev/$PROJECT_ID/firetower-docker/firetower:$COMMIT_SHA']
+
 options:
   logging: CLOUD_LOGGING_ONLY
