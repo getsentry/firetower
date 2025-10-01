@@ -221,3 +221,56 @@ describe('StatusFilter', () => {
     expect(closedButton).toHaveAttribute('aria-selected', 'false');
   });
 });
+
+describe('Route States', () => {
+  beforeEach(() => {
+    queryClient.clear();
+  });
+
+  it('shows spinner in pending state with filters visible', async () => {
+    mockApiGet.mockImplementation(
+      () => new Promise(resolve => setTimeout(() => resolve(mockIncidents), 100))
+    );
+
+    const router = createRouter({
+      routeTree,
+      context: {
+        queryClient,
+      },
+      history: createMemoryHistory({
+        initialEntries: ['/'],
+      }),
+      defaultPendingMs: 0, // Show pending state immediately
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    );
+
+    // The spinner should appear while loading
+    expect(await screen.findByTestId('spinner')).toBeInTheDocument();
+
+    // Filters should still be visible during loading
+    expect(screen.getByTestId('filter-active')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-review')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-closed')).toBeInTheDocument();
+
+    // Wait for the data to load
+    await screen.findByText('INC-1247');
+  });
+
+  it('shows error message with filters visible when API fails', async () => {
+    mockApiGet.mockRejectedValue(new Error('API Error'));
+
+    renderRoute();
+
+    expect(
+      await screen.findByText('Something went wrong fetching incidents.')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('filter-active')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-review')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-closed')).toBeInTheDocument();
+  });
+});
