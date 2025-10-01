@@ -26,7 +26,7 @@ SECRET_KEY = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["firetower.getsentry.net"]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
