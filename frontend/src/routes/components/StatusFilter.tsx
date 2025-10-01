@@ -8,6 +8,7 @@ interface FilterLinkProps {
   statuses: JiraStatus[];
   label: string;
   isActive: boolean;
+  testId?: string;
 }
 
 const FILTER_GROUPS = {
@@ -22,12 +23,14 @@ function arraysEqual(a: JiraStatus[], b: JiraStatus[]): boolean {
   return a.every(val => setB.has(val));
 }
 
-function FilterLink({statuses, label, isActive}: FilterLinkProps) {
+function FilterLink({statuses, label, isActive, testId}: FilterLinkProps) {
   return (
     <Link
       to="/"
       search={{status: statuses}}
       preload="intent"
+      data-testid={testId}
+      aria-selected={isActive}
       className={cn(
         'rounded-radius-sm px-space-lg py-space-sm text-size-sm font-medium transition-colors',
         {
@@ -50,16 +53,19 @@ export function StatusFilter() {
         statuses={FILTER_GROUPS.active}
         label="Active"
         isActive={arraysEqual(status, FILTER_GROUPS.active)}
+        testId="filter-active"
       />
       <FilterLink
         statuses={FILTER_GROUPS.review}
         label="In Review"
         isActive={arraysEqual(status, FILTER_GROUPS.review)}
+        testId="filter-review"
       />
       <FilterLink
         statuses={FILTER_GROUPS.closed}
         label="Closed"
         isActive={arraysEqual(status, FILTER_GROUPS.closed)}
+        testId="filter-closed"
       />
     </div>
   );
