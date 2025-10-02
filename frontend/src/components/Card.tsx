@@ -28,6 +28,7 @@ const title = cva(['text-lg', 'font-semibold', 'mb-space-xl', 'text-content-head
       base: ['text-base'],
       lg: ['text-lg'],
       xl: ['text-xl'],
+      '2xl': ['text-2xl'],
     },
   },
   defaultVariants: {

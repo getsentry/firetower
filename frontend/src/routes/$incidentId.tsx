@@ -1,6 +1,9 @@
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 
+import {Card} from '../components/Card';
+import {Pill} from '../components/Pill';
+
 import {incidentDetailQueryOptions} from './queries/incidentDetailQueryOptions';
 
 export const Route = createFileRoute('/$incidentId')({
@@ -11,47 +14,44 @@ export const Route = createFileRoute('/$incidentId')({
   errorComponent: () => <p>Something went wrong fetching incident.</p>,
 });
 
+function formatDateTime(dateString: string): string {
+  const date = new Date(dateString);
+  const dateFormatted = date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const timeFormatted = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${dateFormatted} • ${timeFormatted}`;
+}
+
 function Incident() {
   const params = Route.useParams();
   const {data: incident} = useSuspenseQuery(incidentDetailQueryOptions(params));
 
   return (
     <div className="p-2">
-      <h3>
-        {incident.id}: {incident.title}
-      </h3>
-      <div>Status: {incident.status}</div>
-      <div>Severity: {incident.severity}</div>
-      <div>Created: {incident.created_at}</div>
-      <div>Updated: {incident.updated_at}</div>
-      <p>{incident.description}</p>
-
-      {incident.participants.length > 0 && (
-        <div>
-          <h4>Participants</h4>
-          {incident.participants.map((participant, index) => (
-            <div key={index}>
-              {participant.name} ({participant.role || 'Participant'}) - @
-              {participant.slack}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div>
-        <h4>External Links</h4>
-        {incident.external_links.jira && (
-          <div>
-            <a
-              href={incident.external_links.jira}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View in Jira
-            </a>
+      <Card>
+        <div className="flex justify-between items-start mb-space-lg">
+          <div className="text-sm text-content-secondary">{incident.id}</div>
+          <div className="text-sm text-content-secondary text-right">
+            {formatDateTime(incident.created_at)}
           </div>
-        )}
-      </div>
+        </div>
+        <div className="flex gap-space-lg mb-space-xl">
+          <Pill variant={incident.severity}>{incident.severity}</Pill>
+          {incident.is_private && <Pill variant="private">Private</Pill>}
+          <Pill variant={incident.status}>{incident.status}</Pill>
+        </div>
+        <Card.Title size="2xl">{incident.title}</Card.Title>
+        <p className="text-content-secondary leading-comfortable">
+          {incident.description}
+        </p>
+      </Card>
     </div>
   );
 }
