@@ -15,7 +15,6 @@ COPY pyproject.toml .
 COPY manage.py .
 COPY README.md .
 COPY src/ src/
-RUN ls -la
 RUN uv sync --group prod --no-dev --frozen --compile-bytecode --no-editable
 
 FROM oven/bun:1.2.22-alpine AS build_frontend
