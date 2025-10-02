@@ -51,4 +51,5 @@ ENV PORT=8080
 EXPOSE $PORT
 
 ENV GRANIAN_STATIC_PATH_MOUNT="static/"
+ENV DJANGO_ENV="prod"
 ENTRYPOINT [ "sh", "-c", "/app/.venv/bin/granian --interface wsgi --host 0.0.0.0 --port $PORT firetower.wsgi:application"]
