@@ -34,6 +34,8 @@ const IncidentDetailSchema = z.object({
   external_links: ExternalLinksSchema,
 });
 
+export type IncidentDetail = z.infer<typeof IncidentDetailSchema>;
+
 interface IncidentDetailQueryArgs {
   incidentId: string;
 }
