@@ -1,6 +1,6 @@
 import {Link} from '@tanstack/react-router';
+import {Pill} from 'components/Pill';
 
-import {Pill} from '../../components/Pill';
 import type {IncidentListItem} from '../queries/incidentsQueryOptions';
 
 interface IncidentCardProps {

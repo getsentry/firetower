@@ -1,6 +1,6 @@
 import {Link, useSearch} from '@tanstack/react-router';
+import {cn} from 'utils/cn';
 
-import {cn} from '../../utils/cn';
 import {type IncidentStatus} from '../queries/incidentsQueryOptions';
 
 interface FilterLinkProps {

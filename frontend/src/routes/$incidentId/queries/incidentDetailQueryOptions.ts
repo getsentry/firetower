@@ -1,7 +1,6 @@
 import {queryOptions} from '@tanstack/react-query';
+import {Api} from 'api';
 import {z} from 'zod';
-
-import {Api} from '../../api';
 
 const ParticipantSchema = z.object({
   name: z.string(),
@@ -33,6 +32,8 @@ const IncidentDetailSchema = z.object({
   participants: z.array(ParticipantSchema),
   external_links: ExternalLinksSchema,
 });
+
+export type IncidentDetail = z.infer<typeof IncidentDetailSchema>;
 
 interface IncidentDetailQueryArgs {
   incidentId: string;
