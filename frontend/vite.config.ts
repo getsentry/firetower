@@ -1,3 +1,5 @@
+import path from 'path';
+
 import tailwindcss from '@tailwindcss/vite';
 import {tanstackRouter} from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react-swc';
@@ -14,4 +16,10 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
+  resolve: {
+    alias: {
+      components: path.resolve(__dirname, './src/components'),
+      utils: path.resolve(__dirname, './src/utils'),
+    },
+  },
 });

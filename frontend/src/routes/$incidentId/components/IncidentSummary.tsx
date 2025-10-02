@@ -1,5 +1,6 @@
-import {Card} from '../../../components/Card';
-import {Pill} from '../../../components/Pill';
+import {Card} from 'components/Card';
+import {Pill} from 'components/Pill';
+
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 
 interface IncidentSummaryProps {

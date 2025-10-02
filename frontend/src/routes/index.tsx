@@ -1,9 +1,8 @@
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
+import {Spinner} from 'components/Spinner';
 import {z} from 'zod';
-
-import {Spinner} from '../components/Spinner';
 
 import {IncidentCard} from './components/IncidentCard';
 import {StatusFilter} from './components/StatusFilter';
