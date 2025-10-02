@@ -17,7 +17,10 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
       className="block no-underline"
       preload={'intent'}
     >
-      <div className="bg-background-primary rounded-radius-lg p-space-xl cursor-pointer shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <div
+        className="bg-background-primary rounded-radius-lg p-space-xl cursor-pointer shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        data-testid={`incident-card-${incident.id}`}
+      >
         <div className="gap-space-xl mb-space-md flex flex-wrap items-center md:flex-nowrap">
           <span className="text-size-md text-content-secondary font-regular">
             {incident.id}

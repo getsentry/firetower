@@ -3,13 +3,29 @@ import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
 import {z} from 'zod';
 
+import {Spinner} from '../components/Spinner';
+
 import {IncidentCard} from './components/IncidentCard';
-import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
+import {StatusFilter} from './components/StatusFilter';
+import {
+  incidentsQueryOptions,
+  IncidentStatusSchema,
+} from './queries/incidentsQueryOptions';
 
 // Zod schema for search params
 const incidentListSearchSchema = z.object({
-  status: z.string().optional(),
+  status: z.array(IncidentStatusSchema).optional().default(['Active', 'Mitigated']),
 });
+
+function IncidentsLayout({children}: {children: React.ReactNode}) {
+  return (
+    <div className="flex flex-col">
+      <StatusFilter />
+      <hr className="mb-space-xl mt-space-lg border-secondary" />
+      {children}
+    </div>
+  );
+}
 
 export const Route = createFileRoute('/')({
   // Component to render
@@ -21,8 +37,25 @@ export const Route = createFileRoute('/')({
   // Define loader with loaderDeps and context (context has queryClient)
   loader: async ({deps, context}) =>
     await context.queryClient.ensureQueryData(incidentsQueryOptions(deps)),
-  pendingComponent: () => <p>Loading incidents...</p>,
-  errorComponent: () => <p>Something went wrong fetching incidents.</p>,
+  pendingComponent: () => (
+    <IncidentsLayout>
+      <div className="flex items-center justify-center py-space-4xl">
+        <Spinner size="lg" />
+      </div>
+    </IncidentsLayout>
+  ),
+  errorComponent: () => (
+    <IncidentsLayout>
+      <p className="text-content-secondary py-space-4xl text-center">
+        Something went wrong fetching incidents.
+      </p>
+    </IncidentsLayout>
+  ),
+  notFoundComponent: () => (
+    <IncidentsLayout>
+      <p className="text-content-secondary py-space-4xl text-center">Page not found.</p>
+    </IncidentsLayout>
+  ),
 });
 
 function Index() {
@@ -30,10 +63,12 @@ function Index() {
   const {data: incidents} = useSuspenseQuery(incidentsQueryOptions(params));
 
   return (
-    <div className="gap-space-lg flex flex-col">
-      {incidents.map(incident => (
-        <IncidentCard key={incident.id} incident={incident} />
-      ))}
-    </div>
+    <IncidentsLayout>
+      <div className="gap-space-lg flex flex-col">
+        {incidents.map(incident => (
+          <IncidentCard key={incident.id} incident={incident} />
+        ))}
+      </div>
+    </IncidentsLayout>
   );
 }

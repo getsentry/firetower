@@ -18,9 +18,9 @@ def incident_list_ui(request):
     """List all incidents from Jira"""
     try:
         jira_service = JiraService()
-        status_filter = request.GET.get("status")
+        status_filters = request.GET.getlist("status")
         jira_incidents = jira_service.get_incidents(
-            status=status_filter, max_results=50
+            statuses=status_filters, max_results=50
         )
         incidents = [
             transform_jira_incident_for_list(incident) for incident in jira_incidents

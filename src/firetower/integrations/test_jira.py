@@ -117,11 +117,11 @@ class TestJiraService:
 
                 # Test with invalid characters in status
                 with pytest.raises(ValueError, match="Invalid status format"):
-                    service.get_incidents(status="Active; DROP TABLE incidents;")
+                    service.get_incidents(statuses=["Active; DROP TABLE incidents;"])
 
                 # Test with numbers in status
                 with pytest.raises(ValueError, match="Invalid status format"):
-                    service.get_incidents(status="Status123")
+                    service.get_incidents(statuses=["Status123"])
 
     def test_get_incidents_builds_correct_jql_query(self):
         """Test that get_incidents builds the correct JQL query."""
@@ -147,11 +147,18 @@ class TestJiraService:
                     expected_jql, maxResults=50, expand="changelog"
                 )
 
-                # Test with status filter
-                service.get_incidents(status="Active")
-                expected_jql_with_status = (
-                    'project = "TESTINC" AND status = "Active" ORDER BY created DESC'
+                # Test with single status filter
+                service.get_incidents(statuses=["Active"])
+                expected_jql_single = (
+                    'project = "TESTINC" AND status IN ("Active") ORDER BY created DESC'
                 )
                 mock_client_instance.search_issues.assert_called_with(
-                    expected_jql_with_status, maxResults=50, expand="changelog"
+                    expected_jql_single, maxResults=50, expand="changelog"
+                )
+
+                # Test with multiple status filters
+                service.get_incidents(statuses=["Active", "Mitigated"])
+                expected_jql_multiple = 'project = "TESTINC" AND status IN ("Active", "Mitigated") ORDER BY created DESC'
+                mock_client_instance.search_issues.assert_called_with(
+                    expected_jql_multiple, maxResults=50, expand="changelog"
                 )
