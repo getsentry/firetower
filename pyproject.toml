@@ -11,6 +11,7 @@ dependencies = [
     "google-cloud-logging>=3.11.4",
     "jira>=3.5.0",
     "psycopg[binary]>=3.2.11",
+    "sentry-sdk[django]>=2.39.0",
     "slack-sdk>=3.31.0",
 ]
 
