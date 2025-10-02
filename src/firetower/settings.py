@@ -147,3 +147,9 @@ JIRA = {
     "PROJECT_KEY": os.environ.get("JIRA_PROJECT_KEY", "TESTINC"),
     "SEVERITY_FIELD": os.environ.get("JIRA_SEVERITY_FIELD", "customfield_11023"),
 }
+
+# Slack Integration Configuration
+SLACK = {
+    "BOT_TOKEN": os.environ.get("SLACK_BOT_TOKEN"),
+    "TEAM_ID": os.environ.get("SLACK_TEAM_ID"),
+}
