@@ -1,7 +1,6 @@
 import {queryOptions} from '@tanstack/react-query';
+import {Api} from 'api';
 import {z} from 'zod';
-
-import {Api} from '../../api';
 
 const ParticipantSchema = z.object({
   name: z.string(),

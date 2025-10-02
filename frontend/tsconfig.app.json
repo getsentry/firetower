@@ -19,7 +19,8 @@
     "baseUrl": "./src",
     "paths": {
       "components/*": ["components/*"],
-      "utils/*": ["utils/*"]
+      "utils/*": ["utils/*"],
+      "api": ["api.ts"]
     },
 
     /* Linting */
