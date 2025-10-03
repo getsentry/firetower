@@ -1,9 +1,16 @@
 import {StrictMode} from 'react';
 import ReactDOM from 'react-dom/client';
+import * as Sentry from '@sentry/react';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {createRouter, RouterProvider} from '@tanstack/react-router';
 
 import {routeTree} from './routeTree.gen';
+
+Sentry.init({
+  dsn: 'https://82cb16514b69a48430dc945408138e0d@o1.ingest.us.sentry.io/4510076293283840',
+  sendDefaultPii: true,
+  environment: String(import.meta.env.MODE),
+});
 
 const queryClient = new QueryClient();
 const router = createRouter({
@@ -26,7 +33,15 @@ declare module '@tanstack/react-router' {
 
 const rootElement = document.getElementById('root')!;
 if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement);
+  const root = ReactDOM.createRoot(rootElement, {
+    onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
+      console.warn('Uncaught error', error, errorInfo.componentStack);
+    }),
+    // Callback called when React catches an error in an ErrorBoundary.
+    onCaughtError: Sentry.reactErrorHandler(),
+    // Callback called when React automatically recovers from errors.
+    onRecoverableError: Sentry.reactErrorHandler(),
+  });
   root.render(
     <StrictMode>
       <RouterProvider router={router} />
