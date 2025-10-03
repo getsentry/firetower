@@ -26,21 +26,21 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
             {incident.id}
           </span>
           <div className="text-size-sm text-content-secondary ml-auto text-right md:order-last">
-            <div>
+            <time dateTime={incident.created_at}>
               {createdAt.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
                 year: 'numeric',
               })}
-            </div>
-            <div>
+            </time>
+            <p>
               Opened{' '}
               {createdAt.toLocaleTimeString('en-US', {
                 hour: 'numeric',
                 minute: '2-digit',
                 hour12: true,
               })}
-            </div>
+            </p>
           </div>
           <h3 className="text-size-xl text-content-headings w-full font-semibold md:w-auto md:flex-1">
             {incident.title}

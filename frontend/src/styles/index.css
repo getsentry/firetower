@@ -3,7 +3,7 @@
 
 /* Global styles */
 body {
-  font-family: var(--tokens-typography-font-family-sans);
+  font-family: Avenir, 'Helvetica Neue', sans-serif;
 }
 
 /* Custom utilities using design tokens */

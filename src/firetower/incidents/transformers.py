@@ -5,6 +5,8 @@ This module contains functions to transform data from external sources
 (like Jira) into the format expected by the frontend API.
 """
 
+from firetower.integrations.services.slack import SlackService
+
 
 def transform_jira_incident_for_list(jira_incident):
     """Transform a Jira incident to the format expected by the frontend list."""
@@ -21,6 +23,8 @@ def transform_jira_incident_for_list(jira_incident):
 
 def transform_jira_incident_for_detail(jira_incident):
     """Transform a Jira incident to the detailed format expected by the frontend."""
+    slack_service = SlackService()
+    slack_url = slack_service.get_channel_url_by_name(jira_incident["id"].lower())
     return {
         "id": jira_incident["id"],
         "title": jira_incident["title"],
@@ -35,7 +39,7 @@ def transform_jira_incident_for_detail(jira_incident):
         "root_causes": [],
         "participants": extract_participants(jira_incident),
         "external_links": {
-            "slack": None,
+            "slack": slack_url,
             "jira": f"https://getsentry.atlassian.net/browse/{jira_incident['id']}",
             "datadog": None,
             "pagerduty": None,

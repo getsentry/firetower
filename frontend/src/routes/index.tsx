@@ -63,11 +63,13 @@ function Index() {
 
   return (
     <IncidentsLayout>
-      <div className="gap-space-lg flex flex-col">
+      <ul className="gap-space-lg flex flex-col list-none">
         {incidents.map(incident => (
-          <IncidentCard key={incident.id} incident={incident} />
+          <li key={incident.id}>
+            <IncidentCard incident={incident} />
+          </li>
         ))}
-      </div>
+      </ul>
     </IncidentsLayout>
   );
 }
