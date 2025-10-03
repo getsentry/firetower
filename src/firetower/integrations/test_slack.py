@@ -5,7 +5,6 @@ Basic pytest tests for Slack integration service.
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from .services.slack import SlackService
 
