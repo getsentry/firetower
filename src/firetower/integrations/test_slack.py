@@ -5,7 +5,6 @@ Basic pytest tests for Slack integration service.
 import os
 from unittest.mock import MagicMock, patch
 
-
 from .services.slack import SlackService
 
 # Set up Django settings
