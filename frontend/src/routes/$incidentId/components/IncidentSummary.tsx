@@ -26,10 +26,13 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
   return (
     <Card>
       <div className="flex justify-between items-start mb-space-lg">
-        <div className="text-sm text-content-secondary">{incident.id}</div>
-        <div className="text-sm text-content-secondary text-right">
+        <span className="text-sm text-content-secondary">{incident.id}</span>
+        <time
+          className="text-sm text-content-secondary text-right"
+          dateTime={incident.created_at}
+        >
           {formatDateTime(incident.created_at)}
-        </div>
+        </time>
       </div>
       <div className="flex gap-space-lg mb-space-xl">
         <Pill variant={incident.severity}>{incident.severity}</Pill>

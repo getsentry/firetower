@@ -1,7 +1,9 @@
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
+import {Card} from 'components/Card';
 
 import {IncidentSummary} from './components/IncidentSummary';
+import {SlackLink} from './components/SlackLink';
 import {incidentDetailQueryOptions} from './queries/incidentDetailQueryOptions';
 
 export const Route = createFileRoute('/$incidentId/')({
@@ -17,8 +19,32 @@ function Incident() {
   const {data: incident} = useSuspenseQuery(incidentDetailQueryOptions(params));
 
   return (
-    <div className="p-2">
+    <div className="p-2 space-y-4">
       <IncidentSummary incident={incident} />
+
+      <div className="flex flex-col md:flex-row gap-4">
+        <section className="flex flex-col gap-4 md:flex-[2]">
+          <Card>
+            <div className="text-center p-12 text-content-muted">
+              <p className="text-lg mb-2">
+                <span role="img" aria-label="fire">
+                  🔥
+                </span>
+              </p>
+              <p>Cool features to come</p>
+            </div>
+          </Card>
+        </section>
+
+        <aside className="flex flex-col gap-4 md:flex-1">
+          {incident.external_links.slack && (
+            <SlackLink
+              slackUrl={incident.external_links.slack}
+              incidentId={params.incidentId}
+            />
+          )}
+        </aside>
+      </div>
     </div>
   );
 }
