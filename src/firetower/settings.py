@@ -37,6 +37,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "::1",
     "firetower.getsentry.net",
+    "test.firetower.getsentry.net",
     "firetower",
 ]
 
