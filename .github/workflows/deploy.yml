@@ -17,12 +17,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Login to Artifact Registry
-        uses: docker/login-action@v3
+      - name: Authenticate with GCP
+        uses: 'google-github-actions/auth@v3'
         with:
-          registry: us-west1-docker.pkg.dev
-          username: _json_key
-          password: ${{ secrets.GOOGLE_JSON_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT }}
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
+      - name: Login to Artifact Registry
+        run: gcloud auth configure-docker us-west1-docker.pkg.dev
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and push
