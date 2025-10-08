@@ -1,0 +1,56 @@
+name: Deploy
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  push:
+    # TODO: REMOVE THIS  DO NOT MERGE
+    branches: [main, test]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to ("production" or "test")'
+        type: environment
+        default: test
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Authenticate with GCP
+        uses: 'google-github-actions/auth@v3'
+        with:
+          project_id: ${{ secrets.GCP_PROJECT }}
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
+      - name: Login to Artifact Registry
+        run: gcloud auth configure-docker us-west1-docker.pkg.dev
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: deploy-test
+        # TODO: restore this DO NOT MERGE
+        #if: ${{ inputs.environment == 'test' }}
+        uses: "google-github-actions/deploy-cloudrun@v3"
+        with:
+          service: firetower-test
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
+      - name: deploy-prod
+        if: ${{ github.ref ==  'ref/heads/main' || inputs.environment == 'prod' }}
+        uses: "google-github-actions/deploy-cloudrun@v3"
+        with:
+          service: firetower
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ github.sha }}
