@@ -32,7 +32,7 @@ jobs:
         with:
           push: true
           registry: us-west1-docker.pkg.dev
-          tags: firetower-docker/firetower:${{ GITHUB_SHA }}
+          tags: firetower-docker/firetower:$GITHUB_SHA
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: deploy-test
