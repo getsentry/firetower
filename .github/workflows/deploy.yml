@@ -32,8 +32,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          registry: us-west1-docker.pkg.dev
-          tags: firetower-docker/firetower:${{ github.sha }}
+          tags: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: deploy-test
