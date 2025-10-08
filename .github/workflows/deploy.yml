@@ -5,6 +5,9 @@ permissions:
 on:
   push:
     branches: [main]
+  # TODO: REMOVE THIS  DO NOT MERGE
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
