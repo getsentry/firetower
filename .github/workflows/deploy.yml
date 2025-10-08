@@ -33,7 +33,7 @@ jobs:
         with:
           push: true
           registry: us-west1-docker.pkg.dev
-          tags: firetower-docker/firetower:$GITHUB_SHA
+          tags: firetower-docker/firetower:${{ env.GITHUB_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: deploy-test
@@ -41,10 +41,10 @@ jobs:
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           service: firetower-test
-          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:$GITHUB_SHA
+          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ env.GITHUB_SHA }}
       - name: deploy-prod
         if: ${{ github.ref ==  'ref/heads/main' || inputs.environment == 'prod' }}
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           service: firetower
-          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:$GITHUB_SHA
+          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ env.GITHUB_SHA }}
