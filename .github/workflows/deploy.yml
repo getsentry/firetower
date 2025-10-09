@@ -25,7 +25,7 @@ jobs:
         uses: 'google-github-actions/auth@v3'
         with:
           project_id: ${{ secrets.GCP_PROJECT }}
-          workload_identity_provider: projects/${{ secrets.GCP_PROJECT }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
       - name: Login to Artifact Registry
         run: gcloud auth configure-docker us-west1-docker.pkg.dev
       - name: Set up Docker Buildx
@@ -34,7 +34,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ github.sha }}
+          tags: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: deploy-test
@@ -42,7 +42,7 @@ jobs:
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           service: firetower-test
-          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ github.sha }}
+          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
       - name: deploy-prod
         if: ${{ github.ref ==  'ref/heads/main' || inputs.environment == 'prod' }}
         uses: "google-github-actions/deploy-cloudrun@v3"
