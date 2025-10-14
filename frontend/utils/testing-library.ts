@@ -3,11 +3,10 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import {cleanup} from '@testing-library/react';
 import {afterEach, expect} from 'bun:test';
 
-// Polyfill React.act for React 19 compatibility (seems to only be an issue with my cursor-agent's shell :shrug:)
-// @ts-expect-error - Adding act polyfill for testing
+// Polyfill React.act for React 19 compatibility
 if (!React.act) {
-  // @ts-expect-error - Adding act polyfill for testing
-  React.act = callback => {
+  // @ts-expect-error type not matching on override
+  React.act = (callback: () => void | Promise<void>) => {
     const result = callback();
     if (result && typeof result.then === 'function') {
       return result;
