@@ -7,10 +7,8 @@ const STORAGE_KEY = 'firetower_list_search';
 export const Header = () => {
   const routerState = useRouterState();
 
-  // Check if we're on the root route
   const isRootRoute = routerState.location.pathname === '/';
 
-  // Read from sessionStorage (synchronous, so no need for useEffect/useState)
   const getPreservedSearch = (): {status?: IncidentStatus[]} | undefined => {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -29,7 +27,6 @@ export const Header = () => {
     <nav className="bg-background-primary border-secondary border-b">
       <div className="px-space-md py-space-md md:px-space-xl mx-auto max-w-6xl">
         {isRootRoute ? (
-          // Centered title on root route
           <div className="flex items-center justify-center">
             <Link to="/" className="gap-space-sm flex items-center no-underline">
               <img src="/firetower.svg" alt="Firetower" className="h-6 w-6" />
@@ -39,7 +36,6 @@ export const Header = () => {
             </Link>
           </div>
         ) : (
-          // Back button + centered title on other routes
           <div className="relative flex items-center justify-between">
             <Link
               to="/"
@@ -58,7 +54,6 @@ export const Header = () => {
                 Firetower
               </span>
             </Link>
-            {/* Spacer to balance layout */}
             <div className="w-24"></div>
           </div>
         )}
