@@ -44,7 +44,7 @@ export const Header = () => {
             <Link
               to="/"
               search={preservedSearch}
-              className="text-content-secondary hover:bg-background-secondary hover:text-accent px-space-md py-space-sm inline-flex items-center gap-2 rounded-sm text-xs transition-colors"
+              className="text-content-secondary hover:bg-background-secondary hover:text-content-accent px-space-md py-space-sm inline-flex items-center gap-2 rounded-sm text-xs transition-colors"
             >
               <span>←</span>
               <span>All Incidents</span>

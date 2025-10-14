@@ -80,6 +80,12 @@ body {
   .text-content-on-vibrant-dark {
     color: var(--tokens-color-content-on-vibrant-dark);
   }
+  .text-content-muted {
+    color: var(--tokens-color-content-secondary);
+  }
+  .hover\:text-content-accent:hover {
+    color: var(--tokens-color-content-accent);
+  }
 
   /* Border colors */
   .border-primary {
@@ -222,6 +228,18 @@ body {
   .py-space-xl {
     padding-top: var(--tokens-size-space-xl);
     padding-bottom: var(--tokens-size-space-xl);
+  }
+  .py-space-2xl {
+    padding-top: var(--tokens-size-space-2xl);
+    padding-bottom: var(--tokens-size-space-2xl);
+  }
+  .py-space-3xl {
+    padding-top: var(--tokens-size-space-3xl);
+    padding-bottom: var(--tokens-size-space-3xl);
+  }
+  .py-space-4xl {
+    padding-top: var(--tokens-size-space-4xl);
+    padding-bottom: var(--tokens-size-space-4xl);
   }
 
   .gap-space-2xs {
