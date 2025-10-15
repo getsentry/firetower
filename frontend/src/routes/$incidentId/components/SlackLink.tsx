@@ -8,10 +8,10 @@ interface SlackLinkProps {
 export function SlackLink({slackUrl, incidentId}: SlackLinkProps) {
   return (
     <a href={slackUrl} target="_blank" rel="noopener noreferrer" className="block">
-      <Card className="hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
+      <Card className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
         <div className="flex items-center gap-3">
-          <img src="/slack-icon.svg" alt="Slack" className="w-7 h-7" />
-          <span className="text-base font-semibold text-content-headings">
+          <img src="/slack-icon.svg" alt="Slack" className="h-7 w-7" />
+          <span className="text-content-headings text-base font-semibold">
             Join #{incidentId.toLowerCase()}
           </span>
         </div>

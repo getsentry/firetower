@@ -25,16 +25,16 @@ function formatDateTime(dateString: string): string {
 export function IncidentSummary({incident}: IncidentSummaryProps) {
   return (
     <Card>
-      <div className="flex justify-between items-start mb-space-lg">
-        <span className="text-sm text-content-secondary">{incident.id}</span>
+      <div className="mb-space-lg flex items-start justify-between">
+        <span className="text-content-secondary text-sm">{incident.id}</span>
         <time
-          className="text-sm text-content-secondary text-right"
+          className="text-content-secondary text-right text-sm"
           dateTime={incident.created_at}
         >
           {formatDateTime(incident.created_at)}
         </time>
       </div>
-      <div className="flex gap-space-lg mb-space-xl">
+      <div className="gap-space-lg mb-space-xl flex">
         <Pill variant={incident.severity}>{incident.severity}</Pill>
         {incident.is_private && <Pill variant="private">Private</Pill>}
         <Pill variant={incident.status}>{incident.status}</Pill>

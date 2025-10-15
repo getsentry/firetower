@@ -1,3 +1,4 @@
+import {useEffect} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
@@ -38,7 +39,7 @@ export const Route = createFileRoute('/')({
     await context.queryClient.ensureQueryData(incidentsQueryOptions(deps)),
   pendingComponent: () => (
     <IncidentsLayout>
-      <div className="flex items-center justify-center py-space-4xl">
+      <div className="py-space-4xl flex items-center justify-center">
         <Spinner size="lg" />
       </div>
     </IncidentsLayout>
@@ -57,13 +58,20 @@ export const Route = createFileRoute('/')({
   ),
 });
 
+const STORAGE_KEY = 'firetower_list_search';
+
 function Index() {
   const params = Route.useSearch();
   const {data: incidents} = useSuspenseQuery(incidentsQueryOptions(params));
 
+  // Store current search params in sessionStorage whenever they change
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(params));
+  }, [params]);
+
   return (
     <IncidentsLayout>
-      <ul className="gap-space-lg flex flex-col list-none">
+      <ul className="gap-space-lg flex list-none flex-col">
         {incidents.map(incident => (
           <li key={incident.id}>
             <IncidentCard incident={incident} />

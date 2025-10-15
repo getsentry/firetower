@@ -19,14 +19,14 @@ function Incident() {
   const {data: incident} = useSuspenseQuery(incidentDetailQueryOptions(params));
 
   return (
-    <div className="p-2 space-y-4">
+    <div className="space-y-4 p-2">
       <IncidentSummary incident={incident} />
 
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col gap-4 md:flex-row">
         <section className="flex flex-col gap-4 md:flex-[2]">
           <Card>
-            <div className="text-center p-12 text-content-muted">
-              <p className="text-lg mb-2">
+            <div className="text-content-muted p-12 text-center">
+              <p className="mb-2 text-lg">
                 <span role="img" aria-label="fire">
                   🔥
                 </span>
