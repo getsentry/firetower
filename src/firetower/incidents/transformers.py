@@ -49,29 +49,71 @@ def transform_jira_incident_for_detail(jira_incident):
 
 
 def extract_participants(jira_incident):
-    """Extract participants from Jira incident data."""
+    """Extract participants from both Jira and Slack."""
     participants = []
+    incident_id = jira_incident["id"].lower()
 
-    if jira_incident.get("assignee"):
-        participants.append(
-            {
-                "name": jira_incident["assignee"],
-                "slack": jira_incident["assignee"].lower().replace(" ", "."),
-                "avatar_url": f"https://via.placeholder.com/32x32?text={jira_incident['assignee'][0]}",
-                "role": "Captain",
-            }
-        )
+    slack_service = SlackService()
+    slack_participants = slack_service.get_channel_participants(incident_id)
 
-    if jira_incident.get("reporter") and jira_incident["reporter"] != jira_incident.get(
-        "assignee"
-    ):
-        participants.append(
-            {
-                "name": jira_incident["reporter"],
-                "slack": jira_incident["reporter"].lower().replace(" ", "."),
-                "avatar_url": f"https://via.placeholder.com/32x32?text={jira_incident['reporter'][0]}",
-                "role": "Reporter",
-            }
-        )
+    if slack_participants:
+        participants_by_email = {
+            p.get("email", "").lower(): p for p in slack_participants if p.get("email")
+        }
+
+        if jira_incident.get("assignee_email"):
+            assignee_email = jira_incident["assignee_email"].lower()
+            participant = participants_by_email.get(assignee_email)
+            if participant:
+                participant["role"] = "Captain"
+            else:
+                new_participant = {
+                    "name": jira_incident.get("assignee", "Unknown"),
+                    "email": jira_incident["assignee_email"],
+                    "avatar_url": None,
+                    "role": "Captain",
+                }
+                participants.append(new_participant)
+
+        if jira_incident.get("reporter_email") and jira_incident.get(
+            "reporter_email"
+        ) != jira_incident.get("assignee_email"):
+            reporter_email = jira_incident["reporter_email"].lower()
+            participant = participants_by_email.get(reporter_email)
+            if participant:
+                participant["role"] = "Reporter"
+            else:
+                new_participant = {
+                    "name": jira_incident.get("reporter", "Unknown"),
+                    "email": jira_incident["reporter_email"],
+                    "avatar_url": None,
+                    "role": "Reporter",
+                }
+                participants.append(new_participant)
+
+        participants.extend(slack_participants)
+
+    else:
+        if jira_incident.get("assignee"):
+            participants.append(
+                {
+                    "name": jira_incident["assignee"],
+                    "email": jira_incident.get("assignee_email"),
+                    "avatar_url": None,
+                    "role": "Captain",
+                }
+            )
+
+        if jira_incident.get("reporter") and jira_incident[
+            "reporter"
+        ] != jira_incident.get("assignee"):
+            participants.append(
+                {
+                    "name": jira_incident["reporter"],
+                    "email": jira_incident.get("reporter_email"),
+                    "avatar_url": None,
+                    "role": "Reporter",
+                }
+            )
 
     return participants

@@ -64,7 +64,13 @@ class JiraService:
             "assignee": issue.fields.assignee.displayName
             if issue.fields.assignee
             else None,
+            "assignee_email": issue.fields.assignee.emailAddress
+            if issue.fields.assignee
+            else None,
             "reporter": issue.fields.reporter.displayName
+            if issue.fields.reporter
+            else None,
+            "reporter_email": issue.fields.reporter.emailAddress
             if issue.fields.reporter
             else None,
             "created_at": issue.fields.created,
@@ -114,7 +120,13 @@ class JiraService:
                 "assignee": issue.fields.assignee.displayName
                 if issue.fields.assignee
                 else None,
+                "assignee_email": issue.fields.assignee.emailAddress
+                if issue.fields.assignee
+                else None,
                 "reporter": issue.fields.reporter.displayName
+                if issue.fields.reporter
+                else None,
+                "reporter_email": issue.fields.reporter.emailAddress
                 if issue.fields.reporter
                 else None,
                 "created_at": issue.fields.created,

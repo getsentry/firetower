@@ -110,3 +110,66 @@ class SlackService:
             return None
         channel_id = self._get_channel_id_by_name(channel_name)
         return self._build_channel_url(channel_id) if channel_id else None
+
+    def get_channel_members(self, channel_id: str) -> list[str] | None:
+        """Get all members of a Slack channel."""
+        if not self.client:
+            return None
+
+        try:
+            response = self.client.conversations_members(channel=channel_id)
+            return response.get("members", [])
+        except SlackApiError as e:
+            print(f"Error fetching channel members: {e}")
+            return None
+
+    def get_user_info(self, user_id: str) -> dict | None:
+        """Get user information from Slack."""
+        if not self.client:
+            return None
+
+        try:
+            response = self.client.users_info(user=user_id)
+            user = response.get("user", {})
+            profile = user.get("profile", {})
+
+            return {
+                "id": user.get("id"),
+                "name": user.get("name"),
+                "real_name": profile.get("real_name"),
+                "display_name": profile.get("display_name"),
+                "avatar_url": profile.get("image_48"),
+                "email": profile.get("email"),
+            }
+        except SlackApiError as e:
+            print(f"Error fetching user info: {e}")
+            return None
+
+    def get_channel_participants(self, channel_name: str) -> list[dict]:
+        """Get all participants in a channel with their full information."""
+        channel_id = self._get_channel_id_by_name(channel_name)
+        if not channel_id:
+            return []
+
+        member_ids = self.get_channel_members(channel_id)
+        if not member_ids:
+            return []
+
+        participants = []
+        for user_id in member_ids:
+            user_info = self.get_user_info(user_id)
+            if user_info:
+                full_name = user_info.get("real_name", "").strip()
+                if not full_name:
+                    full_name = user_info.get("name") or ""
+
+                participants.append(
+                    {
+                        "name": full_name,
+                        "email": user_info.get("email"),
+                        "avatar_url": user_info["avatar_url"],
+                        "role": None,
+                    }
+                )
+
+        return participants
