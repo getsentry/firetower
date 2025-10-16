@@ -26,7 +26,11 @@ class SlackService:
         # Store config for later use
         self.bot_token = slack_config.get("BOT_TOKEN")
         self.team_id = slack_config.get("TEAM_ID")
-        print("bot_token is not none" if bot_token is not None else "bot_token is none")
+        print(
+            "bot_token is not none"
+            if self.bot_token is not None
+            else "bot_token is none"
+        )
         print("team id", self.team_id)
 
         # Initialize Slack client if bot token is available
