@@ -160,3 +160,10 @@ SLACK = {
     "BOT_TOKEN": os.environ.get("SLACK_BOT_TOKEN"),
     "TEAM_ID": os.environ.get("SLACK_TEAM_ID", "sentry"),
 }
+
+# Logging Configuration
+if os.environ.get("DJANGO_ENV", "dev") != "dev":
+    import google.cloud.logging
+
+    client = google.cloud.logging.Client()
+    client.setup_logging()

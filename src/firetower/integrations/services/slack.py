@@ -5,9 +5,13 @@ This service provides a simple interface to interact with Slack's API
 and retrieve information about channels.
 """
 
+import logging
+
 from django.conf import settings
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+
+logger = logging.getLogger(__name__)
 
 
 class SlackService:
@@ -20,26 +24,23 @@ class SlackService:
 
     def __init__(self):
         """Initialize the Slack service."""
-        # Get Slack configuration from Django settings
         slack_config = settings.SLACK
 
-        # Store config for later use
         self.bot_token = slack_config.get("BOT_TOKEN")
         self.team_id = slack_config.get("TEAM_ID")
-        print(
-            "bot_token is not none"
-            if self.bot_token is not None
-            else "bot_token is none"
-        )
-        print("team id", self.team_id)
 
-        # Initialize Slack client if bot token is available
-        self.client = WebClient(token=self.bot_token) if self.bot_token else None
-        print(
-            "self.client is not None"
-            if self.client is not None
-            else "self.client is None"
+        logger.info(
+            "Initializing SlackService",
+            extra={
+                "has_bot_token": self.bot_token is not None,
+                "team_id": self.team_id,
+            },
         )
+
+        self.client = WebClient(token=self.bot_token) if self.bot_token else None
+
+        if self.client is None:
+            logger.warning("Slack client not initialized - missing bot token")
 
     def _get_channel_id_by_name(self, channel_name: str) -> str | None:
         """
@@ -52,21 +53,32 @@ class SlackService:
             str | None: The channel ID if found, None otherwise
         """
         if not self.client:
-            print("self.client is None")
+            logger.warning("Cannot fetch channel - Slack client not initialized")
             return None
 
         try:
-            print("attempting to fetch channels")
-            # List all channels (including private) that the bot has access to
+            logger.debug(f"Fetching channel ID for: {channel_name}")
             response = self.client.conversations_list(
                 types="private_channel,public_channel"
             )
-            print("response['channels']", response["channels"])
-            for channel in response["channels"]:
+
+            channels = response.get("channels", [])
+            logger.debug(f"Found {len(channels)} channels")
+
+            for channel in channels:
                 if channel["name"] == channel_name:
+                    logger.info(
+                        f"Found channel {channel_name}",
+                        extra={"channel_id": channel["id"]},
+                    )
                     return channel["id"]
+
+            logger.warning(f"Channel not found: {channel_name}")
         except SlackApiError as e:
-            print(f"Error fetching Slack channels: {e}")
+            logger.error(
+                f"Error fetching Slack channels: {e}",
+                extra={"channel_name": channel_name},
+            )
 
         return None
 
