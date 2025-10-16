@@ -26,9 +26,20 @@ class SlackService:
         # Store config for later use
         self.bot_token = slack_config.get("BOT_TOKEN")
         self.team_id = slack_config.get("TEAM_ID")
+        print(
+            "bot_token is not none"
+            if self.bot_token is not None
+            else "bot_token is none"
+        )
+        print("team id", self.team_id)
 
         # Initialize Slack client if bot token is available
         self.client = WebClient(token=self.bot_token) if self.bot_token else None
+        print(
+            "self.client is not None"
+            if self.client is not None
+            else "self.client is None"
+        )
 
     def _get_channel_id_by_name(self, channel_name: str) -> str | None:
         """
@@ -41,13 +52,16 @@ class SlackService:
             str | None: The channel ID if found, None otherwise
         """
         if not self.client:
+            print("self.client is None")
             return None
 
         try:
+            print("attempting to fetch channels")
             # List all channels (including private) that the bot has access to
             response = self.client.conversations_list(
                 types="private_channel,public_channel"
             )
+            print("response['channels']", response["channels"])
             for channel in response["channels"]:
                 if channel["name"] == channel_name:
                     return channel["id"]
