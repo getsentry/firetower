@@ -158,5 +158,5 @@ JIRA = {
 # Slack Integration Configuration
 SLACK = {
     "BOT_TOKEN": os.environ.get("SLACK_BOT_TOKEN"),
-    "TEAM_ID": os.environ.get("SLACK_TEAM_ID"),
+    "TEAM_ID": os.environ.get("SLACK_TEAM_ID", "sentry"),
 }
