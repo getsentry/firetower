@@ -4,7 +4,6 @@ import {z} from 'zod';
 
 const ParticipantSchema = z.object({
   name: z.string(),
-  slack: z.string(),
   avatar_url: z.string().nullable(),
   role: z.string().nullable(),
 });
