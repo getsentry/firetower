@@ -56,8 +56,7 @@ def extract_participants(jira_incident):
         participants.append(
             {
                 "name": jira_incident["assignee"],
-                "slack": jira_incident["assignee"].lower().replace(" ", "."),
-                "avatar_url": f"https://via.placeholder.com/32x32?text={jira_incident['assignee'][0]}",
+                "avatar_url": None,
                 "role": "Captain",
             }
         )
@@ -68,8 +67,7 @@ def extract_participants(jira_incident):
         participants.append(
             {
                 "name": jira_incident["reporter"],
-                "slack": jira_incident["reporter"].lower().replace(" ", "."),
-                "avatar_url": f"https://via.placeholder.com/32x32?text={jira_incident['reporter'][0]}",
+                "avatar_url": None,
                 "role": "Reporter",
             }
         )
