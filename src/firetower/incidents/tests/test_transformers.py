@@ -5,18 +5,15 @@ Tests for incident transformers.
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
+from firetower.incidents.transformers import extract_participants
 
 # Set up Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "firetower.settings")
 
 import django
-from django.conf import settings
 
 # Setup Django
 django.setup()
-
-from firetower.incidents.transformers import extract_participants
 
 
 class TestExtractParticipants:
