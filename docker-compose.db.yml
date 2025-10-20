@@ -1,0 +1,43 @@
+services:
+  ftwr-postgres:
+    image: postgres:17.6-alpine3.22
+    environment:
+    - "POSTGRES_PASSWORD=dummy_dev_password"
+    - "POSTGRES_DB=firetower"
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+
+  ftwr-adminer:
+    image: adminer
+    environment:
+    - ADMINER_DEFAULT_DRIVER=pgsql
+    - ADMINER_DEFAULT_SERVER=ftwr-postgres
+    - ADMINER_DEFAULT_USERNAME=postgres
+    - ADMINER_DEFAULT_PASSWORD=dummy_dev_password
+    - ADMINER_DEFAULT_DB=firetower
+    ports:
+      - 8089:8080
+    configs:
+      - source: adminer-index.php
+        target: /var/www/html/index.php
+
+configs:
+  adminer-index.php:
+    content: |
+      <?php
+        if(!count($$_GET)) {
+          $$_POST['auth'] = [
+            'server' => $$_ENV['ADMINER_DEFAULT_SERVER'],
+            'username' => $$_ENV['ADMINER_DEFAULT_USERNAME'],
+            'password' => $$_ENV['ADMINER_DEFAULT_PASSWORD'],
+            'driver' => $$_ENV['ADMINER_DEFAULT_DRIVER'],
+          ];
+        }
+        include './adminer.php';
+      ?>
+
+
+volumes:
+  pgdata:
