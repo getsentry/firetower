@@ -13,6 +13,22 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+
+def env_is_dev() -> bool:
+    return os.environ.get("DJANGO_ENV", "dev") == "dev"
+
+
+def dev_default(key: str, default: str = "") -> str:
+    value = os.environ.get(key)
+    if value is not None:
+        return value
+    if env_is_dev():
+        return default
+    raise Exception(
+        f"ERROR: Environment variable {key} must be set when not in the dev environment!"
+    )
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,16 +37,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-if os.environ.get("DJANGO_ENV", "dev") == "dev":
-    SECRET_KEY = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69"
-else:
-    SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
-    if SECRET_KEY is None or SECRET_KEY == "":
-        raise Exception("You must set DJANGO_SECRET_KEY and keep it private!")
+SECRET_KEY = dev_default(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69",
+)
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_ENV", "dev") == "dev"
+DEBUG = env_is_dev()
 
 ALLOWED_HOSTS = [
     "localhost",
@@ -99,10 +113,10 @@ WSGI_APPLICATION = "firetower.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DJANGO_PG_DB", "firetower"),
-        "HOST": os.environ.get("DJANGO_PG_HOST", "localhost"),
-        "USER": os.environ.get("DJANGO_PG_USER", "postgres"),
-        "PASSWORD": os.environ.get("DJANGO_PG_PASS", "dummy_dev_password"),
+        "NAME": dev_default("DJANGO_PG_DB", "firetower"),
+        "HOST": dev_default("DJANGO_PG_HOST", "localhost"),
+        "USER": dev_default("DJANGO_PG_USER", "postgres"),
+        "PASSWORD": dev_default("DJANGO_PG_PASS", "dummy_dev_password"),
     },
 }
 
@@ -152,20 +166,20 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Defaults to test environment setup (matching opsbot test config)
 JIRA = {
     "DOMAIN": os.environ.get("JIRA_DOMAIN", "https://getsentry.atlassian.net"),
-    "ACCOUNT": os.environ.get("JIRA_ACCOUNT"),
-    "API_KEY": os.environ.get("JIRA_API_KEY"),
-    "PROJECT_KEY": os.environ.get("JIRA_PROJECT_KEY", "TESTINC"),
-    "SEVERITY_FIELD": os.environ.get("JIRA_SEVERITY_FIELD", "customfield_11023"),
+    "ACCOUNT": dev_default("JIRA_ACCOUNT"),
+    "API_KEY": dev_default("JIRA_API_KEY"),
+    "PROJECT_KEY": dev_default("JIRA_PROJECT_KEY", "TESTINC"),
+    "SEVERITY_FIELD": dev_default("JIRA_SEVERITY_FIELD", "customfield_11023"),
 }
 
 # Slack Integration Configuration
 SLACK = {
-    "BOT_TOKEN": os.environ.get("SLACK_BOT_TOKEN"),
+    "BOT_TOKEN": dev_default("SLACK_BOT_TOKEN"),
     "TEAM_ID": os.environ.get("SLACK_TEAM_ID", "sentry"),
 }
 
 # Logging Configuration
-if os.environ.get("DJANGO_ENV", "dev") != "dev":
+if not env_is_dev():
     import google.cloud.logging
 
     client = google.cloud.logging.Client()
