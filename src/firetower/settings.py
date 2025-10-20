@@ -20,7 +20,7 @@ def env_is_dev() -> bool:
 
 def dev_default(key: str, default: str = "") -> str:
     value = os.environ.get(key)
-    if value is not None:
+    if value is not None and value != "":
         return value
     if env_is_dev():
         return default
