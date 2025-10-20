@@ -98,9 +98,12 @@ WSGI_APPLICATION = "firetower.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DJANGO_PG_DB", "firetower"),
+        "HOST": os.environ.get("DJANGO_PG_HOST", "localhost"),
+        "USER": os.environ.get("DJANGO_PG_USER", "postgres"),
+        "PASSWORD": os.environ.get("DJANGO_PG_PASS", "dummy_dev_password"),
+    },
 }
 
 
