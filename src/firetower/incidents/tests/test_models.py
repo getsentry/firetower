@@ -187,7 +187,7 @@ class TestIncident:
 
         areas = incident.affected_areas
         assert len(areas) == 2
-        assert "API" in areas
+        assert "API" in areas  # Preserves original casing
         assert "Database" in areas
 
     def test_root_causes_property(self):
@@ -235,7 +235,7 @@ class TestTag:
         """Test creating a tag"""
         tag = Tag.objects.create(name="API", tag_type=TagType.AFFECTED_AREA)
 
-        assert tag.name == "API"
+        assert tag.name == "API"  # Preserves original casing
         assert tag.tag_type == "AFFECTED_AREA"
         assert tag.created_at is not None
 
@@ -248,12 +248,30 @@ class TestTag:
 
     def test_tag_unique_constraint(self):
         """Test duplicate name+type combination is not allowed"""
+        from django.core.exceptions import ValidationError
+
         Tag.objects.create(name="API", tag_type=TagType.AFFECTED_AREA)
 
-        from django.db import IntegrityError
-
-        with pytest.raises(IntegrityError):
+        # Now raises ValidationError from clean() instead of IntegrityError
+        with pytest.raises(ValidationError):
             Tag.objects.create(name="API", tag_type=TagType.AFFECTED_AREA)
+
+    def test_tag_case_insensitive_uniqueness(self):
+        """Test tags are case-insensitive unique"""
+        from django.core.exceptions import ValidationError
+
+        Tag.objects.create(name="Database", tag_type=TagType.AFFECTED_AREA)
+
+        # Should raise validation error for case-insensitive duplicates
+        with pytest.raises(ValidationError):
+            Tag.objects.create(name="database", tag_type=TagType.AFFECTED_AREA)
+
+        with pytest.raises(ValidationError):
+            Tag.objects.create(name="DATABASE", tag_type=TagType.AFFECTED_AREA)
+
+        # But same name with different type should work
+        tag = Tag.objects.create(name="database", tag_type=TagType.ROOT_CAUSE)
+        assert tag.name == "database"
 
     def test_tag_ordering(self):
         """Test tags are ordered alphabetically by name"""
