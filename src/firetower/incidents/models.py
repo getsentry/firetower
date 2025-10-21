@@ -36,18 +36,18 @@ class Tag(models.Model):
     """
     Tag for categorizing incidents.
 
-    tag_type determines if this is an affected area or root cause.
+    type determines if this is an affected area or root cause.
     Same name can exist for both types (e.g., "Database").
 
     Names preserve original casing but are case-insensitive unique.
     """
 
     name = models.CharField(max_length=100)
-    tag_type = models.CharField(max_length=20, choices=TagType.choices)
+    type = models.CharField(max_length=20, choices=TagType.choices)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [("name", "tag_type")]
+        unique_together = [("name", "type")]
         ordering = ["name"]
 
     def clean(self):
@@ -57,7 +57,7 @@ class Tag(models.Model):
         if self.name:
             # Check for case-insensitive duplicates
             existing = Tag.objects.filter(
-                name__iexact=self.name, tag_type=self.tag_type
+                name__iexact=self.name, type=self.type
             ).exclude(pk=self.pk)
 
             if existing.exists():
@@ -73,7 +73,7 @@ class Tag(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.name} ({self.get_tag_type_display()})"
+        return f"{self.name} ({self.get_type_display()})"
 
 
 class Incident(models.Model):
@@ -129,13 +129,13 @@ class Incident(models.Model):
         "Tag",
         blank=True,
         related_name="incidents_by_affected_area",
-        limit_choices_to={"tag_type": "AFFECTED_AREA"},
+        limit_choices_to={"type": "AFFECTED_AREA"},
     )
     root_cause_tags = models.ManyToManyField(
         "Tag",
         blank=True,
         related_name="incidents_by_root_cause",
-        limit_choices_to={"tag_type": "ROOT_CAUSE"},
+        limit_choices_to={"type": "ROOT_CAUSE"},
     )
 
     class Meta:
@@ -167,7 +167,7 @@ class Incident(models.Model):
         """Return external links as dict with lowercase keys"""
         links = {link_type.lower(): None for link_type in ExternalLinkType.values}
         for link in self.external_links.all():
-            links[link.link_type.lower()] = link.url
+            links[link.type.lower()] = link.url
         return links
 
     def is_visible_to_user(self, user):
@@ -217,15 +217,15 @@ class ExternalLink(models.Model):
     incident = models.ForeignKey(
         "Incident", on_delete=models.CASCADE, related_name="external_links"
     )
-    link_type = models.CharField(max_length=20, choices=ExternalLinkType.choices)
+    type = models.CharField(max_length=20, choices=ExternalLinkType.choices)
     url = models.URLField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [("incident", "link_type")]
+        unique_together = [("incident", "type")]
 
     def __str__(self):
-        return f"{self.incident.incident_number} - {self.link_type}"
+        return f"{self.incident.incident_number} - {self.type}"
 
 
 def filter_visible_to_user(queryset, user):

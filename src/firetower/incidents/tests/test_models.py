@@ -180,8 +180,8 @@ class TestIncident:
             title="Test", status=IncidentStatus.ACTIVE, severity=IncidentSeverity.P1
         )
 
-        tag1 = Tag.objects.create(name="API", tag_type=TagType.AFFECTED_AREA)
-        tag2 = Tag.objects.create(name="Database", tag_type=TagType.AFFECTED_AREA)
+        tag1 = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        tag2 = Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
 
         incident.affected_area_tags.add(tag1, tag2)
 
@@ -196,10 +196,8 @@ class TestIncident:
             title="Test", status=IncidentStatus.ACTIVE, severity=IncidentSeverity.P1
         )
 
-        tag1 = Tag.objects.create(
-            name="Resource Exhaustion", tag_type=TagType.ROOT_CAUSE
-        )
-        tag2 = Tag.objects.create(name="Traffic Spike", tag_type=TagType.ROOT_CAUSE)
+        tag1 = Tag.objects.create(name="Resource Exhaustion", type=TagType.ROOT_CAUSE)
+        tag2 = Tag.objects.create(name="Traffic Spike", type=TagType.ROOT_CAUSE)
 
         incident.root_cause_tags.add(tag1, tag2)
 
@@ -216,7 +214,7 @@ class TestIncident:
 
         ExternalLink.objects.create(
             incident=incident,
-            link_type=ExternalLinkType.SLACK,
+            type=ExternalLinkType.SLACK,
             url="https://slack.com/channel",
         )
 
@@ -233,16 +231,16 @@ class TestIncident:
 class TestTag:
     def test_tag_creation(self):
         """Test creating a tag"""
-        tag = Tag.objects.create(name="API", tag_type=TagType.AFFECTED_AREA)
+        tag = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
 
         assert tag.name == "API"  # Preserves original casing
-        assert tag.tag_type == "AFFECTED_AREA"
+        assert tag.type == "AFFECTED_AREA"
         assert tag.created_at is not None
 
     def test_tag_unique_together(self):
         """Test same name can exist for different tag types"""
-        Tag.objects.create(name="Database", tag_type=TagType.AFFECTED_AREA)
-        Tag.objects.create(name="Database", tag_type=TagType.ROOT_CAUSE)
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Database", type=TagType.ROOT_CAUSE)
 
         assert Tag.objects.filter(name="Database").count() == 2
 
@@ -250,34 +248,34 @@ class TestTag:
         """Test duplicate name+type combination is not allowed"""
         from django.core.exceptions import ValidationError
 
-        Tag.objects.create(name="API", tag_type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
 
         # Now raises ValidationError from clean() instead of IntegrityError
         with pytest.raises(ValidationError):
-            Tag.objects.create(name="API", tag_type=TagType.AFFECTED_AREA)
+            Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
 
     def test_tag_case_insensitive_uniqueness(self):
         """Test tags are case-insensitive unique"""
         from django.core.exceptions import ValidationError
 
-        Tag.objects.create(name="Database", tag_type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
 
         # Should raise validation error for case-insensitive duplicates
         with pytest.raises(ValidationError):
-            Tag.objects.create(name="database", tag_type=TagType.AFFECTED_AREA)
+            Tag.objects.create(name="database", type=TagType.AFFECTED_AREA)
 
         with pytest.raises(ValidationError):
-            Tag.objects.create(name="DATABASE", tag_type=TagType.AFFECTED_AREA)
+            Tag.objects.create(name="DATABASE", type=TagType.AFFECTED_AREA)
 
         # But same name with different type should work
-        tag = Tag.objects.create(name="database", tag_type=TagType.ROOT_CAUSE)
+        tag = Tag.objects.create(name="database", type=TagType.ROOT_CAUSE)
         assert tag.name == "database"
 
     def test_tag_ordering(self):
         """Test tags are ordered alphabetically by name"""
-        Tag.objects.create(name="Zebra", tag_type=TagType.AFFECTED_AREA)
-        Tag.objects.create(name="Apple", tag_type=TagType.AFFECTED_AREA)
-        Tag.objects.create(name="Banana", tag_type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Zebra", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Apple", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Banana", type=TagType.AFFECTED_AREA)
 
         tags = list(Tag.objects.all())
         assert tags[0].name == "Apple"
@@ -286,7 +284,7 @@ class TestTag:
 
     def test_tag_str(self):
         """Test tag string representation"""
-        tag = Tag.objects.create(name="API", tag_type=TagType.AFFECTED_AREA)
+        tag = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
 
         assert str(tag) == "API (Affected Area)"
 
@@ -301,12 +299,12 @@ class TestExternalLink:
 
         link = ExternalLink.objects.create(
             incident=incident,
-            link_type=ExternalLinkType.SLACK,
+            type=ExternalLinkType.SLACK,
             url="https://slack.com/channel",
         )
 
         assert link.incident == incident
-        assert link.link_type == "SLACK"
+        assert link.type == "SLACK"
         assert link.url == "https://slack.com/channel"
         assert link.created_at is not None
 
@@ -318,7 +316,7 @@ class TestExternalLink:
 
         ExternalLink.objects.create(
             incident=incident,
-            link_type=ExternalLinkType.SLACK,
+            type=ExternalLinkType.SLACK,
             url="https://slack.com/channel1",
         )
 
@@ -327,7 +325,7 @@ class TestExternalLink:
         with pytest.raises(IntegrityError):
             ExternalLink.objects.create(
                 incident=incident,
-                link_type=ExternalLinkType.SLACK,
+                type=ExternalLinkType.SLACK,
                 url="https://slack.com/channel2",
             )
 
@@ -338,11 +336,11 @@ class TestExternalLink:
         )
 
         slack = ExternalLink.objects.create(
-            incident=incident, link_type=ExternalLinkType.SLACK, url="https://slack.com"
+            incident=incident, type=ExternalLinkType.SLACK, url="https://slack.com"
         )
 
         jira = ExternalLink.objects.create(
-            incident=incident, link_type=ExternalLinkType.JIRA, url="https://jira.com"
+            incident=incident, type=ExternalLinkType.JIRA, url="https://jira.com"
         )
 
         assert incident.external_links.count() == 2
@@ -356,7 +354,7 @@ class TestExternalLink:
         )
 
         link = ExternalLink.objects.create(
-            incident=incident, link_type=ExternalLinkType.SLACK, url="https://slack.com"
+            incident=incident, type=ExternalLinkType.SLACK, url="https://slack.com"
         )
 
         assert str(link) == f"{incident.incident_number} - SLACK"
