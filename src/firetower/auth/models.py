@@ -13,7 +13,7 @@ class UserProfile(models.Model):
     Extended profile for users.
 
     Linked to Django's built-in User model which provides:
-    - username (set to email)
+    - username
     - email
     - first_name
     - last_name
