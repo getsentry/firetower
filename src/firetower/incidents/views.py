@@ -39,7 +39,7 @@ def incident_list_ui(request):
 @api_view(["GET"])
 def incident_detail_ui(request, incident_id):
     """Get specific incident details from Jira"""
-    project_key = settings.JIRA["PROJECT_KEY"]
+    project_key = settings.PROJECT_KEY
     incident_pattern = rf"^{re.escape(project_key)}-\d+$"
 
     if not re.match(incident_pattern, incident_id):

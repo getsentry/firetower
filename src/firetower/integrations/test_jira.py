@@ -129,36 +129,36 @@ class TestJiraService:
             "ACCOUNT": "test@example.com",
             "API_KEY": "test-api-key",
             "DOMAIN": "https://test.atlassian.net",
-            "PROJECT_KEY": "TESTINC",
             "SEVERITY_FIELD": "customfield_10001",
         }
 
         with patch.object(settings, "JIRA", mock_jira_config):
-            with patch("firetower.integrations.services.jira.JIRA") as mock_jira_client:
-                mock_client_instance = mock_jira_client.return_value
-                mock_client_instance.search_issues.return_value = []
+            with patch.object(settings, "PROJECT_KEY", "TESTINC"):
+                with patch(
+                    "firetower.integrations.services.jira.JIRA"
+                ) as mock_jira_client:
+                    mock_client_instance = mock_jira_client.return_value
+                    mock_client_instance.search_issues.return_value = []
 
-                service = JiraService()
+                    service = JiraService()
 
-                # Test without status filter
-                service.get_incidents()
-                expected_jql = 'project = "TESTINC" ORDER BY created DESC'
-                mock_client_instance.search_issues.assert_called_with(
-                    expected_jql, maxResults=50, expand="changelog"
-                )
+                    # Test without status filter
+                    service.get_incidents()
+                    expected_jql = 'project = "TESTINC" ORDER BY created DESC'
+                    mock_client_instance.search_issues.assert_called_with(
+                        expected_jql, maxResults=50, expand="changelog"
+                    )
 
-                # Test with single status filter
-                service.get_incidents(statuses=["Active"])
-                expected_jql_single = (
-                    'project = "TESTINC" AND status IN ("Active") ORDER BY created DESC'
-                )
-                mock_client_instance.search_issues.assert_called_with(
-                    expected_jql_single, maxResults=50, expand="changelog"
-                )
+                    # Test with single status filter
+                    service.get_incidents(statuses=["Active"])
+                    expected_jql_single = 'project = "TESTINC" AND status IN ("Active") ORDER BY created DESC'
+                    mock_client_instance.search_issues.assert_called_with(
+                        expected_jql_single, maxResults=50, expand="changelog"
+                    )
 
-                # Test with multiple status filters
-                service.get_incidents(statuses=["Active", "Mitigated"])
-                expected_jql_multiple = 'project = "TESTINC" AND status IN ("Active", "Mitigated") ORDER BY created DESC'
-                mock_client_instance.search_issues.assert_called_with(
-                    expected_jql_multiple, maxResults=50, expand="changelog"
-                )
+                    # Test with multiple status filters
+                    service.get_incidents(statuses=["Active", "Mitigated"])
+                    expected_jql_multiple = 'project = "TESTINC" AND status IN ("Active", "Mitigated") ORDER BY created DESC'
+                    mock_client_instance.search_issues.assert_called_with(
+                        expected_jql_multiple, maxResults=50, expand="changelog"
+                    )

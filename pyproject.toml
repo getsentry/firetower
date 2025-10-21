@@ -28,6 +28,8 @@ dev = [
     "pytest-django>=4.8.0",
     "ruff>=0.12.11",
     "ty>=0.0.1a19",
+    "django-stubs>=5.2.7",
+    "django-stubs-ext>=5.2.7",
 ]
 prod = [
     "granian>=2.5.3",
@@ -37,3 +39,12 @@ prod = [
 profile = "black"
 line_length = 100
 lines_between_sections = 1
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "firetower.settings"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.django-stubs]
+django_settings_module = "firetower.settings"
