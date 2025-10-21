@@ -46,7 +46,7 @@ class UserProfile(models.Model):
         Returns:
             ExternalProfile instance or None
         """
-        return self.user.external_profiles.filter(profile_type=profile_type).first()
+        return self.user.external_profiles.filter(type=profile_type).first()
 
     def get_slack_id(self):
         """Convenience method for getting Slack user ID"""
@@ -75,15 +75,15 @@ class ExternalProfile(models.Model):
     user = models.ForeignKey(
         "auth.User", on_delete=models.CASCADE, related_name="external_profiles"
     )
-    profile_type = models.CharField(max_length=20, choices=ExternalProfileType.choices)
+    type = models.CharField(max_length=20, choices=ExternalProfileType.choices)
     external_id = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [("user", "profile_type")]
+        unique_together = [("user", "type")]
         indexes = [
-            models.Index(fields=["profile_type", "external_id"]),
+            models.Index(fields=["type", "external_id"]),
         ]
 
     def __str__(self):
-        return f"{self.user.username} - {self.profile_type}: {self.external_id}"
+        return f"{self.user.username} - {self.type}: {self.external_id}"

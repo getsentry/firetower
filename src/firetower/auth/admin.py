@@ -41,6 +41,6 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(ExternalProfile)
 class ExternalProfileAdmin(admin.ModelAdmin):
-    list_display = ["user", "profile_type", "external_id", "created_at"]
-    list_filter = ["profile_type"]
+    list_display = ["user", "type", "external_id", "created_at"]
+    list_filter = ["type"]
     search_fields = ["user__username", "external_id"]

@@ -96,7 +96,7 @@ class TestUserProfile:
 
         # Create Slack profile
         slack_profile = ExternalProfile.objects.create(
-            user=user, profile_type=ExternalProfileType.SLACK, external_id="U12345"
+            user=user, type=ExternalProfileType.SLACK, external_id="U12345"
         )
 
         # Test generic method
@@ -118,7 +118,7 @@ class TestUserProfile:
 
         # Create Slack profile
         ExternalProfile.objects.create(
-            user=user, profile_type=ExternalProfileType.SLACK, external_id="U12345"
+            user=user, type=ExternalProfileType.SLACK, external_id="U12345"
         )
 
         assert user.userprofile.get_slack_id() == "U12345"
@@ -132,7 +132,7 @@ class TestUserProfile:
 
         # Create PagerDuty profile
         ExternalProfile.objects.create(
-            user=user, profile_type=ExternalProfileType.PAGERDUTY, external_id="PXXXXXX"
+            user=user, type=ExternalProfileType.PAGERDUTY, external_id="PXXXXXX"
         )
 
         assert user.userprofile.get_pagerduty_id() == "PXXXXXX"
@@ -145,11 +145,11 @@ class TestExternalProfile:
         user = User.objects.create_user(username="test@example.com")
 
         profile = ExternalProfile.objects.create(
-            user=user, profile_type=ExternalProfileType.SLACK, external_id="U12345"
+            user=user, type=ExternalProfileType.SLACK, external_id="U12345"
         )
 
         assert profile.user == user
-        assert profile.profile_type == "SLACK"
+        assert profile.type == "SLACK"
         assert profile.external_id == "U12345"
         assert profile.created_at is not None
 
@@ -159,7 +159,7 @@ class TestExternalProfile:
 
         # Create first Slack profile
         ExternalProfile.objects.create(
-            user=user, profile_type=ExternalProfileType.SLACK, external_id="U12345"
+            user=user, type=ExternalProfileType.SLACK, external_id="U12345"
         )
 
         # Try to create second Slack profile - should fail
@@ -167,19 +167,19 @@ class TestExternalProfile:
 
         with pytest.raises(IntegrityError):
             ExternalProfile.objects.create(
-                user=user, profile_type=ExternalProfileType.SLACK, external_id="U99999"
+                user=user, type=ExternalProfileType.SLACK, external_id="U99999"
             )
 
-    def test_multiple_profile_types_allowed(self):
+    def test_multiple_types_allowed(self):
         """Test that user can have multiple profiles of different types"""
         user = User.objects.create_user(username="test@example.com")
 
         slack = ExternalProfile.objects.create(
-            user=user, profile_type=ExternalProfileType.SLACK, external_id="U12345"
+            user=user, type=ExternalProfileType.SLACK, external_id="U12345"
         )
 
         pagerduty = ExternalProfile.objects.create(
-            user=user, profile_type=ExternalProfileType.PAGERDUTY, external_id="PXXXXXX"
+            user=user, type=ExternalProfileType.PAGERDUTY, external_id="PXXXXXX"
         )
 
         assert user.external_profiles.count() == 2
@@ -191,12 +191,12 @@ class TestExternalProfile:
         user = User.objects.create_user(username="test@example.com")
 
         ExternalProfile.objects.create(
-            user=user, profile_type=ExternalProfileType.SLACK, external_id="U12345"
+            user=user, type=ExternalProfileType.SLACK, external_id="U12345"
         )
 
         # Find user by Slack ID
         profile = ExternalProfile.objects.get(
-            profile_type=ExternalProfileType.SLACK, external_id="U12345"
+            type=ExternalProfileType.SLACK, external_id="U12345"
         )
 
         assert profile.user == user
@@ -206,7 +206,7 @@ class TestExternalProfile:
         user = User.objects.create_user(username="test@example.com")
 
         profile = ExternalProfile.objects.create(
-            user=user, profile_type=ExternalProfileType.SLACK, external_id="U12345"
+            user=user, type=ExternalProfileType.SLACK, external_id="U12345"
         )
 
         assert str(profile) == "test@example.com - SLACK: U12345"

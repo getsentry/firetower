@@ -50,13 +50,13 @@ class IncidentAdmin(admin.ModelAdmin):
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ["name", "tag_type", "created_at"]
-    list_filter = ["tag_type"]
+    list_display = ["name", "type", "created_at"]
+    list_filter = ["type"]
     search_fields = ["name"]
 
 
 @admin.register(ExternalLink)
 class ExternalLinkAdmin(admin.ModelAdmin):
-    list_display = ["incident", "link_type", "url"]
-    list_filter = ["link_type"]
+    list_display = ["incident", "type", "url"]
+    list_filter = ["type"]
     search_fields = ["incident__id", "url"]
