@@ -175,8 +175,8 @@ class Incident(models.Model):
         if not self.is_private:
             return True
 
-        # Admins can see all incidents
-        if hasattr(user, "userprofile") and user.userprofile.is_admin:
+        # Superusers can see all incidents
+        if user.is_superuser:
             return True
 
         # Check if user is involved
@@ -239,7 +239,8 @@ def filter_visible_to_user(queryset, user):
     Returns:
         Filtered queryset
     """
-    if hasattr(user, "userprofile") and user.userprofile.is_admin:
+    # Superusers see everything
+    if user.is_superuser:
         return queryset
 
     from django.db.models import Q

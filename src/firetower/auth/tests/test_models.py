@@ -17,7 +17,6 @@ class TestUserProfile:
 
         assert hasattr(user, "userprofile")
         assert isinstance(user.userprofile, UserProfile)
-        assert user.userprofile.is_admin is False
         assert user.userprofile.avatar_url == ""
 
     def test_userprofile_str(self):
