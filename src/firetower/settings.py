@@ -40,6 +40,8 @@ sentry_sdk.init(
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Global project settings
+PROJECT_KEY = os.environ.get("PROJECT_KEY", "INC")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -176,7 +178,6 @@ JIRA = {
     "DOMAIN": os.environ.get("JIRA_DOMAIN", "https://getsentry.atlassian.net"),
     "ACCOUNT": dev_default("JIRA_ACCOUNT"),
     "API_KEY": dev_default("JIRA_API_KEY"),
-    "PROJECT_KEY": dev_default("JIRA_PROJECT_KEY", "TESTINC"),
     "SEVERITY_FIELD": dev_default("JIRA_SEVERITY_FIELD", "customfield_11023"),
 }
 
