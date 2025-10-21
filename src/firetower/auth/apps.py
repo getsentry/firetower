@@ -7,4 +7,4 @@ class AuthConfig(AppConfig):
     label = "firetower_auth"
 
     def ready(self):
-        import firetower.auth.signals
+        pass
