@@ -78,10 +78,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Run migrations
-        run: |
-          uv run manage.py migrate
-
       - name: Run Python tests
         run: |
           cd src
