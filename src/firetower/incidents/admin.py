@@ -30,7 +30,7 @@ class IncidentAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             "Incident Information",
-            {"fields": ("title", "description", "impact", "root_cause")},
+            {"fields": ("title", "description", "impact")},
         ),
         ("Status", {"fields": ("status", "severity", "is_private")}),
         ("People", {"fields": ("captain", "reporter", "participants")}),

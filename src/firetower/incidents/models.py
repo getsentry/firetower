@@ -67,7 +67,6 @@ class Incident(models.Model):
     title = models.CharField(max_length=500)
     description = models.TextField(blank=True)
     impact = models.TextField(blank=True)
-    root_cause = models.TextField(blank=True)
 
     # Status and severity
     status = models.CharField(
