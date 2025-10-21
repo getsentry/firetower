@@ -29,8 +29,7 @@ admin.site.register(User, UserAdmin)
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ["user", "is_admin", "avatar_url"]
-    list_filter = ["is_admin"]
+    list_display = ["user", "avatar_url"]
     search_fields = [
         "user__username",
         "user__email",

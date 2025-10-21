@@ -159,11 +159,13 @@ class TestIncident:
         assert incident.is_visible_to_user(participant) is True
         assert incident.is_visible_to_user(other_user) is False
 
-    def test_private_incident_visible_to_admin(self):
-        """Test private incident is visible to admin users"""
-        admin_user = User.objects.create_user(username="admin@example.com")
-        admin_user.userprofile.is_admin = True
-        admin_user.userprofile.save()
+    def test_private_incident_visible_to_superuser(self):
+        """Test private incident is visible to superusers"""
+        superuser = User.objects.create_superuser(
+            username="superuser@example.com",
+            email="superuser@example.com",
+            password="test123",
+        )
 
         incident = Incident.objects.create(
             title="Private Incident",
@@ -172,7 +174,7 @@ class TestIncident:
             is_private=True,
         )
 
-        assert incident.is_visible_to_user(admin_user) is True
+        assert incident.is_visible_to_user(superuser) is True
 
     def test_affected_areas_property(self):
         """Test affected_areas property returns list of tag names"""
@@ -362,11 +364,13 @@ class TestExternalLink:
 
 @pytest.mark.django_db
 class TestFilterVisibleToUser:
-    def test_admin_sees_all_incidents(self):
-        """Test admin users see all incidents"""
-        admin = User.objects.create_user(username="admin@example.com")
-        admin.userprofile.is_admin = True
-        admin.userprofile.save()
+    def test_superuser_sees_all_incidents(self):
+        """Test superusers see all incidents"""
+        superuser = User.objects.create_superuser(
+            username="superuser@example.com",
+            email="superuser@example.com",
+            password="test123",
+        )
 
         public = Incident.objects.create(
             title="Public",
@@ -383,7 +387,7 @@ class TestFilterVisibleToUser:
         )
 
         queryset = Incident.objects.all()
-        filtered = filter_visible_to_user(queryset, admin)
+        filtered = filter_visible_to_user(queryset, superuser)
 
         assert filtered.count() == 2
         assert public in filtered

@@ -17,13 +17,13 @@ class UserProfile(models.Model):
     - email
     - first_name
     - last_name
+    - is_superuser (for admin access)
     """
 
     user = models.OneToOneField(
         "auth.User", on_delete=models.CASCADE, related_name="userprofile"
     )
     avatar_url = models.URLField(blank=True)
-    is_admin = models.BooleanField(default=False)
 
     @property
     def user_incidents(self):
