@@ -38,6 +38,8 @@ class Tag(models.Model):
 
     tag_type determines if this is an affected area or root cause.
     Same name can exist for both types (e.g., "Database").
+
+    Names preserve original casing but are case-insensitive unique.
     """
 
     name = models.CharField(max_length=100)
@@ -47,6 +49,28 @@ class Tag(models.Model):
     class Meta:
         unique_together = [("name", "tag_type")]
         ordering = ["name"]
+
+    def clean(self):
+        """Validate case-insensitive uniqueness"""
+        from django.core.exceptions import ValidationError
+
+        if self.name:
+            # Check for case-insensitive duplicates
+            existing = Tag.objects.filter(
+                name__iexact=self.name, tag_type=self.tag_type
+            ).exclude(pk=self.pk)
+
+            if existing.exists():
+                raise ValidationError(
+                    {
+                        "name": f'Tag "{existing.first().name}" already exists for this type (case-insensitive match)'
+                    }
+                )
+
+    def save(self, *args, **kwargs):
+        """Run validation before saving"""
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.get_tag_type_display()})"
