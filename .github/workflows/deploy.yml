@@ -38,7 +38,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: deploy-test
-        if: ${{ inputs.environment == 'test' }}
+        # TODO: restore this DO NOT MERGE
+        #if: ${{ inputs.environment == 'test' }}
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           service: firetower-test
