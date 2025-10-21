@@ -44,6 +44,7 @@ jobs:
         with:
           service: firetower-test
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west-1
           image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
       - name: deploy-prod
         if: ${{ github.ref ==  'ref/heads/main' || inputs.environment == 'prod' }}
@@ -51,4 +52,5 @@ jobs:
         with:
           service: firetower
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west-1
           image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ github.sha }}
