@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth.models import User
-from firetower.auth.models import UserProfile, ExternalProfile, ExternalProfileType
+
+from firetower.auth.models import ExternalProfile, ExternalProfileType, UserProfile
 
 
 @pytest.mark.django_db
@@ -40,8 +41,8 @@ class TestUserProfile:
         """Test UserProfile.user_incidents returns incidents user is involved in"""
         from firetower.incidents.models import (
             Incident,
-            IncidentStatus,
             IncidentSeverity,
+            IncidentStatus,
         )
 
         user = User.objects.create_user(username="test@example.com")

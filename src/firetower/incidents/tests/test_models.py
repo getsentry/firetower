@@ -1,14 +1,15 @@
 import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+
 from firetower.incidents.models import (
-    Incident,
-    IncidentStatus,
-    IncidentSeverity,
-    Tag,
-    TagType,
     ExternalLink,
     ExternalLinkType,
+    Incident,
+    IncidentSeverity,
+    IncidentStatus,
+    Tag,
+    TagType,
     filter_visible_to_user,
 )
 
