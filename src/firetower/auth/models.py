@@ -29,6 +29,7 @@ class UserProfile(models.Model):
     def user_incidents(self):
         """Return all incidents where user is captain, reporter, or participant"""
         from django.db.models import Q
+
         from firetower.incidents.models import Incident
 
         return Incident.objects.filter(

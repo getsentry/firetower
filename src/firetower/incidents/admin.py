@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Incident, Tag, ExternalLink
+
+from .models import ExternalLink, Incident, Tag
 
 
 class ExternalLinkInline(admin.TabularInline):
