@@ -5,7 +5,7 @@ import {z} from 'zod';
 const ParticipantSchema = z.object({
   name: z.string(),
   avatar_url: z.string().nullable(),
-  role: z.string().nullable(),
+  role: z.string(),
 });
 
 const ExternalLinksSchema = z.object({
@@ -14,6 +14,8 @@ const ExternalLinksSchema = z.object({
   datadog: z.string().nullable(),
   pagerduty: z.string().nullable(),
   statuspage: z.string().nullable(),
+  notion: z.string().nullable(),
+  linear: z.string().nullable(),
 });
 
 const IncidentDetailSchema = z.object({

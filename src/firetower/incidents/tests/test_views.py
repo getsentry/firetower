@@ -175,9 +175,16 @@ class TestIncidentViews:
         assert data["id"] == incident.incident_number
         assert data["title"] == "Test Incident"
 
+        # Captain and reporter should not be separate fields
+        assert "captain" not in data
+        assert "reporter" not in data
+
+        # Captain should be in participants list
+        assert len(data["participants"]) == 1
+        assert data["participants"][0]["name"] == "Jane Captain"
+        assert data["participants"][0]["role"] == "Captain"
+
         # Detail view includes full data
-        assert "captain" in data
-        assert data["captain"]["name"] == "Jane Captain"
         assert "affected_areas" in data
         assert "API" in data["affected_areas"]
         assert "external_links" in data
