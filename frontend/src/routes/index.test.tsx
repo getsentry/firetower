@@ -140,7 +140,7 @@ describe('IncidentCard (via Index Route)', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Active', 'Mitigated']},
+        query: {status: ['Active', 'Mitigated'], page: 1},
       })
     );
   });
@@ -180,7 +180,7 @@ describe('StatusFilter', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Postmortem', 'Actions Pending']},
+        query: {status: ['Postmortem', 'Actions Pending'], page: 1},
       })
     );
   });
@@ -198,7 +198,7 @@ describe('StatusFilter', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Done']},
+        query: {status: ['Done'], page: 1},
       })
     );
   });
