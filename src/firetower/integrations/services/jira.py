@@ -30,7 +30,7 @@ class JiraService:
 
         # Store config for later use
         self.domain = jira_config["DOMAIN"]
-        self.project_key = jira_config["PROJECT_KEY"]
+        self.project_key = settings.PROJECT_KEY
         self.severity_field_id = jira_config["SEVERITY_FIELD"]
 
         # Initialize Jira client with basic auth

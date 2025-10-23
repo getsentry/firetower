@@ -7,7 +7,7 @@ import {beforeEach, describe, expect, it, vi} from 'bun:test';
 
 import {routeTree} from '../routeTree.gen';
 
-import type {IncidentList} from './queries/incidentsQueryOptions';
+import type {PaginatedIncidents} from './queries/incidentsQueryOptions';
 
 const mockApiGet = vi.fn();
 vi.mock('../api', () => ({
@@ -16,28 +16,33 @@ vi.mock('../api', () => ({
   },
 }));
 
-const mockIncidents: IncidentList = [
-  {
-    id: 'INC-1247',
-    title: 'Database Connection Pool Exhausted',
-    description:
-      'Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout.',
-    status: 'Active',
-    severity: 'P1',
-    created_at: '2024-08-27T18:14:00Z',
-    is_private: false,
-  },
-  {
-    id: 'INC-1246',
-    title: 'SSL Certificate Renewal Failed',
-    description:
-      'Automated SSL certificate renewal process failed for api.example.com. Manual intervention required to restore HTTPS access.',
-    status: 'Mitigated',
-    severity: 'P2',
-    created_at: '2024-08-27T15:32:00Z',
-    is_private: true,
-  },
-];
+const mockIncidents: PaginatedIncidents = {
+  count: 2,
+  next: null,
+  previous: null,
+  results: [
+    {
+      id: 'INC-1247',
+      title: 'Database Connection Pool Exhausted',
+      description:
+        'Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout.',
+      status: 'Active',
+      severity: 'P1',
+      created_at: '2024-08-27T18:14:00Z',
+      is_private: false,
+    },
+    {
+      id: 'INC-1246',
+      title: 'SSL Certificate Renewal Failed',
+      description:
+        'Automated SSL certificate renewal process failed for api.example.com. Manual intervention required to restore HTTPS access.',
+      status: 'Mitigated',
+      severity: 'P2',
+      created_at: '2024-08-27T15:32:00Z',
+      is_private: true,
+    },
+  ],
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -135,7 +140,7 @@ describe('IncidentCard (via Index Route)', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Active', 'Mitigated']},
+        query: {status: ['Active', 'Mitigated'], page: 1},
       })
     );
   });
@@ -175,7 +180,7 @@ describe('StatusFilter', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Postmortem', 'Actions Pending']},
+        query: {status: ['Postmortem', 'Actions Pending'], page: 1},
       })
     );
   });
@@ -193,7 +198,7 @@ describe('StatusFilter', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Done']},
+        query: {status: ['Done'], page: 1},
       })
     );
   });
