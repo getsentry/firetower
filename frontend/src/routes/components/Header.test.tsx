@@ -60,9 +60,8 @@ const mockIncidentDetail: IncidentDetail = {
   participants: [
     {
       name: 'John Doe',
-      slack: '@johndoe',
       avatar_url: 'https://example.com/avatar.jpg',
-      role: 'Incident Commander',
+      role: 'Captain',
     },
   ],
   external_links: {
@@ -71,6 +70,8 @@ const mockIncidentDetail: IncidentDetail = {
     datadog: null,
     pagerduty: null,
     statuspage: null,
+    notion: null,
+    linear: null,
   },
 };
 

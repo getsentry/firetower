@@ -119,34 +119,27 @@ class TestIncidentDetailUISerializer:
         assert data["id"] == f"INC-{incident.id}"
         assert data["title"] == "Test Incident"
 
-        # Check nested users for captain/reporter (name and avatar only)
-        assert data["captain"]["name"] == "Jane Captain"
-        assert "avatar_url" in data["captain"]
-        assert "email" not in data["captain"]
+        # Captain and reporter should NOT be separate fields
+        assert "captain" not in data
+        assert "reporter" not in data
 
-        assert data["reporter"]["name"] == "John Reporter"
-        assert "avatar_url" in data["reporter"]
-        assert "email" not in data["reporter"]
+        # Check participants include captain, reporter, and other participants with roles
+        assert len(data["participants"]) == 3
 
-        # Check participants structure (matches frontend expectation)
-        assert len(data["participants"]) == 3  # captain, reporter, participant
+        # First should be captain
+        assert data["participants"][0]["name"] == "Jane Captain"
+        assert data["participants"][0]["role"] == "Captain"
+        assert "avatar_url" in data["participants"][0]
 
-        # Find each participant
-        captain_participant = next(
-            p for p in data["participants"] if p["role"] == "Captain"
-        )
-        assert captain_participant["name"] == "Jane Captain"
-        assert "avatar_url" in captain_participant
+        # Second should be reporter
+        assert data["participants"][1]["name"] == "John Reporter"
+        assert data["participants"][1]["role"] == "Reporter"
+        assert "avatar_url" in data["participants"][1]
 
-        reporter_participant = next(
-            p for p in data["participants"] if p["role"] == "Reporter"
-        )
-        assert reporter_participant["name"] == "John Reporter"
-
-        other_participant = next(
-            p for p in data["participants"] if p["role"] == "Participant"
-        )
-        assert other_participant["name"] == "Alice Participant"
+        # Third should be participant
+        assert data["participants"][2]["name"] == "Alice Participant"
+        assert data["participants"][2]["role"] == "Participant"
+        assert "avatar_url" in data["participants"][2]
 
         # Check affected_areas and root_causes as arrays of strings
         assert "API" in data["affected_areas"]
