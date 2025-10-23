@@ -1,4 +1,7 @@
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 
 class IncidentStatus(models.TextChoices):
@@ -52,7 +55,6 @@ class Tag(models.Model):
 
     def clean(self):
         """Validate case-insensitive uniqueness"""
-        from django.core.exceptions import ValidationError
 
         if self.name:
             # Check for case-insensitive duplicates
@@ -148,7 +150,6 @@ class Incident(models.Model):
     @property
     def incident_number(self):
         """Return formatted incident number (e.g., 'INC-2000')"""
-        from django.conf import settings
 
         return f"{settings.PROJECT_KEY}-{self.id}"
 
@@ -190,7 +191,6 @@ class Incident(models.Model):
 
     def clean(self):
         """Custom validation"""
-        from django.core.exceptions import ValidationError
 
         if not self.title or not self.title.strip():
             raise ValidationError({"title": "Title cannot be empty"})
@@ -239,11 +239,13 @@ def filter_visible_to_user(queryset, user):
     Returns:
         Filtered queryset
     """
+    # Anonymous users see no incidents. IAP should prevent this, but just in case.
+    if not user.is_authenticated:
+        return queryset.none()
+
     # Superusers see everything
     if user.is_superuser:
         return queryset
-
-    from django.db.models import Q
 
     return queryset.filter(
         Q(is_private=False) | Q(captain=user) | Q(reporter=user) | Q(participants=user)
