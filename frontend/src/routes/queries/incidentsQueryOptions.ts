@@ -1,4 +1,4 @@
-import {queryOptions} from '@tanstack/react-query';
+import {infiniteQueryOptions} from '@tanstack/react-query';
 import {Api} from 'api';
 import {z} from 'zod';
 
@@ -36,14 +36,23 @@ interface IncidentsQueryArgs {
 }
 
 export function incidentsQueryOptions({status}: IncidentsQueryArgs) {
-  return queryOptions({
+  return infiniteQueryOptions({
     queryKey: ['Incidents', status],
-    queryFn: ({signal}) =>
+    queryFn: ({signal, pageParam}) =>
       Api.get({
         path: '/ui/incidents/',
-        query: {status},
+        query: {status, page: pageParam},
         signal,
         responseSchema: PaginatedIncidentsSchema,
       }),
+    initialPageParam: 1,
+    getNextPageParam: lastPage => {
+      // Extract page number from next URL, or return undefined if no next page
+      if (!lastPage.next) return undefined;
+
+      const url = new URL(lastPage.next);
+      const page = url.searchParams.get('page');
+      return page ? parseInt(page, 10) : undefined;
+    },
   });
 }
