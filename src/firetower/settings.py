@@ -124,7 +124,7 @@ DATABASES = {
         "NAME": dev_default("DJANGO_PG_DB", "firetower"),
         "HOST": dev_default("DJANGO_PG_HOST", "localhost"),
         "USER": dev_default("DJANGO_PG_USER", "postgres"),
-        "PASSWORD": dev_default("DJANGO_PG_PASS", "dummy_dev_password"),
+        "PASSWORD": os.environ.get("DJANGO_PG_PASS", "dummy_dev_password"),
     },
 }
 
