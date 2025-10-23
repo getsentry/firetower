@@ -62,7 +62,7 @@ const STORAGE_KEY = 'firetower_list_search';
 
 function Index() {
   const params = Route.useSearch();
-  const {data: incidents} = useSuspenseQuery(incidentsQueryOptions(params));
+  const {data: paginatedIncidents} = useSuspenseQuery(incidentsQueryOptions(params));
 
   // Store current search params in sessionStorage whenever they change
   useEffect(() => {
@@ -72,7 +72,7 @@ function Index() {
   return (
     <IncidentsLayout>
       <ul className="gap-space-lg flex list-none flex-col">
-        {incidents.map(incident => (
+        {paginatedIncidents.results.map(incident => (
           <li key={incident.id}>
             <IncidentCard incident={incident} />
           </li>

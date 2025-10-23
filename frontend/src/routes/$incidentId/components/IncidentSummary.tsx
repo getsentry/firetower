@@ -26,7 +26,10 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
   return (
     <Card>
       <div className="mb-space-lg flex items-start justify-between">
-        <span className="text-content-secondary text-sm">{incident.id}</span>
+        <span className="text-content-secondary text-sm flex items-center gap-space-xs leading-none">
+          {incident.is_private && <span aria-label="Private incident">🔒</span>}
+          {incident.id}
+        </span>
         <time
           className="text-content-secondary text-right text-sm"
           dateTime={incident.created_at}

@@ -22,7 +22,8 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
         data-testid={`incident-card-${incident.id}`}
       >
         <div className="gap-space-xl mb-space-md flex flex-wrap items-center md:flex-nowrap">
-          <span className="text-size-md text-content-secondary font-regular">
+          <span className="text-size-md text-content-secondary font-regular flex items-center gap-space-xs leading-none">
+            {incident.is_private && <span aria-label="Private incident">🔒</span>}
             {incident.id}
           </span>
           <div className="text-size-sm text-content-secondary ml-auto text-right md:order-last">
