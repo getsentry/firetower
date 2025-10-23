@@ -20,11 +20,16 @@ const IncidentListItemSchema = z.object({
   is_private: z.boolean(),
 });
 
-const IncidentsListSchema = z.array(IncidentListItemSchema);
+const PaginatedIncidentsSchema = z.object({
+  count: z.number(),
+  next: z.string().nullable(),
+  previous: z.string().nullable(),
+  results: z.array(IncidentListItemSchema),
+});
 
 export type IncidentStatus = z.infer<typeof IncidentStatusSchema>;
 export type IncidentListItem = z.infer<typeof IncidentListItemSchema>;
-export type IncidentList = z.infer<typeof IncidentsListSchema>;
+export type PaginatedIncidents = z.infer<typeof PaginatedIncidentsSchema>;
 
 interface IncidentsQueryArgs {
   status?: string[];
@@ -38,7 +43,7 @@ export function incidentsQueryOptions({status}: IncidentsQueryArgs) {
         path: '/ui/incidents/',
         query: {status},
         signal,
-        responseSchema: IncidentsListSchema,
+        responseSchema: PaginatedIncidentsSchema,
       }),
   });
 }
