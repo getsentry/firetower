@@ -1,72 +1,93 @@
 import re
 
 from django.conf import settings
-from rest_framework import status
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from rest_framework import generics
+from rest_framework.exceptions import ValidationError
 
-from firetower.integrations.services.jira import JiraService
-
-from .transformers import (
-    transform_jira_incident_for_detail,
-    transform_jira_incident_for_list,
-)
+from .models import Incident, filter_visible_to_user
+from .serializers import IncidentDetailUISerializer, IncidentListUISerializer
 
 
-@api_view(["GET"])
-def incident_list_ui(request):
-    """List all incidents from Jira"""
-    try:
-        jira_service = JiraService()
-        status_filters = request.GET.getlist("status")
-        jira_incidents = jira_service.get_incidents(
-            statuses=status_filters, max_results=50
+class IncidentListUIView(generics.ListAPIView):
+    """
+    List all incidents from database.
+
+    Supports:
+    - Pagination (configured in settings.REST_FRAMEWORK)
+    - Status filtering via query params: ?status=Active&status=Mitigated
+    - Privacy: users only see public incidents + their own private incidents
+
+    Authentication enforced via DEFAULT_PERMISSION_CLASSES in settings.
+    """
+
+    serializer_class = IncidentListUISerializer
+
+    def get_queryset(self):
+        """Filter incidents by visibility and status"""
+        queryset = Incident.objects.all()
+        queryset = filter_visible_to_user(queryset, self.request.user)
+
+        # Filter by status if requested
+        status_filters = self.request.GET.getlist("status")
+        if status_filters:
+            queryset = queryset.filter(status__in=status_filters)
+
+        return queryset
+
+
+class IncidentDetailUIView(generics.RetrieveAPIView):
+    """
+    Get specific incident details from database.
+
+    Accepts incident_id in format: INC-2000
+    Returns 404 if incident not found or user doesn't have access.
+    Uses prefetch_related for optimized queries.
+
+    Authentication enforced via DEFAULT_PERMISSION_CLASSES in settings.
+    """
+
+    serializer_class = IncidentDetailUISerializer
+    lookup_field = "id"
+
+    def get_queryset(self):
+        """Get base queryset with optimized prefetching"""
+        return Incident.objects.prefetch_related(
+            "captain__userprofile",
+            "reporter__userprofile",
+            "participants__userprofile",
+            "affected_area_tags",
+            "root_cause_tags",
+            "external_links",
         )
-        incidents = [
-            transform_jira_incident_for_list(incident) for incident in jira_incidents
-        ]
 
-        return Response(incidents)
+    def get_object(self):
+        """
+        Parse INC-2000 format and filter by visibility.
 
-    except Exception as e:
-        print(f"Error fetching incidents: {e}")
-        return Response(
-            {"error": "Failed to fetch incidents"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        Returns incident if found and user has access, otherwise 404.
+        """
+        incident_id = self.kwargs["incident_id"]
+        project_key = settings.PROJECT_KEY
 
+        # Extract numeric ID from incident number (INC-2000 -> 2000)
+        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
+        match = re.match(incident_pattern, incident_id)
 
-@api_view(["GET"])
-def incident_detail_ui(request, incident_id):
-    """Get specific incident details from Jira"""
-    project_key = settings.PROJECT_KEY
-    incident_pattern = rf"^{re.escape(project_key)}-\d+$"
-
-    if not re.match(incident_pattern, incident_id):
-        return Response(
-            {
-                "error": f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
-            },
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    try:
-        jira_service = JiraService()
-        jira_incident = jira_service.get_incident(incident_id)
-
-        if not jira_incident:
-            return Response(
-                {"error": f"Incident {incident_id} not found"},
-                status=status.HTTP_404_NOT_FOUND,
+        if not match:
+            raise ValidationError(
+                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
             )
 
-        incident_detail = transform_jira_incident_for_detail(jira_incident)
+        # Get incident by numeric ID
+        numeric_id = int(match.group(1))
+        queryset = self.get_queryset()
+        queryset = filter_visible_to_user(queryset, self.request.user)
 
-        return Response(incident_detail)
+        # Returns 404 if not found OR if user doesn't have access
+        return get_object_or_404(queryset, id=numeric_id)
 
-    except Exception as e:
-        print(f"Error fetching incident {incident_id}: {e}")
-        return Response(
-            {"error": f"Failed to fetch incident {incident_id}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+
+# Backwards-compatible function-based view aliases (for gradual migration)
+incident_list_ui = IncidentListUIView.as_view()
+incident_detail_ui = IncidentDetailUIView.as_view()

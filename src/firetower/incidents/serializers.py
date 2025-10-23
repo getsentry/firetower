@@ -5,7 +5,7 @@ from firetower.auth.serializers import UserSerializer
 from .models import Incident
 
 
-class IncidentListSerializer(serializers.ModelSerializer):
+class IncidentListUISerializer(serializers.ModelSerializer):
     """
     Serializer for listing incidents.
 
@@ -59,7 +59,7 @@ class ParticipantSerializer(serializers.Serializer):
         return "Participant"
 
 
-class IncidentDetailSerializer(serializers.ModelSerializer):
+class IncidentDetailUISerializer(serializers.ModelSerializer):
     """
     Serializer for incident detail view.
 

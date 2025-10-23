@@ -11,13 +11,13 @@ from firetower.incidents.models import (
     TagType,
 )
 from firetower.incidents.serializers import (
-    IncidentDetailSerializer,
-    IncidentListSerializer,
+    IncidentDetailUISerializer,
+    IncidentListUISerializer,
 )
 
 
 @pytest.mark.django_db
-class TestIncidentListSerializer:
+class TestIncidentListUISerializer:
     def test_incident_list_serialization(self):
         """Test incident serialization for list view"""
         captain = User.objects.create_user(
@@ -50,7 +50,7 @@ class TestIncidentListSerializer:
         incident.affected_area_tags.add(area_tag)
         incident.root_cause_tags.add(cause_tag)
 
-        serializer = IncidentListSerializer(incident)
+        serializer = IncidentListUISerializer(incident)
         data = serializer.data
 
         # Check id is incident_number string (frontend compatibility)
@@ -67,7 +67,7 @@ class TestIncidentListSerializer:
 
 
 @pytest.mark.django_db
-class TestIncidentDetailSerializer:
+class TestIncidentDetailUISerializer:
     def test_incident_detail_serialization(self):
         """Test incident serialization for detail view (matches frontend expectations)"""
         captain = User.objects.create_user(
@@ -112,7 +112,7 @@ class TestIncidentDetailSerializer:
             url="https://slack.com/channels/incident-123",
         )
 
-        serializer = IncidentDetailSerializer(incident)
+        serializer = IncidentDetailUISerializer(incident)
         data = serializer.data
 
         # Check id is incident_number string (frontend compatibility)
