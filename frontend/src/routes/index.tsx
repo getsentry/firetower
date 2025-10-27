@@ -36,7 +36,6 @@ export const Route = createFileRoute('/')({
   loaderDeps: ({search: {status}}) => ({status}),
   // Define loader with loaderDeps and context (context has queryClient)
   loader: async ({deps, context}) => {
-    // For infinite queries, we need to prefetch instead of ensureQueryData
     const options = incidentsQueryOptions(deps);
     await context.queryClient.prefetchInfiniteQuery(options);
   },
@@ -65,9 +64,12 @@ const STORAGE_KEY = 'firetower_list_search';
 
 function Index() {
   const params = Route.useSearch();
-  const {data, fetchNextPage, hasNextPage, isFetchingNextPage} = useSuspenseInfiniteQuery(
-    incidentsQueryOptions(params)
-  );
+  const {
+    data: incidents,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useSuspenseInfiniteQuery(incidentsQueryOptions(params));
 
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -94,13 +96,10 @@ function Index() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // Flatten all pages into single array
-  const allIncidents = data.pages.flatMap(page => page.results);
-
   return (
     <IncidentsLayout>
       <ul className="gap-space-lg flex list-none flex-col">
-        {allIncidents.map(incident => (
+        {incidents.map(incident => (
           <li key={incident.id}>
             <IncidentCard incident={incident} />
           </li>

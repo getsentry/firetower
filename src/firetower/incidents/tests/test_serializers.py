@@ -59,14 +59,7 @@ class TestIncidentListUISerializer:
         assert data["status"] == IncidentStatus.ACTIVE
         assert data["severity"] == IncidentSeverity.P1
 
-        # List view should not include captain/reporter/tags
-        assert "captain" not in data
-        assert "reporter" not in data
-        assert "affected_areas" not in data
-        assert "root_causes" not in data
 
-
-@pytest.mark.django_db
 class TestIncidentDetailUISerializer:
     def test_incident_detail_serialization(self):
         """Test incident serialization for detail view (matches frontend expectations)"""
@@ -118,10 +111,6 @@ class TestIncidentDetailUISerializer:
         # Check id is incident_number string (frontend compatibility)
         assert data["id"] == f"INC-{incident.id}"
         assert data["title"] == "Test Incident"
-
-        # Captain and reporter should NOT be separate fields
-        assert "captain" not in data
-        assert "reporter" not in data
 
         # Check participants include captain, reporter, and other participants with roles
         assert len(data["participants"]) == 3

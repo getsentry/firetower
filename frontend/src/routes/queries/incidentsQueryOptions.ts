@@ -54,5 +54,6 @@ export function incidentsQueryOptions({status}: IncidentsQueryArgs) {
       const page = url.searchParams.get('page');
       return page ? parseInt(page, 10) : undefined;
     },
+    select: data => data.pages.flatMap(page => page.results),
   });
 }

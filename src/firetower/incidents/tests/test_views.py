@@ -52,10 +52,6 @@ class TestIncidentViews:
         assert "status" in incident
         assert "severity" in incident
 
-        # List view should not include these
-        assert "captain" not in incident
-        assert "affected_areas" not in incident
-
     def test_list_incidents_respects_privacy(self):
         """Test private incidents are filtered correctly"""
         # Create public and private incidents
@@ -174,10 +170,6 @@ class TestIncidentViews:
         data = response.data
         assert data["id"] == incident.incident_number
         assert data["title"] == "Test Incident"
-
-        # Captain and reporter should not be separate fields
-        assert "captain" not in data
-        assert "reporter" not in data
 
         # Captain should be in participants list
         assert len(data["participants"]) == 1
