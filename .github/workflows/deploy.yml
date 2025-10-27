@@ -49,7 +49,7 @@ jobs:
           image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
           wait: true
       - name: deploy-prod-db-migration
-        if: ${{ github.ref ==  'ref/heads/main' || inputs.environment == 'prod' }}
+        if: ${{ github.ref ==  'refs/heads/main' || inputs.environment == 'prod' }}
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           job: firetower-prod-db-migration
@@ -66,7 +66,7 @@ jobs:
           region: us-west1
           image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
       - name: deploy-prod
-        if: ${{ github.ref ==  'ref/heads/main' || inputs.environment == 'prod' }}
+        if: ${{ github.ref ==  'refs/heads/main' || inputs.environment == 'prod' }}
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           service: firetower
