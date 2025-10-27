@@ -5,12 +5,11 @@ permissions:
 
 on:
   push:
-    # TODO: REMOVE THIS  DO NOT MERGE
-    branches: [main, test]
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy to ("production" or "test")'
+        description: 'Environment to deploy to ("prod" or "test")'
         type: environment
         default: test
         required: true
@@ -41,8 +40,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: deploy-test-db-migration
-        # TODO: restore this DO NOT MERGE
-        #if: ${{ inputs.environment == 'test' }}
+        if: ${{ inputs.environment == 'test' }}
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           job: firetower-test-db-migration
@@ -60,8 +58,7 @@ jobs:
           image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ github.sha }}
           wait: true
       - name: deploy-test
-        # TODO: restore this DO NOT MERGE
-        #if: ${{ inputs.environment == 'test' }}
+        if: ${{ inputs.environment == 'test' }}
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           service: firetower-test
