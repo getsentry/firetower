@@ -14,6 +14,9 @@ on:
         default: test
         required: true
 
+env:
+  IMAGE_REF: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
+
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
@@ -36,7 +39,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
+          tags: ${{ env.IMAGE_REF }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: deploy-test-db-migration
@@ -46,7 +49,7 @@ jobs:
           job: firetower-test-db-migration
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           region: us-west1
-          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
+          image: ${{ env.IMAGE_REF }}
           wait: true
       - name: deploy-prod-db-migration
         if: ${{ github.ref ==  'refs/heads/main' || inputs.environment == 'prod' }}
@@ -55,7 +58,7 @@ jobs:
           job: firetower-prod-db-migration
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           region: us-west1
-          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ github.sha }}
+          image: ${{ env.IMAGE_REF }}
           wait: true
       - name: deploy-test
         if: ${{ inputs.environment == 'test' }}
@@ -64,7 +67,7 @@ jobs:
           service: firetower-test
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           region: us-west1
-          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
+          image: ${{ env.IMAGE_REF }}
       - name: deploy-prod
         if: ${{ github.ref ==  'refs/heads/main' || inputs.environment == 'prod' }}
         uses: "google-github-actions/deploy-cloudrun@v3"
@@ -72,4 +75,4 @@ jobs:
           service: firetower
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           region: us-west1
-          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ github.sha }}
+          image: ${{ env.IMAGE_REF }}
