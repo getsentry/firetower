@@ -26,7 +26,7 @@ jobs:
       - name: Authenticate with GCP
         uses: 'google-github-actions/auth@v3'
         with:
-          project_id: ${{ secrets.GCP_PROJECT }}
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
       - name: Login to Artifact Registry
         run: gcloud auth configure-docker us-west1-docker.pkg.dev
