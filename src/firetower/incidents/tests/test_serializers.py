@@ -60,6 +60,7 @@ class TestIncidentListUISerializer:
         assert data["severity"] == IncidentSeverity.P1
 
 
+@pytest.mark.django_db
 class TestIncidentDetailUISerializer:
     def test_incident_detail_serialization(self):
         """Test incident serialization for detail view (matches frontend expectations)"""
