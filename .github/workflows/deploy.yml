@@ -1,0 +1,78 @@
+name: Deploy
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to ("prod" or "test")'
+        type: environment
+        default: test
+        required: true
+
+env:
+  IMAGE_REF: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+  deploy:
+    needs: [ci]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Authenticate with GCP
+        uses: 'google-github-actions/auth@v3'
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
+      - name: Login to Artifact Registry
+        run: gcloud auth configure-docker us-west1-docker.pkg.dev
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ${{ env.IMAGE_REF }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: deploy-test-db-migration
+        if: ${{ inputs.environment == 'test' }}
+        uses: "google-github-actions/deploy-cloudrun@v3"
+        with:
+          job: firetower-test-db-migration
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: ${{ env.IMAGE_REF }}
+          wait: true
+      - name: deploy-prod-db-migration
+        if: ${{ github.ref ==  'refs/heads/main' || inputs.environment == 'prod' }}
+        uses: "google-github-actions/deploy-cloudrun@v3"
+        with:
+          job: firetower-prod-db-migration
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: ${{ env.IMAGE_REF }}
+          wait: true
+      - name: deploy-test
+        if: ${{ inputs.environment == 'test' }}
+        uses: "google-github-actions/deploy-cloudrun@v3"
+        with:
+          service: firetower-test
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: ${{ env.IMAGE_REF }}
+      - name: deploy-prod
+        if: ${{ github.ref ==  'refs/heads/main' || inputs.environment == 'prod' }}
+        uses: "google-github-actions/deploy-cloudrun@v3"
+        with:
+          service: firetower
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: ${{ env.IMAGE_REF }}
