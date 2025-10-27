@@ -40,6 +40,25 @@ jobs:
           tags: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: deploy-test-db-migration
+        # TODO: restore this DO NOT MERGE
+        #if: ${{ inputs.environment == 'test' }}
+        uses: "google-github-actions/deploy-cloudrun@v3"
+        with:
+          job: firetower-test-db-migration
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
+          wait: true
+      - name: deploy-prod-db-migration
+        if: ${{ github.ref ==  'ref/heads/main' || inputs.environment == 'prod' }}
+        uses: "google-github-actions/deploy-cloudrun@v3"
+        with:
+          job: firetower-prod-db-migration
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/firetower-docker/firetower:${{ github.sha }}
+          wait: true
       - name: deploy-test
         # TODO: restore this DO NOT MERGE
         #if: ${{ inputs.environment == 'test' }}
