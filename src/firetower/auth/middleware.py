@@ -3,6 +3,7 @@ import logging
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+
 from firetower.auth.services import get_or_create_user_from_iap
 from firetower.auth.validators import IAPTokenValidator
 
@@ -23,6 +24,11 @@ class IAPAuthenticationMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.validator = IAPTokenValidator() if settings.IAP_ENABLED else None
+
+        if settings.IAP_ENABLED:
+            logger.info("IAP authentication enabled")
+        else:
+            logger.info("IAP authentication disabled - using dev mode")
 
     def __call__(self, request):
         if settings.IAP_ENABLED:
@@ -52,6 +58,9 @@ class IAPAuthenticationMiddleware:
             )
 
             request.user = user
+            logger.debug(
+                f"IAP authentication successful for user {user.email} (ID: {user.username})"
+            )
 
         except ValueError as e:
             logger.error(f"IAP authentication failed: {e}")

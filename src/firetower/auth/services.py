@@ -1,4 +1,8 @@
+import logging
+
 from django.contrib.auth.models import User
+
+logger = logging.getLogger(__name__)
 
 
 def get_or_create_user_from_iap(
@@ -32,9 +36,13 @@ def get_or_create_user_from_iap(
     if created:
         user.set_unusable_password()
         user.save()
+        logger.info(f"Created new user from IAP: {email} (IAP ID: {iap_user_id})")
     else:
         # Update email if changed
         if user.email != email:
+            logger.info(
+                f"Updated email for user {iap_user_id}: {user.email} -> {email}"
+            )
             user.email = email
             user.save()
 
@@ -43,6 +51,7 @@ def get_or_create_user_from_iap(
     if avatar_url and hasattr(user, "userprofile"):
         profile = user.userprofile
         if profile.avatar_url != avatar_url:
+            logger.debug(f"Updated avatar for user {email}")
             profile.avatar_url = avatar_url
             profile.save()
 
