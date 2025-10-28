@@ -1,5 +1,3 @@
-from typing import Optional
-
 from django.conf import settings
 from google.auth.transport import requests
 from google.oauth2 import id_token
