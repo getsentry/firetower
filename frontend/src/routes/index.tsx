@@ -1,5 +1,5 @@
-import {useEffect} from 'react';
-import {useSuspenseQuery} from '@tanstack/react-query';
+import {useEffect, useRef} from 'react';
+import {useSuspenseInfiniteQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
 import {Spinner} from 'components/Spinner';
@@ -35,8 +35,10 @@ export const Route = createFileRoute('/')({
   // Extract search params needed for loader
   loaderDeps: ({search: {status}}) => ({status}),
   // Define loader with loaderDeps and context (context has queryClient)
-  loader: async ({deps, context}) =>
-    await context.queryClient.ensureQueryData(incidentsQueryOptions(deps)),
+  loader: async ({deps, context}) => {
+    const options = incidentsQueryOptions(deps);
+    await context.queryClient.prefetchInfiniteQuery(options);
+  },
   pendingComponent: () => (
     <IncidentsLayout>
       <div className="py-space-4xl flex items-center justify-center">
@@ -62,12 +64,37 @@ const STORAGE_KEY = 'firetower_list_search';
 
 function Index() {
   const params = Route.useSearch();
-  const {data: incidents} = useSuspenseQuery(incidentsQueryOptions(params));
+  const {
+    data: incidents,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useSuspenseInfiniteQuery(incidentsQueryOptions(params));
+
+  const observerTarget = useRef<HTMLDivElement>(null);
 
   // Store current search params in sessionStorage whenever they change
   useEffect(() => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(params));
   }, [params]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const target = observerTarget.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      {threshold: 0.1}
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return (
     <IncidentsLayout>
@@ -78,6 +105,11 @@ function Index() {
           </li>
         ))}
       </ul>
+
+      {/* Intersection observer target */}
+      <div ref={observerTarget} className="py-space-xl flex justify-center">
+        {isFetchingNextPage && <Spinner size="md" />}
+      </div>
     </IncidentsLayout>
   );
 }

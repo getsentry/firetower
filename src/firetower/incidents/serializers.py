@@ -1,11 +1,9 @@
 from rest_framework import serializers
 
-from firetower.auth.serializers import UserSerializer
-
 from .models import Incident
 
 
-class IncidentListSerializer(serializers.ModelSerializer):
+class IncidentListUISerializer(serializers.ModelSerializer):
     """
     Serializer for listing incidents.
 
@@ -59,7 +57,7 @@ class ParticipantSerializer(serializers.Serializer):
         return "Participant"
 
 
-class IncidentDetailSerializer(serializers.ModelSerializer):
+class IncidentDetailUISerializer(serializers.ModelSerializer):
     """
     Serializer for incident detail view.
 
@@ -70,10 +68,7 @@ class IncidentDetailSerializer(serializers.ModelSerializer):
     id = serializers.CharField(source="incident_number", read_only=True)
 
     # Full nested user data for captain/reporter
-    captain = UserSerializer(read_only=True)
-    reporter = UserSerializer(read_only=True)
-
-    # Participants with role information
+    # Participants with role information (includes captain and reporter)
     participants = serializers.SerializerMethodField()
 
     # Tags as arrays of strings (not full objects)
@@ -95,8 +90,6 @@ class IncidentDetailSerializer(serializers.ModelSerializer):
             "status",
             "severity",
             "is_private",
-            "captain",
-            "reporter",
             "participants",
             "affected_areas",
             "root_causes",
@@ -108,21 +101,23 @@ class IncidentDetailSerializer(serializers.ModelSerializer):
 
     def get_participants(self, obj):
         """
-        Get all participants with their roles.
+        Get all participants with their roles, with captain and reporter at the top.
 
-        Combines captain, reporter, and participants into one list
-        matching frontend expectation.
+        Order:
+        1. Captain (if exists)
+        2. Reporter (if exists)
+        3. Other participants
         """
         participants_list = []
         seen_users = set()
 
-        # Add captain
+        # Add captain first
         if obj.captain and obj.captain.id not in seen_users:
             serializer = ParticipantSerializer(obj.captain, context={"incident": obj})
             participants_list.append(serializer.data)
             seen_users.add(obj.captain.id)
 
-        # Add reporter
+        # Add reporter second
         if obj.reporter and obj.reporter.id not in seen_users:
             serializer = ParticipantSerializer(obj.reporter, context={"incident": obj})
             participants_list.append(serializer.data)

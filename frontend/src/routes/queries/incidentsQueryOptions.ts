@@ -1,4 +1,4 @@
-import {queryOptions} from '@tanstack/react-query';
+import {infiniteQueryOptions} from '@tanstack/react-query';
 import {Api} from 'api';
 import {z} from 'zod';
 
@@ -20,25 +20,40 @@ const IncidentListItemSchema = z.object({
   is_private: z.boolean(),
 });
 
-const IncidentsListSchema = z.array(IncidentListItemSchema);
+const PaginatedIncidentsSchema = z.object({
+  count: z.number(),
+  next: z.string().nullable(),
+  previous: z.string().nullable(),
+  results: z.array(IncidentListItemSchema),
+});
 
 export type IncidentStatus = z.infer<typeof IncidentStatusSchema>;
 export type IncidentListItem = z.infer<typeof IncidentListItemSchema>;
-export type IncidentList = z.infer<typeof IncidentsListSchema>;
+export type PaginatedIncidents = z.infer<typeof PaginatedIncidentsSchema>;
 
 interface IncidentsQueryArgs {
   status?: string[];
 }
 
 export function incidentsQueryOptions({status}: IncidentsQueryArgs) {
-  return queryOptions({
+  return infiniteQueryOptions({
     queryKey: ['Incidents', status],
-    queryFn: ({signal}) =>
+    queryFn: ({signal, pageParam}) =>
       Api.get({
         path: '/ui/incidents/',
-        query: {status},
+        query: {status, page: pageParam},
         signal,
-        responseSchema: IncidentsListSchema,
+        responseSchema: PaginatedIncidentsSchema,
       }),
+    initialPageParam: 1,
+    getNextPageParam: lastPage => {
+      // Extract page number from next URL, or return undefined if no next page
+      if (!lastPage.next) return undefined;
+
+      const url = new URL(lastPage.next);
+      const page = url.searchParams.get('page');
+      return page ? parseInt(page, 10) : undefined;
+    },
+    select: data => data.pages.flatMap(page => page.results),
   });
 }

@@ -22,7 +22,7 @@ export function ParticipantsList({participants}: ParticipantsListProps) {
             <div className="text-content-headings flex-1 font-medium">
               {participant.name}
             </div>
-            {participant.role && (
+            {participant.role && participant.role !== 'Participant' && (
               <div className="text-content-secondary text-sm uppercase">
                 {participant.role}
               </div>
