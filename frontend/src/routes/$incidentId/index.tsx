@@ -3,6 +3,7 @@ import {createFileRoute} from '@tanstack/react-router';
 import {Card} from 'components/Card';
 
 import {IncidentSummary} from './components/IncidentSummary';
+import {LinksList} from './components/LinksList';
 import {ParticipantsList} from './components/ParticipantsList';
 import {SlackLink} from './components/SlackLink';
 import {incidentDetailQueryOptions} from './queries/incidentDetailQueryOptions';
@@ -44,6 +45,7 @@ function Incident() {
               incidentId={params.incidentId}
             />
           )}
+          <LinksList externalLinks={incident.external_links} />
           <ParticipantsList participants={incident.participants} />
         </aside>
       </div>
