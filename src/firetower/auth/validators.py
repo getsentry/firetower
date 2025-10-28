@@ -55,9 +55,10 @@ class IAPTokenValidator:
             decoded_token: The decoded JWT claims
 
         Returns:
-            Dictionary with user_email and user_id
+            Dictionary with email, user_id, and avatar_url (if available)
         """
         return {
             "email": decoded_token.get("email"),
             "user_id": decoded_token.get("sub"),
+            "avatar_url": decoded_token.get("picture", ""),
         }
