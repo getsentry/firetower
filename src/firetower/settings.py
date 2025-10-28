@@ -199,6 +199,10 @@ REST_FRAMEWORK = {
     ],
 }
 
+# Google IAP Authentication Configuration
+IAP_ENABLED = not env_is_dev()
+IAP_AUDIENCE = dev_default("IAP_AUDIENCE")
+
 # Logging Configuration
 if not env_is_dev():
     import google.cloud.logging
