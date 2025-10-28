@@ -30,9 +30,11 @@ class TestUserProfile:
 
         assert str(user.userprofile) == "John Doe"
 
-    def test_userprofile_str_fallback_to_username(self):
-        """Test UserProfile falls back to username if no full name"""
-        user = User.objects.create_user(username="test@example.com")
+    def test_userprofile_str_fallback_to_email(self):
+        """Test UserProfile falls back to email if no full name"""
+        user = User.objects.create_user(
+            username="iap_user_id_123", email="test@example.com"
+        )
 
         assert str(user.userprofile) == "test@example.com"
 
