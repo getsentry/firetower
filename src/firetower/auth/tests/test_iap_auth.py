@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
 from django.test import RequestFactory
+from google.auth import exceptions as google_auth_exceptions
 
 from firetower.auth.middleware import IAPAuthenticationMiddleware
 from firetower.auth.services import get_or_create_user_from_iap
@@ -89,6 +90,39 @@ class TestGetOrCreateUserFromIAP:
         with pytest.raises(ValueError):
             get_or_create_user_from_iap(iap_user_id="123", email="")
 
+    def test_raises_error_for_invalid_email(self):
+        with pytest.raises(ValueError, match="Invalid email format"):
+            get_or_create_user_from_iap(
+                iap_user_id="accounts.google.com:12345",
+                email="not-an-email",
+            )
+
+    def test_raises_error_for_iap_id_too_long(self):
+        long_id = "a" * 151
+        with pytest.raises(ValueError, match="exceeds maximum length"):
+            get_or_create_user_from_iap(
+                iap_user_id=long_id,
+                email="test@example.com",
+            )
+
+    def test_ignores_insecure_avatar_url(self):
+        user = get_or_create_user_from_iap(
+            iap_user_id="accounts.google.com:12345",
+            email="test@example.com",
+            avatar_url="http://insecure.example.com/avatar.jpg",
+        )
+
+        assert user.userprofile.avatar_url == ""
+
+    def test_ignores_invalid_avatar_url(self):
+        user = get_or_create_user_from_iap(
+            iap_user_id="accounts.google.com:12345",
+            email="test@example.com",
+            avatar_url="javascript:alert('xss')",
+        )
+
+        assert user.userprofile.avatar_url == ""
+
 
 class TestIAPTokenValidator:
     def test_extract_user_info(self):
@@ -145,7 +179,9 @@ class TestIAPTokenValidator:
 
     @patch("firetower.auth.validators.id_token.verify_token")
     def test_validate_token_verification_fails(self, mock_verify):
-        mock_verify.side_effect = Exception("Invalid signature")
+        mock_verify.side_effect = google_auth_exceptions.GoogleAuthError(
+            "Invalid signature"
+        )
 
         validator = IAPTokenValidator()
 

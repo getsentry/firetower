@@ -65,6 +65,12 @@ class IAPAuthenticationMiddleware:
         except ValueError as e:
             logger.error(f"IAP authentication failed: {e}")
             request.user = AnonymousUser()
+        except Exception as e:
+            logger.critical(
+                f"Unexpected error during IAP authentication: {type(e).__name__}: {e}",
+                exc_info=True,
+            )
+            request.user = AnonymousUser()
 
     def _authenticate_dev(self, request):
         """Development mode: bypass IAP validation."""

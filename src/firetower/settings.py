@@ -204,6 +204,13 @@ REST_FRAMEWORK = {
 IAP_ENABLED = not env_is_dev()
 IAP_AUDIENCE = dev_default("IAP_AUDIENCE")
 
+# Validate IAP settings in production
+if IAP_ENABLED and not IAP_AUDIENCE:
+    raise Exception(
+        "IAP_AUDIENCE must be set when IAP is enabled in production. "
+        "Set the IAP_AUDIENCE environment variable."
+    )
+
 # Logging Configuration
 if not env_is_dev():
     import google.cloud.logging

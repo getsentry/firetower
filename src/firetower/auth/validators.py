@@ -1,4 +1,5 @@
 from django.conf import settings
+from google.auth import exceptions as google_auth_exceptions
 from google.auth.transport import requests
 from google.oauth2 import id_token
 
@@ -44,7 +45,7 @@ class IAPTokenValidator:
 
             return decoded_token
 
-        except Exception as e:
+        except (ValueError, google_auth_exceptions.GoogleAuthError) as e:
             raise ValueError(f"Invalid IAP token: {str(e)}")
 
     def extract_user_info(self, decoded_token: dict) -> dict:

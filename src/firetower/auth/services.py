@@ -1,6 +1,8 @@
 import logging
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator, validate_email
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,26 @@ def get_or_create_user_from_iap(
     """
     if not iap_user_id or not email:
         raise ValueError("IAP user ID and email are required for user creation")
+
+    # Validate email format
+    try:
+        validate_email(email)
+    except ValidationError:
+        raise ValueError(f"Invalid email format: {email}")
+
+    # Validate IAP user ID length (Django username field max_length is 150)
+    if len(iap_user_id) > 150:
+        raise ValueError(
+            f"IAP user ID exceeds maximum length of 150 characters: {len(iap_user_id)}"
+        )
+
+    # Validate avatar URL if provided (HTTPS only for security)
+    if avatar_url:
+        try:
+            URLValidator(schemes=["https"])(avatar_url)
+        except ValidationError:
+            logger.warning(f"Invalid or insecure avatar URL provided: {avatar_url}")
+            avatar_url = ""
 
     user, created = User.objects.get_or_create(
         username=iap_user_id,
