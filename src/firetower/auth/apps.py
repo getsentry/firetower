@@ -8,3 +8,6 @@ class AuthConfig(AppConfig):
 
     def ready(self):
         import firetower.auth.signals  # noqa: F401
+        from firetower.auth.startup import set_initial_superusers
+
+        set_initial_superusers()
