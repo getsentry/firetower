@@ -13,7 +13,7 @@ class UserProfile(models.Model):
     Extended profile for users.
 
     Linked to Django's built-in User model which provides:
-    - username
+    - username (populated with IAP user ID for IAP-authenticated users)
     - email
     - first_name
     - last_name
@@ -59,7 +59,7 @@ class UserProfile(models.Model):
         return profile.external_id if profile else None
 
     def __str__(self):
-        return self.user.get_full_name() or self.user.username
+        return self.user.get_full_name() or self.user.email
 
 
 class ExternalProfile(models.Model):

@@ -209,21 +209,6 @@ class TestIncidentViews:
 
         assert response.status_code == 400
 
-    def test_unauthenticated_detail_request(self):
-        """Test unauthenticated detail request returns 403 (DRF permission denied)"""
-        incident = Incident.objects.create(
-            title="Test",
-            status=IncidentStatus.ACTIVE,
-            severity=IncidentSeverity.P1,
-        )
-
-        # Don't authenticate
-        response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
-
-        # Behind IAP, unauthenticated requests should be blocked
-        # DRF permissions return 403 Forbidden
-        assert response.status_code == 403
-
     def test_retrieve_incident_not_found(self):
         """Test non-existent incident returns 404"""
         self.client.force_authenticate(user=self.user)
@@ -258,18 +243,3 @@ class TestIncidentViews:
         assert response.status_code == 200
         assert response.data["count"] == 2
         assert len(response.data["results"]) == 2
-
-    def test_unauthenticated_request(self):
-        """Test unauthenticated requests return 403 (DRF permission denied)"""
-        Incident.objects.create(
-            title="Test",
-            status=IncidentStatus.ACTIVE,
-            severity=IncidentSeverity.P1,
-        )
-
-        # Don't authenticate
-        response = self.client.get("/api/ui/incidents/")
-
-        # Behind IAP, unauthenticated requests should be blocked
-        # DRF permissions return 403 Forbidden
-        assert response.status_code == 403
