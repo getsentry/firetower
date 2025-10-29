@@ -1,15 +1,20 @@
+import sys
+
 from django.contrib.auth import get_user_model
 from django.db import OperationalError, transaction
 
-User = get_user_model()
-
 
 def set_initial_superusers():
+    if "test" in sys.argv or "pytest" in sys.modules:
+        return
+
     superuser_emails = [
         "richard.gibert@sentry.io",
         "spencer.murray@sentry.io",
         "taylor.osler@sentry.io",
     ]
+
+    User = get_user_model()
 
     try:
         with transaction.atomic():
