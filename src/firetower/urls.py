@@ -18,7 +18,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
+from firetower.auth.views import current_user
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/ui/users/me/", current_user, name="current-user"),
     path("", include("firetower.incidents.urls")),
 ]
