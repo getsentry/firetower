@@ -17,6 +17,9 @@ COPY README.md .
 COPY src/ src/
 RUN uv sync --group prod --no-dev --frozen --compile-bytecode --no-editable
 
+# Build Django-side static file bundle
+RUN uv run --no-sync manage.py collectstatic --no-input
+
 FROM oven/bun:1.2.22-alpine AS build_frontend
 
 WORKDIR /app
@@ -43,6 +46,7 @@ RUN adduser app -h /app -u 1100 -D && chown -R 1100 /app
 # Copy the environment, but not the source code
 COPY --from=build_backend --chown=1100 /app/.venv /app/.venv
 COPY --from=build_frontend --chown=1100 /app/dist /app/static
+COPY --from=build_backend --chown=1100 /app/static/backend /app/static/backend
 
 WORKDIR /app
 USER 1100
