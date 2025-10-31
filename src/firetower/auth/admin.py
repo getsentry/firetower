@@ -5,6 +5,14 @@ from django.contrib.auth.models import User
 from .models import ExternalProfile, UserProfile
 
 
+# Customize User string representation
+def user_str(self):
+    return self.email or self.username
+
+
+User.__str__ = user_str
+
+
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
