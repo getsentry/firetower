@@ -34,6 +34,8 @@ function getInitials(name: string): string {
 }
 
 export function Avatar({name, src, alt, className, size = 'md'}: AvatarProps) {
+  if (!name) return null;
+
   const avatarClasses = cn(baseAvatarClasses, sizeClasses[size], className);
 
   if (src) {

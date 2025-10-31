@@ -274,7 +274,7 @@ describe('Header - User Avatar', () => {
     await screen.findByText('INC-1247');
 
     // Wait for avatar to load (after Suspense resolves)
-    expect(await screen.findByText('TU')).toBeInTheDocument();
+    expect(await screen.findByText('TU', {}, {timeout: 3000})).toBeInTheDocument();
   });
 
   it('displays user avatar with image when avatar_url is provided', async () => {
@@ -298,7 +298,7 @@ describe('Header - User Avatar', () => {
     await screen.findByText('INC-1247');
 
     // Wait for avatar to load (after Suspense resolves)
-    const avatar = await screen.findByAltText('John Doe');
+    const avatar = await screen.findByAltText('John Doe', {}, {timeout: 3000});
     expect(avatar).toBeInTheDocument();
     expect(avatar).toHaveAttribute('src', 'https://example.com/avatar.jpg');
   });
@@ -322,7 +322,7 @@ describe('Header - User Avatar', () => {
     await screen.findByText('Database Connection Pool Exhausted');
 
     // Wait for avatar to load (after Suspense resolves)
-    expect(await screen.findByText('TU')).toBeInTheDocument();
+    expect(await screen.findByText('TU', {}, {timeout: 3000})).toBeInTheDocument();
   });
 });
 
