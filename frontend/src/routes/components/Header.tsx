@@ -1,3 +1,4 @@
+import {Suspense} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {Link, useRouterState} from '@tanstack/react-router';
 import {Avatar} from 'components/Avatar';
@@ -7,9 +8,16 @@ import type {IncidentStatus} from '../queries/incidentsQueryOptions';
 
 const STORAGE_KEY = 'firetower_list_search';
 
+// Separate component to isolate Suspense boundary to just the avatar area.
+// useSuspenseQuery throws during loading, which would suspend the entire Header
+// if called directly. This way only the avatar shows a loading placeholder.
+const UserAvatar = () => {
+  const {data: currentUser} = useSuspenseQuery(currentUserQueryOptions());
+  return <Avatar name={currentUser.name} src={currentUser.avatar_url} size="sm" />;
+};
+
 export const Header = () => {
   const routerState = useRouterState();
-  const {data: currentUser} = useSuspenseQuery(currentUserQueryOptions());
 
   const isRootRoute = routerState.location.pathname === '/';
 
@@ -39,7 +47,9 @@ export const Header = () => {
                 Firetower
               </span>
             </Link>
-            <Avatar name={currentUser.name} src={currentUser.avatar_url} size="sm" />
+            <Suspense fallback={<div className="h-7 w-7" />}>
+              <UserAvatar />
+            </Suspense>
           </div>
         ) : (
           <div className="relative flex items-center justify-between">
@@ -60,7 +70,9 @@ export const Header = () => {
                 Firetower
               </span>
             </Link>
-            <Avatar name={currentUser.name} src={currentUser.avatar_url} size="sm" />
+            <Suspense fallback={<div className="h-7 w-7" />}>
+              <UserAvatar />
+            </Suspense>
           </div>
         )}
       </div>
