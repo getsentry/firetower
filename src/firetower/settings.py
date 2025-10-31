@@ -69,6 +69,11 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://firetower.getsentry.net",
+    "https://*.firetower.getsentry.net",
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
 # Application definition
