@@ -1,11 +1,15 @@
+import {useSuspenseQuery} from '@tanstack/react-query';
 import {Link, useRouterState} from '@tanstack/react-router';
+import {Avatar} from 'components/Avatar';
 
+import {currentUserQueryOptions} from '../queries/currentUserQueryOptions';
 import type {IncidentStatus} from '../queries/incidentsQueryOptions';
 
 const STORAGE_KEY = 'firetower_list_search';
 
 export const Header = () => {
   const routerState = useRouterState();
+  const {data: currentUser} = useSuspenseQuery(currentUserQueryOptions());
 
   const isRootRoute = routerState.location.pathname === '/';
 
@@ -27,13 +31,15 @@ export const Header = () => {
     <nav className="bg-background-primary border-secondary border-b">
       <div className="px-space-md py-space-md md:px-space-xl mx-auto max-w-6xl">
         {isRootRoute ? (
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-between">
+            <div className="w-7"></div>
             <Link to="/" className="gap-space-sm flex items-center no-underline">
               <img src="/firetower.svg" alt="Firetower" className="h-6 w-6" />
               <span className="text-content-headings text-xl font-semibold">
                 Firetower
               </span>
             </Link>
+            <Avatar name={currentUser.name} src={currentUser.avatar_url} size="sm" />
           </div>
         ) : (
           <div className="relative flex items-center justify-between">
@@ -54,7 +60,7 @@ export const Header = () => {
                 Firetower
               </span>
             </Link>
-            <div className="w-24"></div>
+            <Avatar name={currentUser.name} src={currentUser.avatar_url} size="sm" />
           </div>
         )}
       </div>

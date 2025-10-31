@@ -1,24 +1,27 @@
 import {cn} from 'utils/cn';
 
-const avatarClasses = [
+const baseAvatarClasses = [
   'bg-background-tertiary',
   'text-content-secondary',
   'flex',
-  'h-10',
-  'w-10',
   'items-center',
   'justify-center',
   'rounded-full',
-  'text-base',
   'font-semibold',
   'shrink-0',
 ].join(' ');
+
+const sizeClasses = {
+  sm: 'h-7 w-7 text-sm',
+  md: 'h-10 w-10 text-base',
+};
 
 export interface AvatarProps {
   name: string;
   src?: string | null;
   alt?: string;
   className?: string;
+  size?: 'sm' | 'md';
 }
 
 function getInitials(name: string): string {
@@ -30,13 +33,15 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function Avatar({name, src, alt, className}: AvatarProps) {
+export function Avatar({name, src, alt, className, size = 'md'}: AvatarProps) {
+  const avatarClasses = cn(baseAvatarClasses, sizeClasses[size], className);
+
   if (src) {
-    return <img src={src} alt={alt || name} className={cn(avatarClasses, className)} />;
+    return <img src={src} alt={alt || name} className={avatarClasses} />;
   }
 
   return (
-    <div className={cn(avatarClasses, className)} style={{lineHeight: 1}}>
+    <div className={avatarClasses} style={{lineHeight: 1}}>
       {getInitials(name)}
     </div>
   );
