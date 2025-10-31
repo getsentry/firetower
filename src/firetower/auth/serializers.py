@@ -10,7 +10,7 @@ class UserSerializer(serializers.ModelSerializer):
     """
 
     name = serializers.SerializerMethodField()
-    avatar_url = serializers.CharField(source="userprofile.avatar_url", read_only=True)
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -20,3 +20,10 @@ class UserSerializer(serializers.ModelSerializer):
     def get_name(self, obj):
         """Get user's full name or email as fallback"""
         return obj.get_full_name() or obj.email
+
+    def get_avatar_url(self, obj):
+        """Get avatar URL from userprofile if it exists"""
+        try:
+            return obj.userprofile.avatar_url or None
+        except AttributeError:
+            return None
