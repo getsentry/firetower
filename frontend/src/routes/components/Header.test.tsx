@@ -273,7 +273,8 @@ describe('Header - User Avatar', () => {
 
     await screen.findByText('INC-1247');
 
-    expect(screen.getByText('TU')).toBeInTheDocument();
+    // Wait for avatar to load (after Suspense resolves)
+    expect(await screen.findByText('TU')).toBeInTheDocument();
   });
 
   it('displays user avatar with image when avatar_url is provided', async () => {
@@ -296,7 +297,8 @@ describe('Header - User Avatar', () => {
 
     await screen.findByText('INC-1247');
 
-    const avatar = screen.getByAltText('John Doe');
+    // Wait for avatar to load (after Suspense resolves)
+    const avatar = await screen.findByAltText('John Doe');
     expect(avatar).toBeInTheDocument();
     expect(avatar).toHaveAttribute('src', 'https://example.com/avatar.jpg');
   });
@@ -319,7 +321,8 @@ describe('Header - User Avatar', () => {
 
     await screen.findByText('Database Connection Pool Exhausted');
 
-    expect(screen.getByText('TU')).toBeInTheDocument();
+    // Wait for avatar to load (after Suspense resolves)
+    expect(await screen.findByText('TU')).toBeInTheDocument();
   });
 });
 
