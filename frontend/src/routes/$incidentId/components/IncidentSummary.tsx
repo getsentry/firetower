@@ -39,8 +39,8 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
       </div>
       <div className="gap-space-lg mb-space-xl flex">
         <Pill variant={incident.severity}>{incident.severity}</Pill>
-        {incident.is_private && <Pill variant="private">Private</Pill>}
         <Pill variant={incident.status}>{incident.status}</Pill>
+        {incident.is_private && <Pill variant="private">Private</Pill>}
       </div>
       <Card.Title size="2xl">{incident.title}</Card.Title>
       <p className="text-content-secondary leading-comfortable">{incident.description}</p>
