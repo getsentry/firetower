@@ -1,6 +1,6 @@
 import {useEffect} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
-import {createFileRoute, Link} from '@tanstack/react-router';
+import {createFileRoute} from '@tanstack/react-router';
 import {Card} from 'components/Card';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
@@ -27,15 +27,7 @@ export const Route = createFileRoute('/$incidentId/')({
           </p>
         </>
       }
-      action={
-        <Link
-          to="/"
-          className="text-content-secondary hover:bg-background-secondary hover:text-content-accent px-space-md py-space-sm inline-flex items-center gap-2 rounded-sm transition-colors"
-        >
-          <span>{String.fromCharCode(8592)}</span>
-          <span>All Incidents</span>
-        </Link>
-      }
+      showBackButton
     />
   ),
 });
