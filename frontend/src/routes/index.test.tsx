@@ -313,3 +313,84 @@ describe('Route States', () => {
     expect(screen.getByTestId('filter-closed')).toBeInTheDocument();
   });
 });
+
+describe('Empty States', () => {
+  it('shows celebratory message when no active incidents', async () => {
+    mockApiGet.mockImplementation((args: {path: string}) => {
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
+      }
+      if (args.path === '/ui/incidents/') {
+        return Promise.resolve({
+          count: 0,
+          next: null,
+          previous: null,
+          results: [],
+        });
+      }
+      return Promise.reject(new Error('Not found'));
+    });
+
+    renderRoute();
+
+    expect(await screen.findByText(/There are no active incidents/i)).toBeInTheDocument();
+    expect(screen.getByTestId('filter-active')).toBeInTheDocument();
+  });
+
+  it('shows neutral message when no incidents in review', async () => {
+    const user = userEvent.setup();
+    mockApiGet.mockImplementation((args: {path: string}) => {
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
+      }
+      if (args.path === '/ui/incidents/') {
+        return Promise.resolve({
+          count: 0,
+          next: null,
+          previous: null,
+          results: [],
+        });
+      }
+      return Promise.reject(new Error('Not found'));
+    });
+
+    renderRoute();
+
+    // Change to review filter
+    const reviewButton = await screen.findByTestId('filter-review');
+    await user.click(reviewButton);
+
+    expect(
+      await screen.findByText('There are no incidents in review')
+    ).toBeInTheDocument();
+  });
+
+  it('shows help message when no incidents match closed filter', async () => {
+    const user = userEvent.setup();
+    mockApiGet.mockImplementation((args: {path: string}) => {
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
+      }
+      if (args.path === '/ui/incidents/') {
+        return Promise.resolve({
+          count: 0,
+          next: null,
+          previous: null,
+          results: [],
+        });
+      }
+      return Promise.reject(new Error('Not found'));
+    });
+
+    renderRoute();
+
+    // Change to closed filter
+    const closedButton = await screen.findByTestId('filter-closed');
+    await user.click(closedButton);
+
+    expect(
+      await screen.findByText('There are no incidents matching those filters.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('#team-sre')).toBeInTheDocument();
+  });
+});
