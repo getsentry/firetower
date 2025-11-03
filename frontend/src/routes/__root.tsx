@@ -20,7 +20,6 @@ export const Route = createRootRouteWithContext<{queryClient: QueryClient}>()({
   notFoundComponent: () => (
     <ErrorState
       title="Page not found"
-      description="This page doesn't exist."
       action={
         <Link
           to="/"

@@ -52,7 +52,7 @@ export const Route = createFileRoute('/')({
   errorComponent: () => (
     <IncidentsLayout>
       <ErrorState
-        title="Something went wrong fetching incidents :("
+        title="Something went wrong fetching incidents"
         description={
           <>
             Try refreshing the page, or if that doesn't work, come chat with us in{' '}

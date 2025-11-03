@@ -14,13 +14,13 @@ export const ErrorState = ({
   return (
     <div className="flex min-h-[40vh] items-center justify-center">
       <div className="text-center">
-        <h2 className="text-content-headings mb-space-md text-2xl font-semibold">
+        <h2 className="text-content-headings mb-space-lg text-2xl font-medium">
           {title}
         </h2>
         {description && (
-          <p className="text-content-secondary mx-auto mb-space-lg max-w-md">
+          <div className="text-content-secondary mx-auto mb-space-lg max-w-md space-y-space-lg">
             {description}
-          </p>
+          </div>
         )}
         {action && <div className="mt-space-xl">{action}</div>}
       </div>

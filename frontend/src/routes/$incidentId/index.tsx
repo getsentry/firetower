@@ -18,13 +18,13 @@ export const Route = createFileRoute('/$incidentId/')({
   pendingComponent: () => <p>Loading incident...</p>,
   errorComponent: () => (
     <ErrorState
+      title="We couldn't find that incident"
       description={
         <>
-          We couldn't load this incident. It may not exist, may have been deleted, or you
-          may just not have access.
-          <br />
-          <br />
-          If you think this is a bug, let us know in <GetHelpLink />.
+          <p>You don't have access or it doesn't exist.</p>
+          <p>
+            If you think this is a bug, let us know in <GetHelpLink />.
+          </p>
         </>
       }
       action={
