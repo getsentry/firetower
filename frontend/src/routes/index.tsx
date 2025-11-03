@@ -14,6 +14,7 @@ import {
   IncidentStatusSchema,
   type IncidentStatus,
 } from './queries/incidentsQueryOptions';
+import {STATUS_FILTER_GROUPS} from './types';
 
 // Zod schema for search params
 const incidentListSearchSchema = z.object({
@@ -66,12 +67,6 @@ export const Route = createFileRoute('/')({
 
 const STORAGE_KEY = 'firetower_list_search';
 
-const FILTER_GROUPS = {
-  active: ['Active', 'Mitigated'] as IncidentStatus[],
-  review: ['Postmortem', 'Actions Pending'] as IncidentStatus[],
-  closed: ['Done'] as IncidentStatus[],
-};
-
 function arraysEqual(a: IncidentStatus[], b: IncidentStatus[]): boolean {
   if (a.length !== b.length) return false;
   const setB = new Set(b);
@@ -114,14 +109,14 @@ function Index() {
 
   // Determine empty state based on filters
   const renderEmptyState = () => {
-    if (arraysEqual(params.status, FILTER_GROUPS.active)) {
+    if (arraysEqual(params.status, STATUS_FILTER_GROUPS.active)) {
       return (
         <div className="text-content-secondary py-space-4xl text-center">
           <p>There are no active incidents {String.fromCodePoint(0x1f389)}</p>
         </div>
       );
     }
-    if (arraysEqual(params.status, FILTER_GROUPS.review)) {
+    if (arraysEqual(params.status, STATUS_FILTER_GROUPS.review)) {
       return (
         <div className="text-content-secondary py-space-4xl text-center">
           <p>There are no incidents in review</p>
