@@ -7,6 +7,7 @@ import {beforeEach, describe, expect, it, vi} from 'bun:test';
 
 import {routeTree} from '../../routeTree.gen';
 import type {IncidentDetail} from '../$incidentId/queries/incidentDetailQueryOptions';
+import type {CurrentUser} from '../queries/currentUserQueryOptions';
 import type {PaginatedIncidents} from '../queries/incidentsQueryOptions';
 
 const mockApiGet = vi.fn();
@@ -75,6 +76,11 @@ const mockIncidentDetail: IncidentDetail = {
   },
 };
 
+const mockCurrentUser: CurrentUser = {
+  name: 'Test User',
+  avatar_url: null,
+};
+
 const STORAGE_KEY = 'firetower_list_search';
 
 const queryClient = new QueryClient({
@@ -113,6 +119,9 @@ describe('Header - Root Route (Incident List)', () => {
     mockApiGet.mockImplementation((args: {path: string}) => {
       if (args.path === '/ui/incidents/') {
         return Promise.resolve(mockIncidents);
+      }
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
       }
       return Promise.reject(new Error('Not found'));
     });
@@ -168,6 +177,9 @@ describe('Header - Incident Detail Route', () => {
       }
       if (args.path === '/ui/incidents/INC-1247/') {
         return Promise.resolve(mockIncidentDetail);
+      }
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
       }
       return Promise.reject(new Error('Not found'));
     });
@@ -241,6 +253,79 @@ describe('Header - Incident Detail Route', () => {
   });
 });
 
+describe('Header - User Avatar', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    sessionStorage.clear();
+    mockApiGet.mockImplementation((args: {path: string}) => {
+      if (args.path === '/ui/incidents/') {
+        return Promise.resolve(mockIncidents);
+      }
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
+      }
+      return Promise.reject(new Error('Not found'));
+    });
+  });
+
+  it('displays user avatar with initials when no avatar_url', async () => {
+    renderRoute('/');
+
+    await screen.findByText('INC-1247');
+
+    // Wait for avatar to load (after Suspense resolves)
+    expect(await screen.findByText('TU', {}, {timeout: 3000})).toBeInTheDocument();
+  });
+
+  it('displays user avatar with image when avatar_url is provided', async () => {
+    const userWithAvatar: CurrentUser = {
+      name: 'John Doe',
+      avatar_url: 'https://example.com/avatar.jpg',
+    };
+
+    mockApiGet.mockImplementation((args: {path: string}) => {
+      if (args.path === '/ui/incidents/') {
+        return Promise.resolve(mockIncidents);
+      }
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(userWithAvatar);
+      }
+      return Promise.reject(new Error('Not found'));
+    });
+
+    renderRoute('/');
+
+    await screen.findByText('INC-1247');
+
+    // Wait for avatar to load (after Suspense resolves)
+    const avatar = await screen.findByAltText('John Doe', {}, {timeout: 3000});
+    expect(avatar).toBeInTheDocument();
+    expect(avatar).toHaveAttribute('src', 'https://example.com/avatar.jpg');
+  });
+
+  it('shows avatar on incident detail page', async () => {
+    mockApiGet.mockImplementation((args: {path: string}) => {
+      if (args.path === '/ui/incidents/') {
+        return Promise.resolve(mockIncidents);
+      }
+      if (args.path === '/ui/incidents/INC-1247/') {
+        return Promise.resolve(mockIncidentDetail);
+      }
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
+      }
+      return Promise.reject(new Error('Not found'));
+    });
+
+    renderRoute('/INC-1247');
+
+    await screen.findByText('Database Connection Pool Exhausted');
+
+    // Wait for avatar to load (after Suspense resolves)
+    expect(await screen.findByText('TU', {}, {timeout: 3000})).toBeInTheDocument();
+  });
+});
+
 describe('Header - sessionStorage Handling', () => {
   beforeEach(() => {
     queryClient.clear();
@@ -251,6 +336,9 @@ describe('Header - sessionStorage Handling', () => {
       }
       if (args.path === '/ui/incidents/INC-1247/') {
         return Promise.resolve(mockIncidentDetail);
+      }
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
       }
       return Promise.reject(new Error('Not found'));
     });

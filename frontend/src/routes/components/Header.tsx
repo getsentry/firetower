@@ -1,8 +1,20 @@
+import {Suspense} from 'react';
+import {useSuspenseQuery} from '@tanstack/react-query';
 import {Link, useRouterState} from '@tanstack/react-router';
+import {Avatar} from 'components/Avatar';
 
+import {currentUserQueryOptions} from '../queries/currentUserQueryOptions';
 import type {IncidentStatus} from '../queries/incidentsQueryOptions';
 
 const STORAGE_KEY = 'firetower_list_search';
+
+// Separate component to isolate Suspense boundary to just the avatar area.
+// useSuspenseQuery throws during loading, which would suspend the entire Header
+// if called directly. This way only the avatar shows a loading placeholder.
+const UserAvatar = () => {
+  const {data: currentUser} = useSuspenseQuery(currentUserQueryOptions());
+  return <Avatar name={currentUser.name} src={currentUser.avatar_url} size="sm" />;
+};
 
 export const Header = () => {
   const routerState = useRouterState();
@@ -27,13 +39,17 @@ export const Header = () => {
     <nav className="bg-background-primary border-secondary border-b">
       <div className="px-space-md py-space-md md:px-space-xl mx-auto max-w-6xl">
         {isRootRoute ? (
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-between">
+            <div className="w-7"></div>
             <Link to="/" className="gap-space-sm flex items-center no-underline">
               <img src="/firetower.svg" alt="Firetower" className="h-6 w-6" />
               <span className="text-content-headings text-xl font-semibold">
                 Firetower
               </span>
             </Link>
+            <Suspense fallback={<div className="h-7 w-7" />}>
+              <UserAvatar />
+            </Suspense>
           </div>
         ) : (
           <div className="relative flex items-center justify-between">
@@ -54,7 +70,9 @@ export const Header = () => {
                 Firetower
               </span>
             </Link>
-            <div className="w-24"></div>
+            <Suspense fallback={<div className="h-7 w-7" />}>
+              <UserAvatar />
+            </Suspense>
           </div>
         )}
       </div>

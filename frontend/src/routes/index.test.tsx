@@ -7,6 +7,7 @@ import {beforeEach, describe, expect, it, vi} from 'bun:test';
 
 import {routeTree} from '../routeTree.gen';
 
+import type {CurrentUser} from './queries/currentUserQueryOptions';
 import type {PaginatedIncidents} from './queries/incidentsQueryOptions';
 
 const mockApiGet = vi.fn();
@@ -44,6 +45,23 @@ const mockIncidents: PaginatedIncidents = {
   ],
 };
 
+const mockCurrentUser: CurrentUser = {
+  name: 'Test User',
+  avatar_url: null,
+};
+
+function setupDefaultMocks() {
+  mockApiGet.mockImplementation((args: {path: string}) => {
+    if (args.path === '/ui/incidents/') {
+      return Promise.resolve(mockIncidents);
+    }
+    if (args.path === '/ui/users/me/') {
+      return Promise.resolve(mockCurrentUser);
+    }
+    return Promise.reject(new Error('Not found'));
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -75,9 +93,8 @@ const renderRoute = (initialPath = '/') => {
 
 describe('IncidentCard (via Index Route)', () => {
   beforeEach(() => {
-    // Reset query client cache and mock API response
     queryClient.clear();
-    mockApiGet.mockResolvedValue(mockIncidents);
+    setupDefaultMocks();
   });
 
   it('renders incident cards on the index route', async () => {
@@ -149,7 +166,7 @@ describe('IncidentCard (via Index Route)', () => {
 describe('StatusFilter', () => {
   beforeEach(() => {
     queryClient.clear();
-    mockApiGet.mockResolvedValue(mockIncidents);
+    setupDefaultMocks();
   });
 
   it('renders all three filter buttons', async () => {
@@ -236,9 +253,15 @@ describe('Route States', () => {
   });
 
   it('shows spinner in pending state with filters visible', async () => {
-    mockApiGet.mockImplementation(
-      () => new Promise(resolve => setTimeout(() => resolve(mockIncidents), 100))
-    );
+    mockApiGet.mockImplementation((args: {path: string}) => {
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
+      }
+      if (args.path === '/ui/incidents/') {
+        return new Promise(resolve => setTimeout(() => resolve(mockIncidents), 100));
+      }
+      return Promise.reject(new Error('Not found'));
+    });
 
     const router = createRouter({
       routeTree,
@@ -270,7 +293,15 @@ describe('Route States', () => {
   });
 
   it('shows error message with filters visible when API fails', async () => {
-    mockApiGet.mockRejectedValue(new Error('API Error'));
+    mockApiGet.mockImplementation((args: {path: string}) => {
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
+      }
+      if (args.path === '/ui/incidents/') {
+        return Promise.reject(new Error('API Error'));
+      }
+      return Promise.reject(new Error('Not found'));
+    });
 
     renderRoute();
 
