@@ -32,14 +32,17 @@ class TestGetOrCreateUserFromIAP:
         assert hasattr(user, "userprofile")
         assert user.userprofile.avatar_url == ""
 
-    def test_creates_user_with_avatar_url(self):
+    def test_creates_user_without_slack_profile(self):
+        """Test that user creation works even if not in Slack."""
         user = get_or_create_user_from_iap(
             iap_user_id="accounts.google.com:12345",
             email="test@example.com",
-            avatar_url="https://example.com/avatar.jpg",
         )
 
-        assert user.userprofile.avatar_url == "https://example.com/avatar.jpg"
+        # Profile is created but empty since no Slack lookup
+        assert user.userprofile.avatar_url == ""
+        assert user.first_name == ""
+        assert user.last_name == ""
 
     def test_returns_existing_user_by_iap_id(self):
         user1 = get_or_create_user_from_iap(
@@ -68,20 +71,21 @@ class TestGetOrCreateUserFromIAP:
 
         assert user.email == "new@example.com"
 
-    def test_updates_avatar_if_changed(self):
+    def test_does_not_refetch_slack_on_subsequent_logins(self):
+        """Test that Slack is only called on user creation, not subsequent logins."""
+        # First login - user created
         user = get_or_create_user_from_iap(
             iap_user_id="accounts.google.com:12345",
             email="test@example.com",
-            avatar_url="https://example.com/old.jpg",
         )
 
-        user = get_or_create_user_from_iap(
+        # Second login - user already exists
+        user2 = get_or_create_user_from_iap(
             iap_user_id="accounts.google.com:12345",
             email="test@example.com",
-            avatar_url="https://example.com/new.jpg",
         )
 
-        assert user.userprofile.avatar_url == "https://example.com/new.jpg"
+        assert user.id == user2.id
 
     def test_raises_error_if_missing_required_fields(self):
         with pytest.raises(ValueError):
@@ -105,24 +109,6 @@ class TestGetOrCreateUserFromIAP:
                 email="test@example.com",
             )
 
-    def test_ignores_insecure_avatar_url(self):
-        user = get_or_create_user_from_iap(
-            iap_user_id="accounts.google.com:12345",
-            email="test@example.com",
-            avatar_url="http://insecure.example.com/avatar.jpg",
-        )
-
-        assert user.userprofile.avatar_url == ""
-
-    def test_ignores_invalid_avatar_url(self):
-        user = get_or_create_user_from_iap(
-            iap_user_id="accounts.google.com:12345",
-            email="test@example.com",
-            avatar_url="javascript:alert('xss')",
-        )
-
-        assert user.userprofile.avatar_url == ""
-
 
 class TestIAPTokenValidator:
     def test_extract_user_info(self):
@@ -137,7 +123,6 @@ class TestIAPTokenValidator:
 
         assert user_info["email"] == "test@example.com"
         assert user_info["user_id"] == "accounts.google.com:12345"
-        assert user_info["avatar_url"] == "https://example.com/avatar.jpg"
 
     def test_extract_user_info_without_picture(self):
         validator = IAPTokenValidator()
@@ -148,7 +133,8 @@ class TestIAPTokenValidator:
 
         user_info = validator.extract_user_info(decoded_token)
 
-        assert user_info["avatar_url"] == ""
+        assert user_info["email"] == "test@example.com"
+        assert user_info["user_id"] == "accounts.google.com:12345"
 
     @patch("firetower.auth.validators.id_token.verify_token")
     def test_validate_token_success(self, mock_verify):
@@ -209,7 +195,6 @@ class TestIAPAuthenticationMiddleware:
         mock_extract.return_value = {
             "email": "test@example.com",
             "user_id": "accounts.google.com:12345",
-            "avatar_url": "",
         }
 
         middleware = IAPAuthenticationMiddleware(get_response)
