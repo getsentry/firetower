@@ -73,10 +73,8 @@ class SlackService:
                 first_name = parts[0] if len(parts) > 0 else ""
                 last_name = parts[1] if len(parts) > 1 else ""
 
-            avatar_url = profile.get(
-                "image_512",
-                profile.get("image_192", profile.get("image_72", "")),
-            )
+            # Get avatar - Slack provides image_512 as the smallest size
+            avatar_url = profile.get("image_512", "")
 
             logger.info(f"Found Slack profile for {email}")
             return {

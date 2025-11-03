@@ -87,8 +87,7 @@ class TestSlackService:
                         "real_name": "John Doe",
                         "profile": {
                             "display_name": "Johnny",
-                            "image_512": "https://example.com/avatar.jpg",
-                            "image_192": "https://example.com/avatar-192.jpg",
+                            "image_512": "https://example.com/avatar-512.jpg",
                         },
                     }
                 }
@@ -100,7 +99,7 @@ class TestSlackService:
                 assert profile["name"] == "Johnny"
                 assert profile["first_name"] == "John"
                 assert profile["last_name"] == "Doe"
-                assert profile["avatar_url"] == "https://example.com/avatar.jpg"
+                assert profile["avatar_url"] == "https://example.com/avatar-512.jpg"
 
     def test_get_user_profile_by_email_not_found(self):
         """Test user profile fetch when user doesn't exist in Slack."""

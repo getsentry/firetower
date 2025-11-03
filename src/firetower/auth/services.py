@@ -10,6 +10,59 @@ logger = logging.getLogger(__name__)
 _slack_service = SlackService()
 
 
+def sync_user_profile_from_slack(user: User) -> bool:
+    """
+    Sync a user's profile (name, avatar) from Slack.
+
+    Args:
+        user: User instance to sync
+
+    Returns:
+        True if profile was updated, False otherwise
+    """
+    if not user.email:
+        logger.warning(f"Cannot sync user {user.username} - no email address")
+        return False
+
+    slack_profile = _slack_service.get_user_profile_by_email(user.email)
+
+    if not slack_profile:
+        logger.info(f"No Slack profile found for {user.email}")
+        return False
+
+    first_name = slack_profile.get("first_name", "")
+    last_name = slack_profile.get("last_name", "")
+    avatar_url = slack_profile.get("avatar_url", "")
+
+    needs_save = False
+    if first_name and user.first_name != first_name[:150]:
+        user.first_name = first_name[:150]
+        needs_save = True
+    if last_name and user.last_name != last_name[:150]:
+        user.last_name = last_name[:150]
+        needs_save = True
+
+    if needs_save:
+        user.save()
+        logger.info(f"Updated profile from Slack for {user.email}")
+
+    # Update avatar from Slack profile
+    if avatar_url and hasattr(user, "userprofile"):
+        profile = user.userprofile
+        if profile.avatar_url != avatar_url:
+            # Validate avatar URL (HTTPS only for security)
+            try:
+                URLValidator(schemes=["https"])(avatar_url)
+                profile.avatar_url = avatar_url
+                profile.save()
+                logger.info(f"Updated avatar for user {user.email}")
+                needs_save = True
+            except ValidationError:
+                logger.warning(f"Invalid or insecure avatar URL: {avatar_url}")
+
+    return needs_save
+
+
 def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
     """
     Get or create a Django user from IAP authentication.
@@ -25,9 +78,8 @@ def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
         ValueError: If email or iap_user_id is missing
 
     Note:
-        TEMPORARY: Name and avatar are currently fetched from Slack on EVERY
-        authentication to backfill existing users. This should be changed back
-        to only run on user creation once backfill is complete.
+        Name and avatar are fetched from Slack only on user creation.
+        Use the "Sync with Slack" admin action to update existing users.
     """
     if not iap_user_id or not email:
         raise ValueError("IAP user ID and email are required for user creation")
@@ -56,6 +108,9 @@ def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
         user.set_unusable_password()
         user.save()
         logger.info(f"Created new user from IAP: {email} (IAP ID: {iap_user_id})")
+
+        # Fetch profile from Slack on user creation only
+        sync_user_profile_from_slack(user)
     else:
         # For existing users, only update email if changed
         if user.email != email:
@@ -64,40 +119,5 @@ def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
             )
             user.email = email
             user.save()
-
-    # TODO: TEMPORARY - Remove after existing users are backfilled
-    # Fetch profile from Slack on EVERY authentication to backfill existing users
-    # Once all users have profiles, this should only run on user creation (see above)
-    slack_profile = _slack_service.get_user_profile_by_email(email)
-
-    if slack_profile:
-        first_name = slack_profile.get("first_name", "")
-        last_name = slack_profile.get("last_name", "")
-        avatar_url = slack_profile.get("avatar_url", "")
-
-        needs_save = False
-        if first_name and user.first_name != first_name[:150]:
-            user.first_name = first_name[:150]
-            needs_save = True
-        if last_name and user.last_name != last_name[:150]:
-            user.last_name = last_name[:150]
-            needs_save = True
-
-        if needs_save:
-            user.save()
-            logger.info(f"Updated profile from Slack for {email}")
-
-        # Update avatar from Slack profile
-        if avatar_url and hasattr(user, "userprofile"):
-            profile = user.userprofile
-            if profile.avatar_url != avatar_url:
-                # Validate avatar URL (HTTPS only for security)
-                try:
-                    URLValidator(schemes=["https"])(avatar_url)
-                    profile.avatar_url = avatar_url
-                    profile.save()
-                    logger.info(f"Updated avatar for user {email}")
-                except ValidationError:
-                    logger.warning(f"Invalid or insecure avatar URL: {avatar_url}")
 
     return user
