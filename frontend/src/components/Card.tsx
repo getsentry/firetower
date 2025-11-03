@@ -11,14 +11,13 @@ const card = cva([
 
 interface CardProps
   extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof card> {}
+    VariantProps<typeof card> {
+  ref?: React.Ref<HTMLDivElement>;
+}
 
-const CardRoot = React.forwardRef<HTMLDivElement, CardProps>(
-  ({className, ...props}, ref) => (
-    <div ref={ref} className={cn(card({className}))} {...props} />
-  )
+const CardRoot = ({className, ref, ...props}: CardProps) => (
+  <div ref={ref} className={cn(card({className}))} {...props} />
 );
-CardRoot.displayName = 'Card';
 
 const title = cva(['text-lg', 'font-semibold', 'mb-space-xl', 'text-content-headings'], {
   variants: {
@@ -37,16 +36,15 @@ const title = cva(['text-lg', 'font-semibold', 'mb-space-xl', 'text-content-head
 
 interface TitleProps
   extends React.HTMLAttributes<HTMLHeadingElement>,
-    VariantProps<typeof title> {}
+    VariantProps<typeof title> {
+  ref?: React.Ref<HTMLHeadingElement>;
+}
 
-const Title = React.forwardRef<HTMLHeadingElement, TitleProps>(
-  ({className, size, children, ...props}, ref) => (
-    <h3 ref={ref} className={cn(title({className, size}))} {...props}>
-      {children}
-    </h3>
-  )
+const Title = ({className, size, children, ref, ...props}: TitleProps) => (
+  <h3 ref={ref} className={cn(title({className, size}))} {...props}>
+    {children}
+  </h3>
 );
-Title.displayName = 'Card.Title';
 
 export const Card = Object.assign(CardRoot, {
   Title,

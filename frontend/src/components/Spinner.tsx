@@ -3,6 +3,7 @@ import {cn} from 'utils/cn';
 
 interface SpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: 'sm' | 'md' | 'lg';
+  ref?: React.Ref<HTMLDivElement>;
 }
 
 const sizeClasses = {
@@ -11,24 +12,21 @@ const sizeClasses = {
   lg: 'h-12 w-12 border-4',
 };
 
-export const Spinner = React.forwardRef<HTMLDivElement, SpinnerProps>(
-  ({size = 'md', className, ...props}, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          'animate-spin rounded-full border-border-secondary border-t-transparent',
-          sizeClasses[size],
-          className
-        )}
-        role="status"
-        aria-label="Loading"
-        data-testid="spinner"
-        {...props}
-      >
-        <span className="sr-only">Loading...</span>
-      </div>
-    );
-  }
-);
-Spinner.displayName = 'Spinner';
+export const Spinner = ({size = 'md', className, ref, ...props}: SpinnerProps) => {
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'animate-spin rounded-full border-border-secondary border-t-transparent',
+        sizeClasses[size],
+        className
+      )}
+      role="status"
+      aria-label="Loading"
+      data-testid="spinner"
+      {...props}
+    >
+      <span className="sr-only">Loading...</span>
+    </div>
+  );
+};

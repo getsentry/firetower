@@ -50,13 +50,12 @@ const pill = cva(
 
 interface PillProps
   extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof pill> {}
+    VariantProps<typeof pill> {
+  ref?: React.Ref<HTMLSpanElement>;
+}
 
-const Pill = React.forwardRef<HTMLSpanElement, PillProps>(
-  ({className, variant, ...props}, ref) => (
-    <span ref={ref} className={cn(pill({variant, className}))} {...props} />
-  )
+const Pill = ({className, variant, ref, ...props}: PillProps) => (
+  <span ref={ref} className={cn(pill({variant, className}))} {...props} />
 );
-Pill.displayName = 'Pill';
 
 export {Pill, type PillProps};
