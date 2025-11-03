@@ -72,7 +72,13 @@ class TestGetOrCreateUserFromIAP:
         assert user.email == "new@example.com"
 
     def test_does_not_refetch_slack_on_subsequent_logins(self):
-        """Test that Slack is only called on user creation, not subsequent logins."""
+        """
+        Test that subsequent logins return the same user.
+
+        TODO: TEMPORARY - This test should be updated once backfill is complete
+        to verify that Slack is NOT called on subsequent logins.
+        Currently Slack IS called on every login to backfill existing users.
+        """
         # First login - user created
         user = get_or_create_user_from_iap(
             iap_user_id="accounts.google.com:12345",
