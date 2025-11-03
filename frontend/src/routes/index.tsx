@@ -67,6 +67,31 @@ export const Route = createFileRoute('/')({
 
 const STORAGE_KEY = 'firetower_list_search';
 
+function IncidentsEmptyState({status}: {status: IncidentStatus[]}) {
+  if (arraysEqual(status, STATUS_FILTER_GROUPS.active)) {
+    return (
+      <div className="text-content-secondary py-space-4xl text-center">
+        <p>There are no active incidents {String.fromCodePoint(0x1f389)}</p>
+      </div>
+    );
+  }
+  if (arraysEqual(status, STATUS_FILTER_GROUPS.review)) {
+    return (
+      <div className="text-content-secondary py-space-4xl text-center">
+        <p>There are no incidents in review</p>
+      </div>
+    );
+  }
+  return (
+    <div className="text-content-secondary py-space-4xl text-center">
+      <p className="mb-space-lg">There are no incidents matching those filters.</p>
+      <p>
+        If you think this is a bug, let us know in <GetHelpLink />.
+      </p>
+    </div>
+  );
+}
+
 function Index() {
   const params = Route.useSearch();
   const {
@@ -101,36 +126,10 @@ function Index() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // Determine empty state based on filters
-  const renderEmptyState = () => {
-    if (arraysEqual(params.status, STATUS_FILTER_GROUPS.active)) {
-      return (
-        <div className="text-content-secondary py-space-4xl text-center">
-          <p>There are no active incidents {String.fromCodePoint(0x1f389)}</p>
-        </div>
-      );
-    }
-    if (arraysEqual(params.status, STATUS_FILTER_GROUPS.review)) {
-      return (
-        <div className="text-content-secondary py-space-4xl text-center">
-          <p>There are no incidents in review</p>
-        </div>
-      );
-    }
-    return (
-      <div className="text-content-secondary py-space-4xl text-center">
-        <p className="mb-space-lg">There are no incidents matching those filters.</p>
-        <p>
-          If you think this is a bug, let us know in <GetHelpLink />.
-        </p>
-      </div>
-    );
-  };
-
   return (
     <IncidentsLayout>
       {incidents.length === 0 ? (
-        renderEmptyState()
+        <IncidentsEmptyState status={params.status} />
       ) : (
         <>
           <ul className="gap-space-lg flex list-none flex-col">

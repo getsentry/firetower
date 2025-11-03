@@ -315,7 +315,7 @@ describe('Route States', () => {
 });
 
 describe('Empty States', () => {
-  it('shows celebratory message when no active incidents', async () => {
+  it('shows no active incidents message', async () => {
     mockApiGet.mockImplementation((args: {path: string}) => {
       if (args.path === '/ui/users/me/') {
         return Promise.resolve(mockCurrentUser);
@@ -337,7 +337,7 @@ describe('Empty States', () => {
     expect(screen.getByTestId('filter-active')).toBeInTheDocument();
   });
 
-  it('shows neutral message when no incidents in review', async () => {
+  it('shows no incidents in review message', async () => {
     const user = userEvent.setup();
     mockApiGet.mockImplementation((args: {path: string}) => {
       if (args.path === '/ui/users/me/') {
