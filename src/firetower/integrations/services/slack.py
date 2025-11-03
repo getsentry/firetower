@@ -1,8 +1,8 @@
 """
-Slack integration service for fetching channel data and building URLs.
+Slack integration service for fetching user profile data.
 
 This service provides a simple interface to interact with Slack's API
-and retrieve information about channels.
+and retrieve user profile information (name, avatar).
 """
 
 import logging
@@ -18,8 +18,7 @@ class SlackService:
     """
     Service class for interacting with Slack API.
 
-    Provides methods to fetch channel information and build Slack URLs
-    for the Firetower application.
+    Provides methods to fetch user profile information for authentication.
     """
 
     def __init__(self):
@@ -42,75 +41,6 @@ class SlackService:
         if self.client is None:
             logger.warning("Slack client not initialized - missing bot token")
 
-    def _get_channel_id_by_name(self, channel_name: str) -> str | None:
-        """
-        Get Slack channel ID by name using the bot token.
-
-        Args:
-            channel_name (str): The name of the Slack channel (without the # prefix)
-
-        Returns:
-            str | None: The channel ID if found, None otherwise
-        """
-        if not self.client:
-            logger.warning("Cannot fetch channel - Slack client not initialized")
-            return None
-
-        try:
-            logger.debug(f"Fetching channel ID for: {channel_name}")
-            response = self.client.conversations_list(
-                types="private_channel,public_channel"
-            )
-
-            channels = response.get("channels", [])
-            logger.debug(f"Found {len(channels)} channels")
-
-            for channel in channels:
-                if channel["name"] == channel_name:
-                    logger.info(
-                        f"Found channel {channel_name}",
-                        extra={"channel_id": channel["id"]},
-                    )
-                    return channel["id"]
-
-            logger.warning(f"Channel not found: {channel_name}")
-        except SlackApiError as e:
-            logger.error(
-                f"Error fetching Slack channels: {e}",
-                extra={"channel_name": channel_name},
-            )
-
-        return None
-
-    def _build_channel_url(self, channel_id: str) -> str:
-        """
-        Build a Slack channel URL from a channel ID.
-
-        Args:
-            channel_id (str): The Slack channel ID
-
-        Returns:
-            str: The full Slack channel URL
-        """
-        # Use the team_id from settings to construct the URL
-        # Format: https://{team_id}.slack.com/archives/{channel_id}
-        return f"https://{self.team_id}.slack.com/archives/{channel_id}"
-
-    def get_channel_url_by_name(self, channel_name: str) -> str | None:
-        """
-        Get a Slack channel URL by channel name.
-
-        Args:
-            channel_name (str): The name of the Slack channel (without the # prefix)
-
-        Returns:
-            str | None: The full Slack channel URL if found, None otherwise
-        """
-        if not self.team_id:
-            return None
-        channel_id = self._get_channel_id_by_name(channel_name)
-        return self._build_channel_url(channel_id) if channel_id else None
-
     def get_user_profile_by_email(self, email: str) -> dict | None:
         """
         Get user profile information from Slack by email.
@@ -126,7 +56,7 @@ class SlackService:
             return None
 
         try:
-            logger.debug(f"Fetching Slack profile for: {email}")
+            logger.info(f"Fetching Slack profile for: {email}")
             response = self.client.users_lookupByEmail(email=email)
 
             user = response.get("user", {})

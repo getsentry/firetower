@@ -57,7 +57,7 @@ class IAPAuthenticationMiddleware:
             )
 
             request.user = user
-            logger.debug(
+            logger.info(
                 f"IAP authentication successful for user {user.email} (ID: {user.username})"
             )
 

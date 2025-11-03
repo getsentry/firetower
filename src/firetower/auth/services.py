@@ -76,7 +76,7 @@ def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
                     profile = user.userprofile
                     profile.avatar_url = avatar_url
                     profile.save()
-                    logger.debug(f"Set avatar for user {email}")
+                    logger.info(f"Set avatar for user {email}")
                 except ValidationError:
                     logger.warning(f"Invalid or insecure avatar URL: {avatar_url}")
     else:

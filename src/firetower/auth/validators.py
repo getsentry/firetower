@@ -57,10 +57,6 @@ class IAPTokenValidator:
 
         Returns:
             Dictionary with email and user_id
-
-        Note:
-            IAP tokens only contain: email, sub, azp, hd, identity_source, iss
-            They do NOT contain name or picture fields.
         """
         return {
             "email": decoded_token.get("email"),
