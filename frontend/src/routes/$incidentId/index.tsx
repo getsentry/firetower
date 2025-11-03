@@ -1,3 +1,4 @@
+import {useEffect} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {Card} from 'components/Card';
@@ -19,6 +20,13 @@ export const Route = createFileRoute('/$incidentId/')({
 function Incident() {
   const params = Route.useParams();
   const {data: incident} = useSuspenseQuery(incidentDetailQueryOptions(params));
+
+  useEffect(() => {
+    document.title = `${params.incidentId} • Firetower`;
+    return () => {
+      document.title = 'Firetower';
+    };
+  }, [params.incidentId]);
 
   return (
     <div className="space-y-4 p-2">
