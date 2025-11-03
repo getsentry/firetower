@@ -44,10 +44,10 @@ describe('Pill', () => {
   });
 
   it('forwards ref', () => {
-    const ref = React.createRef<HTMLSpanElement>();
+    const ref = React.createRef<HTMLDivElement>();
     render(<Pill ref={ref}>Ref Test</Pill>);
 
-    expect(ref.current).toBeInstanceOf(HTMLSpanElement);
+    expect(ref.current).toBeInstanceOf(HTMLDivElement);
   });
 
   it('spreads additional props', () => {
