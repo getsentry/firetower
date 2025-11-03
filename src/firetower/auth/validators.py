@@ -66,7 +66,7 @@ class IAPTokenValidator:
         available_fields = {
             k: v for k, v in decoded_token.items() if k not in ["exp", "iat", "aud"]
         }
-        logger.debug(f"IAP token fields available: {list(available_fields.keys())}")
+        logger.info(f"IAP token fields available: {list(available_fields.keys())}")
 
         return {
             "email": decoded_token.get("email"),
