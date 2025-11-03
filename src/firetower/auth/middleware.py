@@ -54,7 +54,6 @@ class IAPAuthenticationMiddleware:
             user = get_or_create_user_from_iap(
                 iap_user_id=user_info["user_id"],
                 email=user_info["email"],
-                avatar_url=user_info.get("avatar_url", ""),
             )
 
             request.user = user
