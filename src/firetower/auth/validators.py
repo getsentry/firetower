@@ -58,6 +58,16 @@ class IAPTokenValidator:
         Returns:
             Dictionary with email, user_id, and avatar_url (if available)
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Log all available token fields for debugging (excluding sensitive timestamps)
+        available_fields = {
+            k: v for k, v in decoded_token.items() if k not in ["exp", "iat", "aud"]
+        }
+        logger.debug(f"IAP token fields available: {list(available_fields.keys())}")
+
         return {
             "email": decoded_token.get("email"),
             "user_id": decoded_token.get("sub"),
