@@ -2,6 +2,8 @@ import {useEffect, useRef} from 'react';
 import {useSuspenseInfiniteQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
+import {ErrorState} from 'components/ErrorState';
+import {GetHelpLink} from 'components/GetHelpLink';
 import {Spinner} from 'components/Spinner';
 import {z} from 'zod';
 
@@ -10,6 +12,7 @@ import {StatusFilter} from './components/StatusFilter';
 import {
   incidentsQueryOptions,
   IncidentStatusSchema,
+  type IncidentStatus,
 } from './queries/incidentsQueryOptions';
 
 // Zod schema for search params
@@ -48,19 +51,32 @@ export const Route = createFileRoute('/')({
   ),
   errorComponent: () => (
     <IncidentsLayout>
-      <p className="text-content-secondary py-space-4xl text-center">
-        Something went wrong fetching incidents.
-      </p>
-    </IncidentsLayout>
-  ),
-  notFoundComponent: () => (
-    <IncidentsLayout>
-      <p className="text-content-secondary py-space-4xl text-center">Page not found.</p>
+      <ErrorState
+        title="Something went wrong fetching incidents :("
+        description={
+          <>
+            Try refreshing the page, or if that doesn't work, come chat with us in{' '}
+            <GetHelpLink />.
+          </>
+        }
+      />
     </IncidentsLayout>
   ),
 });
 
 const STORAGE_KEY = 'firetower_list_search';
+
+const FILTER_GROUPS = {
+  active: ['Active', 'Mitigated'] as IncidentStatus[],
+  review: ['Postmortem', 'Actions Pending'] as IncidentStatus[],
+  closed: ['Done'] as IncidentStatus[],
+};
+
+function arraysEqual(a: IncidentStatus[], b: IncidentStatus[]): boolean {
+  if (a.length !== b.length) return false;
+  const setB = new Set(b);
+  return a.every(val => setB.has(val));
+}
 
 function Index() {
   const params = Route.useSearch();
@@ -96,20 +112,52 @@ function Index() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
+  // Determine empty state based on filters
+  const renderEmptyState = () => {
+    if (arraysEqual(params.status, FILTER_GROUPS.active)) {
+      return (
+        <div className="text-content-secondary py-space-4xl text-center">
+          <p>There are no active incidents {String.fromCodePoint(0x1f389)}</p>
+        </div>
+      );
+    }
+    if (arraysEqual(params.status, FILTER_GROUPS.review)) {
+      return (
+        <div className="text-content-secondary py-space-4xl text-center">
+          <p>There are no incidents in review</p>
+        </div>
+      );
+    }
+    return (
+      <div className="text-content-secondary py-space-4xl text-center">
+        <p className="mb-space-lg">There are no incidents matching those filters.</p>
+        <p>
+          If you think this is a bug, let us know in <GetHelpLink />.
+        </p>
+      </div>
+    );
+  };
+
   return (
     <IncidentsLayout>
-      <ul className="gap-space-lg flex list-none flex-col">
-        {incidents.map(incident => (
-          <li key={incident.id}>
-            <IncidentCard incident={incident} />
-          </li>
-        ))}
-      </ul>
+      {incidents.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        <>
+          <ul className="gap-space-lg flex list-none flex-col">
+            {incidents.map(incident => (
+              <li key={incident.id}>
+                <IncidentCard incident={incident} />
+              </li>
+            ))}
+          </ul>
 
-      {/* Intersection observer target */}
-      <div ref={observerTarget} className="py-space-xl flex justify-center">
-        {isFetchingNextPage && <Spinner size="md" />}
-      </div>
+          {/* Intersection observer target */}
+          <div ref={observerTarget} className="py-space-xl flex justify-center">
+            {isFetchingNextPage && <Spinner size="md" />}
+          </div>
+        </>
+      )}
     </IncidentsLayout>
   );
 }

@@ -1,7 +1,9 @@
 import {useEffect} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
-import {createFileRoute} from '@tanstack/react-router';
+import {createFileRoute, Link} from '@tanstack/react-router';
 import {Card} from 'components/Card';
+import {ErrorState} from 'components/ErrorState';
+import {GetHelpLink} from 'components/GetHelpLink';
 
 import {IncidentSummary} from './components/IncidentSummary';
 import {LinksList} from './components/LinksList';
@@ -14,7 +16,28 @@ export const Route = createFileRoute('/$incidentId/')({
   loader: async ({params, context}) =>
     await context.queryClient.ensureQueryData(incidentDetailQueryOptions(params)),
   pendingComponent: () => <p>Loading incident...</p>,
-  errorComponent: () => <p>Something went wrong fetching incident.</p>,
+  errorComponent: () => (
+    <ErrorState
+      description={
+        <>
+          We couldn't load this incident. It may not exist, may have been deleted, or you
+          may just not have access.
+          <br />
+          <br />
+          If you think this is a bug, let us know in <GetHelpLink />.
+        </>
+      }
+      action={
+        <Link
+          to="/"
+          className="text-content-secondary hover:bg-background-secondary hover:text-content-accent px-space-md py-space-sm inline-flex items-center gap-2 rounded-sm transition-colors"
+        >
+          <span>{String.fromCharCode(8592)}</span>
+          <span>All Incidents</span>
+        </Link>
+      }
+    />
+  ),
 });
 
 function Incident() {
