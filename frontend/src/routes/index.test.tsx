@@ -306,7 +306,7 @@ describe('Route States', () => {
     renderRoute();
 
     expect(
-      await screen.findByText('Something went wrong fetching incidents.')
+      await screen.findByText('Something went wrong fetching incidents')
     ).toBeInTheDocument();
     expect(screen.getByTestId('filter-active')).toBeInTheDocument();
     expect(screen.getByTestId('filter-review')).toBeInTheDocument();

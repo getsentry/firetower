@@ -1,4 +1,5 @@
 import {Link, useSearch} from '@tanstack/react-router';
+import {arraysEqual} from 'utils/arrays';
 import {cn} from 'utils/cn';
 
 import {type IncidentStatus} from '../queries/incidentsQueryOptions';
@@ -9,12 +10,6 @@ interface FilterLinkProps {
   label: string;
   isActive: boolean;
   testId?: string;
-}
-
-function arraysEqual(a: IncidentStatus[], b: IncidentStatus[]): boolean {
-  if (a.length !== b.length) return false;
-  const setB = new Set(b);
-  return a.every(val => setB.has(val));
 }
 
 function FilterLink({statuses, label, isActive, testId}: FilterLinkProps) {

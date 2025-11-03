@@ -5,6 +5,7 @@ import {zodValidator} from '@tanstack/zod-adapter';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {Spinner} from 'components/Spinner';
+import {arraysEqual} from 'utils/arrays';
 import {z} from 'zod';
 
 import {IncidentCard} from './components/IncidentCard';
@@ -12,7 +13,6 @@ import {StatusFilter} from './components/StatusFilter';
 import {
   incidentsQueryOptions,
   IncidentStatusSchema,
-  type IncidentStatus,
 } from './queries/incidentsQueryOptions';
 import {STATUS_FILTER_GROUPS} from './types';
 
@@ -66,12 +66,6 @@ export const Route = createFileRoute('/')({
 });
 
 const STORAGE_KEY = 'firetower_list_search';
-
-function arraysEqual(a: IncidentStatus[], b: IncidentStatus[]): boolean {
-  if (a.length !== b.length) return false;
-  const setB = new Set(b);
-  return a.every(val => setB.has(val));
-}
 
 function Index() {
   const params = Route.useSearch();
