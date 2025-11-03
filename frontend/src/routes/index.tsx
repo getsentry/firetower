@@ -13,6 +13,7 @@ import {StatusFilter} from './components/StatusFilter';
 import {
   incidentsQueryOptions,
   IncidentStatusSchema,
+  type IncidentStatus,
 } from './queries/incidentsQueryOptions';
 import {STATUS_FILTER_GROUPS} from './types';
 
