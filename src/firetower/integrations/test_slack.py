@@ -243,3 +243,74 @@ class TestSlackService:
                 url = service.get_channel_url_by_name("nonexistent-channel")
 
                 assert url is None
+
+    def test_get_user_profile_by_email_success(self):
+        """Test successful user profile fetch from Slack."""
+        mock_slack_config = {
+            "BOT_TOKEN": "xoxb-test-token",
+            "TEAM_ID": "sentry",
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            with patch("firetower.integrations.services.slack.WebClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+
+                mock_client.users_lookupByEmail.return_value = {
+                    "user": {
+                        "id": "U12345",
+                        "real_name": "John Doe",
+                        "profile": {
+                            "display_name": "Johnny",
+                            "image_512": "https://example.com/avatar.jpg",
+                            "image_192": "https://example.com/avatar-192.jpg",
+                        },
+                    }
+                }
+
+                service = SlackService()
+                profile = service.get_user_profile_by_email("john@example.com")
+
+                assert profile is not None
+                assert profile["name"] == "Johnny"
+                assert profile["first_name"] == "John"
+                assert profile["last_name"] == "Doe"
+                assert profile["avatar_url"] == "https://example.com/avatar.jpg"
+
+    def test_get_user_profile_by_email_not_found(self):
+        """Test user profile fetch when user doesn't exist in Slack."""
+        from slack_sdk.errors import SlackApiError
+
+        mock_slack_config = {
+            "BOT_TOKEN": "xoxb-test-token",
+            "TEAM_ID": "sentry",
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            with patch("firetower.integrations.services.slack.WebClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+
+                mock_response = MagicMock()
+                mock_response.get.return_value = "users_not_found"
+                mock_client.users_lookupByEmail.side_effect = SlackApiError(
+                    "user_not_found", mock_response
+                )
+
+                service = SlackService()
+                profile = service.get_user_profile_by_email("nonexistent@example.com")
+
+                assert profile is None
+
+    def test_get_user_profile_without_client(self):
+        """Test that profile fetch returns None when Slack client not initialized."""
+        mock_slack_config = {
+            "BOT_TOKEN": None,
+            "TEAM_ID": "sentry",
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            service = SlackService()
+            profile = service.get_user_profile_by_email("test@example.com")
+
+            assert profile is None

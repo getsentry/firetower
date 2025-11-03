@@ -4,7 +4,10 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator, validate_email
 
+from firetower.integrations.services import SlackService
+
 logger = logging.getLogger(__name__)
+_slack_service = SlackService()
 
 
 def get_or_create_user_from_iap(
@@ -39,14 +42,6 @@ def get_or_create_user_from_iap(
             f"IAP user ID exceeds maximum length of 150 characters: {len(iap_user_id)}"
         )
 
-    # Validate avatar URL if provided (HTTPS only for security)
-    if avatar_url:
-        try:
-            URLValidator(schemes=["https"])(avatar_url)
-        except ValidationError:
-            logger.warning(f"Invalid or insecure avatar URL provided: {avatar_url}")
-            avatar_url = ""
-
     user, created = User.objects.get_or_create(
         username=iap_user_id,
         defaults={
@@ -59,14 +54,37 @@ def get_or_create_user_from_iap(
         user.set_unusable_password()
         user.save()
         logger.info(f"Created new user from IAP: {email} (IAP ID: {iap_user_id})")
+
+        # Only fetch profile from Slack on user creation (not on every request)
+        slack_profile = _slack_service.get_user_profile_by_email(email)
+
+        if slack_profile:
+            first_name = slack_profile.get("first_name", "")
+            last_name = slack_profile.get("last_name", "")
+            user.first_name = first_name[:150]
+            user.last_name = last_name[:150]
+            user.save()
+            logger.info(f"Populated profile from Slack for {email}")
+
+            # Use avatar from Slack profile if available and not provided via IAP
+            if not avatar_url and slack_profile.get("avatar_url"):
+                avatar_url = slack_profile["avatar_url"]
     else:
-        # Update email if changed
+        # For existing users, only update email if changed
         if user.email != email:
             logger.info(
                 f"Updated email for user {iap_user_id}: {user.email} -> {email}"
             )
             user.email = email
             user.save()
+
+    # Validate avatar URL if provided (HTTPS only for security)
+    if avatar_url:
+        try:
+            URLValidator(schemes=["https"])(avatar_url)
+        except ValidationError:
+            logger.warning(f"Invalid or insecure avatar URL provided: {avatar_url}")
+            avatar_url = ""
 
     # Update avatar if changed
     # UserProfile is created automatically by django signal
