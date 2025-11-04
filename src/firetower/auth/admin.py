@@ -57,9 +57,19 @@ class UserProfileAdmin(admin.ModelAdmin):
         "user__last_name",
     ]
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "user":
+            kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 
 @admin.register(ExternalProfile)
 class ExternalProfileAdmin(admin.ModelAdmin):
     list_display = ["user", "type", "external_id", "created_at"]
     list_filter = ["type"]
     search_fields = ["user__username", "external_id"]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "user":
+            kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
