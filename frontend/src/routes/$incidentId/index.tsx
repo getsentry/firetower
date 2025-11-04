@@ -5,6 +5,7 @@ import {Card} from 'components/Card';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 
+import {IncidentDetailSkeleton} from './components/IncidentDetailSkeleton';
 import {IncidentSummary} from './components/IncidentSummary';
 import {LinksList} from './components/LinksList';
 import {ParticipantsList} from './components/ParticipantsList';
@@ -15,7 +16,7 @@ export const Route = createFileRoute('/$incidentId/')({
   component: Incident,
   loader: async ({params, context}) =>
     await context.queryClient.ensureQueryData(incidentDetailQueryOptions(params)),
-  pendingComponent: () => <p>Loading incident...</p>,
+  pendingComponent: () => <IncidentDetailSkeleton />,
   errorComponent: () => (
     <ErrorState
       title="We couldn't find that incident"
