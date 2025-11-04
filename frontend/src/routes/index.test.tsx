@@ -149,7 +149,7 @@ describe('IncidentCard (via Index Route)', () => {
     expect(incidentLinks[1]).toHaveAttribute('href', '/INC-1246');
   });
 
-  it('calls the incidents API with correct parameters', async () => {
+  it('calls the incidents API without status params by default', async () => {
     renderRoute();
 
     await screen.findByText('INC-1247');
@@ -157,7 +157,7 @@ describe('IncidentCard (via Index Route)', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Active', 'Mitigated'], page: 1},
+        query: {status: undefined, page: 1},
       })
     );
   });

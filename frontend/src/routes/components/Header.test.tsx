@@ -154,7 +154,7 @@ describe('Header - Root Route (Incident List)', () => {
     expect(parsed).toEqual({status: ['Postmortem', 'Actions Pending']});
   });
 
-  it('stores default search params in sessionStorage on initial load', async () => {
+  it('stores empty search params in sessionStorage on initial load', async () => {
     renderRoute('/');
 
     await screen.findByText('INC-1247');
@@ -163,7 +163,7 @@ describe('Header - Root Route (Incident List)', () => {
     expect(stored).not.toBeNull();
 
     const parsed = JSON.parse(stored!);
-    expect(parsed).toEqual({status: ['Active', 'Mitigated']});
+    expect(parsed).toEqual({});
   });
 });
 
@@ -376,7 +376,7 @@ describe('Header - sessionStorage Handling', () => {
 
     let stored = sessionStorage.getItem(STORAGE_KEY);
     let parsed = JSON.parse(stored!);
-    expect(parsed).toEqual({status: ['Active', 'Mitigated']});
+    expect(parsed).toEqual({});
 
     const reviewButton = screen.getByTestId('filter-review');
     await user.click(reviewButton);

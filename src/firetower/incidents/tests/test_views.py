@@ -87,6 +87,35 @@ class TestIncidentViews:
         assert "Private Incident" in titles
         assert "Someone Else's Private" not in titles
 
+    def test_list_incidents_defaults_to_active_and_mitigated(self):
+        """Test that no status filter defaults to Active and Mitigated"""
+        Incident.objects.create(
+            title="Active Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="Mitigated Incident",
+            status=IncidentStatus.MITIGATED,
+            severity=IncidentSeverity.P2,
+        )
+        Incident.objects.create(
+            title="Done Incident",
+            status=IncidentStatus.DONE,
+            severity=IncidentSeverity.P3,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+        titles = [inc["title"] for inc in response.data["results"]]
+        assert "Active Incident" in titles
+        assert "Mitigated Incident" in titles
+        assert "Done Incident" not in titles
+
     def test_list_incidents_filter_by_status(self):
         """Test filtering incidents by status"""
         Incident.objects.create(
