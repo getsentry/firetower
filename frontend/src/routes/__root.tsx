@@ -1,6 +1,7 @@
 import type {QueryClient} from '@tanstack/react-query';
 import {createRootRouteWithContext, Outlet} from '@tanstack/react-router';
 import {TanStackRouterDevtools} from '@tanstack/react-router-devtools';
+import {ErrorState} from 'components/ErrorState';
 
 import {Header} from './components/Header';
 
@@ -16,4 +17,5 @@ const RootLayout = () => (
 
 export const Route = createRootRouteWithContext<{queryClient: QueryClient}>()({
   component: RootLayout,
+  notFoundComponent: () => <ErrorState title="Page not found" showBackButton />,
 });

@@ -11,7 +11,7 @@ export default defineConfig({
     tanstackRouter({
       target: 'react',
       autoCodeSplitting: true,
-      routeFileIgnorePattern: 'queries|components|.*.test.tsx?',
+      routeFileIgnorePattern: 'queries|components|types|.*.test.tsx?',
     }),
     tailwindcss(),
     react(),

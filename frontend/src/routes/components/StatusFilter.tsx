@@ -1,25 +1,15 @@
 import {Link, useSearch} from '@tanstack/react-router';
+import {arraysEqual} from 'utils/arrays';
 import {cn} from 'utils/cn';
 
 import {type IncidentStatus} from '../queries/incidentsQueryOptions';
+import {STATUS_FILTER_GROUPS} from '../types';
 
 interface FilterLinkProps {
   statuses: IncidentStatus[];
   label: string;
   isActive: boolean;
   testId?: string;
-}
-
-const FILTER_GROUPS = {
-  active: ['Active', 'Mitigated'] as IncidentStatus[],
-  review: ['Postmortem', 'Actions Pending'] as IncidentStatus[],
-  closed: ['Done'] as IncidentStatus[],
-};
-
-function arraysEqual(a: IncidentStatus[], b: IncidentStatus[]): boolean {
-  if (a.length !== b.length) return false;
-  const setB = new Set(b);
-  return a.every(val => setB.has(val));
 }
 
 function FilterLink({statuses, label, isActive, testId}: FilterLinkProps) {
@@ -49,21 +39,21 @@ export function StatusFilter() {
   return (
     <div className="gap-space-2xs flex">
       <FilterLink
-        statuses={FILTER_GROUPS.active}
+        statuses={STATUS_FILTER_GROUPS.active}
         label="Active"
-        isActive={arraysEqual(status, FILTER_GROUPS.active)}
+        isActive={arraysEqual(status, STATUS_FILTER_GROUPS.active)}
         testId="filter-active"
       />
       <FilterLink
-        statuses={FILTER_GROUPS.review}
+        statuses={STATUS_FILTER_GROUPS.review}
         label="In Review"
-        isActive={arraysEqual(status, FILTER_GROUPS.review)}
+        isActive={arraysEqual(status, STATUS_FILTER_GROUPS.review)}
         testId="filter-review"
       />
       <FilterLink
-        statuses={FILTER_GROUPS.closed}
+        statuses={STATUS_FILTER_GROUPS.closed}
         label="Closed"
-        isActive={arraysEqual(status, FILTER_GROUPS.closed)}
+        isActive={arraysEqual(status, STATUS_FILTER_GROUPS.closed)}
         testId="filter-closed"
       />
     </div>
