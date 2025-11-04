@@ -6,7 +6,7 @@ import {type IncidentStatus} from '../queries/incidentsQueryOptions';
 import {STATUS_FILTER_GROUPS} from '../types';
 
 interface FilterLinkProps {
-  statuses: IncidentStatus[];
+  statuses?: IncidentStatus[];
   label: string;
   isActive: boolean;
   testId?: string;
@@ -39,21 +39,23 @@ export function StatusFilter() {
   return (
     <div className="gap-space-2xs flex">
       <FilterLink
-        statuses={STATUS_FILTER_GROUPS.active}
+        statuses={undefined}
         label="Active"
-        isActive={arraysEqual(status, STATUS_FILTER_GROUPS.active)}
+        isActive={
+          status === undefined || arraysEqual(status, STATUS_FILTER_GROUPS.active)
+        }
         testId="filter-active"
       />
       <FilterLink
         statuses={STATUS_FILTER_GROUPS.review}
         label="In Review"
-        isActive={arraysEqual(status, STATUS_FILTER_GROUPS.review)}
+        isActive={arraysEqual(status ?? [], STATUS_FILTER_GROUPS.review)}
         testId="filter-review"
       />
       <FilterLink
         statuses={STATUS_FILTER_GROUPS.closed}
         label="Closed"
-        isActive={arraysEqual(status, STATUS_FILTER_GROUPS.closed)}
+        isActive={arraysEqual(status ?? [], STATUS_FILTER_GROUPS.closed)}
         testId="filter-closed"
       />
     </div>

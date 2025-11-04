@@ -16,6 +16,7 @@ class IncidentListUIView(generics.ListAPIView):
     Supports:
     - Pagination (configured in settings.REST_FRAMEWORK)
     - Status filtering via query params: ?status=Active&status=Mitigated
+      (defaults to Active and Mitigated if no status param provided)
     - Privacy: users only see public incidents + their own private incidents
 
     Authentication enforced via DEFAULT_PERMISSION_CLASSES in settings.
@@ -28,10 +29,11 @@ class IncidentListUIView(generics.ListAPIView):
         queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
 
-        # Filter by status if requested
+        # Filter by status (defaults to Active and Mitigated if not specified)
         status_filters = self.request.GET.getlist("status")
-        if status_filters:
-            queryset = queryset.filter(status__in=status_filters)
+        if not status_filters:
+            status_filters = ["Active", "Mitigated"]
+        queryset = queryset.filter(status__in=status_filters)
 
         return queryset
 

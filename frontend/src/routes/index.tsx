@@ -19,7 +19,7 @@ import {STATUS_FILTER_GROUPS} from './types';
 
 // Zod schema for search params
 const incidentListSearchSchema = z.object({
-  status: z.array(IncidentStatusSchema).optional().default(['Active', 'Mitigated']),
+  status: z.array(IncidentStatusSchema).optional(),
 });
 
 function IncidentsLayout({children}: {children: React.ReactNode}) {
@@ -68,8 +68,8 @@ export const Route = createFileRoute('/')({
 
 const STORAGE_KEY = 'firetower_list_search';
 
-function IncidentsEmptyState({status}: {status: IncidentStatus[]}) {
-  if (arraysEqual(status, STATUS_FILTER_GROUPS.active)) {
+function IncidentsEmptyState({status}: {status?: IncidentStatus[]}) {
+  if (!status || arraysEqual(status, STATUS_FILTER_GROUPS.active)) {
     return (
       <div className="text-content-secondary py-space-4xl text-center">
         <p>There are no active incidents! {String.fromCodePoint(0x1f389)}</p>
