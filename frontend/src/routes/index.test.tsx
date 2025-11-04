@@ -333,7 +333,9 @@ describe('Empty States', () => {
 
     renderRoute();
 
-    expect(await screen.findByText(/There are no active incidents/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/There are no active incidents!/i)
+    ).toBeInTheDocument();
     expect(screen.getByTestId('filter-active')).toBeInTheDocument();
   });
 
@@ -361,7 +363,7 @@ describe('Empty States', () => {
     await user.click(reviewButton);
 
     expect(
-      await screen.findByText('There are no incidents in review')
+      await screen.findByText('There are no incidents in review.')
     ).toBeInTheDocument();
   });
 

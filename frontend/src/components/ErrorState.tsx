@@ -8,7 +8,7 @@ interface ErrorStateProps {
 }
 
 export const ErrorState = ({
-  title = 'Something went wrong :(',
+  title = 'Something went wrong',
   description,
   showBackButton = false,
 }: ErrorStateProps) => {

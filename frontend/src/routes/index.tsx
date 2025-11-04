@@ -72,14 +72,14 @@ function IncidentsEmptyState({status}: {status: IncidentStatus[]}) {
   if (arraysEqual(status, STATUS_FILTER_GROUPS.active)) {
     return (
       <div className="text-content-secondary py-space-4xl text-center">
-        <p>There are no active incidents {String.fromCodePoint(0x1f389)}</p>
+        <p>There are no active incidents! {String.fromCodePoint(0x1f389)}</p>
       </div>
     );
   }
   if (arraysEqual(status, STATUS_FILTER_GROUPS.review)) {
     return (
       <div className="text-content-secondary py-space-4xl text-center">
-        <p>There are no incidents in review</p>
+        <p>There are no incidents in review.</p>
       </div>
     );
   }
