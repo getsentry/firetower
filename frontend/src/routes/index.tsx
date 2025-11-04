@@ -9,6 +9,7 @@ import {arraysEqual} from 'utils/arrays';
 import {z} from 'zod';
 
 import {IncidentCard} from './components/IncidentCard';
+import {IncidentListSkeleton} from './components/IncidentListSkeleton';
 import {StatusFilter} from './components/StatusFilter';
 import {
   incidentsQueryOptions,
@@ -46,9 +47,7 @@ export const Route = createFileRoute('/')({
   },
   pendingComponent: () => (
     <IncidentsLayout>
-      <div className="py-space-4xl flex items-center justify-center">
-        <Spinner size="lg" />
-      </div>
+      <IncidentListSkeleton />
     </IncidentsLayout>
   ),
   errorComponent: () => (
