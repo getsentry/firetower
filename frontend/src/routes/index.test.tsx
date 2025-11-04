@@ -252,7 +252,7 @@ describe('Route States', () => {
     queryClient.clear();
   });
 
-  it('shows spinner in pending state with filters visible', async () => {
+  it('shows skeleton in pending state with filters visible', async () => {
     mockApiGet.mockImplementation((args: {path: string}) => {
       if (args.path === '/ui/users/me/') {
         return Promise.resolve(mockCurrentUser);
@@ -280,8 +280,9 @@ describe('Route States', () => {
       </QueryClientProvider>
     );
 
-    // The spinner should appear while loading
-    expect(await screen.findByTestId('spinner')).toBeInTheDocument();
+    // The skeleton should appear while loading
+    const skeletons = await screen.findAllByRole('generic', {hidden: true});
+    expect(skeletons.length).toBeGreaterThan(0);
 
     // Filters should still be visible during loading
     expect(screen.getByTestId('filter-active')).toBeInTheDocument();
