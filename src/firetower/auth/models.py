@@ -1,7 +1,7 @@
-from typing import Any
-
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
+
+from firetower.incidents.models import Incident
 
 
 class ExternalProfileType(models.TextChoices):
@@ -29,12 +29,8 @@ class UserProfile(models.Model):
     avatar_url = models.URLField(blank=True)
 
     @property
-    def user_incidents(self) -> QuerySet[Any]:
+    def user_incidents(self) -> QuerySet[Incident]:
         """Return all incidents where user is captain, reporter, or participant"""
-        # Local imports to avoid circular dependency (PLC0415=import-outside-toplevel)
-        from django.db.models import Q  # noqa: PLC0415
-
-        from firetower.incidents.models import Incident  # noqa: PLC0415
 
         return Incident.objects.filter(
             Q(captain=self.user) | Q(reporter=self.user) | Q(participants=self.user)
