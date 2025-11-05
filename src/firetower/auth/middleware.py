@@ -49,8 +49,14 @@ class IAPAuthenticationMiddleware:
             request.user = AnonymousUser()
             return
 
-        # Validator is always set when IAP is enabled
-        assert self.validator is not None
+        # Validator should always be set when IAP is enabled
+        if self.validator is None:
+            logger.critical(
+                "IAP authentication called but validator is not initialized. "
+                "Check IAP_ENABLED setting and middleware configuration."
+            )
+            request.user = AnonymousUser()
+            return
 
         try:
             decoded_token = self.validator.validate_token(token)
