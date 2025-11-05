@@ -41,11 +41,11 @@ repos:
         require_serial: true
       - id: mypy
         name: mypy
-        entry: bash -c 'if [ -n "${SENTRY_MYPY_PRE_PUSH:-}" ]; then exec mypy "$@"; fi' --
+        entry: mypy src
         language: system
-        stages: [pre-push]
         types: [python]
         require_serial: true
+        pass_filenames: false
       - id: check-mypy-bypass
         name: do not bypass the type checker
         entry: '(^# *mypy: *ignore-errors|^# *type: *ignore|\bno_type_check\b|ignore\[import-untyped\])'
