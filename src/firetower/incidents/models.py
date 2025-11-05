@@ -132,6 +132,7 @@ class Incident(models.Model):
     )
 
     # Tags (many-to-many)
+    # Django ManyToManyField descriptor type is too complex for mypy (var-annotated)
     affected_area_tags = models.ManyToManyField(  # type: ignore[var-annotated]
         "Tag",
         blank=True,

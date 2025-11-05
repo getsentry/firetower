@@ -31,6 +31,7 @@ class UserProfile(models.Model):
     @property
     def user_incidents(self) -> QuerySet[Any]:
         """Return all incidents where user is captain, reporter, or participant"""
+        # Local imports to avoid circular dependency (PLC0415=import-outside-toplevel)
         from django.db.models import Q  # noqa: PLC0415
 
         from firetower.incidents.models import Incident  # noqa: PLC0415

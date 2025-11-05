@@ -41,6 +41,7 @@ class TestUserProfile:
 
     def test_user_incidents_property(self):
         """Test UserProfile.user_incidents returns incidents user is involved in"""
+        # Local import to avoid circular dependency (PLC0415=import-outside-toplevel)
         from firetower.incidents.models import (  # noqa: PLC0415
             Incident,
             IncidentSeverity,
