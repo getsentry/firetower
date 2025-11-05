@@ -6,6 +6,7 @@ and transform Jira issues into our incident data format.
 """
 
 import re
+from typing import Any
 
 from django.conf import settings
 from jira import JIRA
@@ -19,7 +20,7 @@ class JiraService:
     into a format suitable for the Firetower application.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Jira service."""
         # Get Jira configuration from Django settings
         jira_config = settings.JIRA
@@ -38,12 +39,12 @@ class JiraService:
             self.domain, basic_auth=(jira_config["ACCOUNT"], jira_config["API_KEY"])
         )
 
-    def _extract_severity(self, issue):
+    def _extract_severity(self, issue: Any) -> str | None:
         """Extract severity from Jira custom field."""
         severity_field = getattr(issue.fields, self.severity_field_id, None)
         return getattr(severity_field, "value", None) if severity_field else None
 
-    def get_incident(self, incident_key: str):
+    def get_incident(self, incident_key: str) -> dict[str, Any]:
         """
         Fetch a single incident by its Jira key.
 
@@ -77,7 +78,9 @@ class JiraService:
             "updated_at": issue.fields.updated,
         }
 
-    def get_incidents(self, statuses: list[str] | None = None, max_results=50):
+    def get_incidents(
+        self, statuses: list[str] | None = None, max_results: int = 50
+    ) -> list[dict[str, Any]]:
         """
         Fetch a list of incidents from the Jira project.
 

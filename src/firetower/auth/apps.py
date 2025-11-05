@@ -6,5 +6,5 @@ class AuthConfig(AppConfig):
     name = "firetower.auth"
     label = "firetower_auth"
 
-    def ready(self):
+    def ready(self) -> None:
         import firetower.auth.signals  # noqa: F401, PLC0415

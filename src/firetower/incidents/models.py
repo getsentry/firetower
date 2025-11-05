@@ -1,7 +1,9 @@
+from typing import Any
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 
 
 class IncidentStatus(models.TextChoices):
@@ -53,7 +55,7 @@ class Tag(models.Model):
         unique_together = [("name", "type")]
         ordering = ["name"]
 
-    def clean(self):
+    def clean(self) -> None:
         """Validate case-insensitive uniqueness"""
 
         if self.name:
@@ -63,18 +65,20 @@ class Tag(models.Model):
             ).exclude(pk=self.pk)
 
             if existing.exists():
+                first_tag = existing.first()
+                assert first_tag is not None
                 raise ValidationError(
                     {
-                        "name": f'Tag "{existing.first().name}" already exists for this type (case-insensitive match)'
+                        "name": f'Tag "{first_tag.name}" already exists for this type (case-insensitive match)'
                     }
                 )
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Run validation before saving"""
         self.full_clean()
         super().save(*args, **kwargs)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.name} ({self.get_type_display()})"
 
 
@@ -127,13 +131,13 @@ class Incident(models.Model):
     )
 
     # Tags (many-to-many)
-    affected_area_tags = models.ManyToManyField(
+    affected_area_tags = models.ManyToManyField(  # type: ignore[var-annotated]
         "Tag",
         blank=True,
         related_name="incidents_by_affected_area",
         limit_choices_to={"type": "AFFECTED_AREA"},
     )
-    root_cause_tags = models.ManyToManyField(
+    root_cause_tags = models.ManyToManyField(  # type: ignore[var-annotated]
         "Tag",
         blank=True,
         related_name="incidents_by_root_cause",
@@ -148,30 +152,32 @@ class Incident(models.Model):
         ]
 
     @property
-    def incident_number(self):
+    def incident_number(self) -> str:
         """Return formatted incident number (e.g., 'INC-2000')"""
 
         return f"{settings.PROJECT_KEY}-{self.id}"
 
     @property
-    def affected_areas(self):
+    def affected_areas(self) -> list[str]:
         """Return list of affected area names"""
         return list(self.affected_area_tags.values_list("name", flat=True))
 
     @property
-    def root_causes(self):
+    def root_causes(self) -> list[str]:
         """Return list of root cause names"""
         return list(self.root_cause_tags.values_list("name", flat=True))
 
     @property
-    def external_links_dict(self):
+    def external_links_dict(self) -> dict[str, str | None]:
         """Return external links as dict with lowercase keys"""
-        links = {link_type.lower(): None for link_type in ExternalLinkType.values}
+        links: dict[str, str | None] = {
+            link_type.lower(): None for link_type in ExternalLinkType.values
+        }
         for link in self.external_links.all():
             links[link.type.lower()] = link.url
         return links
 
-    def is_visible_to_user(self, user):
+    def is_visible_to_user(self, user: Any) -> bool:
         """Check if incident is visible to the given user"""
         if not self.is_private:
             return True
@@ -189,7 +195,7 @@ class Incident(models.Model):
 
         return False
 
-    def clean(self):
+    def clean(self) -> None:
         """Custom validation"""
 
         if not self.title or not self.title.strip():
@@ -198,12 +204,12 @@ class Incident(models.Model):
         if not self.severity:
             raise ValidationError({"severity": "Severity must be set"})
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Override save to run validation"""
         self.full_clean()
         super().save(*args, **kwargs)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.incident_number}: {self.title}"
 
 
@@ -224,11 +230,13 @@ class ExternalLink(models.Model):
     class Meta:
         unique_together = [("incident", "type")]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.incident.incident_number} - {self.type}"
 
 
-def filter_visible_to_user(queryset, user):
+def filter_visible_to_user(
+    queryset: QuerySet[Incident], user: Any
+) -> QuerySet[Incident]:
     """
     Filter incidents queryset to only those visible to user.
 

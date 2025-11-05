@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
@@ -24,7 +26,7 @@ class UserAdmin(BaseUserAdmin):
     actions = ["sync_with_slack"]
 
     @admin.action(description="Sync selected users with Slack")
-    def sync_with_slack(self, request, queryset):
+    def sync_with_slack(self, request: Any, queryset: Any) -> None:
         """Sync selected users' profiles (name, avatar) from Slack."""
         updated_count = 0
         skipped_count = 0
@@ -57,7 +59,9 @@ class UserProfileAdmin(admin.ModelAdmin):
         "user__last_name",
     ]
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+    def formfield_for_foreignkey(
+        self, db_field: Any, request: Any, **kwargs: Any
+    ) -> Any:
         if db_field.name == "user":
             kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
@@ -69,7 +73,9 @@ class ExternalProfileAdmin(admin.ModelAdmin):
     list_filter = ["type"]
     search_fields = ["user__username", "external_id"]
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+    def formfield_for_foreignkey(
+        self, db_field: Any, request: Any, **kwargs: Any
+    ) -> Any:
         if db_field.name == "user":
             kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
         return super().formfield_for_foreignkey(db_field, request, **kwargs)

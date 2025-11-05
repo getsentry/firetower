@@ -1,3 +1,5 @@
+from typing import Any
+
 from rest_framework import permissions
 
 
@@ -9,5 +11,5 @@ class IsAuthenticated(permissions.BasePermission):
     to ensure no unauthenticated access slips through.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Any, view: Any) -> bool:
         return request.user and request.user.is_authenticated

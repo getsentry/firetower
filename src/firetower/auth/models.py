@@ -1,4 +1,7 @@
+from typing import Any
+
 from django.db import models
+from django.db.models import QuerySet
 
 
 class ExternalProfileType(models.TextChoices):
@@ -26,7 +29,7 @@ class UserProfile(models.Model):
     avatar_url = models.URLField(blank=True)
 
     @property
-    def user_incidents(self):
+    def user_incidents(self) -> QuerySet[Any]:
         """Return all incidents where user is captain, reporter, or participant"""
         from django.db.models import Q  # noqa: PLC0415
 
@@ -36,7 +39,7 @@ class UserProfile(models.Model):
             Q(captain=self.user) | Q(reporter=self.user) | Q(participants=self.user)
         ).distinct()
 
-    def get_external_profile(self, profile_type):
+    def get_external_profile(self, profile_type: str) -> "ExternalProfile | None":
         """
         Get external profile by type.
 
@@ -48,17 +51,17 @@ class UserProfile(models.Model):
         """
         return self.user.external_profiles.filter(type=profile_type).first()
 
-    def get_slack_id(self):
+    def get_slack_id(self) -> str | None:
         """Convenience method for getting Slack user ID"""
         profile = self.get_external_profile(ExternalProfileType.SLACK)
         return profile.external_id if profile else None
 
-    def get_pagerduty_id(self):
+    def get_pagerduty_id(self) -> str | None:
         """Convenience method for getting PagerDuty user ID"""
         profile = self.get_external_profile(ExternalProfileType.PAGERDUTY)
         return profile.external_id if profile else None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.user.get_full_name() or self.user.email
 
 
@@ -85,5 +88,5 @@ class ExternalProfile(models.Model):
             models.Index(fields=["type", "external_id"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.user.username} - {self.type}: {self.external_id}"

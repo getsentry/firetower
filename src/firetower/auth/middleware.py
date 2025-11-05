@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -22,7 +23,7 @@ class IAPAuthenticationMiddleware:
 
     IAP_HEADER = "HTTP_X_GOOG_IAP_JWT_ASSERTION"
 
-    def __init__(self, get_response):
+    def __init__(self, get_response: Any) -> None:
         self.get_response = get_response
         self.validator = IAPTokenValidator() if settings.IAP_ENABLED else None
 
@@ -31,7 +32,7 @@ class IAPAuthenticationMiddleware:
         else:
             logger.info("IAP authentication disabled - using dev mode")
 
-    def __call__(self, request):
+    def __call__(self, request: Any) -> Any:
         if settings.IAP_ENABLED:
             self._authenticate_iap(request)
         else:
@@ -39,7 +40,7 @@ class IAPAuthenticationMiddleware:
 
         return self.get_response(request)
 
-    def _authenticate_iap(self, request):
+    def _authenticate_iap(self, request: Any) -> None:
         """Authenticate via IAP token validation."""
         token = request.META.get(self.IAP_HEADER)
 
@@ -48,8 +49,13 @@ class IAPAuthenticationMiddleware:
             request.user = AnonymousUser()
             return
 
+        # Validator is always set when IAP is enabled
+        assert self.validator is not None
+
         try:
             decoded_token = self.validator.validate_token(token)
+            if decoded_token is None:
+                raise ValueError("Token validation returned None")
             user_info = self.validator.extract_user_info(decoded_token)
 
             user = get_or_create_user_from_iap(
@@ -72,7 +78,7 @@ class IAPAuthenticationMiddleware:
             )
             request.user = AnonymousUser()
 
-    def _authenticate_dev(self, request):
+    def _authenticate_dev(self, request: Any) -> None:
         """Development mode: bypass IAP validation."""
         # Sanity check: ensure we're actually in dev environment
         if os.environ.get("DJANGO_ENV", "dev") != "dev":

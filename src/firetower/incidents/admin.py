@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.contrib import admin
 
 from .models import ExternalLink, Incident, Tag
@@ -41,17 +43,21 @@ class IncidentAdmin(admin.ModelAdmin):
         ),
     )
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+    def formfield_for_foreignkey(
+        self, db_field: Any, request: Any, **kwargs: Any
+    ) -> Any:
         if db_field.name in ["captain", "reporter"]:
             kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    def formfield_for_manytomany(self, db_field, request, **kwargs):
+    def formfield_for_manytomany(
+        self, db_field: Any, request: Any, **kwargs: Any
+    ) -> Any:
         if db_field.name == "participants":
             kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
         return super().formfield_for_manytomany(db_field, request, **kwargs)
 
-    def incident_number_display(self, obj):
+    def incident_number_display(self, obj: Any) -> str:
         return obj.incident_number
 
     incident_number_display.short_description = "Incident #"
