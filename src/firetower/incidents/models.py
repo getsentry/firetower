@@ -170,11 +170,9 @@ class Incident(models.Model):
         return list(self.root_cause_tags.values_list("name", flat=True))
 
     @property
-    def external_links_dict(self) -> dict[str, str | None]:
-        """Return external links as dict with lowercase keys"""
-        links: dict[str, str | None] = {
-            link_type.lower(): None for link_type in ExternalLinkType.values
-        }
+    def external_links_dict(self) -> dict[str, str]:
+        """Return external links as dict with lowercase keys (only includes existing links)"""
+        links: dict[str, str] = {}
         for link in self.external_links.all():
             links[link.type.lower()] = link.url
         return links

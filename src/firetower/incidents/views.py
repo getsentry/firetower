@@ -183,5 +183,9 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
         queryset = self.get_queryset()
 
         # Get the incident (404 if not found)
-        # Permission check happens in IncidentPermission.has_object_permission
-        return get_object_or_404(queryset, id=numeric_id)
+        obj = get_object_or_404(queryset, id=numeric_id)
+
+        # Explicitly check object permissions
+        self.check_object_permissions(self.request, obj)
+
+        return obj

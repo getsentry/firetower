@@ -230,7 +230,7 @@ class TestIncidentViews:
         self.client.force_authenticate(user=self.user)
         response = self.client.get(f"/api/incidents/{incident.incident_number}/")
 
-        assert response.status_code == 404
+        assert response.status_code == 403
 
     def test_retrieve_incident_invalid_format(self):
         """Test invalid incident ID format returns 400"""
@@ -273,3 +273,312 @@ class TestIncidentViews:
         assert response.status_code == 200
         assert response.data["count"] == 2
         assert len(response.data["results"]) == 2
+
+
+@pytest.mark.django_db
+class TestIncidentAPIViews:
+    """Tests for programmatic API endpoints (not UI)"""
+
+    def setup_method(self):
+        """Set up test client and common test data"""
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test@example.com",
+            email="test@example.com",
+            password="testpass123",
+        )
+        self.captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            password="testpass123",
+        )
+        self.reporter = User.objects.create_user(
+            username="reporter@example.com",
+            email="reporter@example.com",
+            password="testpass123",
+        )
+
+    def test_create_incident_with_required_fields(self):
+        """Test POST /api/incidents/ creates incident with required fields"""
+        self.client.force_authenticate(user=self.user)
+        data = {
+            "title": "New Incident",
+            "severity": IncidentSeverity.P1,
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.post("/api/incidents/", data)
+
+        assert response.status_code == 201
+        assert Incident.objects.count() == 1
+
+        incident = Incident.objects.first()
+        assert incident.title == "New Incident"
+        assert incident.severity == IncidentSeverity.P1
+        assert incident.is_private is False
+        assert incident.captain == self.captain
+        assert incident.reporter == self.reporter
+        assert incident.status == IncidentStatus.ACTIVE  # Default
+
+    def test_create_incident_with_optional_fields(self):
+        """Test creating incident with optional fields"""
+        self.client.force_authenticate(user=self.user)
+        data = {
+            "title": "Detailed Incident",
+            "description": "This is a description",
+            "impact": "High impact",
+            "status": IncidentStatus.MITIGATED,
+            "severity": IncidentSeverity.P2,
+            "is_private": True,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.post("/api/incidents/", data)
+
+        assert response.status_code == 201
+        incident = Incident.objects.first()
+        assert incident.description == "This is a description"
+        assert incident.impact == "High impact"
+        assert incident.status == IncidentStatus.MITIGATED
+
+    def test_create_incident_missing_required_fields(self):
+        """Test creating incident without required fields fails"""
+        self.client.force_authenticate(user=self.user)
+
+        # Missing captain
+        data = {
+            "title": "Incomplete",
+            "severity": IncidentSeverity.P1,
+            "is_private": False,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.post("/api/incidents/", data)
+        assert response.status_code == 400
+        assert "captain" in response.data
+
+        # Missing reporter
+        data = {
+            "title": "Incomplete",
+            "severity": IncidentSeverity.P1,
+            "is_private": False,
+            "captain": self.captain.id,
+        }
+        response = self.client.post("/api/incidents/", data)
+        assert response.status_code == 400
+        assert "reporter" in response.data
+
+    def test_list_api_incidents(self):
+        """Test GET /api/incidents/ returns all visible incidents"""
+        Incident.objects.create(
+            title="Public Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        Incident.objects.create(
+            title="Done Incident",
+            status=IncidentStatus.DONE,
+            severity=IncidentSeverity.P2,
+            is_private=False,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+    def test_retrieve_api_incident(self):
+        """Test GET /api/incidents/INC-{id}/ returns incident with proper format"""
+        incident = Incident.objects.create(
+            title="Test Incident",
+            description="Description",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+
+        assert response.status_code == 200
+        data = response.data
+        assert data["id"] == incident.incident_number
+        assert data["title"] == "Test Incident"
+        assert data["captain"] == self.captain.email
+        assert data["reporter"] == self.reporter.email
+        assert "created_at" in data
+        assert "updated_at" in data
+
+    def test_update_incident_as_captain(self):
+        """Test PATCH /api/incidents/INC-{id}/ allows captain to update"""
+        incident = Incident.objects.create(
+            title="Original Title",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+        data = {"title": "Updated Title"}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.title == "Updated Title"
+
+    def test_update_incident_as_reporter(self):
+        """Test reporter can update incident"""
+        incident = Incident.objects.create(
+            title="Original",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.reporter)
+        data = {"status": IncidentStatus.MITIGATED}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.status == IncidentStatus.MITIGATED
+
+    def test_update_incident_as_participant(self):
+        """Test participant can update incident"""
+        participant = User.objects.create_user(
+            username="participant@example.com",
+            email="participant@example.com",
+        )
+        incident = Incident.objects.create(
+            title="Original",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        incident.participants.add(participant)
+
+        self.client.force_authenticate(user=participant)
+        data = {"description": "Updated by participant"}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.description == "Updated by participant"
+
+    def test_update_incident_as_unauthorized_user(self):
+        """Test unauthorized user cannot update incident"""
+        incident = Incident.objects.create(
+            title="Original",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        data = {"title": "Hacked"}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert response.status_code == 403
+        incident.refresh_from_db()
+        assert incident.title == "Original"
+
+    def test_update_incident_as_superuser(self):
+        """Test superuser can update any incident"""
+        superuser = User.objects.create_superuser(
+            username="admin@example.com",
+            email="admin@example.com",
+            password="testpass123",
+        )
+        incident = Incident.objects.create(
+            title="Original",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=superuser)
+        data = {"title": "Updated by admin"}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.title == "Updated by admin"
+
+    def test_full_update_with_put(self):
+        """Test PUT /api/incidents/INC-{id}/ performs full update"""
+        incident = Incident.objects.create(
+            title="Original",
+            description="Original description",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+        data = {
+            "title": "Completely New",
+            "severity": IncidentSeverity.P2,
+            "is_private": True,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.put(f"/api/incidents/{incident.incident_number}/", data)
+
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.title == "Completely New"
+        assert incident.severity == IncidentSeverity.P2
+        assert incident.is_private is True
+
+    def test_api_respects_privacy_on_read(self):
+        """Test API list respects incident privacy"""
+        Incident.objects.create(
+            title="Public",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        Incident.objects.create(
+            title="Private - captain",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.user,
+        )
+        Incident.objects.create(
+            title="Private - other",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.captain,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        titles = [inc["title"] for inc in response.data["results"]]
+        assert "Public" in titles
+        assert "Private - captain" in titles
+        assert "Private - other" not in titles

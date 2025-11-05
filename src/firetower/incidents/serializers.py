@@ -202,9 +202,12 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     Optional fields: description, impact, status
     """
 
+    id = serializers.CharField(source="incident_number", read_only=True)
+
     class Meta:
         model = Incident
         fields = [
+            "id",
             "title",
             "description",
             "impact",
