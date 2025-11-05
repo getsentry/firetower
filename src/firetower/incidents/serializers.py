@@ -145,3 +145,77 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
                 seen_users.add(participant.id)
 
         return participants_list
+
+
+class IncidentReadSerializer(serializers.ModelSerializer):
+    """
+    Serializer for reading incidents via the programmatic API.
+
+    Returns all incident data with simplified formats:
+    - captain/reporter/participants as emails
+    - tags as lists of strings
+    - external_links as dict
+    """
+
+    id = serializers.CharField(source="incident_number", read_only=True)
+    captain = serializers.EmailField(source="captain.email", read_only=True)
+    reporter = serializers.EmailField(source="reporter.email", read_only=True)
+    participants = serializers.SerializerMethodField()
+    affected_area_tags = serializers.ListField(
+        child=serializers.CharField(), source="affected_areas", read_only=True
+    )
+    root_cause_tags = serializers.ListField(
+        child=serializers.CharField(), source="root_causes", read_only=True
+    )
+    external_links = serializers.DictField(source="external_links_dict", read_only=True)
+
+    class Meta:
+        model = Incident
+        fields = [
+            "id",
+            "title",
+            "description",
+            "impact",
+            "status",
+            "severity",
+            "is_private",
+            "captain",
+            "reporter",
+            "participants",
+            "affected_area_tags",
+            "root_cause_tags",
+            "external_links",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_participants(self, obj: Incident) -> list[str]:
+        """Return list of participant emails"""
+        return [user.email for user in obj.participants.all()]
+
+
+class IncidentWriteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating and updating incidents via the programmatic API.
+
+    Required fields: title, severity, is_private, captain, reporter
+    Optional fields: description, impact, status
+    """
+
+    class Meta:
+        model = Incident
+        fields = [
+            "title",
+            "description",
+            "impact",
+            "status",
+            "severity",
+            "is_private",
+            "captain",
+            "reporter",
+        ]
+        extra_kwargs = {
+            "captain": {"required": True},
+            "reporter": {"required": True},
+            "is_private": {"required": True},
+        }
