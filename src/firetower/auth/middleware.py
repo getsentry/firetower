@@ -1,10 +1,11 @@
 import logging
 import os
-from typing import Any
+from collections.abc import Callable
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.http import HttpRequest, HttpResponse
 
 from firetower.auth.services import get_or_create_user_from_iap
 from firetower.auth.validators import IAPTokenValidator
@@ -23,7 +24,7 @@ class IAPAuthenticationMiddleware:
 
     IAP_HEADER = "HTTP_X_GOOG_IAP_JWT_ASSERTION"
 
-    def __init__(self, get_response: Any) -> None:
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
         self.validator = IAPTokenValidator() if settings.IAP_ENABLED else None
 
@@ -32,7 +33,7 @@ class IAPAuthenticationMiddleware:
         else:
             logger.info("IAP authentication disabled - using dev mode")
 
-    def __call__(self, request: Any) -> Any:
+    def __call__(self, request: HttpRequest) -> HttpResponse:
         if settings.IAP_ENABLED:
             self._authenticate_iap(request)
         else:
@@ -40,7 +41,7 @@ class IAPAuthenticationMiddleware:
 
         return self.get_response(request)
 
-    def _authenticate_iap(self, request: Any) -> None:
+    def _authenticate_iap(self, request: HttpRequest) -> None:
         """Authenticate via IAP token validation."""
         token = request.META.get(self.IAP_HEADER)
 
@@ -84,7 +85,7 @@ class IAPAuthenticationMiddleware:
             )
             request.user = AnonymousUser()
 
-    def _authenticate_dev(self, request: Any) -> None:
+    def _authenticate_dev(self, request: HttpRequest) -> None:
         """Development mode: bypass IAP validation."""
         # Sanity check: ensure we're actually in dev environment
         if os.environ.get("DJANGO_ENV", "dev") != "dev":

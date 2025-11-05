@@ -9,7 +9,7 @@ from .models import UserProfile
 
 @receiver(post_save, sender=User)
 def create_user_profile(
-    sender: Any, instance: Any, created: bool, **kwargs: Any
+    sender: type[User], instance: User, created: bool, **kwargs: Any
 ) -> None:
     """Create UserProfile when User is created"""
     if created:
@@ -17,7 +17,7 @@ def create_user_profile(
 
 
 @receiver(post_save, sender=User)
-def save_user_profile(sender: Any, instance: Any, **kwargs: Any) -> None:
+def save_user_profile(sender: type[User], instance: User, **kwargs: Any) -> None:
     """Save UserProfile when User is saved"""
     if hasattr(instance, "userprofile"):
         instance.userprofile.save()

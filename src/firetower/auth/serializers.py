@@ -1,5 +1,3 @@
-from typing import Any
-
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
@@ -19,11 +17,11 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ["name", "avatar_url"]
         read_only_fields: list[str] = []
 
-    def get_name(self, obj: Any) -> str:
+    def get_name(self, obj: User) -> str:
         """Get user's full name or email as fallback"""
         return obj.get_full_name() or obj.email
 
-    def get_avatar_url(self, obj: Any) -> str | None:
+    def get_avatar_url(self, obj: User) -> str | None:
         """Get avatar URL from userprofile if it exists"""
         try:
             return obj.userprofile.avatar_url or None

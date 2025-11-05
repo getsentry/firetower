@@ -1,6 +1,11 @@
+from __future__ import annotations
+
 from typing import Any
 
 from django.contrib import admin
+from django.db.models import ForeignKey, ManyToManyField
+from django.forms import ModelChoiceField, ModelMultipleChoiceField
+from django.http import HttpRequest
 
 from .models import ExternalLink, Incident, Tag
 
@@ -44,20 +49,20 @@ class IncidentAdmin(admin.ModelAdmin):
     )
 
     def formfield_for_foreignkey(
-        self, db_field: Any, request: Any, **kwargs: Any
-    ) -> Any:
+        self, db_field: ForeignKey[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> ModelChoiceField | None:
         if db_field.name in ["captain", "reporter"]:
             kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def formfield_for_manytomany(
-        self, db_field: Any, request: Any, **kwargs: Any
-    ) -> Any:
+        self, db_field: ManyToManyField[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> ModelMultipleChoiceField | None:
         if db_field.name == "participants":
             kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
         return super().formfield_for_manytomany(db_field, request, **kwargs)
 
-    def incident_number_display(self, obj: Any) -> str:
+    def incident_number_display(self, obj: Incident) -> str:
         return obj.incident_number
 
     incident_number_display.short_description = "Incident #"

@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 from typing import Any
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
+from django.db.models import ForeignKey, QuerySet
+from django.forms import ModelChoiceField
+from django.http import HttpRequest
 
 from .models import ExternalProfile, UserProfile
 from .services import sync_user_profile_from_slack
@@ -26,7 +31,7 @@ class UserAdmin(BaseUserAdmin):
     actions = ["sync_with_slack"]
 
     @admin.action(description="Sync selected users with Slack")
-    def sync_with_slack(self, request: Any, queryset: Any) -> None:
+    def sync_with_slack(self, request: HttpRequest, queryset: QuerySet[User]) -> None:
         """Sync selected users' profiles (name, avatar) from Slack."""
         updated_count = 0
         skipped_count = 0
@@ -60,8 +65,8 @@ class UserProfileAdmin(admin.ModelAdmin):
     ]
 
     def formfield_for_foreignkey(
-        self, db_field: Any, request: Any, **kwargs: Any
-    ) -> Any:
+        self, db_field: ForeignKey[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> ModelChoiceField | None:
         if db_field.name == "user":
             kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
@@ -74,8 +79,8 @@ class ExternalProfileAdmin(admin.ModelAdmin):
     search_fields = ["user__username", "external_id"]
 
     def formfield_for_foreignkey(
-        self, db_field: Any, request: Any, **kwargs: Any
-    ) -> Any:
+        self, db_field: ForeignKey[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> ModelChoiceField | None:
         if db_field.name == "user":
             kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
