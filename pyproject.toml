@@ -24,7 +24,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pre-commit>=4.0.0",
-    "isort>=6.0.1",
+    "mypy>=1.15.0",
     "pyupgrade>=3.20.0",
     "pytest>=8.0.0",
     "pytest-django>=4.8.0",
@@ -36,11 +36,6 @@ dev = [
 prod = [
     "granian>=2.5.3",
 ]
-
-[tool.isort]
-profile = "black"
-line_length = 100
-lines_between_sections = 1
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "firetower.settings"

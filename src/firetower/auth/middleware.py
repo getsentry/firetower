@@ -1,4 +1,5 @@
 import logging
+import os
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -73,8 +74,6 @@ class IAPAuthenticationMiddleware:
 
     def _authenticate_dev(self, request):
         """Development mode: bypass IAP validation."""
-        import os
-
         # Sanity check: ensure we're actually in dev environment
         if os.environ.get("DJANGO_ENV", "dev") != "dev":
             logger.critical(

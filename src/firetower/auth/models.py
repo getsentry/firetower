@@ -28,9 +28,9 @@ class UserProfile(models.Model):
     @property
     def user_incidents(self):
         """Return all incidents where user is captain, reporter, or participant"""
-        from django.db.models import Q
+        from django.db.models import Q  # noqa: PLC0415
 
-        from firetower.incidents.models import Incident
+        from firetower.incidents.models import Incident  # noqa: PLC0415
 
         return Incident.objects.filter(
             Q(captain=self.user) | Q(reporter=self.user) | Q(participants=self.user)

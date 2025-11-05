@@ -5,6 +5,8 @@ Basic pytest tests for Slack integration service.
 import os
 from unittest.mock import MagicMock, patch
 
+from slack_sdk.errors import SlackApiError
+
 from .services.slack import SlackService
 
 # Set up Django settings
@@ -103,8 +105,6 @@ class TestSlackService:
 
     def test_get_user_profile_by_email_not_found(self):
         """Test user profile fetch when user doesn't exist in Slack."""
-        from slack_sdk.errors import SlackApiError
-
         mock_slack_config = {
             "BOT_TOKEN": "xoxb-test-token",
             "TEAM_ID": "sentry",

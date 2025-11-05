@@ -1,4 +1,5 @@
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import User
 
 from firetower.incidents.models import (
@@ -54,7 +55,7 @@ class TestIncidentListUISerializer:
         data = serializer.data
 
         # Check id is incident_number string (frontend compatibility)
-        assert data["id"] == f"INC-{incident.id}"
+        assert data["id"] == f"{settings.PROJECT_KEY}-{incident.id}"
         assert data["title"] == "Test Incident"
         assert data["status"] == IncidentStatus.ACTIVE
         assert data["severity"] == IncidentSeverity.P1
@@ -110,7 +111,7 @@ class TestIncidentDetailUISerializer:
         data = serializer.data
 
         # Check id is incident_number string (frontend compatibility)
-        assert data["id"] == f"INC-{incident.id}"
+        assert data["id"] == f"{settings.PROJECT_KEY}-{incident.id}"
         assert data["title"] == "Test Incident"
 
         # Check participants include captain, reporter, and other participants with roles

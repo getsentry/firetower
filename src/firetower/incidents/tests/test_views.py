@@ -1,4 +1,5 @@
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
@@ -241,7 +242,7 @@ class TestIncidentViews:
     def test_retrieve_incident_not_found(self):
         """Test non-existent incident returns 404"""
         self.client.force_authenticate(user=self.user)
-        response = self.client.get("/api/ui/incidents/INC-99999/")
+        response = self.client.get(f"/api/ui/incidents/{settings.PROJECT_KEY}-99999/")
 
         assert response.status_code == 404
 
