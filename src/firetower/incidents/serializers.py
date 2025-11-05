@@ -1,9 +1,17 @@
-from typing import Any
+from typing import TypedDict
 
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import Incident
+
+
+class ParticipantData(TypedDict):
+    """Structure of serialized participant data."""
+
+    name: str
+    avatar_url: str | None
+    role: str
 
 
 class IncidentListUISerializer(serializers.ModelSerializer):
@@ -102,7 +110,7 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def get_participants(self, obj: Incident) -> list[dict[str, Any]]:
+    def get_participants(self, obj: Incident) -> list[ParticipantData]:
         """
         Get all participants with their roles, with captain and reporter at the top.
 
