@@ -1,4 +1,4 @@
-from typing import TypedDict
+from dataclasses import dataclass
 
 from django.contrib.auth.models import User
 from rest_framework import serializers
@@ -6,7 +6,8 @@ from rest_framework import serializers
 from .models import Incident
 
 
-class ParticipantData(TypedDict):
+@dataclass
+class ParticipantData:
     """Structure of serialized participant data."""
 
     name: str
