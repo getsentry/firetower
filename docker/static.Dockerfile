@@ -39,21 +39,11 @@ ENV VITE_API_URL="/api"
 
 RUN bun run build
 
-FROM python:3.12.11-alpine3.22
+FROM nginx:1.29.3-alpine3.22
 
-RUN adduser app -h /app -u 1100 -D && chown -R 1100 /app
+USER 101
 
-# Copy the environment, but not the source code
-COPY --from=build_backend --chown=1100 /app/.venv /app/.venv
-COPY --from=build_frontend --chown=1100 /app/dist /app/static
-COPY --from=build_backend --chown=1100 /app/static/backend /app/static/backend
+COPY --from=build_frontend --chown=101 /app/dist /app/static
+COPY --from=build_backend --chown=101 /app/static/backend /app/static/backend
 
-WORKDIR /app
-USER 1100
-
-ENV PORT=8080
-EXPOSE $PORT
-
-ENV GRANIAN_STATIC_PATH_MOUNT="static/"
-ENV DJANGO_ENV="prod"
-ENTRYPOINT [ "sh", "-c", "/app/.venv/bin/granian --interface wsgi --host 0.0.0.0 --port $PORT firetower.wsgi:application"]
+COPY ./nginx.conf /etc/nginx/nginx.conf
