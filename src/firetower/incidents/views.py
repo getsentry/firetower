@@ -164,7 +164,7 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
         Parse INC-2000 format and check permissions.
 
         Returns incident if found and user has access, otherwise 404.
-        Permission enforcement happens via IncidentPermission.has_object_permission
+        Filters by visibility before lookup to avoid leaking incident existence.
         """
         incident_id = self.kwargs["incident_id"]
         project_key = settings.PROJECT_KEY
@@ -178,14 +178,17 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
                 f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
             )
 
-        # Get incident by numeric ID
+        # Get incident by numeric ID, filtered by visibility
         numeric_id = int(match.group(1))
         queryset = self.get_queryset()
 
-        # Get the incident (404 if not found)
+        # Filter by visibility before lookup (404 if not visible)
+        queryset = filter_visible_to_user(queryset, self.request.user)
+
+        # Get the incident (404 if not found OR not visible)
         obj = get_object_or_404(queryset, id=numeric_id)
 
-        # Explicitly check object permissions
+        # Check object permissions for write operations
         self.check_object_permissions(self.request, obj)
 
         return obj

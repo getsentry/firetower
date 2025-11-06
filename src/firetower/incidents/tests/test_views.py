@@ -230,7 +230,7 @@ class TestIncidentViews:
         self.client.force_authenticate(user=self.user)
         response = self.client.get(f"/api/incidents/{incident.incident_number}/")
 
-        assert response.status_code == 403
+        assert response.status_code == 404
 
     def test_retrieve_incident_invalid_format(self):
         """Test invalid incident ID format returns 400"""
