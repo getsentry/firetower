@@ -104,7 +104,7 @@ incident_detail_ui = IncidentDetailUIView.as_view()
 
 class IncidentListCreateAPIView(generics.ListCreateAPIView):
     """
-    Programmatic API for listing and creating incidents.
+    Service API for listing and creating incidents.
 
     GET: List all incidents visible to the user (no search/filtering for now)
     POST: Create a new incident
@@ -129,7 +129,7 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
 
 class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
     """
-    Programmatic API for retrieving and updating incidents.
+    Service API for retrieving and updating incidents.
 
     GET: Get incident details
     PUT: Full update

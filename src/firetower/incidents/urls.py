@@ -15,7 +15,7 @@ urlpatterns = [
         incident_detail_ui,
         name="incident-detail-ui",
     ),
-    # Programmatic API endpoints
+    # Service API endpoints
     path(
         "incidents/",
         IncidentListCreateAPIView.as_view(),

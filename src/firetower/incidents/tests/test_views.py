@@ -280,7 +280,7 @@ class TestIncidentViews:
 
 @pytest.mark.django_db
 class TestIncidentAPIViews:
-    """Tests for programmatic API endpoints (not UI)"""
+    """Tests for service API endpoints (not UI)"""
 
     def setup_method(self):
         """Set up test client and common test data"""

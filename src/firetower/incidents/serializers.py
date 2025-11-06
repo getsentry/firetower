@@ -149,7 +149,7 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
 
 class IncidentReadSerializer(serializers.ModelSerializer):
     """
-    Serializer for reading incidents via the programmatic API.
+    Serializer for reading incidents via the service API.
 
     Returns all incident data with simplified formats:
     - captain/reporter/participants as emails
@@ -196,7 +196,7 @@ class IncidentReadSerializer(serializers.ModelSerializer):
 
 class IncidentWriteSerializer(serializers.ModelSerializer):
     """
-    Serializer for creating and updating incidents via the programmatic API.
+    Serializer for creating and updating incidents via the service API.
 
     Required fields: title, severity, is_private, captain, reporter
     Optional fields: description, impact, status
