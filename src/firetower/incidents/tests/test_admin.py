@@ -8,6 +8,7 @@ from django.test import RequestFactory
 
 from firetower.incidents.admin import IncidentAdmin
 from firetower.incidents.models import Incident, IncidentSeverity, IncidentStatus
+from firetower.incidents.services import ParticipantsSyncStats
 
 
 @pytest.mark.django_db
@@ -54,12 +55,10 @@ class TestIncidentAdmin:
         with patch(
             "firetower.incidents.admin.sync_incident_participants_from_slack"
         ) as mock_sync:
-            mock_sync.return_value = {
-                "added": 5,
-                "already_existed": 2,
-                "errors": [],
-                "skipped": False,
-            }
+            mock_sync.return_value = ParticipantsSyncStats(
+                added=5,
+                already_existed=2,
+            )
 
             self.incident_admin.sync_participants_from_slack(request, queryset)
 
@@ -97,19 +96,14 @@ class TestIncidentAdmin:
 
             def side_effect(incident, force):
                 if incident.id == incident1.id:
-                    return {
-                        "added": 5,
-                        "already_existed": 2,
-                        "errors": [],
-                        "skipped": False,
-                    }
+                    return ParticipantsSyncStats(
+                        added=5,
+                        already_existed=2,
+                    )
                 elif incident.id == incident2.id:
-                    return {
-                        "added": 0,
-                        "already_existed": 0,
-                        "errors": ["Some error"],
-                        "skipped": False,
-                    }
+                    return ParticipantsSyncStats(
+                        errors=["Some error"],
+                    )
                 else:
                     raise Exception("Sync failed")
 

@@ -68,10 +68,10 @@ class TestSyncIncidentParticipantsFromSlack:
 
                 stats = sync_incident_participants_from_slack(incident)
 
-                assert stats["added"] == 2
-                assert stats["already_existed"] == 0
-                assert stats["errors"] == []
-                assert stats["skipped"] is False
+                assert stats.added == 2
+                assert stats.already_existed == 0
+                assert stats.errors == []
+                assert stats.skipped is False
 
                 assert incident.participants.count() == 3
                 assert slack_user1 in incident.participants.all()
@@ -139,8 +139,8 @@ class TestSyncIncidentParticipantsFromSlack:
 
         stats = sync_incident_participants_from_slack(incident)
 
-        assert stats["skipped"] is True
-        assert stats["added"] == 0
+        assert stats.skipped is True
+        assert stats.added == 0
 
     def test_force_bypasses_throttle(self):
         incident = Incident.objects.create(
@@ -177,8 +177,8 @@ class TestSyncIncidentParticipantsFromSlack:
 
                 stats = sync_incident_participants_from_slack(incident, force=True)
 
-                assert stats["skipped"] is False
-                assert stats["added"] == 1
+                assert stats.skipped is False
+                assert stats.added == 1
 
     def test_handles_missing_slack_link(self):
         incident = Incident.objects.create(
@@ -189,9 +189,9 @@ class TestSyncIncidentParticipantsFromSlack:
 
         stats = sync_incident_participants_from_slack(incident)
 
-        assert stats["added"] == 0
-        assert len(stats["errors"]) == 1
-        assert "No Slack link" in stats["errors"][0]
+        assert stats.added == 0
+        assert len(stats.errors) == 1
+        assert "No Slack link" in stats.errors[0]
 
     def test_handles_invalid_channel_url(self):
         incident = Incident.objects.create(
@@ -212,9 +212,9 @@ class TestSyncIncidentParticipantsFromSlack:
 
             stats = sync_incident_participants_from_slack(incident)
 
-            assert stats["added"] == 0
-            assert len(stats["errors"]) == 1
-            assert "Could not parse channel ID" in stats["errors"][0]
+            assert stats.added == 0
+            assert len(stats.errors) == 1
+            assert "Could not parse channel ID" in stats.errors[0]
 
     def test_handles_slack_api_failure(self):
         incident = Incident.objects.create(
@@ -240,9 +240,9 @@ class TestSyncIncidentParticipantsFromSlack:
 
                 stats = sync_incident_participants_from_slack(incident)
 
-                assert stats["added"] == 0
-                assert len(stats["errors"]) == 1
-                assert "Failed to fetch channel members" in stats["errors"][0]
+                assert stats.added == 0
+                assert len(stats.errors) == 1
+                assert "Failed to fetch channel members" in stats.errors[0]
 
     def test_handles_user_creation_failure(self):
         incident = Incident.objects.create(
@@ -273,9 +273,9 @@ class TestSyncIncidentParticipantsFromSlack:
 
                     stats = sync_incident_participants_from_slack(incident)
 
-                    assert stats["added"] == 0
-                    assert len(stats["errors"]) == 1
-                    assert "Could not get/create user" in stats["errors"][0]
+                    assert stats.added == 0
+                    assert len(stats.errors) == 1
+                    assert "Could not get/create user" in stats.errors[0]
 
     def test_counts_already_existed_participants(self):
         incident = Incident.objects.create(
@@ -312,8 +312,8 @@ class TestSyncIncidentParticipantsFromSlack:
 
                 stats = sync_incident_participants_from_slack(incident)
 
-                assert stats["added"] == 0
-                assert stats["already_existed"] == 1
+                assert stats.added == 0
+                assert stats.already_existed == 1
                 assert incident.participants.count() == 1
 
     def test_skips_bots(self):
@@ -357,5 +357,5 @@ class TestSyncIncidentParticipantsFromSlack:
 
                     assert mock_get_user.call_count == 1
                     mock_get_user.assert_called_once_with("U11111")
-                    assert stats["added"] == 1
-                    assert stats["errors"] == []
+                    assert stats.added == 1
+                    assert stats.errors == []

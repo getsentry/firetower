@@ -139,7 +139,7 @@ class SlackService:
         try:
             logger.info(f"Fetching members for channel: {channel_id}")
             response = self.client.conversations_members(channel=channel_id)
-            members = response.get("members", [])
+            members: list[str] = response.get("members", [])
             logger.info(f"Found {len(members)} members in channel {channel_id}")
             return members
 
@@ -168,7 +168,7 @@ class SlackService:
             logger.info(f"Fetching Slack user info for: {slack_user_id}")
             response = self.client.users_info(user=slack_user_id)
 
-            user = response.get("user", {})
+            user: dict[str, Any] = response.get("user", {})
             profile = user.get("profile", {})
 
             email = profile.get("email", "")

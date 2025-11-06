@@ -16,6 +16,7 @@ from firetower.incidents.models import (
     Tag,
     TagType,
 )
+from firetower.incidents.services import ParticipantsSyncStats
 
 
 @pytest.mark.django_db
@@ -325,12 +326,10 @@ class TestIncidentViews:
         with patch(
             "firetower.incidents.views.sync_incident_participants_from_slack"
         ) as mock_sync:
-            mock_sync.return_value = {
-                "added": 3,
-                "already_existed": 5,
-                "errors": [],
-                "skipped": False,
-            }
+            mock_sync.return_value = ParticipantsSyncStats(
+                added=3,
+                already_existed=5,
+            )
 
             self.client.force_authenticate(user=self.user)
             response = self.client.post(

@@ -1,11 +1,13 @@
 import logging
 import re
+from dataclasses import asdict
 
 from django.conf import settings
 from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from .models import Incident, filter_visible_to_user
@@ -16,7 +18,7 @@ from .serializers import (
     IncidentReadSerializer,
     IncidentWriteSerializer,
 )
-from .services import sync_incident_participants_from_slack
+from .services import ParticipantsSyncStats, sync_incident_participants_from_slack
 
 logger = logging.getLogger(__name__)
 
@@ -124,10 +126,10 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
     Authentication enforced via DEFAULT_PERMISSION_CLASSES in settings.
     """
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Incident]:
         return Incident.objects.all()
 
-    def get_incident(self):
+    def get_incident(self) -> Incident:
         incident_id = self.kwargs["incident_id"]
         project_key = settings.PROJECT_KEY
 
@@ -145,27 +147,23 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
 
         return get_object_or_404(queryset, id=numeric_id)
 
-    def post(self, request, incident_id):
+    def post(self, request: Request, incident_id: str) -> Response:
         incident = self.get_incident()
 
         try:
             stats = sync_incident_participants_from_slack(incident, force=True)
-            return Response({"success": True, "stats": stats})
+            return Response({"success": True, "stats": asdict(stats)})
         except Exception as e:
             logger.error(
                 f"Failed to force sync participants for incident {incident.id}: {e}",
                 exc_info=True,
             )
+            error_stats = ParticipantsSyncStats(errors=[str(e)])
             return Response(
                 {
                     "success": False,
                     "error": str(e),
-                    "stats": {
-                        "added": 0,
-                        "already_existed": 0,
-                        "errors": [str(e)],
-                        "skipped": False,
-                    },
+                    "stats": asdict(error_stats),
                 },
                 status=500,
             )
