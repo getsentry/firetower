@@ -526,33 +526,6 @@ class TestIncidentAPIViews:
         incident.refresh_from_db()
         assert incident.title == "Updated by admin"
 
-    def test_full_update_with_put(self):
-        """Test PUT /api/incidents/INC-{id}/ performs full update"""
-        incident = Incident.objects.create(
-            title="Original",
-            description="Original description",
-            status=IncidentStatus.ACTIVE,
-            severity=IncidentSeverity.P1,
-            captain=self.captain,
-            reporter=self.reporter,
-        )
-
-        self.client.force_authenticate(user=self.captain)
-        data = {
-            "title": "Completely New",
-            "severity": IncidentSeverity.P2,
-            "is_private": True,
-            "captain": self.captain.id,
-            "reporter": self.reporter.id,
-        }
-        response = self.client.put(f"/api/incidents/{incident.incident_number}/", data)
-
-        assert response.status_code == 200
-        incident.refresh_from_db()
-        assert incident.title == "Completely New"
-        assert incident.severity == IncidentSeverity.P2
-        assert incident.is_private is True
-
     def test_api_respects_privacy_on_read(self):
         """Test API list respects incident privacy"""
         Incident.objects.create(
@@ -808,3 +781,62 @@ class TestIncidentAPIViews:
         response = self.client.post("/api/incidents/", payload, format="json")
         assert response.status_code == 400
         assert "external_links" in response.json()
+
+    def test_put_not_allowed(self):
+        """Test that PUT returns 405 Method Not Allowed"""
+        incident = Incident.objects.create(
+            title="Test",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+        data = {
+            "title": "Updated",
+            "severity": "P2",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.put(f"/api/incidents/{incident.incident_number}/", data)
+        assert response.status_code == 405
+
+    def test_patch_without_external_links_preserves_existing(self):
+        """Test that PATCH without external_links field preserves existing links"""
+        self.client.force_authenticate(user=self.captain)
+
+        # Create incident with external links
+        payload = {
+            "title": "Test",
+            "severity": "P1",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+            "external_links": {
+                "slack": "https://slack.com/channel",
+                "jira": "https://jira.example.com/issue",
+            },
+        }
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 201
+        incident_id = response.json()["id"]
+
+        # Verify links were created
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        assert len(response.json()["external_links"]) == 2
+
+        # PATCH request without external_links should preserve existing
+        patch_payload = {"title": "Updated Title"}
+        response = self.client.patch(
+            f"/api/incidents/{incident_id}/", patch_payload, format="json"
+        )
+        assert response.status_code == 200
+
+        # Verify links still exist
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        data = response.json()
+        assert len(data["external_links"]) == 2
+        assert data["external_links"]["slack"] == "https://slack.com/channel"
+        assert data["external_links"]["jira"] == "https://jira.example.com/issue"

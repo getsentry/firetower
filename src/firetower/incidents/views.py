@@ -132,7 +132,6 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
     Service API for retrieving and updating incidents.
 
     GET: Get incident details
-    PUT: Full update
     PATCH: Partial update
 
     Accepts incident_id in format: INC-2000
@@ -141,6 +140,7 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
 
     permission_classes = [IncidentPermission]
     lookup_field = "id"
+    http_method_names = ["get", "patch", "options", "head"]
 
     def get_serializer_class(self) -> type[serializers.Serializer]:
         """Use different serializers for retrieve vs update"""

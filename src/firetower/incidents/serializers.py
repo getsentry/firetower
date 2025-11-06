@@ -202,8 +202,9 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     Optional fields: description, impact, status, external_links
 
     external_links format: {"slack": "url", "jira": "url", ...}
-    - On PATCH: merges with existing links (only updates provided links)
-    - Use null to delete a link: {"slack": null}
+    - Merges with existing links (only updates provided links)
+    - Use null to delete a specific link: {"slack": null}
+    - Omit external_links field to leave existing links unchanged
     """
 
     id = serializers.CharField(source="incident_number", read_only=True)
@@ -278,7 +279,12 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         return incident
 
     def update(self, instance: Incident, validated_data: dict) -> Incident:
-        """Update incident with merge behavior for external links"""
+        """
+        Update incident with merge behavior for external links.
+
+        Only updates fields provided in the request (partial update).
+        External links are merged - only provided links are updated/deleted.
+        """
         external_links_data = validated_data.pop("external_links", None)
 
         # Update basic fields
