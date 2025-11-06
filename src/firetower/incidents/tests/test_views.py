@@ -1,3 +1,6 @@
+import time
+from datetime import datetime
+
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -582,3 +585,62 @@ class TestIncidentAPIViews:
         assert "Public" in titles
         assert "Private - captain" in titles
         assert "Private - other" not in titles
+
+    def test_timestamps_on_create_and_update(self):
+        """Test created_at and updated_at timestamps work correctly"""
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Create incident
+        payload = {
+            "title": "Timestamp Test",
+            "severity": "P2",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 201
+
+        incident_id = response.json()["id"]
+
+        # Get the incident to check timestamps
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        assert response.status_code == 200
+
+        data = response.json()
+        created_at = data["created_at"]
+        updated_at = data["updated_at"]
+
+        # Verify timestamps exist and are valid ISO 8601 format
+        assert created_at is not None
+        assert updated_at is not None
+        created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        updated_dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+
+        # Initially, created_at and updated_at should be very close (within 1 second)
+        assert abs((created_dt - updated_dt).total_seconds()) < 1
+
+        # Wait a bit to ensure timestamps will differ
+        time.sleep(0.1)
+
+        # Update the incident
+        update_payload = {"status": "Mitigated"}
+        response = self.client.patch(
+            f"/api/incidents/{incident_id}/", update_payload, format="json"
+        )
+        assert response.status_code == 200
+
+        # Get the incident again
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        data = response.json()
+
+        new_created_at = data["created_at"]
+        new_updated_at = data["updated_at"]
+
+        # created_at should remain the same
+        assert new_created_at == created_at
+
+        # updated_at should have changed
+        assert new_updated_at != updated_at
+        assert new_updated_at > updated_at
