@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from .models import Incident
+from .models import ExternalLink, ExternalLinkType, Incident
 
 
 @dataclass
@@ -199,10 +199,20 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     Serializer for creating and updating incidents via the service API.
 
     Required fields: title, severity, is_private, captain, reporter
-    Optional fields: description, impact, status
+    Optional fields: description, impact, status, external_links
+
+    external_links format: {"slack": "url", "jira": "url", ...}
+    - On PATCH: merges with existing links (only updates provided links)
+    - Use null to delete a link: {"slack": null}
     """
 
     id = serializers.CharField(source="incident_number", read_only=True)
+    external_links = serializers.DictField(
+        child=serializers.CharField(allow_null=True),
+        required=False,
+        allow_null=False,
+        write_only=True,
+    )
 
     class Meta:
         model = Incident
@@ -216,9 +226,80 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "is_private",
             "captain",
             "reporter",
+            "external_links",
         ]
         extra_kwargs = {
             "captain": {"required": True},
             "reporter": {"required": True},
             "is_private": {"required": True},
         }
+
+    def validate_external_links(
+        self, value: dict[str, str | None]
+    ) -> dict[str, str | None]:
+        """Validate external link types and URLs"""
+        valid_types = [link_type.lower() for link_type in ExternalLinkType.values]
+
+        for link_type, url in value.items():
+            if link_type.lower() not in valid_types:
+                raise serializers.ValidationError(
+                    f"Invalid link type '{link_type}'. Must be one of: {', '.join(valid_types)}"
+                )
+
+            # Validate URL format if not null
+            if url is not None:
+                url_validator = serializers.URLField()
+                try:
+                    url_validator.run_validation(url)
+                except serializers.ValidationError as e:
+                    raise serializers.ValidationError(
+                        f"Invalid URL for {link_type}: {e.detail[0]}"
+                    )
+
+        return value
+
+    def create(self, validated_data: dict) -> Incident:
+        """Create incident with external links"""
+        external_links_data = validated_data.pop("external_links", None)
+
+        # Create the incident
+        incident = super().create(validated_data)
+
+        # Create external links if provided
+        if external_links_data:
+            for link_type, url in external_links_data.items():
+                if url is not None:  # Skip null values on create
+                    ExternalLink.objects.create(
+                        incident=incident,
+                        type=link_type.upper(),
+                        url=url,
+                    )
+
+        return incident
+
+    def update(self, instance: Incident, validated_data: dict) -> Incident:
+        """Update incident with merge behavior for external links"""
+        external_links_data = validated_data.pop("external_links", None)
+
+        # Update basic fields
+        instance = super().update(instance, validated_data)
+
+        # Merge external links if provided
+        if external_links_data is not None:
+            for link_type, url in external_links_data.items():
+                link_type_upper = link_type.upper()
+
+                if url is None:
+                    # Delete the link
+                    ExternalLink.objects.filter(
+                        incident=instance, type=link_type_upper
+                    ).delete()
+                else:
+                    # Create or update the link
+                    ExternalLink.objects.update_or_create(
+                        incident=instance,
+                        type=link_type_upper,
+                        defaults={"url": url},
+                    )
+
+        return instance

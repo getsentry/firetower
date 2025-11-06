@@ -644,3 +644,167 @@ class TestIncidentAPIViews:
         # updated_at should have changed
         assert new_updated_at != updated_at
         assert new_updated_at > updated_at
+
+    def test_create_incident_with_external_links(self):
+        """Test creating incident with external links"""
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {
+            "title": "Incident with Links",
+            "severity": "P1",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+            "external_links": {
+                "slack": "https://slack.com/channel/123",
+                "jira": "https://jira.company.com/browse/INC-1",
+            },
+        }
+
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 201
+
+        incident_id = response.json()["id"]
+
+        # Verify links were created
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        data = response.json()
+
+        assert data["external_links"]["slack"] == "https://slack.com/channel/123"
+        assert data["external_links"]["jira"] == "https://jira.company.com/browse/INC-1"
+        assert "datadog" not in data["external_links"]
+
+    def test_add_external_link_via_patch(self):
+        """Test adding a single external link via PATCH (merge behavior)"""
+        # Create incident with one link
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/original",
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Add jira link, should keep slack
+        payload = {"external_links": {"jira": "https://jira.com/new"}}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        # Verify both links exist
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+
+        assert data["external_links"]["slack"] == "https://slack.com/original"
+        assert data["external_links"]["jira"] == "https://jira.com/new"
+
+    def test_update_existing_external_link(self):
+        """Test updating an existing external link via PATCH"""
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/old",
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Update slack link
+        payload = {"external_links": {"slack": "https://slack.com/new"}}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        # Verify link was updated
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+
+        assert data["external_links"]["slack"] == "https://slack.com/new"
+
+    def test_delete_external_link_with_null(self):
+        """Test deleting an external link by sending null"""
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/test",
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.JIRA,
+            url="https://jira.com/test",
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Delete slack link, keep jira
+        payload = {"external_links": {"slack": None}}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        # Verify slack deleted, jira remains
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+
+        assert "slack" not in data["external_links"]
+        assert data["external_links"]["jira"] == "https://jira.com/test"
+
+    def test_invalid_external_link_type(self):
+        """Test that invalid link types are rejected"""
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {
+            "title": "Test",
+            "severity": "P1",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+            "external_links": {"invalid_type": "https://example.com"},
+        }
+
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 400
+        assert "external_links" in response.json()
+
+    def test_invalid_external_link_url(self):
+        """Test that invalid URLs are rejected"""
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {
+            "title": "Test",
+            "severity": "P1",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+            "external_links": {"slack": "not-a-valid-url"},
+        }
+
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 400
+        assert "external_links" in response.json()
