@@ -87,12 +87,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
+    "djk8s",
     "firetower.auth",
     "firetower.incidents",
     "firetower.integrations",
 ]
 
 MIDDLEWARE = [
+    "djk8s.middleware.ProbeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -223,3 +225,8 @@ if not env_is_dev():
 
     client = google.cloud.logging.Client()
     client.setup_logging()
+
+# django-k8s proreadiness probes
+DJK8S_READINESS_PROBES = [
+    "djk8s.probes.DatabaseProbe",
+]
