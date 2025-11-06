@@ -9,13 +9,13 @@ const ParticipantSchema = z.object({
 });
 
 const ExternalLinksSchema = z.object({
-  slack: z.string().nullable(),
-  jira: z.string().nullable(),
-  datadog: z.string().nullable(),
-  pagerduty: z.string().nullable(),
-  statuspage: z.string().nullable(),
-  notion: z.string().nullable(),
-  linear: z.string().nullable(),
+  slack: z.string().optional(),
+  jira: z.string().optional(),
+  datadog: z.string().optional(),
+  pagerduty: z.string().optional(),
+  statuspage: z.string().optional(),
+  notion: z.string().optional(),
+  linear: z.string().optional(),
 });
 
 const IncidentDetailSchema = z.object({
