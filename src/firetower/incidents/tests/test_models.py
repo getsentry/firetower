@@ -224,11 +224,12 @@ class TestIncident:
 
         links = incident.external_links_dict
 
-        # Should have all link types with None for missing ones
+        # Should only include existing links (no nulls)
         assert "slack" in links
         assert links["slack"] == "https://slack.com/channel"
-        assert links["jira"] is None
-        assert links["datadog"] is None
+        assert "jira" not in links
+        assert "datadog" not in links
+        assert len(links) == 1
 
 
 @pytest.mark.django_db
