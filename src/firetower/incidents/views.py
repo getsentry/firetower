@@ -6,6 +6,7 @@ from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
 from .models import Incident, filter_visible_to_user
 from .permissions import IncidentPermission
@@ -110,9 +111,70 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
         return incident
 
 
-# Backwards-compatible function-based view aliases (for gradual migration)
+class SyncIncidentParticipantsView(generics.GenericAPIView):
+    """
+    Force sync incident participants from Slack channel.
+
+    POST /api/ui/incidents/{incident_id}/sync-participants/
+
+    Accepts incident_id in format: INC-2000
+    Returns sync statistics.
+    Bypasses throttle (force=True).
+
+    Authentication enforced via DEFAULT_PERMISSION_CLASSES in settings.
+    """
+
+    def get_queryset(self):
+        return Incident.objects.all()
+
+    def get_incident(self):
+        incident_id = self.kwargs["incident_id"]
+        project_key = settings.PROJECT_KEY
+
+        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
+        match = re.match(incident_pattern, incident_id)
+
+        if not match:
+            raise ValidationError(
+                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
+            )
+
+        numeric_id = int(match.group(1))
+        queryset = self.get_queryset()
+        queryset = filter_visible_to_user(queryset, self.request.user)
+
+        return get_object_or_404(queryset, id=numeric_id)
+
+    def post(self, request, incident_id):
+        incident = self.get_incident()
+
+        try:
+            stats = sync_incident_participants_from_slack(incident, force=True)
+            return Response({"success": True, "stats": stats})
+        except Exception as e:
+            logger.error(
+                f"Failed to force sync participants for incident {incident.id}: {e}",
+                exc_info=True,
+            )
+            return Response(
+                {
+                    "success": False,
+                    "error": str(e),
+                    "stats": {
+                        "added": 0,
+                        "already_existed": 0,
+                        "errors": [str(e)],
+                        "skipped": False,
+                    },
+                },
+                status=500,
+            )
+
+
+# View aliases for cleaner URL imports
 incident_list_ui = IncidentListUIView.as_view()
 incident_detail_ui = IncidentDetailUIView.as_view()
+sync_incident_participants = SyncIncidentParticipantsView.as_view()
 
 
 class IncidentListCreateAPIView(generics.ListCreateAPIView):
