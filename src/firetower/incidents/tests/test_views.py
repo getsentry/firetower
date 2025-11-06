@@ -416,6 +416,24 @@ class TestIncidentAPIViews:
         assert "created_at" in data
         assert "updated_at" in data
 
+    def test_retrieve_incident_with_null_captain_reporter(self):
+        """Test that incidents with null captain/reporter don't crash"""
+        incident = Incident.objects.create(
+            title="Legacy Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=None,
+            reporter=None,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+
+        assert response.status_code == 200
+        data = response.data
+        assert data["captain"] is None
+        assert data["reporter"] is None
+
     def test_update_incident_as_captain(self):
         """Test PATCH /api/incidents/INC-{id}/ allows captain to update"""
         incident = Incident.objects.create(

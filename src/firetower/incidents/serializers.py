@@ -158,8 +158,8 @@ class IncidentReadSerializer(serializers.ModelSerializer):
     """
 
     id = serializers.CharField(source="incident_number", read_only=True)
-    captain = serializers.EmailField(source="captain.email", read_only=True)
-    reporter = serializers.EmailField(source="reporter.email", read_only=True)
+    captain = serializers.SerializerMethodField()
+    reporter = serializers.SerializerMethodField()
     participants = serializers.SerializerMethodField()
     affected_area_tags = serializers.ListField(
         child=serializers.CharField(), source="affected_areas", read_only=True
@@ -188,6 +188,14 @@ class IncidentReadSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_captain(self, obj: Incident) -> str | None:
+        """Return captain email or None if not set"""
+        return obj.captain.email if obj.captain else None
+
+    def get_reporter(self, obj: Incident) -> str | None:
+        """Return reporter email or None if not set"""
+        return obj.reporter.email if obj.reporter else None
 
     def get_participants(self, obj: Incident) -> list[str]:
         """Return list of participant emails"""
