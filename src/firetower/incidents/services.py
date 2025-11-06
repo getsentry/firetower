@@ -36,11 +36,11 @@ def sync_incident_participants_from_slack(incident, force=False):
         "skipped": False,
     }
 
-    throttle_seconds = getattr(settings, "PARTICIPANT_SYNC_THROTTLE_SECONDS", 60)
-
     if not force and incident.participants_last_synced_at:
         time_since_sync = timezone.now() - incident.participants_last_synced_at
-        if time_since_sync < timedelta(seconds=throttle_seconds):
+        if time_since_sync < timedelta(
+            seconds=settings.PARTICIPANT_SYNC_THROTTLE_SECONDS
+        ):
             logger.info(
                 f"Skipping sync for incident {incident.id} - synced {time_since_sync.total_seconds():.0f}s ago"
             )
