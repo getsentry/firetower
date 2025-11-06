@@ -315,3 +315,47 @@ class TestSyncIncidentParticipantsFromSlack:
                 assert stats["added"] == 0
                 assert stats["already_existed"] == 1
                 assert incident.participants.count() == 1
+
+    def test_skips_bots(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://workspace.slack.com/archives/C12345",
+        )
+
+        slack_user = User.objects.create_user(
+            username="slack:U11111",
+            email="user1@example.com",
+        )
+        ExternalProfile.objects.create(
+            user=slack_user,
+            type=ExternalProfileType.SLACK,
+            external_id="U11111",
+        )
+
+        with patch(
+            "firetower.incidents.services._slack_service.parse_channel_id_from_url"
+        ) as mock_parse:
+            mock_parse.return_value = "C12345"
+
+            with patch(
+                "firetower.incidents.services._slack_service.get_channel_members"
+            ) as mock_get_members:
+                mock_get_members.return_value = ["U11111", "B12345", "BSLACKBOT"]
+
+                with patch(
+                    "firetower.incidents.services.get_or_create_user_from_slack_id"
+                ) as mock_get_user:
+                    mock_get_user.return_value = slack_user
+
+                    stats = sync_incident_participants_from_slack(incident)
+
+                    assert mock_get_user.call_count == 1
+                    mock_get_user.assert_called_once_with("U11111")
+                    assert stats["added"] == 1
+                    assert stats["errors"] == []
