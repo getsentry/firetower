@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator, validate_email
 
+from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.integrations.services import SlackService
 
 logger = logging.getLogger(__name__)
@@ -12,7 +13,7 @@ _slack_service = SlackService()
 
 def sync_user_profile_from_slack(user: User) -> bool:
     """
-    Sync a user's profile (name, avatar) from Slack.
+    Sync a user's profile (name, avatar, Slack ID) from Slack.
 
     Args:
         user: User instance to sync
@@ -30,6 +31,7 @@ def sync_user_profile_from_slack(user: User) -> bool:
         logger.info(f"No Slack profile found for {user.email}")
         return False
 
+    slack_user_id = slack_profile.get("slack_user_id", "")
     first_name = slack_profile.get("first_name", "")
     last_name = slack_profile.get("last_name", "")
     avatar_url = slack_profile.get("avatar_url", "")
@@ -46,11 +48,9 @@ def sync_user_profile_from_slack(user: User) -> bool:
         user.save()
         logger.info(f"Updated profile from Slack for {user.email}")
 
-    # Update avatar from Slack profile
     if avatar_url and hasattr(user, "userprofile"):
         profile = user.userprofile
         if profile.avatar_url != avatar_url:
-            # Validate avatar URL (HTTPS only for security)
             try:
                 URLValidator(schemes=["https"])(avatar_url)
                 profile.avatar_url = avatar_url
@@ -59,6 +59,21 @@ def sync_user_profile_from_slack(user: User) -> bool:
                 needs_save = True
             except ValidationError:
                 logger.warning(f"Invalid or insecure avatar URL: {avatar_url}")
+
+    if slack_user_id:
+        external_profile, created = ExternalProfile.objects.get_or_create(
+            user=user,
+            type=ExternalProfileType.SLACK,
+            defaults={"external_id": slack_user_id},
+        )
+        if not created and external_profile.external_id != slack_user_id:
+            external_profile.external_id = slack_user_id
+            external_profile.save()
+            logger.info(f"Updated Slack ID for user {user.email}")
+            needs_save = True
+        elif created:
+            logger.info(f"Created Slack ExternalProfile for user {user.email}")
+            needs_save = True
 
     return needs_save
 

@@ -98,6 +98,7 @@ class TestSlackService:
                 profile = service.get_user_profile_by_email("john@example.com")
 
                 assert profile is not None
+                assert profile["slack_user_id"] == "U12345"
                 assert profile["name"] == "Johnny"
                 assert profile["first_name"] == "John"
                 assert profile["last_name"] == "Doe"
