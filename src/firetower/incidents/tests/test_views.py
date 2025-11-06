@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -276,6 +277,42 @@ class TestIncidentViews:
         assert response.status_code == 200
         assert response.data["count"] == 2
         assert len(response.data["results"]) == 2
+
+    def test_retrieve_incident_syncs_participants(self):
+        """Test that retrieving incident details syncs participants from Slack"""
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack"
+        ) as mock_sync:
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
+
+            assert response.status_code == 200
+            mock_sync.assert_called_once_with(incident)
+
+    def test_retrieve_incident_does_not_fail_on_sync_error(self):
+        """Test that incident retrieval succeeds even if participant sync fails"""
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack"
+        ) as mock_sync:
+            mock_sync.side_effect = Exception("Slack API error")
+
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
+
+            assert response.status_code == 200
+            assert response.data["id"] == incident.incident_number
 
 
 @pytest.mark.django_db

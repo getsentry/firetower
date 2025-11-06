@@ -1,3 +1,4 @@
+import logging
 import re
 
 from django.conf import settings
@@ -14,6 +15,9 @@ from .serializers import (
     IncidentReadSerializer,
     IncidentWriteSerializer,
 )
+from .services import sync_incident_participants_from_slack
+
+logger = logging.getLogger(__name__)
 
 
 class IncidentListUIView(generics.ListAPIView):
@@ -93,8 +97,17 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
         queryset = self.get_queryset()
         queryset = filter_visible_to_user(queryset, self.request.user)
 
-        # Returns 404 if not found OR if user doesn't have access
-        return get_object_or_404(queryset, id=numeric_id)
+        incident = get_object_or_404(queryset, id=numeric_id)
+
+        try:
+            sync_incident_participants_from_slack(incident)
+        except Exception as e:
+            logger.error(
+                f"Failed to sync participants for incident {incident.id}: {e}",
+                exc_info=True,
+            )
+
+        return incident
 
 
 # Backwards-compatible function-based view aliases (for gradual migration)
@@ -190,5 +203,13 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
 
         # Check object permissions for write operations
         self.check_object_permissions(self.request, obj)
+
+        try:
+            sync_incident_participants_from_slack(obj)
+        except Exception as e:
+            logger.error(
+                f"Failed to sync participants for incident {obj.id}: {e}",
+                exc_info=True,
+            )
 
         return obj
