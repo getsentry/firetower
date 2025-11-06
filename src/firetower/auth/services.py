@@ -170,46 +170,54 @@ def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
         ValueError: If email or iap_user_id is missing
 
     Note:
-        Name and avatar are fetched from Slack only on user creation.
-        Use the "Sync with Slack" admin action to update existing users.
+        If a Slack-provisioned user exists with matching email, it will be
+        merged by updating the username from "slack:{slack_id}" to the IAP ID.
     """
     if not iap_user_id or not email:
         raise ValueError("IAP user ID and email are required for user creation")
 
-    # Validate email format
     try:
         validate_email(email)
     except ValidationError:
         raise ValueError(f"Invalid email format: {email}")
 
-    # Validate IAP user ID length (Django username field max_length is 150)
     if len(iap_user_id) > 150:
         raise ValueError(
             f"IAP user ID exceeds maximum length of 150 characters: {len(iap_user_id)}"
         )
 
-    user, created = User.objects.get_or_create(
-        username=iap_user_id,
-        defaults={
-            "email": email,
-            "is_active": True,
-        },
-    )
-
-    if created:
-        user.set_unusable_password()
-        user.save()
-        logger.info(f"Created new user from IAP: {email} (IAP ID: {iap_user_id})")
-
-        # Fetch profile from Slack on user creation only
-        sync_user_profile_from_slack(user)
-    else:
-        # For existing users, only update email if changed
+    try:
+        user = User.objects.get(username=iap_user_id)
         if user.email != email:
             logger.info(
                 f"Updated email for user {iap_user_id}: {user.email} -> {email}"
             )
             user.email = email
             user.save()
+        return user
+    except User.DoesNotExist:
+        pass
+
+    slack_user = User.objects.filter(email=email, username__startswith="slack:").first()
+
+    if slack_user:
+        old_username = slack_user.username
+        slack_user.username = iap_user_id
+        slack_user.save()
+        logger.info(
+            f"Merged Slack-provisioned user {email}: {old_username} -> {iap_user_id}"
+        )
+        return slack_user
+
+    user = User.objects.create(
+        username=iap_user_id,
+        email=email,
+        is_active=True,
+    )
+    user.set_unusable_password()
+    user.save()
+    logger.info(f"Created new user from IAP: {email} (IAP ID: {iap_user_id})")
+
+    sync_user_profile_from_slack(user)
 
     return user
