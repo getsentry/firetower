@@ -79,6 +79,10 @@ def sync_incident_participants_from_slack(incident, force=False):
     new_participants = []
 
     for slack_user_id in slack_member_ids:
+        if slack_user_id.startswith("B"):
+            logger.info(f"Skipping bot: {slack_user_id}")
+            continue
+
         user = get_or_create_user_from_slack_id(slack_user_id)
 
         if not user:
