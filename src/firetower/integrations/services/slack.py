@@ -50,7 +50,7 @@ class SlackService:
             email: User's email address
 
         Returns:
-            dict with 'name' and 'avatar_url', or None if not found
+            dict with 'slack_user_id', 'name', 'first_name', 'last_name', 'avatar_url', or None if not found
         """
         if not self.client:
             logger.warning("Cannot fetch user - Slack client not initialized")
@@ -63,6 +63,7 @@ class SlackService:
             user: dict[str, Any] = response.get("user", {})
             profile = user.get("profile", {})
 
+            slack_user_id = user.get("id", "")
             real_name = user.get("real_name", "")
             display_name = profile.get("display_name", "")
             name = display_name or real_name
@@ -74,11 +75,11 @@ class SlackService:
                 first_name = parts[0] if len(parts) > 0 else ""
                 last_name = parts[1] if len(parts) > 1 else ""
 
-            # Get avatar - Slack provides image_512 as the smallest size
             avatar_url = profile.get("image_512", "")
 
             logger.info(f"Found Slack profile for {email}")
             return {
+                "slack_user_id": slack_user_id,
                 "name": name,
                 "first_name": first_name,
                 "last_name": last_name,
