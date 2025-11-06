@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.conf import settings
 from google.auth import exceptions as google_auth_exceptions
 from google.auth.transport import requests
@@ -14,11 +16,11 @@ class IAPTokenValidator:
 
     IAP_ISSUER = "https://cloud.google.com/iap"
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the validator with audience from settings."""
         self.audience = settings.IAP_AUDIENCE
 
-    def validate_token(self, token: str) -> dict | None:
+    def validate_token(self, token: str) -> dict[Any, Any] | None:
         """
         Validate an IAP JWT token and return the decoded claims.
 
@@ -48,7 +50,7 @@ class IAPTokenValidator:
         except (ValueError, google_auth_exceptions.GoogleAuthError) as e:
             raise ValueError(f"Invalid IAP token: {str(e)}")
 
-    def extract_user_info(self, decoded_token: dict) -> dict:
+    def extract_user_info(self, decoded_token: dict[Any, Any]) -> dict[str, Any]:
         """
         Extract user information from decoded token.
 

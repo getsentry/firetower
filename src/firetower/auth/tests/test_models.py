@@ -1,5 +1,6 @@
 import pytest
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType, UserProfile
 
@@ -40,7 +41,8 @@ class TestUserProfile:
 
     def test_user_incidents_property(self):
         """Test UserProfile.user_incidents returns incidents user is involved in"""
-        from firetower.incidents.models import (
+        # Local import to avoid circular dependency (PLC0415=import-outside-toplevel)
+        from firetower.incidents.models import (  # noqa: PLC0415
             Incident,
             IncidentSeverity,
             IncidentStatus,
@@ -164,8 +166,6 @@ class TestExternalProfile:
         )
 
         # Try to create second Slack profile - should fail
-        from django.db import IntegrityError
-
         with pytest.raises(IntegrityError):
             ExternalProfile.objects.create(
                 user=user, type=ExternalProfileType.SLACK, external_id="U99999"

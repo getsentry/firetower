@@ -1,6 +1,8 @@
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 
 from firetower.incidents.models import (
     ExternalLink,
@@ -51,8 +53,8 @@ class TestIncident:
             title="Test", status=IncidentStatus.ACTIVE, severity=IncidentSeverity.P2
         )
 
-        assert incident.incident_number.startswith("INC-")
-        assert incident.incident_number == f"INC-{incident.id}"
+        assert incident.incident_number.startswith(f"{settings.PROJECT_KEY}-")
+        assert incident.incident_number == f"{settings.PROJECT_KEY}-{incident.id}"
 
     def test_incident_str(self):
         """Test incident string representation"""
@@ -248,8 +250,6 @@ class TestTag:
 
     def test_tag_unique_constraint(self):
         """Test duplicate name+type combination is not allowed"""
-        from django.core.exceptions import ValidationError
-
         Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
 
         # Now raises ValidationError from clean() instead of IntegrityError
@@ -258,8 +258,6 @@ class TestTag:
 
     def test_tag_case_insensitive_uniqueness(self):
         """Test tags are case-insensitive unique"""
-        from django.core.exceptions import ValidationError
-
         Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
 
         # Should raise validation error for case-insensitive duplicates
@@ -321,8 +319,6 @@ class TestExternalLink:
             type=ExternalLinkType.SLACK,
             url="https://slack.com/channel1",
         )
-
-        from django.db import IntegrityError
 
         with pytest.raises(IntegrityError):
             ExternalLink.objects.create(

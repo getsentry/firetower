@@ -1,0 +1,24 @@
+src = ["src"]
+exclude = ["frontend/node_modules/*"]
+
+[lint]
+per-file-ignores = {"devenv/*" = ["T201", "PLC0415"], "manage.py" = ["PLC0415"]}
+
+# https://docs.astral.sh/ruff/rules/
+select = [
+    "ASYNC", # flake8-async - async checks
+    "C4",    # flake8-comprehensions - list/set/dict/generator comprehensions
+    "E",     # pycodestyle - error rules
+    "F",     # pyflakes - general Python errors, undefined names
+    "I",     # isort - import sorting
+    "PERF",  # perflint - performance anti-pattern rules
+    "PLC",   # pylint - convention rules
+    "PLE",   # pylint - error rules
+    "PLW",   # pylint - warning rules
+    "T20",   # flake8-print - print statements
+    "UP",    # pyupgrade - force modern idioms
+    "W",     # pycodestyle - warning rules
+]
+ignore = [
+    "E501",  # Line too long
+]

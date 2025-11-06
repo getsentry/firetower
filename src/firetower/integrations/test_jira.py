@@ -43,19 +43,21 @@ class TestJiraService:
             "ACCOUNT": "test@example.com",
             "API_KEY": "test-api-key",
             "DOMAIN": "https://test.atlassian.net",
-            "PROJECT_KEY": "INC",
             "SEVERITY_FIELD": "customfield_10001",
         }
 
         with patch.object(settings, "JIRA", mock_jira_config):
-            with patch("firetower.integrations.services.jira.JIRA") as mock_jira_client:
-                service = JiraService()
+            with patch.object(settings, "PROJECT_KEY", "INC"):
+                with patch(
+                    "firetower.integrations.services.jira.JIRA"
+                ) as mock_jira_client:
+                    service = JiraService()
 
-                # Verify the service was created and JIRA client was initialized
-                assert service.domain == "https://test.atlassian.net"
-                assert service.project_key == "INC"
-                assert service.severity_field_id == "customfield_10001"
-                mock_jira_client.assert_called_once()
+                    # Verify the service was created and JIRA client was initialized
+                    assert service.domain == "https://test.atlassian.net"
+                    assert service.project_key == "INC"
+                    assert service.severity_field_id == "customfield_10001"
+                    mock_jira_client.assert_called_once()
 
     def test_extract_severity_with_valid_field(self):
         """Test severity extraction from Jira issue with valid severity field."""

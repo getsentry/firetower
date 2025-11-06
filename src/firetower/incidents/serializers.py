@@ -1,6 +1,18 @@
+from dataclasses import dataclass
+
+from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import Incident
+
+
+@dataclass
+class ParticipantData:
+    """Structure of serialized participant data."""
+
+    name: str
+    avatar_url: str | None
+    role: str
 
 
 class IncidentListUISerializer(serializers.ModelSerializer):
@@ -40,11 +52,11 @@ class ParticipantSerializer(serializers.Serializer):
     avatar_url = serializers.CharField(source="userprofile.avatar_url", read_only=True)
     role = serializers.SerializerMethodField()
 
-    def get_name(self, obj):
+    def get_name(self, obj: User) -> str:
         """Get user's full name or username"""
         return obj.get_full_name() or obj.username
 
-    def get_role(self, obj):
+    def get_role(self, obj: User) -> str:
         """Determine role based on incident context"""
         incident = self.context.get("incident")
         if not incident:
@@ -99,7 +111,7 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    def get_participants(self, obj):
+    def get_participants(self, obj: Incident) -> list[ParticipantData]:
         """
         Get all participants with their roles, with captain and reporter at the top.
 

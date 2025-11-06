@@ -1,6 +1,7 @@
 import re
 
 from django.conf import settings
+from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
@@ -24,7 +25,7 @@ class IncidentListUIView(generics.ListAPIView):
 
     serializer_class = IncidentListUISerializer
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Incident]:
         """Filter incidents by visibility and status"""
         queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
@@ -52,7 +53,7 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
     serializer_class = IncidentDetailUISerializer
     lookup_field = "id"
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Incident]:
         """Get base queryset with optimized prefetching"""
         return Incident.objects.prefetch_related(
             "captain__userprofile",
@@ -63,7 +64,7 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
             "external_links",
         )
 
-    def get_object(self):
+    def get_object(self) -> Incident:
         """
         Parse INC-2000 format and filter by visibility.
 

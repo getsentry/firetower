@@ -6,6 +6,7 @@ and retrieve user profile information (name, avatar).
 """
 
 import logging
+from typing import Any
 
 from django.conf import settings
 from slack_sdk import WebClient
@@ -21,7 +22,7 @@ class SlackService:
     Provides methods to fetch user profile information for authentication.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Slack service."""
         slack_config = settings.SLACK
 
@@ -59,7 +60,7 @@ class SlackService:
             logger.info(f"Fetching Slack profile for: {email}")
             response = self.client.users_lookupByEmail(email=email)
 
-            user = response.get("user", {})
+            user: dict[str, Any] = response.get("user", {})
             profile = user.get("profile", {})
 
             real_name = user.get("real_name", "")

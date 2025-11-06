@@ -34,9 +34,9 @@ jobs:
         run: |
           uv run ruff format --check
 
-      - name: Run isort check
+      - name: Run mypy type check
         run: |
-          uv run isort . --check --diff
+          uv run mypy src
 
   backend-test:
     name: Backend tests
