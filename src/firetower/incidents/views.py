@@ -158,11 +158,13 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
                 f"Failed to force sync participants for incident {incident.id}: {e}",
                 exc_info=True,
             )
-            error_stats = ParticipantsSyncStats(errors=[str(e)])
+            error_stats = ParticipantsSyncStats(
+                errors=["Failed to sync participants from Slack"]
+            )
             return Response(
                 {
                     "success": False,
-                    "error": str(e),
+                    "error": "Failed to sync participants from Slack",
                     "stats": asdict(error_stats),
                 },
                 status=500,

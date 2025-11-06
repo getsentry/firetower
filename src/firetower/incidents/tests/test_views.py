@@ -362,8 +362,12 @@ class TestIncidentViews:
 
             assert response.status_code == 500
             assert response.data["success"] is False
-            assert "Slack API error" in response.data["error"]
+            assert response.data["error"] == "Failed to sync participants from Slack"
             assert len(response.data["stats"]["errors"]) > 0
+            assert (
+                response.data["stats"]["errors"][0]
+                == "Failed to sync participants from Slack"
+            )
 
     def test_sync_participants_endpoint_respects_privacy(self):
         """Test sync endpoint returns 404 for private incidents user can't access"""
