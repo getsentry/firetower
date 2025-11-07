@@ -41,6 +41,8 @@ RUN bun run build
 
 FROM nginx:1.29.3-alpine3.22
 
+RUN chown 101:101 -R /var/cache/nginx/ /var/log/nginx/
+RUN touch /run/nginx.pid && chown 101:101 /run/nginx.pid
 USER 101
 
 COPY --from=build_frontend --chown=101 /app/dist /app/static
