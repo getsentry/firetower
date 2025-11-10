@@ -209,9 +209,10 @@ describe('EditableTextField', () => {
     const saveButton = await screen.findByText('Save');
     await user.click(saveButton);
 
-    // Should show saving state
-    const savingButton = await screen.findByText('Saving...');
-    expect(savingButton).toBeInTheDocument();
+    // Should show saving state (button is disabled)
+    await waitFor(() => {
+      expect(saveButton).toBeDisabled();
+    });
 
     // Resolve save
     resolveSave!();

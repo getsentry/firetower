@@ -12,7 +12,7 @@ const displayStyles = cva(['transition-opacity'], {
   variants: {
     editing: {
       true: ['hidden'],
-      false: ['block'],
+      false: [],
     },
   },
 });
@@ -58,6 +58,7 @@ const inputStyles = cva(
     'text-content-primary',
     'bg-background-primary',
     'transition-colors',
+    'm-0',
   ],
   {
     variants: {
@@ -107,6 +108,10 @@ const saveButtonStyles = cva([
   'hover:opacity-90',
   'hover:scale-105',
   'active:scale-95',
+  'disabled:hover:opacity-50',
+  'disabled:hover:scale-100',
+  'w-16', // Fixed width to prevent layout shift
+  'h-8', // Fixed height to prevent layout shift
 ]);
 
 const cancelButtonStyles = cva([
@@ -116,6 +121,8 @@ const cancelButtonStyles = cva([
   'hover:bg-background-tertiary',
   'hover:scale-105',
   'active:scale-95',
+  'w-16', // Fixed width to match save button
+  'h-8', // Fixed height to match save button
 ]);
 
 const messageStyles = cva(['text-sm', 'mt-space-xs'], {
@@ -137,6 +144,7 @@ export interface EditableTextFieldProps {
   editable?: boolean;
   validationSchema?: z.ZodSchema<string>;
   multiline?: boolean;
+  fullWidth?: boolean; // Whether display text should expand to full width (default: false)
   className?: string;
 }
 
@@ -147,6 +155,7 @@ export function EditableTextField({
   editable = true,
   validationSchema,
   multiline = false,
+  fullWidth = false,
   className,
 }: EditableTextFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -280,10 +289,12 @@ export function EditableTextField({
   };
 
   return (
-    <div className={cn('relative', className)}>
+    <div className="relative">
       {/* Display + Trigger */}
       <div className={cn(displayContainerStyles(), displayStyles({editing: isEditing}))}>
-        <Component>{value}</Component>
+        <Component className={cn(fullWidth ? 'flex-1 min-w-0' : 'inline', className)}>
+          {value}
+        </Component>
         {editable && !isEditing && (
           <button
             type="button"
@@ -306,7 +317,10 @@ export function EditableTextField({
                 ref={inputRef as React.RefObject<HTMLTextAreaElement>}
                 value={draftValue}
                 onChange={handleInputChange}
-                className={cn(inputStyles({error: hasError, hidden: !isEditing}))}
+                className={cn(
+                  inputStyles({error: hasError, hidden: !isEditing}),
+                  className
+                )}
                 autoFocus
                 aria-invalid={hasError}
                 style={{
@@ -322,14 +336,7 @@ export function EditableTextField({
                   disabled={isSaving}
                   className={cn(saveButtonStyles())}
                 >
-                  {isSaving ? (
-                    <>
-                      <Spinner size="sm" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    'Save'
-                  )}
+                  {isSaving ? <Spinner size="sm" /> : 'Save'}
                 </button>
                 <button
                   type="button"
@@ -349,7 +356,10 @@ export function EditableTextField({
                 type="text"
                 value={draftValue}
                 onChange={handleInputChange}
-                className={cn(inputStyles({error: hasError, hidden: !isEditing}))}
+                className={cn(
+                  inputStyles({error: hasError, hidden: !isEditing}),
+                  className
+                )}
                 autoFocus
                 aria-invalid={hasError}
               />
@@ -360,14 +370,7 @@ export function EditableTextField({
                   disabled={isSaving}
                   className={cn(saveButtonStyles())}
                 >
-                  {isSaving ? (
-                    <>
-                      <Spinner size="sm" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    'Save'
-                  )}
+                  {isSaving ? <Spinner size="sm" /> : 'Save'}
                 </button>
                 <button
                   type="button"
