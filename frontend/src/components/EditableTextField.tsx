@@ -17,6 +17,11 @@ const displayStyles = cva(['transition-opacity'], {
   },
 });
 
+// Label layout styles
+const labelContainerStyles = cva(['flex', 'items-center', 'gap-space-xs', 'mb-space-xs']);
+
+const labelStyles = cva(['font-medium', 'text-content-secondary', 'text-sm']);
+
 const triggerStyles = cva(
   [
     'inline-flex',
@@ -146,6 +151,11 @@ export interface EditableTextFieldProps {
   multiline?: boolean;
   fullWidth?: boolean; // Whether display text should expand to full width (default: false)
   className?: string;
+
+  // Label layout (if present, pencil appears next to label instead of value)
+  label?: string;
+  labelAs?: 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'div';
+  labelClassName?: string;
 }
 
 export function EditableTextField({
@@ -157,6 +167,9 @@ export function EditableTextField({
   multiline = false,
   fullWidth = false,
   className,
+  label,
+  labelAs: LabelComponent = 'div',
+  labelClassName,
 }: EditableTextFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftValue, setDraftValue] = useState(value);
@@ -290,45 +303,87 @@ export function EditableTextField({
 
   return (
     <div className="relative">
-      {/* Display + Trigger */}
-      <div className={cn(displayContainerStyles(), displayStyles({editing: isEditing}))}>
-        <Component className={cn(fullWidth ? 'flex-1 min-w-0' : 'inline', className)}>
-          {value}
-        </Component>
-        {editable && !isEditing && (
-          <button
-            type="button"
-            onClick={startEditing}
-            aria-label="Edit"
-            className={cn(triggerStyles({hidden: isEditing}))}
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+      {label ? (
+        // Label layout: Pencil next to label, value separate
+        <>
+          {/* Label + Trigger (always visible) */}
+          <div className={cn(labelContainerStyles())}>
+            <LabelComponent className={cn(labelStyles(), labelClassName)}>
+              {label}
+            </LabelComponent>
+            {editable && !isEditing && (
+              <button
+                type="button"
+                onClick={startEditing}
+                aria-label="Edit"
+                className={cn(triggerStyles({hidden: false}))}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Display Value (no pencil) */}
+          {!isEditing && <Component className={cn(className)}>{value}</Component>}
+        </>
+      ) : (
+        // Default layout: Pencil next to value
+        <div
+          className={cn(displayContainerStyles(), displayStyles({editing: isEditing}))}
+        >
+          <Component className={cn(fullWidth ? 'flex-1 min-w-0' : 'inline', className)}>
+            {value}
+          </Component>
+          {editable && !isEditing && (
+            <button
+              type="button"
+              onClick={startEditing}
+              aria-label="Edit"
+              className={cn(triggerStyles({hidden: isEditing}))}
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Input + Actions */}
       {isEditing && (
         <>
-          {multiline ? (
-            // Multiline: Stack vertically
+          {multiline || label ? (
+            // Multiline or labeled: Stack vertically with actions below
             <>
-              <textarea
-                ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-                value={draftValue}
-                onChange={handleInputChange}
-                className={cn(
-                  inputStyles({error: hasError, hidden: !isEditing}),
-                  className
-                )}
-                autoFocus
-                aria-invalid={hasError}
-                style={{
-                  minHeight: '80px',
-                  resize: 'none',
-                  overflow: 'hidden',
-                }}
-              />
+              {multiline ? (
+                <textarea
+                  ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+                  value={draftValue}
+                  onChange={handleInputChange}
+                  className={cn(
+                    inputStyles({error: hasError, hidden: !isEditing}),
+                    className
+                  )}
+                  autoFocus
+                  aria-invalid={hasError}
+                  style={{
+                    minHeight: '80px',
+                    resize: 'none',
+                    overflow: 'hidden',
+                  }}
+                />
+              ) : (
+                <input
+                  ref={inputRef as React.RefObject<HTMLInputElement>}
+                  type="text"
+                  value={draftValue}
+                  onChange={handleInputChange}
+                  className={cn(
+                    inputStyles({error: hasError, hidden: !isEditing}),
+                    className
+                  )}
+                  autoFocus
+                  aria-invalid={hasError}
+                />
+              )}
               <div className={cn(actionsStyles({hidden: !isEditing}), 'mt-space-sm')}>
                 <button
                   type="button"
@@ -349,7 +404,7 @@ export function EditableTextField({
               </div>
             </>
           ) : (
-            // Single-line: Inline with buttons
+            // Single-line without label: Inline with buttons
             <div className="gap-space-sm flex items-center">
               <input
                 ref={inputRef as React.RefObject<HTMLInputElement>}
