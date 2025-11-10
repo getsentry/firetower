@@ -7,42 +7,21 @@ import {EditableTextField} from './EditableTextField';
 
 describe('EditableTextField', () => {
   it('renders display value', async () => {
-    render(
-      <EditableTextField value="Test value" onSave={async () => {}}>
-        <EditableTextField.Display>Test value</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Test value" onSave={async () => {}} />);
 
     const display = await screen.findByText('Test value');
     expect(display).toBeInTheDocument();
   });
 
   it('shows trigger button when editable', async () => {
-    render(
-      <EditableTextField value="Test" onSave={async () => {}} editable={true}>
-        <EditableTextField.Display>Test</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Test" onSave={async () => {}} editable={true} />);
 
     const trigger = await screen.findByLabelText('Edit');
     expect(trigger).toBeInTheDocument();
   });
 
   it('hides trigger button when not editable', async () => {
-    render(
-      <EditableTextField value="Test" onSave={async () => {}} editable={false}>
-        <EditableTextField.Display>Test</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Test" onSave={async () => {}} editable={false} />);
 
     const trigger = screen.queryByLabelText('Edit');
     expect(trigger).not.toBeInTheDocument();
@@ -51,19 +30,12 @@ describe('EditableTextField', () => {
   it('enters edit mode when trigger is clicked', async () => {
     const user = userEvent.setup();
 
-    render(
-      <EditableTextField value="Test" onSave={async () => {}}>
-        <EditableTextField.Display>Test</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Test" onSave={async () => {}} />);
 
     const trigger = await screen.findByLabelText('Edit');
     await user.click(trigger);
 
-    const input = await screen.findByPlaceholderText('Enter text');
+    const input = await screen.findByDisplayValue('Test');
     expect(input).toBeInTheDocument();
     expect(input).toHaveValue('Test');
   });
@@ -72,21 +44,14 @@ describe('EditableTextField', () => {
     const user = userEvent.setup();
     const onSave = jest.fn(async () => {});
 
-    render(
-      <EditableTextField value="Original" onSave={onSave}>
-        <EditableTextField.Display>Original</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Original" onSave={onSave} />);
 
     // Enter edit mode
     const trigger = await screen.findByLabelText('Edit');
     await user.click(trigger);
 
     // Edit text
-    const input = await screen.findByPlaceholderText('Enter text');
+    const input = await screen.findByDisplayValue('Original');
     await user.clear(input);
     await user.type(input, 'Updated');
 
@@ -102,21 +67,14 @@ describe('EditableTextField', () => {
   it('cancels edit mode when cancel button is clicked', async () => {
     const user = userEvent.setup();
 
-    render(
-      <EditableTextField value="Original" onSave={async () => {}}>
-        <EditableTextField.Display>Original</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Original" onSave={async () => {}} />);
 
     // Enter edit mode
     const trigger = await screen.findByLabelText('Edit');
     await user.click(trigger);
 
     // Edit text
-    const input = await screen.findByPlaceholderText('Enter text');
+    const input = await screen.findByDisplayValue('Original');
     await user.type(input, ' Changed');
 
     // Cancel
@@ -125,7 +83,7 @@ describe('EditableTextField', () => {
 
     // Should exit edit mode
     await waitFor(() => {
-      expect(screen.queryByPlaceholderText('Enter text')).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue('Original Changed')).not.toBeInTheDocument();
     });
   });
 
@@ -137,12 +95,7 @@ describe('EditableTextField', () => {
         value="Test"
         onSave={async () => {}}
         validationSchema={z.string().min(5, 'Must be at least 5 characters')}
-      >
-        <EditableTextField.Display>Test</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions />
-      </EditableTextField>
+      />
     );
 
     // Enter edit mode
@@ -150,7 +103,7 @@ describe('EditableTextField', () => {
     await user.click(trigger);
 
     // Enter invalid text (too short)
-    const input = await screen.findByPlaceholderText('Enter text');
+    const input = await screen.findByDisplayValue('Test');
     await user.clear(input);
     await user.type(input, 'Hi');
 
@@ -172,21 +125,14 @@ describe('EditableTextField', () => {
       throw new Error('Save failed');
     });
 
-    render(
-      <EditableTextField value="Test" onSave={onSave}>
-        <EditableTextField.Display>Test</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Test" onSave={onSave} />);
 
     // Enter edit mode
     const trigger = await screen.findByLabelText('Edit');
     await user.click(trigger);
 
     // Edit the text
-    const input = await screen.findByPlaceholderText('Enter text');
+    const input = await screen.findByDisplayValue('Test');
     await user.type(input, ' Updated');
 
     // Try to save
@@ -207,21 +153,14 @@ describe('EditableTextField', () => {
   it('supports multiline mode with textarea', async () => {
     const user = userEvent.setup();
 
-    render(
-      <EditableTextField value="Line 1" onSave={async () => {}} multiline={true}>
-        <EditableTextField.Display>Line 1</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Line 1" onSave={async () => {}} multiline={true} />);
 
     // Enter edit mode
     const trigger = await screen.findByLabelText('Edit');
     await user.click(trigger);
 
     // Should render textarea
-    const textarea = await screen.findByPlaceholderText('Enter text');
+    const textarea = await screen.findByDisplayValue('Line 1');
     expect(textarea.tagName).toBe('TEXTAREA');
   });
 
@@ -229,14 +168,7 @@ describe('EditableTextField', () => {
     const user = userEvent.setup();
     const onSave = jest.fn(async () => {});
 
-    render(
-      <EditableTextField value="Unchanged" onSave={onSave}>
-        <EditableTextField.Display>Unchanged</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Unchanged" onSave={onSave} />);
 
     // Enter edit mode
     const trigger = await screen.findByLabelText('Edit');
@@ -251,7 +183,7 @@ describe('EditableTextField', () => {
 
     // Should exit edit mode
     await waitFor(() => {
-      expect(screen.queryByPlaceholderText('Enter text')).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue('Unchanged')).not.toBeInTheDocument();
     });
   });
 
@@ -263,21 +195,14 @@ describe('EditableTextField', () => {
     });
     const onSave = jest.fn(async () => savePromise);
 
-    render(
-      <EditableTextField value="Test" onSave={onSave}>
-        <EditableTextField.Display>Test</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions />
-      </EditableTextField>
-    );
+    render(<EditableTextField value="Test" onSave={onSave} />);
 
     // Enter edit mode
     const trigger = await screen.findByLabelText('Edit');
     await user.click(trigger);
 
     // Edit text
-    const input = await screen.findByPlaceholderText('Enter text');
+    const input = await screen.findByDisplayValue('Test');
     await user.type(input, ' Updated');
 
     // Click save
@@ -293,7 +218,14 @@ describe('EditableTextField', () => {
 
     // Should exit edit mode
     await waitFor(() => {
-      expect(screen.queryByPlaceholderText('Enter text')).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue('Test Updated')).not.toBeInTheDocument();
     });
+  });
+
+  it('renders with custom HTML element', async () => {
+    render(<EditableTextField value="Heading" onSave={async () => {}} as="h2" />);
+
+    const heading = await screen.findByText('Heading');
+    expect(heading.tagName).toBe('H2');
   });
 });

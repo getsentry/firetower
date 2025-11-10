@@ -1,12 +1,4 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {cva} from 'class-variance-authority';
 import {Pencil} from 'lucide-react';
 import {cn} from 'utils/cn';
@@ -14,76 +6,149 @@ import {z} from 'zod';
 
 import {Spinner} from './Spinner';
 
-interface EditableTextFieldContextValue {
-  // State
-  value: string;
-  draftValue: string;
-  isEditing: boolean;
-  isSaving: boolean;
-  error: string | null;
-  validationError: string | null;
+const displayContainerStyles = cva(['flex', 'items-center', 'gap-space-xs']);
 
-  // Actions
-  startEditing: () => void;
-  cancelEditing: () => void;
-  save: () => Promise<void>;
-  updateDraft: (value: string) => void;
-
-  // Config
-  editable: boolean;
-  multiline: boolean;
-
-  // Refs
-  inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>;
-}
-
-const EditableTextFieldContext = createContext<EditableTextFieldContextValue | null>(
-  null
-);
-
-function useEditableTextField() {
-  const context = useContext(EditableTextFieldContext);
-  if (!context) {
-    throw new Error(
-      'EditableTextField subcomponents must be used within EditableTextField.Root'
-    );
-  }
-  return context;
-}
-
-const rootStyles = cva(['relative', 'group'], {
+const displayStyles = cva(['transition-opacity'], {
   variants: {
     editing: {
-      true: [],
+      true: ['hidden'],
+      false: ['block'],
+    },
+  },
+});
+
+const triggerStyles = cva(
+  [
+    'inline-flex',
+    'items-center',
+    'justify-center',
+    'transition-all',
+    'p-space-xs',
+    'rounded-radius-sm',
+    'hover:bg-background-secondary',
+    'hover:scale-110',
+    'focus:outline-none',
+    'focus:ring-2',
+    'focus:ring-offset-2',
+    'text-content-secondary',
+    'hover:text-content-primary',
+    'cursor-pointer',
+    'my-auto',
+  ],
+  {
+    variants: {
+      hidden: {
+        true: ['hidden'],
+        false: [],
+      },
+    },
+  }
+);
+
+const inputStyles = cva(
+  [
+    'w-full',
+    'px-space-md',
+    'py-space-sm',
+    'rounded-radius-md',
+    'border-2',
+    'border-border-primary',
+    'focus:border-content-accent',
+    'focus:outline-none',
+    'text-content-primary',
+    'bg-background-primary',
+    'transition-colors',
+  ],
+  {
+    variants: {
+      error: {
+        true: ['border-content-danger', 'focus:border-content-danger'],
+        false: [],
+      },
+      hidden: {
+        true: ['hidden'],
+        false: [],
+      },
+    },
+  }
+);
+
+const actionsStyles = cva(['flex', 'items-center', 'gap-space-sm'], {
+  variants: {
+    hidden: {
+      true: ['hidden'],
       false: [],
     },
   },
 });
 
-interface EditableTextFieldRootProps {
+const buttonBaseStyles = [
+  'inline-flex',
+  'items-center',
+  'justify-center',
+  'gap-space-xs',
+  'px-space-md',
+  'py-space-sm',
+  'rounded-radius-md',
+  'font-medium',
+  'text-sm',
+  'transition-colors',
+  'focus:outline-none',
+  'focus:ring-2',
+  'focus:ring-offset-2',
+  'disabled:opacity-50',
+  'disabled:cursor-not-allowed',
+];
+
+const saveButtonStyles = cva([
+  ...buttonBaseStyles,
+  'bg-background-accent-vibrant',
+  'text-content-on-vibrant-light',
+  'hover:opacity-90',
+  'hover:scale-105',
+  'active:scale-95',
+]);
+
+const cancelButtonStyles = cva([
+  ...buttonBaseStyles,
+  'bg-background-secondary',
+  'text-content-primary',
+  'hover:bg-background-tertiary',
+  'hover:scale-105',
+  'active:scale-95',
+]);
+
+const messageStyles = cva(['text-sm', 'mt-space-xs'], {
+  variants: {
+    type: {
+      error: ['text-content-danger'],
+      success: ['text-content-success'],
+    },
+  },
+});
+
+export interface EditableTextFieldProps {
   // Required
   value: string;
   onSave: (newValue: string) => Promise<void>;
 
   // Optional
+  as?: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'div';
   editable?: boolean;
   validationSchema?: z.ZodSchema<string>;
   multiline?: boolean;
-
-  // Styling
   className?: string;
-  children: React.ReactNode;
 }
 
-function EditableTextFieldRoot({
+export function EditableTextField({
   value,
   onSave,
+  as: Component = 'div',
   editable = true,
   validationSchema,
   multiline = false,
   className,
-  children,
-}: EditableTextFieldRootProps) {
+}: EditableTextFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftValue, setDraftValue] = useState(value);
   const [isSaving, setIsSaving] = useState(false);
@@ -142,6 +207,17 @@ function EditableTextFieldRoot({
     }
   }, [validationSchema, draftValue, value, onSave]);
 
+  const updateDraft = useCallback(
+    (newValue: string) => {
+      setDraftValue(newValue);
+      // Clear validation error when user starts typing
+      if (validationError) {
+        setValidationError(null);
+      }
+    },
+    [validationError]
+  );
+
   // Update draft when value changes (e.g., after successful save)
   useEffect(() => {
     if (!isEditing) {
@@ -177,172 +253,6 @@ function EditableTextFieldRoot({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isEditing, multiline, save]);
 
-  const updateDraft = useCallback(
-    (newValue: string) => {
-      setDraftValue(newValue);
-      // Clear validation error when user starts typing
-      if (validationError) {
-        setValidationError(null);
-      }
-    },
-    [validationError]
-  );
-
-  const contextValue: EditableTextFieldContextValue = useMemo(
-    () => ({
-      value,
-      draftValue,
-      isEditing,
-      isSaving,
-      error,
-      validationError,
-      startEditing,
-      cancelEditing,
-      save,
-      updateDraft,
-      editable,
-      multiline,
-      inputRef,
-    }),
-    [
-      value,
-      draftValue,
-      isEditing,
-      isSaving,
-      error,
-      validationError,
-      startEditing,
-      cancelEditing,
-      save,
-      updateDraft,
-      editable,
-      multiline,
-      inputRef,
-    ]
-  );
-
-  return (
-    <EditableTextFieldContext.Provider value={contextValue}>
-      <div className={cn(rootStyles({editing: isEditing}), className)}>{children}</div>
-    </EditableTextFieldContext.Provider>
-  );
-}
-
-const displayStyles = cva(['transition-opacity'], {
-  variants: {
-    editing: {
-      true: ['hidden'],
-      false: ['block'],
-    },
-  },
-});
-
-interface DisplayProps extends React.HTMLAttributes<HTMLElement> {
-  as?: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'div';
-  children: React.ReactNode;
-}
-
-function Display({as: Component = 'div', className, children, ...props}: DisplayProps) {
-  const {isEditing} = useEditableTextField();
-
-  return (
-    <Component className={cn(displayStyles({editing: isEditing}), className)} {...props}>
-      {children}
-    </Component>
-  );
-}
-
-const triggerStyles = cva(
-  [
-    'inline-flex',
-    'items-center',
-    'justify-center',
-    'transition-all',
-    'p-space-xs',
-    'rounded-radius-sm',
-    'hover:bg-background-secondary',
-    'hover:scale-110',
-    'focus:outline-none',
-    'focus:ring-2',
-    'focus:ring-offset-2',
-    'text-content-secondary',
-    'hover:text-content-primary',
-    'cursor-pointer',
-    'my-auto',
-  ],
-  {
-    variants: {
-      hidden: {
-        true: ['hidden'],
-        false: [],
-      },
-    },
-  }
-);
-
-interface TriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  children?: React.ReactNode;
-}
-
-function Trigger({className, children, ...props}: TriggerProps) {
-  const {startEditing, editable, isEditing} = useEditableTextField();
-
-  if (!editable || isEditing) return null;
-
-  return (
-    <button
-      type="button"
-      onClick={startEditing}
-      aria-label="Edit"
-      className={cn(triggerStyles({hidden: isEditing}), className)}
-      {...props}
-    >
-      {children || <Pencil className="h-4 w-4" />}
-    </button>
-  );
-}
-
-const inputStyles = cva(
-  [
-    'w-full',
-    'px-space-md',
-    'py-space-sm',
-    'rounded-radius-md',
-    'border-2',
-    'border-border-primary',
-    'focus:border-content-accent',
-    'focus:outline-none',
-    'text-content-primary',
-    'bg-background-primary',
-    'transition-colors',
-  ],
-  {
-    variants: {
-      error: {
-        true: ['border-content-danger', 'focus:border-content-danger'],
-        false: [],
-      },
-      hidden: {
-        true: ['hidden'],
-        false: [],
-      },
-    },
-  }
-);
-
-function Input({
-  className,
-  ...props
-}: Omit<
-  React.InputHTMLAttributes<HTMLInputElement> &
-    React.TextareaHTMLAttributes<HTMLTextAreaElement>,
-  'ref'
->) {
-  const {draftValue, updateDraft, isEditing, multiline, validationError, inputRef} =
-    useEditableTextField();
-
-  const hasError = !!validationError;
-
   // Auto-resize textarea to fit content
   useEffect(() => {
     if (multiline && inputRef.current && isEditing) {
@@ -352,161 +262,137 @@ function Input({
       // Set height to scrollHeight to fit content
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
-  }, [draftValue, multiline, isEditing, inputRef]);
+  }, [draftValue, multiline, isEditing]);
 
-  if (!isEditing) return null;
-
-  const commonProps = {
-    ref: inputRef as React.RefObject<HTMLInputElement | HTMLTextAreaElement>,
-    value: draftValue,
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      updateDraft(e.target.value);
-      // Auto-resize on change
-      if (multiline) {
-        const textarea = e.target as HTMLTextAreaElement;
-        textarea.style.height = 'auto';
-        textarea.style.height = `${textarea.scrollHeight}px`;
-      }
-    },
-    className: cn(inputStyles({error: hasError, hidden: !isEditing}), className),
-    autoFocus: true,
-    'aria-invalid': hasError,
-    ...props,
-  };
-
-  if (multiline) {
-    return (
-      <textarea
-        {...(commonProps as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
-        style={{
-          minHeight: '80px',
-          resize: 'none',
-          overflow: 'hidden',
-          ...(props.style || {}),
-        }}
-      />
-    );
-  }
-
-  return (
-    <input
-      type="text"
-      {...(commonProps as React.InputHTMLAttributes<HTMLInputElement>)}
-    />
-  );
-}
-
-const actionsStyles = cva(['flex', 'items-center', 'gap-space-sm'], {
-  variants: {
-    hidden: {
-      true: ['hidden'],
-      false: [],
-    },
-  },
-});
-
-const buttonBaseStyles = [
-  'inline-flex',
-  'items-center',
-  'justify-center',
-  'gap-space-xs',
-  'px-space-md',
-  'py-space-sm',
-  'rounded-radius-md',
-  'font-medium',
-  'text-sm',
-  'transition-colors',
-  'focus:outline-none',
-  'focus:ring-2',
-  'focus:ring-offset-2',
-  'disabled:opacity-50',
-  'disabled:cursor-not-allowed',
-];
-
-const saveButtonStyles = cva([
-  ...buttonBaseStyles,
-  'bg-background-accent-vibrant',
-  'text-content-on-vibrant-light',
-  'hover:opacity-90',
-  'hover:scale-105',
-  'active:scale-95',
-]);
-
-const cancelButtonStyles = cva([
-  ...buttonBaseStyles,
-  'bg-background-secondary',
-  'text-content-primary',
-  'hover:bg-background-tertiary',
-  'hover:scale-105',
-  'active:scale-95',
-]);
-
-const messageStyles = cva(['text-sm', 'mt-space-xs'], {
-  variants: {
-    type: {
-      error: ['text-content-danger'],
-      success: ['text-content-success'],
-    },
-    hidden: {
-      true: ['hidden'],
-      false: [],
-    },
-  },
-});
-
-function Actions({className, ...props}: React.HTMLAttributes<HTMLDivElement>) {
-  const {isEditing, save, cancelEditing, isSaving, error, validationError} =
-    useEditableTextField();
-
-  if (!isEditing) return null;
-
+  const hasError = !!validationError;
   const errorMessage = validationError || error;
 
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    updateDraft(e.target.value);
+    // Auto-resize on change
+    if (multiline) {
+      const textarea = e.target as HTMLTextAreaElement;
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  };
+
   return (
-    <>
-      <div className={cn(actionsStyles({hidden: !isEditing}), className)} {...props}>
-        <button
-          type="button"
-          onClick={save}
-          disabled={isSaving}
-          className={cn(saveButtonStyles())}
-        >
-          {isSaving ? (
+    <div className={cn('relative', className)}>
+      {/* Display + Trigger */}
+      <div className={cn(displayContainerStyles(), displayStyles({editing: isEditing}))}>
+        <Component>{value}</Component>
+        {editable && !isEditing && (
+          <button
+            type="button"
+            onClick={startEditing}
+            aria-label="Edit"
+            className={cn(triggerStyles({hidden: isEditing}))}
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Input + Actions */}
+      {isEditing && (
+        <>
+          {multiline ? (
+            // Multiline: Stack vertically
             <>
-              <Spinner size="sm" />
-              <span>Saving...</span>
+              <textarea
+                ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+                value={draftValue}
+                onChange={handleInputChange}
+                className={cn(inputStyles({error: hasError, hidden: !isEditing}))}
+                autoFocus
+                aria-invalid={hasError}
+                style={{
+                  minHeight: '80px',
+                  resize: 'none',
+                  overflow: 'hidden',
+                }}
+              />
+              <div className={cn(actionsStyles({hidden: !isEditing}), 'mt-space-sm')}>
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={isSaving}
+                  className={cn(saveButtonStyles())}
+                >
+                  {isSaving ? (
+                    <>
+                      <Spinner size="sm" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  disabled={isSaving}
+                  className={cn(cancelButtonStyles())}
+                >
+                  Cancel
+                </button>
+              </div>
             </>
           ) : (
-            'Save'
+            // Single-line: Inline with buttons
+            <div className="gap-space-sm flex items-center">
+              <input
+                ref={inputRef as React.RefObject<HTMLInputElement>}
+                type="text"
+                value={draftValue}
+                onChange={handleInputChange}
+                className={cn(inputStyles({error: hasError, hidden: !isEditing}))}
+                autoFocus
+                aria-invalid={hasError}
+              />
+              <div className={cn(actionsStyles({hidden: !isEditing}))}>
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={isSaving}
+                  className={cn(saveButtonStyles())}
+                >
+                  {isSaving ? (
+                    <>
+                      <Spinner size="sm" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  disabled={isSaving}
+                  className={cn(cancelButtonStyles())}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
-        </button>
-        <button
-          type="button"
-          onClick={cancelEditing}
-          disabled={isSaving}
-          className={cn(cancelButtonStyles())}
-        >
-          Cancel
-        </button>
-      </div>
-      {errorMessage && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className={cn(messageStyles({type: 'error', hidden: false}), 'mt-space-xs')}
-        >
-          {errorMessage}
-        </div>
+
+          {/* Error Message */}
+          {errorMessage && (
+            <div
+              role="alert"
+              aria-live="polite"
+              className={cn(messageStyles({type: 'error'}), 'mt-space-xs')}
+            >
+              {errorMessage}
+            </div>
+          )}
+        </>
       )}
-    </>
+    </div>
   );
 }
-
-export const EditableTextField = Object.assign(EditableTextFieldRoot, {
-  Display,
-  Trigger,
-  Input,
-  Actions,
-});
-
-export type {EditableTextFieldRootProps, DisplayProps, TriggerProps};
