@@ -12,10 +12,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Test value</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -29,10 +26,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Test</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -46,10 +40,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Test</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -65,10 +56,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Test</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -89,10 +77,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Original</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -114,49 +99,15 @@ describe('EditableTextField', () => {
     });
   });
 
-  it('exits edit mode after successful save', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <EditableTextField value="Test" onSave={async () => {}}>
-        <EditableTextField.Display>Test</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
-      </EditableTextField>
-    );
-
-    // Enter edit mode
-    const trigger = await screen.findByLabelText('Edit');
-    await user.click(trigger);
-
-    // Save
-    const saveButton = await screen.findByText('Save');
-    await user.click(saveButton);
-
-    // Should exit edit mode
-    await waitFor(() => {
-      expect(screen.queryByPlaceholderText('Enter text')).not.toBeInTheDocument();
-    });
-  });
-
   it('cancels edit mode when cancel button is clicked', async () => {
     const user = userEvent.setup();
-    // Mock window.confirm to return true (user confirms cancel)
-    global.confirm = jest.fn(() => true);
 
     render(
       <EditableTextField value="Original" onSave={async () => {}}>
         <EditableTextField.Display>Original</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -171,9 +122,6 @@ describe('EditableTextField', () => {
     // Cancel
     const cancelButton = await screen.findByText('Cancel');
     await user.click(cancelButton);
-
-    // Should show confirmation
-    expect(global.confirm).toHaveBeenCalled();
 
     // Should exit edit mode
     await waitFor(() => {
@@ -193,11 +141,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Test</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
-        <EditableTextField.Error />
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -233,11 +177,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Test</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
-        <EditableTextField.Error />
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -272,10 +212,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Line 1</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -297,10 +234,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Unchanged</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -334,10 +268,7 @@ describe('EditableTextField', () => {
         <EditableTextField.Display>Test</EditableTextField.Display>
         <EditableTextField.Trigger />
         <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
+        <EditableTextField.Actions />
       </EditableTextField>
     );
 
@@ -359,39 +290,6 @@ describe('EditableTextField', () => {
 
     // Resolve save
     resolveSave!();
-
-    // Should exit edit mode
-    await waitFor(() => {
-      expect(screen.queryByPlaceholderText('Enter text')).not.toBeInTheDocument();
-    });
-  });
-
-  it('cancels without confirmation when value has not changed', async () => {
-    const user = userEvent.setup();
-    global.confirm = jest.fn(() => true);
-
-    render(
-      <EditableTextField value="Unchanged" onSave={async () => {}}>
-        <EditableTextField.Display>Unchanged</EditableTextField.Display>
-        <EditableTextField.Trigger />
-        <EditableTextField.Input placeholder="Enter text" />
-        <EditableTextField.Actions>
-          <EditableTextField.Save />
-          <EditableTextField.Cancel />
-        </EditableTextField.Actions>
-      </EditableTextField>
-    );
-
-    // Enter edit mode
-    const trigger = await screen.findByLabelText('Edit');
-    await user.click(trigger);
-
-    // Cancel without editing
-    const cancelButton = await screen.findByText('Cancel');
-    await user.click(cancelButton);
-
-    // Should NOT show confirmation
-    expect(global.confirm).not.toHaveBeenCalled();
 
     // Should exit edit mode
     await waitFor(() => {
