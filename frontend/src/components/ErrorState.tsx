@@ -19,7 +19,7 @@ export const ErrorState = ({
           {title}
         </h2>
         {description && (
-          <div className="text-content-secondary mx-auto mb-space-lg max-w-md space-y-space-lg">
+          <div className="text-content-secondary mb-space-lg space-y-space-lg mx-auto max-w-md">
             {description}
           </div>
         )}
