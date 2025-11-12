@@ -28,20 +28,11 @@ class IncidentPermission(permissions.BasePermission):
 
     - READ: User must have visibility to the incident (respects is_visible_to_user)
     - CREATE: Any authenticated user can create
-    - UPDATE: Captain, reporter, participants, or superuser
+    - UPDATE: Same as read permissions (anyone who can see can update)
     """
 
     def has_permission(self, request: Request, view: "APIView") -> bool:
-        # All operations require authentication
-        if not request.user or not request.user.is_authenticated:
-            return False
-
-        # CREATE is allowed for any authenticated user
-        if request.method == "POST":
-            return True
-
-        # Other operations handled by has_object_permission
-        return True
+        return request.user and request.user.is_authenticated
 
     def has_object_permission(
         self, request: Request, view: "APIView", obj: Any
@@ -55,13 +46,8 @@ class IncidentPermission(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return obj.is_visible_to_user(user)
 
-        # UPDATE: Captain, reporter, participants, or superuser
-        if request.method in ["PUT", "PATCH"]:
-            return (
-                user.is_superuser
-                or obj.captain == user
-                or obj.reporter == user
-                or obj.participants.filter(id=user.id).exists()
-            )
+        # UPDATE: Same as read permissions
+        if request.method == "PATCH":
+            return obj.is_visible_to_user(user)
 
         return False

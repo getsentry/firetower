@@ -500,13 +500,14 @@ class TestIncidentAPIViews:
         assert incident.description == "Updated by participant"
 
     def test_update_incident_as_unauthorized_user(self):
-        """Test unauthorized user cannot update incident"""
+        """Test unauthorized user cannot update private incident"""
         incident = Incident.objects.create(
             title="Original",
             status=IncidentStatus.ACTIVE,
             severity=IncidentSeverity.P1,
             captain=self.captain,
             reporter=self.reporter,
+            is_private=True,
         )
 
         self.client.force_authenticate(user=self.user)
@@ -515,7 +516,9 @@ class TestIncidentAPIViews:
             f"/api/incidents/{incident.incident_number}/", data
         )
 
-        assert response.status_code == 403
+        assert (
+            response.status_code == 404
+        )  # 404 because user can't see private incident
         incident.refresh_from_db()
         assert incident.title == "Original"
 
