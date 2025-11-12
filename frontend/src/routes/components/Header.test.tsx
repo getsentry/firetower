@@ -67,12 +67,6 @@ const mockIncidentDetail: IncidentDetail = {
   ],
   external_links: {
     slack: 'https://slack.com/archives/C123456',
-    jira: null,
-    datadog: null,
-    pagerduty: null,
-    statuspage: null,
-    notion: null,
-    linear: null,
   },
 };
 

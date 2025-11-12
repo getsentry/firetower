@@ -136,9 +136,10 @@ class TestIncidentDetailUISerializer:
         assert "API" in data["affected_areas"]
         assert "Database" in data["root_causes"]
 
-        # Check external links (dict format for frontend compatibility)
+        # Check external links (dict format for frontend compatibility, only includes existing links)
         assert "slack" in data["external_links"]
         assert (
             data["external_links"]["slack"] == "https://slack.com/channels/incident-123"
         )
-        assert data["external_links"]["jira"] is None  # Not set
+        assert "jira" not in data["external_links"]  # Not set, so not included
+        assert len(data["external_links"]) == 1

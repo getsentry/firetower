@@ -1,3 +1,6 @@
+import time
+from datetime import datetime
+
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -273,3 +276,588 @@ class TestIncidentViews:
         assert response.status_code == 200
         assert response.data["count"] == 2
         assert len(response.data["results"]) == 2
+
+
+@pytest.mark.django_db
+class TestIncidentAPIViews:
+    """Tests for service API endpoints (not UI)"""
+
+    def setup_method(self):
+        """Set up test client and common test data"""
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test@example.com",
+            email="test@example.com",
+            password="testpass123",
+        )
+        self.captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            password="testpass123",
+        )
+        self.reporter = User.objects.create_user(
+            username="reporter@example.com",
+            email="reporter@example.com",
+            password="testpass123",
+        )
+
+    def test_create_incident_with_required_fields(self):
+        """Test POST /api/incidents/ creates incident with required fields"""
+        self.client.force_authenticate(user=self.user)
+        data = {
+            "title": "New Incident",
+            "severity": IncidentSeverity.P1,
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.post("/api/incidents/", data)
+
+        assert response.status_code == 201
+        assert Incident.objects.count() == 1
+
+        incident = Incident.objects.first()
+        assert incident.title == "New Incident"
+        assert incident.severity == IncidentSeverity.P1
+        assert incident.is_private is False
+        assert incident.captain == self.captain
+        assert incident.reporter == self.reporter
+        assert incident.status == IncidentStatus.ACTIVE  # Default
+
+    def test_create_incident_with_optional_fields(self):
+        """Test creating incident with optional fields"""
+        self.client.force_authenticate(user=self.user)
+        data = {
+            "title": "Detailed Incident",
+            "description": "This is a description",
+            "impact": "High impact",
+            "status": IncidentStatus.MITIGATED,
+            "severity": IncidentSeverity.P2,
+            "is_private": True,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.post("/api/incidents/", data)
+
+        assert response.status_code == 201
+        incident = Incident.objects.first()
+        assert incident.description == "This is a description"
+        assert incident.impact == "High impact"
+        assert incident.status == IncidentStatus.MITIGATED
+
+    def test_create_incident_missing_required_fields(self):
+        """Test creating incident without required fields fails"""
+        self.client.force_authenticate(user=self.user)
+
+        # Missing captain
+        data = {
+            "title": "Incomplete",
+            "severity": IncidentSeverity.P1,
+            "is_private": False,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.post("/api/incidents/", data)
+        assert response.status_code == 400
+        assert "captain" in response.data
+
+        # Missing reporter
+        data = {
+            "title": "Incomplete",
+            "severity": IncidentSeverity.P1,
+            "is_private": False,
+            "captain": self.captain.id,
+        }
+        response = self.client.post("/api/incidents/", data)
+        assert response.status_code == 400
+        assert "reporter" in response.data
+
+    def test_list_api_incidents(self):
+        """Test GET /api/incidents/ returns all visible incidents"""
+        Incident.objects.create(
+            title="Public Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        Incident.objects.create(
+            title="Done Incident",
+            status=IncidentStatus.DONE,
+            severity=IncidentSeverity.P2,
+            is_private=False,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+    def test_retrieve_api_incident(self):
+        """Test GET /api/incidents/INC-{id}/ returns incident with proper format"""
+        incident = Incident.objects.create(
+            title="Test Incident",
+            description="Description",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+
+        assert response.status_code == 200
+        data = response.data
+        assert data["id"] == incident.incident_number
+        assert data["title"] == "Test Incident"
+        assert data["captain"] == self.captain.email
+        assert data["reporter"] == self.reporter.email
+        assert "created_at" in data
+        assert "updated_at" in data
+
+    def test_retrieve_incident_with_null_captain_reporter(self):
+        """Test that incidents with null captain/reporter don't crash"""
+        incident = Incident.objects.create(
+            title="Legacy Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=None,
+            reporter=None,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+
+        assert response.status_code == 200
+        data = response.data
+        assert data["captain"] is None
+        assert data["reporter"] is None
+
+    def test_update_incident_as_captain(self):
+        """Test PATCH /api/incidents/INC-{id}/ allows captain to update"""
+        incident = Incident.objects.create(
+            title="Original Title",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+        data = {"title": "Updated Title"}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.title == "Updated Title"
+
+    def test_update_incident_as_reporter(self):
+        """Test reporter can update incident"""
+        incident = Incident.objects.create(
+            title="Original",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.reporter)
+        data = {"status": IncidentStatus.MITIGATED}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.status == IncidentStatus.MITIGATED
+
+    def test_update_incident_as_participant(self):
+        """Test participant can update incident"""
+        participant = User.objects.create_user(
+            username="participant@example.com",
+            email="participant@example.com",
+        )
+        incident = Incident.objects.create(
+            title="Original",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        incident.participants.add(participant)
+
+        self.client.force_authenticate(user=participant)
+        data = {"description": "Updated by participant"}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.description == "Updated by participant"
+
+    def test_update_incident_as_unauthorized_user(self):
+        """Test unauthorized user cannot update private incident"""
+        incident = Incident.objects.create(
+            title="Original",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+            is_private=True,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        data = {"title": "Hacked"}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert (
+            response.status_code == 404
+        )  # 404 because user can't see private incident
+        incident.refresh_from_db()
+        assert incident.title == "Original"
+
+    def test_update_incident_as_superuser(self):
+        """Test superuser can update any incident"""
+        superuser = User.objects.create_superuser(
+            username="admin@example.com",
+            email="admin@example.com",
+            password="testpass123",
+        )
+        incident = Incident.objects.create(
+            title="Original",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=superuser)
+        data = {"title": "Updated by admin"}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", data
+        )
+
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.title == "Updated by admin"
+
+    def test_api_respects_privacy_on_read(self):
+        """Test API list respects incident privacy"""
+        Incident.objects.create(
+            title="Public",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        Incident.objects.create(
+            title="Private - captain",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.user,
+        )
+        Incident.objects.create(
+            title="Private - other",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.captain,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        titles = [inc["title"] for inc in response.data["results"]]
+        assert "Public" in titles
+        assert "Private - captain" in titles
+        assert "Private - other" not in titles
+
+    def test_timestamps_on_create_and_update(self):
+        """Test created_at and updated_at timestamps work correctly"""
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Create incident
+        payload = {
+            "title": "Timestamp Test",
+            "severity": "P2",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 201
+
+        incident_id = response.json()["id"]
+
+        # Get the incident to check timestamps
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        assert response.status_code == 200
+
+        data = response.json()
+        created_at = data["created_at"]
+        updated_at = data["updated_at"]
+
+        # Verify timestamps exist and are valid ISO 8601 format
+        assert created_at is not None
+        assert updated_at is not None
+        created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        updated_dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+
+        # Initially, created_at and updated_at should be very close (within 1 second)
+        assert abs((created_dt - updated_dt).total_seconds()) < 1
+
+        # Wait a bit to ensure timestamps will differ
+        time.sleep(0.1)
+
+        # Update the incident
+        update_payload = {"status": "Mitigated"}
+        response = self.client.patch(
+            f"/api/incidents/{incident_id}/", update_payload, format="json"
+        )
+        assert response.status_code == 200
+
+        # Get the incident again
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        data = response.json()
+
+        new_created_at = data["created_at"]
+        new_updated_at = data["updated_at"]
+
+        # created_at should remain the same
+        assert new_created_at == created_at
+
+        # updated_at should have changed
+        assert new_updated_at != updated_at
+        assert new_updated_at > updated_at
+
+    def test_create_incident_with_external_links(self):
+        """Test creating incident with external links"""
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {
+            "title": "Incident with Links",
+            "severity": "P1",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+            "external_links": {
+                "slack": "https://slack.com/channel/123",
+                "jira": "https://jira.company.com/browse/INC-1",
+            },
+        }
+
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 201
+
+        incident_id = response.json()["id"]
+
+        # Verify links were created
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        data = response.json()
+
+        assert data["external_links"]["slack"] == "https://slack.com/channel/123"
+        assert data["external_links"]["jira"] == "https://jira.company.com/browse/INC-1"
+        assert "datadog" not in data["external_links"]
+
+    def test_add_external_link_via_patch(self):
+        """Test adding a single external link via PATCH (merge behavior)"""
+        # Create incident with one link
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/original",
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Add jira link, should keep slack
+        payload = {"external_links": {"jira": "https://jira.com/new"}}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        # Verify both links exist
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+
+        assert data["external_links"]["slack"] == "https://slack.com/original"
+        assert data["external_links"]["jira"] == "https://jira.com/new"
+
+    def test_update_existing_external_link(self):
+        """Test updating an existing external link via PATCH"""
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/old",
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Update slack link
+        payload = {"external_links": {"slack": "https://slack.com/new"}}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        # Verify link was updated
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+
+        assert data["external_links"]["slack"] == "https://slack.com/new"
+
+    def test_delete_external_link_with_null(self):
+        """Test deleting an external link by sending null"""
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/test",
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.JIRA,
+            url="https://jira.com/test",
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Delete slack link, keep jira
+        payload = {"external_links": {"slack": None}}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        # Verify slack deleted, jira remains
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+
+        assert "slack" not in data["external_links"]
+        assert data["external_links"]["jira"] == "https://jira.com/test"
+
+    def test_invalid_external_link_type(self):
+        """Test that invalid link types are rejected"""
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {
+            "title": "Test",
+            "severity": "P1",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+            "external_links": {"invalid_type": "https://example.com"},
+        }
+
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 400
+        assert "external_links" in response.json()
+
+    def test_invalid_external_link_url(self):
+        """Test that invalid URLs are rejected"""
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {
+            "title": "Test",
+            "severity": "P1",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+            "external_links": {"slack": "not-a-valid-url"},
+        }
+
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 400
+        assert "external_links" in response.json()
+
+    def test_put_not_allowed(self):
+        """Test that PUT returns 405 Method Not Allowed"""
+        incident = Incident.objects.create(
+            title="Test",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+        data = {
+            "title": "Updated",
+            "severity": "P2",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+        }
+        response = self.client.put(f"/api/incidents/{incident.incident_number}/", data)
+        assert response.status_code == 405
+
+    def test_patch_without_external_links_preserves_existing(self):
+        """Test that PATCH without external_links field preserves existing links"""
+        self.client.force_authenticate(user=self.captain)
+
+        # Create incident with external links
+        payload = {
+            "title": "Test",
+            "severity": "P1",
+            "is_private": False,
+            "captain": self.captain.id,
+            "reporter": self.reporter.id,
+            "external_links": {
+                "slack": "https://slack.com/channel",
+                "jira": "https://jira.example.com/issue",
+            },
+        }
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 201
+        incident_id = response.json()["id"]
+
+        # Verify links were created
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        assert len(response.json()["external_links"]) == 2
+
+        # PATCH request without external_links should preserve existing
+        patch_payload = {"title": "Updated Title"}
+        response = self.client.patch(
+            f"/api/incidents/{incident_id}/", patch_payload, format="json"
+        )
+        assert response.status_code == 200
+
+        # Verify links still exist
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        data = response.json()
+        assert len(data["external_links"]) == 2
+        assert data["external_links"]["slack"] == "https://slack.com/channel"
+        assert data["external_links"]["jira"] == "https://jira.example.com/issue"
