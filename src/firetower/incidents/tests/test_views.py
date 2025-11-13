@@ -316,7 +316,7 @@ class TestIncidentViews:
             assert response.data["id"] == incident.incident_number
 
     def test_sync_participants_endpoint(self):
-        """Test POST /api/ui/incidents/{id}/sync-participants/ forces sync"""
+        """Test POST /api/incidents/{id}/sync-participants/ forces sync"""
         incident = Incident.objects.create(
             title="Test Incident",
             status=IncidentStatus.ACTIVE,
@@ -333,7 +333,7 @@ class TestIncidentViews:
 
             self.client.force_authenticate(user=self.user)
             response = self.client.post(
-                f"/api/ui/incidents/{incident.incident_number}/sync-participants/"
+                f"/api/incidents/{incident.incident_number}/sync-participants/"
             )
 
             assert response.status_code == 200
@@ -357,7 +357,7 @@ class TestIncidentViews:
 
             self.client.force_authenticate(user=self.user)
             response = self.client.post(
-                f"/api/ui/incidents/{incident.incident_number}/sync-participants/"
+                f"/api/incidents/{incident.incident_number}/sync-participants/"
             )
 
             assert response.status_code == 500
@@ -385,7 +385,7 @@ class TestIncidentViews:
 
         self.client.force_authenticate(user=self.user)
         response = self.client.post(
-            f"/api/ui/incidents/{incident.incident_number}/sync-participants/"
+            f"/api/incidents/{incident.incident_number}/sync-participants/"
         )
 
         assert response.status_code == 404
@@ -393,7 +393,7 @@ class TestIncidentViews:
     def test_sync_participants_endpoint_invalid_format(self):
         """Test sync endpoint returns 400 for invalid incident ID"""
         self.client.force_authenticate(user=self.user)
-        response = self.client.post("/api/ui/incidents/INVALID-123/sync-participants/")
+        response = self.client.post("/api/incidents/INVALID-123/sync-participants/")
 
         assert response.status_code == 400
 
