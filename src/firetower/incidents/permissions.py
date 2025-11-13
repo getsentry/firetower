@@ -28,7 +28,7 @@ class IncidentPermission(permissions.BasePermission):
 
     - READ: User must have visibility to the incident (respects is_visible_to_user)
     - CREATE: Any authenticated user can create
-    - UPDATE/POST: Same as read permissions (anyone who can see can update/interact)
+    - UPDATE: Same as read permissions (anyone who can see can update)
     """
 
     def has_permission(self, request: Request, view: "APIView") -> bool:
