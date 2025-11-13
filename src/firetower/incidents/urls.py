@@ -16,11 +16,6 @@ urlpatterns = [
         incident_detail_ui,
         name="incident-detail-ui",
     ),
-    path(
-        "ui/incidents/<str:incident_id>/sync-participants/",
-        sync_incident_participants,
-        name="sync-incident-participants",
-    ),
     # Service API endpoints
     path(
         "incidents/",
@@ -31,5 +26,10 @@ urlpatterns = [
         "incidents/<str:incident_id>/",
         IncidentRetrieveUpdateAPIView.as_view(),
         name="incident-retrieve-update",
+    ),
+    path(
+        "incidents/<str:incident_id>/sync-participants/",
+        sync_incident_participants,
+        name="sync-incident-participants",
     ),
 ]
