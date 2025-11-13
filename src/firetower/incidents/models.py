@@ -111,6 +111,7 @@ class Incident(models.Model):
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    participants_last_synced_at = models.DateTimeField(null=True, blank=True)
 
     # Relationships
     captain = models.ForeignKey(
