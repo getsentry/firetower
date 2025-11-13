@@ -229,16 +229,10 @@ export function EditableTextField({
     }
   }, [validationSchema, draftValue, value, onSave]);
 
-  const updateDraft = useCallback(
-    (newValue: string) => {
-      setDraftValue(newValue);
-      // Clear validation error when user starts typing
-      if (validationError) {
-        setValidationError(null);
-      }
-    },
-    [validationError]
-  );
+  const updateDraft = useCallback((newValue: string) => {
+    setDraftValue(newValue);
+    setValidationError(null);
+  }, []);
 
   // Update draft when value changes (e.g., after successful save)
   useEffect(() => {
