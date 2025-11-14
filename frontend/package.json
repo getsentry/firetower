@@ -21,6 +21,7 @@
     "@tanstack/zod-adapter": "^1.131.44",
     "class-variance-authority": "^0.7.1",
     "classnames": "^2.5.1",
+    "lucide-react": "^0.552.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "tailwind-merge": "^3.3.1",

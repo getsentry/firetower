@@ -45,7 +45,7 @@ function Link({type, url, isLast = false}: LinkProps) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className={`text-content-accent flex items-center gap-3 py-space-lg no-underline transition-colors hover:text-content-accent/80 ${
+      className={`text-content-accent py-space-lg hover:text-content-accent/80 flex items-center gap-3 no-underline transition-colors ${
         !isLast ? 'border-b border-gray-200' : ''
       }`}
     >
