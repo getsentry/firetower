@@ -6,6 +6,7 @@ from django.test import RequestFactory
 from google.auth import exceptions as google_auth_exceptions
 
 from firetower.auth.middleware import IAPAuthenticationMiddleware
+from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_iap
 from firetower.auth.validators import IAPTokenValidator
 
@@ -108,6 +109,68 @@ class TestGetOrCreateUserFromIAP:
                 iap_user_id=long_id,
                 email="test@example.com",
             )
+
+    def test_merges_slack_provisioned_user_on_first_iap_login(self):
+        slack_user = User.objects.create_user(
+            username="slack:U12345",
+            email="john@example.com",
+            first_name="John",
+            last_name="Doe",
+        )
+        ExternalProfile.objects.create(
+            user=slack_user,
+            type=ExternalProfileType.SLACK,
+            external_id="U12345",
+        )
+
+        iap_user = get_or_create_user_from_iap(
+            iap_user_id="accounts.google.com:67890",
+            email="john@example.com",
+        )
+
+        assert iap_user.id == slack_user.id
+        assert iap_user.username == "accounts.google.com:67890"
+        assert iap_user.email == "john@example.com"
+        assert iap_user.first_name == "John"
+        assert iap_user.last_name == "Doe"
+
+        slack_profile = ExternalProfile.objects.get(
+            user=iap_user, type=ExternalProfileType.SLACK
+        )
+        assert slack_profile.external_id == "U12345"
+
+        assert User.objects.count() == 1
+
+    def test_creates_new_user_if_no_slack_user_with_email(self):
+        User.objects.create_user(
+            username="slack:U12345",
+            email="other@example.com",
+        )
+
+        new_user = get_or_create_user_from_iap(
+            iap_user_id="accounts.google.com:67890",
+            email="john@example.com",
+        )
+
+        assert new_user.username == "accounts.google.com:67890"
+        assert new_user.email == "john@example.com"
+        assert User.objects.count() == 2
+
+    def test_merge_preserves_user_profile_and_avatar(self):
+        slack_user = User.objects.create_user(
+            username="slack:U12345",
+            email="john@example.com",
+        )
+        slack_user.userprofile.avatar_url = "https://example.com/avatar.jpg"
+        slack_user.userprofile.save()
+
+        iap_user = get_or_create_user_from_iap(
+            iap_user_id="accounts.google.com:67890",
+            email="john@example.com",
+        )
+
+        assert iap_user.id == slack_user.id
+        assert iap_user.userprofile.avatar_url == "https://example.com/avatar.jpg"
 
 
 class TestIAPTokenValidator:

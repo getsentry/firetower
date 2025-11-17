@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -15,6 +16,7 @@ from firetower.incidents.models import (
     Tag,
     TagType,
 )
+from firetower.incidents.services import ParticipantsSyncStats
 
 
 @pytest.mark.django_db
@@ -276,6 +278,124 @@ class TestIncidentViews:
         assert response.status_code == 200
         assert response.data["count"] == 2
         assert len(response.data["results"]) == 2
+
+    def test_retrieve_incident_syncs_participants(self):
+        """Test that retrieving incident details syncs participants from Slack"""
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack"
+        ) as mock_sync:
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
+
+            assert response.status_code == 200
+            mock_sync.assert_called_once_with(incident)
+
+    def test_retrieve_incident_does_not_fail_on_sync_error(self):
+        """Test that incident retrieval succeeds even if participant sync fails"""
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack"
+        ) as mock_sync:
+            mock_sync.side_effect = Exception("Slack API error")
+
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
+
+            assert response.status_code == 200
+            assert response.data["id"] == incident.incident_number
+
+    def test_sync_participants_endpoint(self):
+        """Test POST /api/incidents/{id}/sync-participants/ forces sync"""
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack"
+        ) as mock_sync:
+            mock_sync.return_value = ParticipantsSyncStats(
+                added=3,
+                already_existed=5,
+            )
+
+            self.client.force_authenticate(user=self.user)
+            response = self.client.post(
+                f"/api/incidents/{incident.incident_number}/sync-participants/"
+            )
+
+            assert response.status_code == 200
+            assert response.data["success"] is True
+            assert response.data["stats"]["added"] == 3
+            assert response.data["stats"]["already_existed"] == 5
+            mock_sync.assert_called_once_with(incident, force=True)
+
+    def test_sync_participants_endpoint_handles_errors(self):
+        """Test sync endpoint returns 500 on error"""
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack"
+        ) as mock_sync:
+            mock_sync.side_effect = Exception("Slack API error")
+
+            self.client.force_authenticate(user=self.user)
+            response = self.client.post(
+                f"/api/incidents/{incident.incident_number}/sync-participants/"
+            )
+
+            assert response.status_code == 500
+            assert response.data["success"] is False
+            assert response.data["error"] == "Failed to sync participants from Slack"
+            assert len(response.data["stats"]["errors"]) > 0
+            assert (
+                response.data["stats"]["errors"][0]
+                == "Failed to sync participants from Slack"
+            )
+
+    def test_sync_participants_endpoint_respects_privacy(self):
+        """Test sync endpoint returns 404 for private incidents user can't access"""
+        other_user = User.objects.create_user(
+            username="other@example.com",
+            password="testpass123",
+        )
+        incident = Incident.objects.create(
+            title="Private Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=other_user,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            f"/api/incidents/{incident.incident_number}/sync-participants/"
+        )
+
+        assert response.status_code == 404
+
+    def test_sync_participants_endpoint_invalid_format(self):
+        """Test sync endpoint returns 400 for invalid incident ID"""
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post("/api/incidents/INVALID-123/sync-participants/")
+
+        assert response.status_code == 400
 
 
 @pytest.mark.django_db
