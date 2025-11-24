@@ -17,7 +17,7 @@ from rest_framework.response import Response
 logger = logging.getLogger(__name__)
 
 
-def check_database() -> tuple[bool, str]:
+def check_database() -> bool:
     """
     Check database connectivity.
 
@@ -27,10 +27,10 @@ def check_database() -> tuple[bool, str]:
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
-        return True, "Database connection successful"
+        return True
     except Exception as e:
         logger.error("Database health check failed", extra={"error": str(e)})
-        return False, f"Database connection failed: {str(e)}"
+        return False
 
 
 @api_view(["GET"])
@@ -48,7 +48,7 @@ def readiness_check(request: Request) -> Response:
         "database": check_database(),
     }
 
-    is_ready = all(check[0] for check in checks.values())
+    is_ready = all(check for check in checks.values())
     status_code = 200 if is_ready else 503
 
     # Report availability to Datadog as a gauge metric

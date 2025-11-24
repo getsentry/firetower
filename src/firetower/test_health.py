@@ -29,7 +29,7 @@ class TestHealthChecks:
         # Verify Datadog metric was sent
         mock_gauge.assert_called_once()
         call_args = mock_gauge.call_args
-        assert call_args[0][0] == "firetower.service.available"
+        assert call_args[0][0] == "firetower.ready"
         assert call_args[0][1] == 1
 
     def test_readiness_check_database_failure(self):
@@ -50,7 +50,7 @@ class TestHealthChecks:
         # Verify Datadog metric was sent with value 0
         mock_gauge.assert_called_once()
         call_args = mock_gauge.call_args
-        assert call_args[0][0] == "firetower.service.available"
+        assert call_args[0][0] == "firetower.ready"
         assert call_args[0][1] == 0
 
     def test_readiness_check_datadog_failure_does_not_affect_response(self):
