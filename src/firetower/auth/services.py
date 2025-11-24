@@ -89,9 +89,9 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
         User instance or None if Slack API fails
 
     Note:
-        This function optimizes API calls by first checking if the user
-        already exists via ExternalProfile lookup. Only calls Slack API
-        if the user doesn't exist locally.
+        - First checks if a Slack ExternalProfile exists for this ID
+        - If a user with matching email already exists, attaches Slack profile to them
+        - Otherwise creates a new user with email as username
     """
     if not slack_user_id:
         logger.warning("Cannot get/create user - no Slack user ID provided")
@@ -122,10 +122,20 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
         logger.warning(f"Slack user {slack_user_id} has no email, cannot create user")
         return None
 
-    username = f"slack:{slack_user_id}"
+    # Check if user already exists with this email (e.g., created via IAP)
+    existing_user = User.objects.filter(email=email).first()
+    if existing_user:
+        # Attach Slack profile to existing user
+        ExternalProfile.objects.create(
+            user=existing_user,
+            type=ExternalProfileType.SLACK,
+            external_id=slack_user_id,
+        )
+        logger.info(f"Attached Slack ID {slack_user_id} to existing user: {email}")
+        return existing_user
 
     user = User.objects.create(
-        username=username,
+        username=email,
         email=email,
         first_name=first_name[:150],
         last_name=last_name[:150],
@@ -148,9 +158,7 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
         external_id=slack_user_id,
     )
 
-    logger.info(
-        f"Created new user from Slack: {email} (Slack ID: {slack_user_id}, username: {username})"
-    )
+    logger.info(f"Created new user from Slack: {email} (Slack ID: {slack_user_id})")
 
     return user
 
