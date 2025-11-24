@@ -135,7 +135,7 @@ class TestSyncUserProfileFromSlack:
 class TestGetOrCreateUserFromSlackId:
     def test_returns_existing_user(self):
         existing_user = User.objects.create_user(
-            username="slack:U12345",
+            username="john@example.com",
             email="john@example.com",
         )
         ExternalProfile.objects.create(
@@ -149,7 +149,7 @@ class TestGetOrCreateUserFromSlackId:
         assert user == existing_user
         assert User.objects.count() == 1
 
-    def test_creates_new_user_with_slack_prefix(self):
+    def test_creates_new_user_with_email_as_username(self):
         mock_user_info = {
             "email": "jane@example.com",
             "first_name": "Jane",
@@ -165,11 +165,40 @@ class TestGetOrCreateUserFromSlackId:
             user = get_or_create_user_from_slack_id("U67890")
 
             assert user is not None
-            assert user.username == "slack:U67890"
+            assert user.username == "jane@example.com"
             assert user.email == "jane@example.com"
             assert user.first_name == "Jane"
             assert user.last_name == "Smith"
             assert user.userprofile.avatar_url == "https://example.com/avatar.jpg"
+
+            external_profile = ExternalProfile.objects.get(
+                user=user, type=ExternalProfileType.SLACK
+            )
+            assert external_profile.external_id == "U67890"
+
+    def test_attaches_slack_profile_to_existing_user(self):
+        """If a user exists with matching email, attach Slack profile to them."""
+        existing_user = User.objects.create_user(
+            username="jane@example.com",
+            email="jane@example.com",
+        )
+
+        mock_user_info = {
+            "email": "jane@example.com",
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "avatar_url": "https://example.com/avatar.jpg",
+        }
+
+        with patch(
+            "firetower.auth.services._slack_service.get_user_info"
+        ) as mock_get_info:
+            mock_get_info.return_value = mock_user_info
+
+            user = get_or_create_user_from_slack_id("U67890")
+
+            assert user.id == existing_user.id
+            assert User.objects.count() == 1
 
             external_profile = ExternalProfile.objects.get(
                 user=user, type=ExternalProfileType.SLACK
