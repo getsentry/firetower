@@ -37,7 +37,7 @@ class TestSyncIncidentParticipantsFromSlack:
         incident.participants.add(existing_user)
 
         slack_user1 = User.objects.create_user(
-            username="slack:U11111",
+            username="user1@example.com",
             email="user1@example.com",
         )
         ExternalProfile.objects.create(
@@ -47,7 +47,7 @@ class TestSyncIncidentParticipantsFromSlack:
         )
 
         slack_user2 = User.objects.create_user(
-            username="slack:U22222",
+            username="user2@example.com",
             email="user2@example.com",
         )
         ExternalProfile.objects.create(
@@ -99,7 +99,7 @@ class TestSyncIncidentParticipantsFromSlack:
         incident.participants.add(manual_user)
 
         slack_user = User.objects.create_user(
-            username="slack:U11111",
+            username="user1@example.com",
             email="user1@example.com",
         )
         ExternalProfile.objects.create(
@@ -156,7 +156,7 @@ class TestSyncIncidentParticipantsFromSlack:
         )
 
         slack_user = User.objects.create_user(
-            username="slack:U11111",
+            username="user1@example.com",
             email="user1@example.com",
         )
         ExternalProfile.objects.create(
@@ -290,7 +290,7 @@ class TestSyncIncidentParticipantsFromSlack:
         )
 
         slack_user = User.objects.create_user(
-            username="slack:U11111",
+            username="user1@example.com",
             email="user1@example.com",
         )
         ExternalProfile.objects.create(
@@ -329,7 +329,7 @@ class TestSyncIncidentParticipantsFromSlack:
         )
 
         slack_user = User.objects.create_user(
-            username="slack:U11111",
+            username="user1@example.com",
             email="user1@example.com",
         )
         ExternalProfile.objects.create(
