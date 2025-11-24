@@ -125,13 +125,14 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
     # Check if user already exists with this email (e.g., created via IAP)
     existing_user = User.objects.filter(email=email).first()
     if existing_user:
-        # Attach Slack profile to existing user
-        ExternalProfile.objects.create(
+        # Attach Slack profile to existing user (get_or_create handles race conditions)
+        _, created = ExternalProfile.objects.get_or_create(
             user=existing_user,
             type=ExternalProfileType.SLACK,
-            external_id=slack_user_id,
+            defaults={"external_id": slack_user_id},
         )
-        logger.info(f"Attached Slack ID {slack_user_id} to existing user: {email}")
+        if created:
+            logger.info(f"Attached Slack ID {slack_user_id} to existing user: {email}")
         return existing_user
 
     user = User.objects.create(
@@ -208,13 +209,14 @@ def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
     # Check if user already exists with this email (e.g., created via Slack sync)
     existing_user = User.objects.filter(email=email).first()
     if existing_user:
-        # Attach IAP profile to existing user
-        ExternalProfile.objects.create(
+        # Attach IAP profile to existing user (get_or_create handles race conditions)
+        _, created = ExternalProfile.objects.get_or_create(
             user=existing_user,
             type=ExternalProfileType.IAP,
-            external_id=iap_user_id,
+            defaults={"external_id": iap_user_id},
         )
-        logger.info(f"Attached IAP ID to existing user: {email}")
+        if created:
+            logger.info(f"Attached IAP ID to existing user: {email}")
         return existing_user
 
     # Create new user
