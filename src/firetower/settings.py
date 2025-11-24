@@ -239,9 +239,9 @@ DJK8S_READINESS_PROBES = [
 
 # Datadog Configuration
 DATADOG_STATS = {
-    "STATSD_HOST": os.environ.get("DATADOG_STATSD_HOST", "localhost"),
-    "STATSD_PORT": int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
-    "STATSD_NAMESPACE": "firetower",
+    "statsd_host": os.environ.get("DATADOG_STATSD_HOST", "localhost"),
+    "statsd_port": int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
+    "statsd_namespace": "firetower",
 }
 
 # Initialize Datadog statsd
