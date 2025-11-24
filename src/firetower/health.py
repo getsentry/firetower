@@ -20,9 +20,6 @@ logger = logging.getLogger(__name__)
 def check_database() -> bool:
     """
     Check database connectivity.
-
-    Returns:
-        Tuple of (is_healthy, message)
     """
     try:
         with connection.cursor() as cursor:
