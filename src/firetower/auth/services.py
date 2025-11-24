@@ -178,8 +178,9 @@ def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
         ValueError: If email or iap_user_id is missing
 
     Note:
-        If a Slack-provisioned user exists with matching email, it will be
-        merged by updating the username from "slack:{slack_id}" to the IAP ID.
+        - First checks if an IAP ExternalProfile exists for this ID
+        - If a user with matching email already exists, attaches IAP profile to them
+        - Otherwise creates a new user with email as username
     """
     if not iap_user_id or not email:
         raise ValueError("IAP user ID and email are required for user creation")
@@ -189,42 +190,48 @@ def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
     except ValidationError:
         raise ValueError(f"Invalid email format: {email}")
 
-    if len(iap_user_id) > 150:
-        raise ValueError(
-            f"IAP user ID exceeds maximum length of 150 characters: {len(iap_user_id)}"
-        )
-
+    # Check if user already exists via IAP ExternalProfile
     try:
-        user = User.objects.get(username=iap_user_id)
+        iap_profile = ExternalProfile.objects.get(
+            type=ExternalProfileType.IAP,
+            external_id=iap_user_id,
+        )
+        user = iap_profile.user
         if user.email != email:
-            logger.info(
-                f"Updated email for user {iap_user_id}: {user.email} -> {email}"
-            )
+            logger.info(f"Updated email for user {email}: {user.email} -> {email}")
             user.email = email
             user.save()
         return user
-    except User.DoesNotExist:
+    except ExternalProfile.DoesNotExist:
         pass
 
-    slack_user = User.objects.filter(email=email, username__startswith="slack:").first()
-
-    if slack_user:
-        old_username = slack_user.username
-        slack_user.username = iap_user_id
-        slack_user.save()
-        logger.info(
-            f"Merged Slack-provisioned user {email}: {old_username} -> {iap_user_id}"
+    # Check if user already exists with this email (e.g., created via Slack sync)
+    existing_user = User.objects.filter(email=email).first()
+    if existing_user:
+        # Attach IAP profile to existing user
+        ExternalProfile.objects.create(
+            user=existing_user,
+            type=ExternalProfileType.IAP,
+            external_id=iap_user_id,
         )
-        return slack_user
+        logger.info(f"Attached IAP ID to existing user: {email}")
+        return existing_user
 
+    # Create new user
     user = User.objects.create(
-        username=iap_user_id,
+        username=email,
         email=email,
         is_active=True,
     )
     user.set_unusable_password()
     user.save()
-    logger.info(f"Created new user from IAP: {email} (IAP ID: {iap_user_id})")
+
+    ExternalProfile.objects.create(
+        user=user,
+        type=ExternalProfileType.IAP,
+        external_id=iap_user_id,
+    )
+    logger.info(f"Created new user from IAP: {email}")
 
     sync_user_profile_from_slack(user)
 
