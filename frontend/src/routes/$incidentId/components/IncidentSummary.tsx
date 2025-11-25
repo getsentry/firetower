@@ -1,8 +1,10 @@
 import {Card} from 'components/Card';
+import {EditablePill} from 'components/EditablePill';
 import {Pill} from 'components/Pill';
 import {Tag} from 'components/Tag';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
+import {useUpdateIncidentField} from '../queries/incidentMutations';
 
 interface IncidentSummaryProps {
   incident: IncidentDetail;
@@ -23,7 +25,34 @@ function formatDateTime(dateString: string): string {
   return `${dateFormatted} • ${timeFormatted}`;
 }
 
+const SEVERITY_OPTIONS = ['P0', 'P1', 'P2', 'P3', 'P4'] as const;
+const STATUS_OPTIONS = [
+  'Active',
+  'Mitigated',
+  'Postmortem',
+  'Actions Pending',
+  'Done',
+] as const;
+
 export function IncidentSummary({incident}: IncidentSummaryProps) {
+  const updateIncidentField = useUpdateIncidentField();
+
+  const handleSeverityChange = async (newSeverity: (typeof SEVERITY_OPTIONS)[number]) => {
+    await updateIncidentField.mutateAsync({
+      incidentId: incident.id,
+      field: 'severity',
+      value: newSeverity,
+    });
+  };
+
+  const handleStatusChange = async (newStatus: (typeof STATUS_OPTIONS)[number]) => {
+    await updateIncidentField.mutateAsync({
+      incidentId: incident.id,
+      field: 'status',
+      value: newStatus,
+    });
+  };
+
   return (
     <Card>
       <div className="mb-space-lg flex items-start justify-between">
@@ -39,8 +68,16 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         </time>
       </div>
       <div className="gap-space-lg mb-space-xl flex">
-        <Pill variant={incident.severity}>{incident.severity}</Pill>
-        <Pill variant={incident.status}>{incident.status}</Pill>
+        <EditablePill
+          value={incident.severity}
+          options={SEVERITY_OPTIONS}
+          onSave={handleSeverityChange}
+        />
+        <EditablePill
+          value={incident.status}
+          options={STATUS_OPTIONS}
+          onSave={handleStatusChange}
+        />
         {incident.is_private && <Pill variant="private">Private</Pill>}
       </div>
       <Card.Title size="2xl">{incident.title}</Card.Title>

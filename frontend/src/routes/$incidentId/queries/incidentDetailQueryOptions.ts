@@ -35,6 +35,7 @@ const IncidentDetailSchema = z.object({
 });
 
 export type IncidentDetail = z.infer<typeof IncidentDetailSchema>;
+export {IncidentDetailSchema};
 
 interface IncidentDetailQueryArgs {
   incidentId: string;

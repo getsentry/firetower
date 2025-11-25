@@ -56,7 +56,7 @@ const Pill = ({className, variant, ref, ...props}: PillProps) => {
   return (
     <div ref={ref} className={cn(pill({variant, className}))} {...rest}>
       {/* mt-[2px] and mb-auto is to align the text inside the div properly. I think the font is messed up slightly based on internet reading.*/}
-      <p className="mt-[2px] mb-auto">{children}</p>
+      <span className="mt-[2px] mb-auto block">{children}</span>
     </div>
   );
 };

@@ -100,7 +100,32 @@ function post<ResponseSchemaT extends z.ZodType>({
     query,
     method: 'POST',
     body,
-    extraHeaders,
+    extraHeaders: {
+      'Content-Type': 'application/json',
+      ...extraHeaders,
+    },
+    signal,
+    responseSchema,
+  });
+}
+
+function patch<ResponseSchemaT extends z.ZodType>({
+  path,
+  query = {},
+  body = undefined,
+  extraHeaders = {},
+  signal,
+  responseSchema,
+}: FetchArgs<ResponseSchemaT>) {
+  return _fetch({
+    path,
+    query,
+    method: 'PATCH',
+    body,
+    extraHeaders: {
+      'Content-Type': 'application/json',
+      ...extraHeaders,
+    },
     signal,
     responseSchema,
   });
@@ -109,5 +134,5 @@ function post<ResponseSchemaT extends z.ZodType>({
 export const Api = {
   get,
   post,
-  // add other methods as needed
+  patch,
 };
