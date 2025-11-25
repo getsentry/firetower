@@ -2,6 +2,15 @@ import {queryOptions} from '@tanstack/react-query';
 import {Api} from 'api';
 import {z} from 'zod';
 
+export const SEVERITY_OPTIONS = ['P0', 'P1', 'P2', 'P3', 'P4'] as const;
+export const STATUS_OPTIONS = [
+  'Active',
+  'Mitigated',
+  'Postmortem',
+  'Actions Pending',
+  'Done',
+] as const;
+
 const ParticipantSchema = z.object({
   name: z.string(),
   avatar_url: z.string().nullable(),
@@ -23,8 +32,8 @@ const IncidentDetailSchema = z.object({
   title: z.string(),
   description: z.string(),
   impact: z.string(),
-  status: z.enum(['Active', 'Mitigated', 'Postmortem', 'Actions Pending', 'Done']),
-  severity: z.enum(['P0', 'P1', 'P2', 'P3', 'P4']),
+  status: z.enum(STATUS_OPTIONS),
+  severity: z.enum(SEVERITY_OPTIONS),
   created_at: z.string(),
   updated_at: z.string(),
   is_private: z.boolean(),

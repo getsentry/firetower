@@ -3,6 +3,7 @@ import {Api} from 'api';
 import {z} from 'zod';
 
 import type {IncidentDetail} from './incidentDetailQueryOptions';
+import {SEVERITY_OPTIONS, STATUS_OPTIONS} from './incidentDetailQueryOptions';
 
 export interface UpdateIncidentFieldArgs {
   incidentId: string;
@@ -15,8 +16,8 @@ const PatchResponseSchema = z.object({
   title: z.string(),
   description: z.string(),
   impact: z.string(),
-  status: z.enum(['Active', 'Mitigated', 'Postmortem', 'Actions Pending', 'Done']),
-  severity: z.enum(['P0', 'P1', 'P2', 'P3', 'P4']),
+  status: z.enum(STATUS_OPTIONS),
+  severity: z.enum(SEVERITY_OPTIONS),
   is_private: z.boolean(),
 });
 

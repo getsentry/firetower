@@ -5,6 +5,10 @@ import {Pill} from 'components/Pill';
 import {Tag} from 'components/Tag';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
+import {
+  SEVERITY_OPTIONS,
+  STATUS_OPTIONS,
+} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
 interface IncidentSummaryProps {
@@ -25,15 +29,6 @@ function formatDateTime(dateString: string): string {
   });
   return `${dateFormatted} • ${timeFormatted}`;
 }
-
-const SEVERITY_OPTIONS = ['P0', 'P1', 'P2', 'P3', 'P4'] as const;
-const STATUS_OPTIONS = [
-  'Active',
-  'Mitigated',
-  'Postmortem',
-  'Actions Pending',
-  'Done',
-] as const;
 
 export function IncidentSummary({incident}: IncidentSummaryProps) {
   const queryClient = useQueryClient();
