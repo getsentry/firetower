@@ -46,8 +46,8 @@ class IncidentPermission(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return obj.is_visible_to_user(user)
 
-        # UPDATE: Same as read permissions
-        if request.method == "PATCH":
+        # UPDATE/POST: Same as read permissions (for PATCH updates and POST actions)
+        if request.method in ["PATCH", "POST"]:
             return obj.is_visible_to_user(user)
 
         return False

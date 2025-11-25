@@ -1,10 +1,14 @@
+import logging
 import re
+from dataclasses import asdict
 
 from django.conf import settings
 from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.request import Request
+from rest_framework.response import Response
 
 from .models import Incident, filter_visible_to_user
 from .permissions import IncidentPermission
@@ -14,6 +18,9 @@ from .serializers import (
     IncidentReadSerializer,
     IncidentWriteSerializer,
 )
+from .services import ParticipantsSyncStats, sync_incident_participants_from_slack
+
+logger = logging.getLogger(__name__)
 
 
 class IncidentListUIView(generics.ListAPIView):
@@ -93,11 +100,20 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
         queryset = self.get_queryset()
         queryset = filter_visible_to_user(queryset, self.request.user)
 
-        # Returns 404 if not found OR if user doesn't have access
-        return get_object_or_404(queryset, id=numeric_id)
+        incident = get_object_or_404(queryset, id=numeric_id)
+
+        try:
+            sync_incident_participants_from_slack(incident)
+        except Exception as e:
+            logger.error(
+                f"Failed to sync participants for incident {incident.id}: {e}",
+                exc_info=True,
+            )
+
+        return incident
 
 
-# Backwards-compatible function-based view aliases (for gradual migration)
+# View aliases for cleaner URL imports
 incident_list_ui = IncidentListUIView.as_view()
 incident_detail_ui = IncidentDetailUIView.as_view()
 
@@ -191,4 +207,86 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
         # Check object permissions for write operations
         self.check_object_permissions(self.request, obj)
 
+        try:
+            sync_incident_participants_from_slack(obj)
+        except Exception as e:
+            logger.error(
+                f"Failed to sync participants for incident {obj.id}: {e}",
+                exc_info=True,
+            )
+
         return obj
+
+
+class SyncIncidentParticipantsView(generics.GenericAPIView):
+    """
+    Force sync incident participants from Slack channel.
+
+    POST /api/incidents/{incident_id}/sync-participants/
+
+    Accepts incident_id in format: INC-2000
+    Returns sync statistics.
+    Bypasses throttle (force=True).
+
+    Uses IncidentPermission for access control.
+    """
+
+    permission_classes = [IncidentPermission]
+
+    def get_queryset(self) -> QuerySet[Incident]:
+        return Incident.objects.all()
+
+    def get_object(self) -> Incident:
+        """
+        Parse INC-2000 format and check permissions.
+
+        Returns incident if found and user has access, otherwise 404.
+        """
+        incident_id = self.kwargs["incident_id"]
+        project_key = settings.PROJECT_KEY
+
+        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
+        match = re.match(incident_pattern, incident_id)
+
+        if not match:
+            raise ValidationError(
+                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
+            )
+
+        numeric_id = int(match.group(1))
+        queryset = self.get_queryset()
+        queryset = filter_visible_to_user(queryset, self.request.user)
+
+        obj = get_object_or_404(queryset, id=numeric_id)
+
+        # Check object permissions
+        self.check_object_permissions(self.request, obj)
+
+        return obj
+
+    def post(self, request: Request, incident_id: str) -> Response:
+        incident = self.get_object()
+
+        try:
+            stats = sync_incident_participants_from_slack(incident, force=True)
+            return Response({"success": True, "stats": asdict(stats)})
+        except Exception as e:
+            logger.error(
+                f"Failed to force sync participants for incident {incident.id}: {e}",
+                exc_info=True,
+            )
+            error_stats = ParticipantsSyncStats(
+                errors=["Failed to sync participants from Slack"]
+            )
+            return Response(
+                {
+                    "success": False,
+                    "error": "Failed to sync participants from Slack",
+                    "stats": asdict(error_stats),
+                },
+                status=500,
+            )
+
+
+# View alias for sync endpoint
+sync_incident_participants = SyncIncidentParticipantsView.as_view()

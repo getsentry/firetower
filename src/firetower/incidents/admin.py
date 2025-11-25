@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from django.contrib import admin
-from django.db.models import ForeignKey, ManyToManyField
+from django.db.models import ForeignKey, ManyToManyField, QuerySet
 from django.forms import ModelChoiceField, ModelMultipleChoiceField
 from django.http import HttpRequest
 
 from .models import ExternalLink, Incident, Tag
+from .services import sync_incident_participants_from_slack
 
 
 class ExternalLinkInline(admin.TabularInline):
@@ -31,6 +32,8 @@ class IncidentAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at", "updated_at"]
 
     filter_horizontal = ["participants", "affected_area_tags", "root_cause_tags"]
+
+    actions = ["sync_participants_from_slack"]
 
     inlines = [ExternalLinkInline]
 
@@ -67,6 +70,36 @@ class IncidentAdmin(admin.ModelAdmin):
 
     incident_number_display.short_description = "Incident #"
     incident_number_display.admin_order_field = "id"
+
+    @admin.action(description="Sync participants from Slack")
+    def sync_participants_from_slack(
+        self, request: HttpRequest, queryset: QuerySet[Incident]
+    ) -> None:
+        success_count = 0
+        skipped_count = 0
+        error_count = 0
+
+        for incident in queryset:
+            try:
+                stats = sync_incident_participants_from_slack(incident, force=True)
+                if stats.errors:
+                    error_count += 1
+                elif stats.skipped:
+                    skipped_count += 1
+                else:
+                    success_count += 1
+            except Exception:
+                error_count += 1
+
+        message_parts = []
+        if success_count:
+            message_parts.append(f"{success_count} synced successfully")
+        if skipped_count:
+            message_parts.append(f"{skipped_count} skipped")
+        if error_count:
+            message_parts.append(f"{error_count} failed")
+
+        self.message_user(request, f"Participant sync: {', '.join(message_parts)}")
 
 
 @admin.register(Tag)

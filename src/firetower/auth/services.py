@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator, validate_email
 
+from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.integrations.services import SlackService
 
 logger = logging.getLogger(__name__)
@@ -12,7 +13,7 @@ _slack_service = SlackService()
 
 def sync_user_profile_from_slack(user: User) -> bool:
     """
-    Sync a user's profile (name, avatar) from Slack.
+    Sync a user's profile (name, avatar, Slack ID) from Slack.
 
     Args:
         user: User instance to sync
@@ -30,6 +31,7 @@ def sync_user_profile_from_slack(user: User) -> bool:
         logger.info(f"No Slack profile found for {user.email}")
         return False
 
+    slack_user_id = slack_profile.get("slack_user_id", "")
     first_name = slack_profile.get("first_name", "")
     last_name = slack_profile.get("last_name", "")
     avatar_url = slack_profile.get("avatar_url", "")
@@ -46,11 +48,9 @@ def sync_user_profile_from_slack(user: User) -> bool:
         user.save()
         logger.info(f"Updated profile from Slack for {user.email}")
 
-    # Update avatar from Slack profile
     if avatar_url and hasattr(user, "userprofile"):
         profile = user.userprofile
         if profile.avatar_url != avatar_url:
-            # Validate avatar URL (HTTPS only for security)
             try:
                 URLValidator(schemes=["https"])(avatar_url)
                 profile.avatar_url = avatar_url
@@ -60,7 +60,108 @@ def sync_user_profile_from_slack(user: User) -> bool:
             except ValidationError:
                 logger.warning(f"Invalid or insecure avatar URL: {avatar_url}")
 
+    if slack_user_id:
+        external_profile, created = ExternalProfile.objects.get_or_create(
+            user=user,
+            type=ExternalProfileType.SLACK,
+            defaults={"external_id": slack_user_id},
+        )
+        if not created and external_profile.external_id != slack_user_id:
+            external_profile.external_id = slack_user_id
+            external_profile.save()
+            logger.info(f"Updated Slack ID for user {user.email}")
+            needs_save = True
+        elif created:
+            logger.info(f"Created Slack ExternalProfile for user {user.email}")
+            needs_save = True
+
     return needs_save
+
+
+def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
+    """
+    Get or create a Django user from Slack user ID.
+
+    Args:
+        slack_user_id: Slack user ID (e.g., U12345678)
+
+    Returns:
+        User instance or None if Slack API fails
+
+    Note:
+        - First checks if a Slack ExternalProfile exists for this ID
+        - If a user with matching email already exists, attaches Slack profile to them
+        - Otherwise creates a new user with email as username
+    """
+    if not slack_user_id:
+        logger.warning("Cannot get/create user - no Slack user ID provided")
+        return None
+
+    try:
+        external_profile = ExternalProfile.objects.get(
+            type=ExternalProfileType.SLACK,
+            external_id=slack_user_id,
+        )
+        logger.info(f"Found existing user for Slack ID: {slack_user_id}")
+        return external_profile.user
+    except ExternalProfile.DoesNotExist:
+        pass
+
+    slack_user_info = _slack_service.get_user_info(slack_user_id)
+
+    if not slack_user_info:
+        logger.warning(f"Could not fetch user info from Slack for ID: {slack_user_id}")
+        return None
+
+    email = slack_user_info.get("email", "")
+    first_name = slack_user_info.get("first_name", "")
+    last_name = slack_user_info.get("last_name", "")
+    avatar_url = slack_user_info.get("avatar_url", "")
+
+    if not email:
+        logger.warning(f"Slack user {slack_user_id} has no email, cannot create user")
+        return None
+
+    # Check if user already exists with this email (e.g., created via IAP)
+    existing_user = User.objects.filter(email=email).first()
+    if existing_user:
+        # Attach Slack profile to existing user (get_or_create handles race conditions)
+        _, created = ExternalProfile.objects.get_or_create(
+            user=existing_user,
+            type=ExternalProfileType.SLACK,
+            defaults={"external_id": slack_user_id},
+        )
+        if created:
+            logger.info(f"Attached Slack ID {slack_user_id} to existing user: {email}")
+        return existing_user
+
+    user = User.objects.create(
+        username=email,
+        email=email,
+        first_name=first_name[:150],
+        last_name=last_name[:150],
+        is_active=True,
+    )
+    user.set_unusable_password()
+    user.save()
+
+    if avatar_url:
+        try:
+            URLValidator(schemes=["https"])(avatar_url)
+            user.userprofile.avatar_url = avatar_url
+            user.userprofile.save()
+        except ValidationError:
+            logger.warning(f"Invalid avatar URL for Slack user {slack_user_id}")
+
+    ExternalProfile.objects.create(
+        user=user,
+        type=ExternalProfileType.SLACK,
+        external_id=slack_user_id,
+    )
+
+    logger.info(f"Created new user from Slack: {email} (Slack ID: {slack_user_id})")
+
+    return user
 
 
 def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
@@ -78,46 +179,62 @@ def get_or_create_user_from_iap(iap_user_id: str, email: str) -> User:
         ValueError: If email or iap_user_id is missing
 
     Note:
-        Name and avatar are fetched from Slack only on user creation.
-        Use the "Sync with Slack" admin action to update existing users.
+        - First checks if an IAP ExternalProfile exists for this ID
+        - If a user with matching email already exists, attaches IAP profile to them
+        - Otherwise creates a new user with email as username
     """
     if not iap_user_id or not email:
         raise ValueError("IAP user ID and email are required for user creation")
 
-    # Validate email format
     try:
         validate_email(email)
     except ValidationError:
         raise ValueError(f"Invalid email format: {email}")
 
-    # Validate IAP user ID length (Django username field max_length is 150)
-    if len(iap_user_id) > 150:
-        raise ValueError(
-            f"IAP user ID exceeds maximum length of 150 characters: {len(iap_user_id)}"
+    # Check if user already exists via IAP ExternalProfile
+    try:
+        iap_profile = ExternalProfile.objects.get(
+            type=ExternalProfileType.IAP,
+            external_id=iap_user_id,
         )
-
-    user, created = User.objects.get_or_create(
-        username=iap_user_id,
-        defaults={
-            "email": email,
-            "is_active": True,
-        },
-    )
-
-    if created:
-        user.set_unusable_password()
-        user.save()
-        logger.info(f"Created new user from IAP: {email} (IAP ID: {iap_user_id})")
-
-        # Fetch profile from Slack on user creation only
-        sync_user_profile_from_slack(user)
-    else:
-        # For existing users, only update email if changed
+        user = iap_profile.user
         if user.email != email:
-            logger.info(
-                f"Updated email for user {iap_user_id}: {user.email} -> {email}"
-            )
+            logger.info(f"Updated email for user {email}: {user.email} -> {email}")
             user.email = email
             user.save()
+        return user
+    except ExternalProfile.DoesNotExist:
+        pass
+
+    # Check if user already exists with this email (e.g., created via Slack sync)
+    existing_user = User.objects.filter(email=email).first()
+    if existing_user:
+        # Attach IAP profile to existing user (get_or_create handles race conditions)
+        _, created = ExternalProfile.objects.get_or_create(
+            user=existing_user,
+            type=ExternalProfileType.IAP,
+            defaults={"external_id": iap_user_id},
+        )
+        if created:
+            logger.info(f"Attached IAP ID to existing user: {email}")
+        return existing_user
+
+    # Create new user
+    user = User.objects.create(
+        username=email,
+        email=email,
+        is_active=True,
+    )
+    user.set_unusable_password()
+    user.save()
+
+    ExternalProfile.objects.create(
+        user=user,
+        type=ExternalProfileType.IAP,
+        external_id=iap_user_id,
+    )
+    logger.info(f"Created new user from IAP: {email}")
+
+    sync_user_profile_from_slack(user)
 
     return user

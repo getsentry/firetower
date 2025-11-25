@@ -71,9 +71,7 @@ class IAPAuthenticationMiddleware:
             )
 
             request.user = user
-            logger.info(
-                f"IAP authentication successful for user {user.email} (ID: {user.username})"
-            )
+            logger.info(f"IAP authentication successful for user {user.email}")
 
         except ValueError as e:
             logger.error(f"IAP authentication failed: {e}")
