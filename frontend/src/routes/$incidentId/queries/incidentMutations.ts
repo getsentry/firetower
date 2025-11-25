@@ -15,7 +15,7 @@ export function useUpdateIncidentField() {
   return useMutation({
     mutationFn: async ({incidentId, field, value}: UpdateIncidentFieldArgs) => {
       return Api.patch({
-        path: `/ui/incidents/${incidentId}/`,
+        path: `/incidents/${incidentId}/`,
         body: {[field]: value},
         responseSchema: IncidentDetailSchema,
       });
