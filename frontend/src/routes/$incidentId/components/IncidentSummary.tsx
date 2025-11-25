@@ -85,22 +85,22 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
 
       <div className="mt-space-xl grid grid-cols-1 gap-space-xl md:grid-cols-3">
         <div>
-          <h3 className="text-size-md font-semibold text-content-secondary mb-space-md">
+          <h3 className="mb-space-md text-size-md font-semibold text-content-secondary">
             Impact
           </h3>
           {incident.impact ? (
-            <p className="text-content-secondary text-size-sm leading-comfortable">
+            <p className="text-size-sm leading-comfortable text-content-secondary">
               {incident.impact}
             </p>
           ) : (
-            <p className="text-content-disabled text-size-sm italic">
+            <p className="text-size-sm italic text-content-disabled">
               No impact specified
             </p>
           )}
         </div>
 
         <div>
-          <h3 className="text-size-md font-semibold text-content-secondary mb-space-md">
+          <h3 className="mb-space-md text-size-md font-semibold text-content-secondary">
             Affected Areas
           </h3>
           {incident.affected_areas.length > 0 ? (
@@ -110,14 +110,14 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
               ))}
             </div>
           ) : (
-            <p className="text-content-disabled text-size-sm italic">
+            <p className="text-size-sm italic text-content-disabled">
               No affected areas specified
             </p>
           )}
         </div>
 
         <div>
-          <h3 className="text-size-md font-semibold text-content-secondary mb-space-md">
+          <h3 className="mb-space-md text-size-md font-semibold text-content-secondary">
             Root Cause
           </h3>
           {incident.root_causes.length > 0 ? (
@@ -127,7 +127,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
               ))}
             </div>
           ) : (
-            <p className="text-content-disabled text-size-sm italic">
+            <p className="text-size-sm italic text-content-disabled">
               No root cause specified
             </p>
           )}
