@@ -1,10 +1,10 @@
-import {useMutation, useQueryClient} from '@tanstack/react-query';
+import {mutationOptions, type QueryClient} from '@tanstack/react-query';
 import {Api} from 'api';
 import {z} from 'zod';
 
 import type {IncidentDetail} from './incidentDetailQueryOptions';
 
-interface UpdateIncidentFieldArgs {
+export interface UpdateIncidentFieldArgs {
   incidentId: string;
   field: 'severity' | 'status';
   value: string;
@@ -20,10 +20,8 @@ const PatchResponseSchema = z.object({
   is_private: z.boolean(),
 });
 
-export function useUpdateIncidentField() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
+export function updateIncidentFieldMutationOptions(queryClient: QueryClient) {
+  return mutationOptions({
     mutationFn: async ({incidentId, field, value}: UpdateIncidentFieldArgs) => {
       return Api.patch({
         path: `/incidents/${incidentId}/`,

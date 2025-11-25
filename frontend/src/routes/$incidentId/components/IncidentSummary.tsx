@@ -1,10 +1,11 @@
+import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {Card} from 'components/Card';
 import {EditablePill} from 'components/EditablePill';
 import {Pill} from 'components/Pill';
 import {Tag} from 'components/Tag';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
-import {useUpdateIncidentField} from '../queries/incidentMutations';
+import {updateIncidentFieldMutationOptions} from '../queries/incidentMutations';
 
 interface IncidentSummaryProps {
   incident: IncidentDetail;
@@ -35,7 +36,8 @@ const STATUS_OPTIONS = [
 ] as const;
 
 export function IncidentSummary({incident}: IncidentSummaryProps) {
-  const updateIncidentField = useUpdateIncidentField();
+  const queryClient = useQueryClient();
+  const updateIncidentField = useMutation(updateIncidentFieldMutationOptions(queryClient));
 
   const handleSeverityChange = async (newSeverity: (typeof SEVERITY_OPTIONS)[number]) => {
     await updateIncidentField.mutateAsync({
