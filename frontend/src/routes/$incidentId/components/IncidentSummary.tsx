@@ -5,7 +5,7 @@ import {Pill} from 'components/Pill';
 import {Tag} from 'components/Tag';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
-import {updateIncidentFieldMutationOptions} from '../queries/incidentMutations';
+import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
 interface IncidentSummaryProps {
   incident: IncidentDetail;
