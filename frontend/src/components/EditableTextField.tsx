@@ -146,7 +146,6 @@ export interface EditableTextFieldProps {
 
   // Optional
   as?: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'div';
-  editable?: boolean;
   validationSchema?: z.ZodSchema<string>;
   multiline?: boolean;
   fullWidth?: boolean; // Whether display text should expand to full width (default: false)
@@ -162,7 +161,6 @@ export function EditableTextField({
   value,
   onSave,
   as: Component = 'div',
-  editable = true,
   validationSchema,
   multiline = false,
   fullWidth = false,
@@ -180,12 +178,11 @@ export function EditableTextField({
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
   const startEditing = useCallback(() => {
-    if (!editable) return;
     setIsEditing(true);
     setError(null);
     setValidationError(null);
     setDraftValue(value);
-  }, [editable, value]);
+  }, [value]);
 
   const cancelEditing = useCallback(() => {
     setIsEditing(false);
@@ -305,7 +302,7 @@ export function EditableTextField({
             <LabelComponent className={cn(labelStyles(), labelClassName)}>
               {label}
             </LabelComponent>
-            {editable && !isEditing && (
+            {!isEditing && (
               <button
                 type="button"
                 onClick={startEditing}
@@ -328,7 +325,7 @@ export function EditableTextField({
           <Component className={cn(fullWidth ? 'flex-1 min-w-0' : 'inline', className)}>
             {value}
           </Component>
-          {editable && !isEditing && (
+          {!isEditing && (
             <button
               type="button"
               onClick={startEditing}

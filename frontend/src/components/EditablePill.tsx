@@ -50,7 +50,6 @@ export interface EditablePillProps<T extends string> {
   value: T;
   options: readonly T[];
   onSave: (newValue: T) => Promise<void>;
-  editable?: boolean;
   className?: string;
   getVariant?: (value: T) => PillProps['variant'];
 }
@@ -59,22 +58,21 @@ export function EditablePill<T extends string>({
   value,
   options,
   onSave,
-  editable = true,
   className,
   getVariant,
 }: EditablePillProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const open = useCallback(() => {
-    if (!editable || isSaving) return;
+    if (isSaving) return;
     setIsOpen(true);
     const currentIndex = options.indexOf(value);
     setFocusedIndex(currentIndex);
-  }, [editable, isSaving, options, value]);
+  }, [isSaving, options, value]);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -104,7 +102,7 @@ export function EditablePill<T extends string>({
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      if (!editable || isSaving) return;
+      if (isSaving) return;
 
       if (!isOpen) {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -136,7 +134,7 @@ export function EditablePill<T extends string>({
           break;
       }
     },
-    [editable, isSaving, isOpen, open, close, focusedIndex, options, handleSelect]
+    [isSaving, isOpen, open, close, focusedIndex, options, handleSelect]
   );
 
   useEffect(() => {
@@ -164,24 +162,24 @@ export function EditablePill<T extends string>({
 
   return (
     <>
-      <div ref={triggerRef} className="relative inline-block">
-        <Pill
-          variant={variant}
-          className={cn(editable && triggerStyles(), className)}
-          onClick={editable ? open : undefined}
-          onKeyDown={editable ? handleKeyDown : undefined}
-          role={editable ? 'button' : undefined}
-          aria-haspopup={editable ? 'listbox' : undefined}
-          aria-expanded={editable ? isOpen : undefined}
-          tabIndex={editable ? 0 : undefined}
+      <div className="relative inline-block">
+        <button
+          ref={triggerRef}
+          onClick={open}
+          onKeyDown={handleKeyDown}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          className={cn(triggerStyles(), className)}
         >
-          <span className="relative inline-flex items-center justify-center">
-            <span className={cn(isSaving && 'invisible')}>{value}</span>
-            {isSaving && (
-              <Spinner size="sm" className="absolute h-3 w-3" />
-            )}
-          </span>
-        </Pill>
+          <Pill variant={variant}>
+            <span className="relative inline-flex items-center justify-center">
+              <span className={cn(isSaving && 'invisible')}>{value}</span>
+              {isSaving && (
+                <Spinner size="sm" className="absolute h-3 w-3" />
+              )}
+            </span>
+          </Pill>
+        </button>
 
         {isOpen && (
           <div ref={popoverRef} className={cn(popoverStyles())} role="listbox">

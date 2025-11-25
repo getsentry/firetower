@@ -176,24 +176,6 @@ describe('EditablePill', () => {
     });
   });
 
-  it('does not open popover when not editable', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <EditablePill
-        value="P1"
-        options={SEVERITY_OPTIONS}
-        onSave={async () => {}}
-        editable={false}
-      />
-    );
-
-    const pill = await screen.findByText('P1');
-    await user.click(pill);
-
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-  });
-
   it('handles save errors gracefully', async () => {
     const user = userEvent.setup();
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
