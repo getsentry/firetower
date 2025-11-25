@@ -139,8 +139,11 @@ export function EditablePill<T extends string>({
           aria-haspopup={editable ? 'listbox' : undefined}
           aria-expanded={editable ? isOpen : undefined}
         >
-          <span className="inline-flex items-center justify-center min-w-[2.5rem]">
-            {isSaving ? <Spinner size="sm" className="h-3 w-3" /> : value}
+          <span className="relative inline-flex items-center justify-center">
+            <span className={cn(isSaving && 'invisible')}>{value}</span>
+            {isSaving && (
+              <Spinner size="sm" className="absolute h-3 w-3" />
+            )}
           </span>
         </Pill>
 
