@@ -65,16 +65,21 @@ export function EditablePill<T extends string>({
 }: EditablePillProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const triggerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const open = useCallback(() => {
     if (!editable || isSaving) return;
     setIsOpen(true);
-  }, [editable, isSaving]);
+    const currentIndex = options.indexOf(value);
+    setFocusedIndex(currentIndex);
+  }, [editable, isSaving, options, value]);
 
   const close = useCallback(() => {
     setIsOpen(false);
+    setFocusedIndex(-1);
+    triggerRef.current?.focus();
   }, []);
 
   const handleSelect = useCallback(
@@ -97,6 +102,43 @@ export function EditablePill<T extends string>({
     [value, onSave, close]
   );
 
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (!editable || isSaving) return;
+
+      if (!isOpen) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          open();
+        }
+        return;
+      }
+
+      switch (event.key) {
+        case 'ArrowDown':
+          event.preventDefault();
+          setFocusedIndex(prev => (prev + 1) % options.length);
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          setFocusedIndex(prev => (prev - 1 + options.length) % options.length);
+          break;
+        case 'Enter':
+        case ' ':
+          event.preventDefault();
+          if (focusedIndex >= 0) {
+            handleSelect(options[focusedIndex]);
+          }
+          break;
+        case 'Escape':
+          event.preventDefault();
+          close();
+          break;
+      }
+    },
+    [editable, isSaving, isOpen, open, close, focusedIndex, options, handleSelect]
+  );
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -111,18 +153,10 @@ export function EditablePill<T extends string>({
       }
     };
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        close();
-      }
-    };
-
     document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen, close]);
 
@@ -135,9 +169,11 @@ export function EditablePill<T extends string>({
           variant={variant}
           className={cn(editable && triggerStyles(), className)}
           onClick={editable ? open : undefined}
+          onKeyDown={editable ? handleKeyDown : undefined}
           role={editable ? 'button' : undefined}
           aria-haspopup={editable ? 'listbox' : undefined}
           aria-expanded={editable ? isOpen : undefined}
+          tabIndex={editable ? 0 : undefined}
         >
           <span className="relative inline-flex items-center justify-center">
             <span className={cn(isSaving && 'invisible')}>{value}</span>
@@ -149,14 +185,18 @@ export function EditablePill<T extends string>({
 
         {isOpen && (
           <div ref={popoverRef} className={cn(popoverStyles())} role="listbox">
-            {options.map(option => {
+            {options.map((option, index) => {
               const optionVariant = getVariant
                 ? getVariant(option)
                 : (option as PillProps['variant']);
+              const isFocused = index === focusedIndex;
               return (
                 <div
                   key={option}
-                  className={cn(optionRowStyles())}
+                  className={cn(
+                    optionRowStyles(),
+                    isFocused && 'bg-gray-100'
+                  )}
                   onClick={() => handleSelect(option)}
                   role="option"
                   aria-selected={option === value}
