@@ -4,6 +4,15 @@ import {env} from '../env';
 
 type ParamsObj = Record<string, string | number | undefined | (string | number)[]>;
 
+function getCsrfToken(): string | null {
+  const name = 'csrftoken';
+  const cookieValue = document.cookie
+    .split('; ')
+    .find(row => row.startsWith(name + '='))
+    ?.split('=')[1];
+  return cookieValue || null;
+}
+
 export function paramsFromObject(params: ParamsObj): URLSearchParams {
   const urlParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -47,10 +56,20 @@ async function _fetch<ResponseSchemaT extends z.ZodType>({
   const queryString = paramsFromObject(query);
   const url = `${env.VITE_API_URL}${normalizedPath}${queryString ? '?' + queryString : ''}`;
 
+  const headers: Record<string, string> = {
+    ...extraHeaders,
+  };
+
+  // Add CSRF token for state-changing requests
+  if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+  }
+
   return fetch(url, {
-    headers: {
-      ...extraHeaders,
-    },
+    headers,
     method,
     signal,
     credentials: 'include',
