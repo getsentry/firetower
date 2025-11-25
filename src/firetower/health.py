@@ -79,9 +79,8 @@ def readiness_check(request: Request) -> Response:
         "checks": {
             name: {
                 "status": "pass" if passed else "fail",
-                "message": message,
             }
-            for name, (passed, message) in checks.items()
+            for name, passed in checks.items()
         },
     }
 
