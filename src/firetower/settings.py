@@ -247,7 +247,7 @@ DATADOG_STATS = {
 # Initialize Datadog statsd
 initialize(**DATADOG_STATS)
 statsd.constant_tags = [
-    f"env:{"production" if os.environ.get('DJANGO_ENV') == 'prod' else "test"}",
+    f"env:{'production' if os.environ.get('DJANGO_ENV') == 'prod' else 'test'}",
     "service:firetower",
     f"version:{os.environ.get('K_REVISION', 'unknown')}",
 ]
