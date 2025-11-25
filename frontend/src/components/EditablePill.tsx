@@ -42,6 +42,7 @@ const triggerStyles = cva([
   'hover:scale-105',
   'active:scale-95',
   'relative',
+  'rounded-full',
 ]);
 
 const overlayStyles = cva(['fixed', 'inset-0', 'z-40', 'bg-transparent']);
