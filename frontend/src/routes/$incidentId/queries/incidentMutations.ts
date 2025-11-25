@@ -2,6 +2,8 @@ import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {Api} from 'api';
 import {z} from 'zod';
 
+import type {IncidentDetail} from './incidentDetailQueryOptions';
+
 interface UpdateIncidentFieldArgs {
   incidentId: string;
   field: 'severity' | 'status';
@@ -29,7 +31,38 @@ export function useUpdateIncidentField() {
         responseSchema: PatchResponseSchema,
       });
     },
-    onSuccess: (_data, variables) => {
+    onMutate: async variables => {
+      await queryClient.cancelQueries({
+        queryKey: ['IncidentDetail', variables.incidentId],
+      });
+
+      const previousIncident = queryClient.getQueryData([
+        'IncidentDetail',
+        variables.incidentId,
+      ]);
+
+      queryClient.setQueryData(
+        ['IncidentDetail', variables.incidentId],
+        (old: IncidentDetail | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            [variables.field]: variables.value,
+          };
+        }
+      );
+
+      return {previousIncident};
+    },
+    onError: (_err, variables, context) => {
+      if (context?.previousIncident) {
+        queryClient.setQueryData(
+          ['IncidentDetail', variables.incidentId],
+          context.previousIncident
+        );
+      }
+    },
+    onSettled: (_data, _error, variables) => {
       queryClient.invalidateQueries({queryKey: ['IncidentDetail', variables.incidentId]});
     },
   });
