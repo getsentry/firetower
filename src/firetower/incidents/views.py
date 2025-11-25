@@ -5,6 +5,8 @@ from dataclasses import asdict
 from django.conf import settings
 from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
@@ -118,6 +120,7 @@ incident_list_ui = IncidentListUIView.as_view()
 incident_detail_ui = IncidentDetailUIView.as_view()
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class IncidentListCreateAPIView(generics.ListCreateAPIView):
     """
     Service API for listing and creating incidents.
@@ -143,6 +146,7 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
         return queryset
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
     """
     Service API for retrieving and updating incidents.
@@ -218,6 +222,7 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
         return obj
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class SyncIncidentParticipantsView(generics.GenericAPIView):
     """
     Force sync incident participants from Slack channel.
