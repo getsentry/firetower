@@ -45,7 +45,7 @@ EXPOSE $PORT
 ENV DJANGO_ENV="prod"
 ENTRYPOINT ["/app/datadog-init"]
 CMD [
-  "/bin/sh",
+  "sh",
   "-c",
   """
   export PYTHONPATH=/app:$PYTHONPATH && \
