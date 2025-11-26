@@ -37,7 +37,7 @@ class TestHealthChecks:
         client = Client()
 
         with (
-            patch("firetower.health.check_database", return_value=(False, "DB error")),
+            patch("firetower.health.check_database", return_value=False),
             patch("firetower.health.statsd.gauge") as mock_gauge,
         ):
             response = client.get(reverse("readiness"))
