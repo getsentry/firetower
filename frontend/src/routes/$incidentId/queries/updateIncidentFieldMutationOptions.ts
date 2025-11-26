@@ -5,11 +5,9 @@ import {z} from 'zod';
 import type {IncidentDetail} from './incidentDetailQueryOptions';
 import {SEVERITY_OPTIONS, STATUS_OPTIONS} from './incidentDetailQueryOptions';
 
-export interface UpdateIncidentFieldArgs {
-  incidentId: string;
-  field: 'severity' | 'status' | 'title' | 'description' | 'impact';
-  value: string;
-}
+export type UpdateIncidentFieldArgs =
+  | {incidentId: string; field: 'severity' | 'status' | 'title' | 'description' | 'impact'; value: string}
+  | {incidentId: string; field: 'is_private'; value: boolean};
 
 const PatchResponseSchema = z.object({
   id: z.string(),
