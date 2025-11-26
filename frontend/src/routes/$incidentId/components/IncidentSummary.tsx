@@ -46,6 +46,14 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
       });
     };
 
+  const handleVisibilityToggle = async () => {
+    await updateIncidentField.mutateAsync({
+      incidentId: incident.id,
+      field: 'is_private',
+      value: !incident.is_private,
+    });
+  };
+
   return (
     <Card>
       <div className="mb-space-lg flex items-start justify-between">
@@ -62,9 +70,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           </time>
           <OverflowMenu
             isPrivate={incident.is_private}
-            onToggleVisibility={() => {
-              // TODO: Wire up API mutation
-            }}
+            onToggleVisibility={handleVisibilityToggle}
           />
         </div>
       </div>
