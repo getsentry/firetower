@@ -1,9 +1,8 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {cva} from 'class-variance-authority';
+import {ConfirmationDialog} from 'components/ConfirmationDialog';
 import {EllipsisVertical} from 'lucide-react';
 import {cn} from 'utils/cn';
-
-import {ConfirmationDialog} from './ConfirmationDialog';
 
 const triggerStyles = cva([
   'text-content-secondary',
