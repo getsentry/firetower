@@ -53,7 +53,7 @@ interface ConfirmationDialogProps {
   onCancel: () => void;
 }
 
-const ConfirmationDialog = ({
+function ConfirmationDialog({
   isOpen,
   title,
   message,
@@ -61,7 +61,7 @@ const ConfirmationDialog = ({
   cancelLabel = 'Cancel',
   onConfirm,
   onCancel,
-}: ConfirmationDialogProps) => {
+}: ConfirmationDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -126,6 +126,6 @@ const ConfirmationDialog = ({
       </div>
     </>
   );
-};
+}
 
 export {ConfirmationDialog, type ConfirmationDialogProps};
