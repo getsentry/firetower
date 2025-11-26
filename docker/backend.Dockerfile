@@ -48,7 +48,7 @@ ENV GRANIAN_BACKPRESSURE="32"
 
 ENTRYPOINT ["/app/datadog-init"]
 CMD [
-  "/bin/sh",
+  "sh",
   "-c",
   """
   export PYTHONPATH=/app:$PYTHONPATH && \
