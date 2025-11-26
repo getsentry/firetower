@@ -5,6 +5,7 @@ import {EllipsisVertical} from 'lucide-react';
 import {cn} from 'utils/cn';
 
 const triggerStyles = cva([
+  'cursor-pointer',
   'text-content-secondary',
   'hover:text-content-primary',
   'hover:bg-background-secondary',

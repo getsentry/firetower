@@ -21,6 +21,7 @@ const dialog = cva([
 
 const button = cva(
   [
+    'cursor-pointer',
     'px-space-xl',
     'py-space-md',
     'rounded-radius-md',
