@@ -9,6 +9,8 @@ import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {SEVERITY_OPTIONS, STATUS_OPTIONS} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
+import {OverflowMenu} from './OverflowMenu';
+
 interface IncidentSummaryProps {
   incident: IncidentDetail;
 }
@@ -51,12 +53,20 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           {incident.is_private && <span aria-label="Private incident">🔒</span>}
           {incident.id}
         </span>
-        <time
-          className="text-content-secondary text-right text-sm"
-          dateTime={incident.created_at}
-        >
-          {formatDateTime(incident.created_at)}
-        </time>
+        <div className="gap-space-md flex items-center">
+          <time
+            className="text-content-secondary text-right text-sm"
+            dateTime={incident.created_at}
+          >
+            {formatDateTime(incident.created_at)}
+          </time>
+          <OverflowMenu
+            isPrivate={incident.is_private}
+            onToggleVisibility={() => {
+              // TODO: Wire up API mutation
+            }}
+          />
+        </div>
       </div>
       <div className="gap-space-lg mb-space-xl flex">
         <EditablePill
