@@ -56,7 +56,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
 
   return (
     <Card>
-      <div className="mb-space-lg flex items-start justify-between">
+      <div className="mb-space-lg flex items-center justify-between">
         <span className="text-content-secondary gap-space-xs flex items-center text-sm leading-none">
           {incident.is_private && <span aria-label="Private incident">🔒</span>}
           {incident.id}
