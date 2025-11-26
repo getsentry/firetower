@@ -5,10 +5,7 @@ import {Pill} from 'components/Pill';
 import {Tag} from 'components/Tag';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
-import {
-  SEVERITY_OPTIONS,
-  STATUS_OPTIONS,
-} from '../queries/incidentDetailQueryOptions';
+import {SEVERITY_OPTIONS, STATUS_OPTIONS} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
 interface IncidentSummaryProps {
@@ -32,7 +29,9 @@ function formatDateTime(dateString: string): string {
 
 export function IncidentSummary({incident}: IncidentSummaryProps) {
   const queryClient = useQueryClient();
-  const updateIncidentField = useMutation(updateIncidentFieldMutationOptions(queryClient));
+  const updateIncidentField = useMutation(
+    updateIncidentFieldMutationOptions(queryClient)
+  );
 
   const handleSeverityChange = async (newSeverity: (typeof SEVERITY_OPTIONS)[number]) => {
     await updateIncidentField.mutateAsync({

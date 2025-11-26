@@ -175,9 +175,7 @@ export function EditablePill<T extends string>({
           <Pill variant={variant}>
             <span className="relative inline-flex items-center justify-center">
               <span className={cn(isSaving && 'invisible')}>{value}</span>
-              {isSaving && (
-                <Spinner size="sm" className="absolute h-3 w-3" />
-              )}
+              {isSaving && <Spinner size="sm" className="absolute h-3 w-3" />}
             </span>
           </Pill>
         </button>
@@ -192,10 +190,7 @@ export function EditablePill<T extends string>({
               return (
                 <div
                   key={option}
-                  className={cn(
-                    optionRowStyles(),
-                    isFocused && 'bg-gray-100'
-                  )}
+                  className={cn(optionRowStyles(), isFocused && 'bg-gray-100')}
                   onClick={() => handleSelect(option)}
                   role="option"
                   aria-selected={option === value}
