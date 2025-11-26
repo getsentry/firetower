@@ -31,7 +31,11 @@ const button = cva(
   {
     variants: {
       variant: {
-        primary: ['bg-gray-900', 'text-white', 'hover:bg-gray-800'],
+        primary: [
+          'bg-background-accent-vibrant',
+          'text-content-on-vibrant-light',
+          'hover:opacity-90',
+        ],
         secondary: ['bg-gray-100', 'text-gray-900', 'hover:bg-gray-200'],
       },
     },
