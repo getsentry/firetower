@@ -1,10 +1,10 @@
-import {useEffect, useRef} from 'react';
+import React, {useEffect, useRef} from 'react';
 import {cva} from 'class-variance-authority';
 import {cn} from 'utils/cn';
 
-const overlayStyles = cva(['fixed', 'inset-0', 'z-50', 'bg-black/50']);
+const overlay = cva(['fixed', 'inset-0', 'z-50', 'bg-black/50']);
 
-const dialogStyles = cva([
+const dialog = cva([
   'fixed',
   'top-1/2',
   'left-1/2',
@@ -19,7 +19,7 @@ const dialogStyles = cva([
   'shadow-xl',
 ]);
 
-const buttonStyles = cva(
+const button = cva(
   [
     'px-space-xl',
     'py-space-md',
@@ -41,20 +41,22 @@ const buttonStyles = cva(
 interface ConfirmationDialogProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmLabel: string;
+  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export function ConfirmationDialog({
+const ConfirmationDialog = ({
   isOpen,
   title,
   message,
   confirmLabel,
+  cancelLabel = 'Cancel',
   onConfirm,
   onCancel,
-}: ConfirmationDialogProps) {
+}: ConfirmationDialogProps) => {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -85,33 +87,33 @@ export function ConfirmationDialog({
 
   return (
     <>
-      <div className={cn(overlayStyles())} onClick={onCancel} aria-hidden="true" />
+      <div className={cn(overlay())} onClick={onCancel} aria-hidden="true" />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className={cn(dialogStyles())}
+        className={cn(dialog())}
       >
         <h2
           id="dialog-title"
-          className="text-content-headings mb-space-md text-lg font-semibold"
+          className="mb-space-md text-content-headings text-lg font-semibold"
         >
           {title}
         </h2>
-        <p className="text-content-secondary mb-space-xl">{message}</p>
+        <div className="mb-space-xl text-content-secondary">{message}</div>
         <div className="gap-space-md flex justify-end">
           <button
             type="button"
             onClick={onCancel}
-            className={cn(buttonStyles({variant: 'secondary'}))}
+            className={cn(button({variant: 'secondary'}))}
           >
-            Cancel
+            {cancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={cn(buttonStyles({variant: 'primary'}))}
+            className={cn(button({variant: 'primary'}))}
           >
             {confirmLabel}
           </button>
@@ -119,4 +121,6 @@ export function ConfirmationDialog({
       </div>
     </>
   );
-}
+};
+
+export {ConfirmationDialog, type ConfirmationDialogProps};
