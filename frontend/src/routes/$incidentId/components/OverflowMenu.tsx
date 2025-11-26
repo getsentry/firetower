@@ -108,7 +108,7 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
             onClick={handleToggle}
             className={cn(menuItemStyles())}
           >
-            {isPrivate ? 'Make public' : 'Make private'}
+            {isPrivate ? 'Make incident public' : 'Convert to private incident'}
           </button>
         </div>
       )}
