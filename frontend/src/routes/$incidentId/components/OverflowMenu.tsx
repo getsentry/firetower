@@ -3,6 +3,8 @@ import {cva} from 'class-variance-authority';
 import {EllipsisVertical} from 'lucide-react';
 import {cn} from 'utils/cn';
 
+import {ConfirmationDialog} from './ConfirmationDialog';
+
 const triggerStyles = cva([
   'text-content-secondary',
   'hover:text-content-primary',
@@ -47,6 +49,7 @@ interface OverflowMenuProps {
 export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -55,8 +58,13 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
     triggerRef.current?.focus();
   }, []);
 
-  const handleToggle = useCallback(async () => {
+  const handleMenuItemClick = useCallback(() => {
     close();
+    setShowConfirmation(true);
+  }, [close]);
+
+  const handleConfirm = useCallback(async () => {
+    setShowConfirmation(false);
     setIsLoading(true);
     try {
       await onToggleVisibility();
@@ -65,7 +73,11 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
     } finally {
       setIsLoading(false);
     }
-  }, [onToggleVisibility, close]);
+  }, [onToggleVisibility]);
+
+  const handleCancel = useCallback(() => {
+    setShowConfirmation(false);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -85,33 +97,52 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, close]);
 
-  return (
-    <div className="relative" ref={menuRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        disabled={isLoading}
-        className={cn(triggerStyles())}
-        aria-label="More actions"
-        aria-expanded={isOpen}
-        aria-haspopup="menu"
-      >
-        <EllipsisVertical className="h-5 w-5" />
-      </button>
+  const dialogTitle = isPrivate
+    ? 'Make incident public?'
+    : 'Convert to private incident?';
+  const dialogMessage = isPrivate
+    ? 'This incident will be visible to all users.'
+    : 'This incident will only be visible to participants and admins.';
+  const confirmLabel = isPrivate ? 'Make public' : 'Convert to private';
 
-      {isOpen && (
-        <div role="menu" className={cn(popoverStyles())}>
-          <button
-            role="menuitem"
-            type="button"
-            onClick={handleToggle}
-            className={cn(menuItemStyles())}
-          >
-            {isPrivate ? 'Make incident public' : 'Convert to private incident'}
-          </button>
-        </div>
-      )}
-    </div>
+  return (
+    <>
+      <div className="relative" ref={menuRef}>
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          disabled={isLoading}
+          className={cn(triggerStyles())}
+          aria-label="More actions"
+          aria-expanded={isOpen}
+          aria-haspopup="menu"
+        >
+          <EllipsisVertical className="h-5 w-5" />
+        </button>
+
+        {isOpen && (
+          <div role="menu" className={cn(popoverStyles())}>
+            <button
+              role="menuitem"
+              type="button"
+              onClick={handleMenuItemClick}
+              className={cn(menuItemStyles())}
+            >
+              {isPrivate ? 'Make incident public' : 'Convert to private incident'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <ConfirmationDialog
+        isOpen={showConfirmation}
+        title={dialogTitle}
+        message={dialogMessage}
+        confirmLabel={confirmLabel}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+    </>
   );
 }
