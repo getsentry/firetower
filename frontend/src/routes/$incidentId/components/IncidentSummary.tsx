@@ -66,6 +66,14 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     });
   };
 
+  const handleImpactChange = async (newImpact: string) => {
+    await updateIncidentField.mutateAsync({
+      incidentId: incident.id,
+      field: 'impact',
+      value: newImpact,
+    });
+  };
+
   return (
     <Card>
       <div className="mb-space-lg flex items-start justify-between">
@@ -111,18 +119,15 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
 
       <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-3">
         <div>
-          <h3 className="mb-space-md text-size-md text-content-secondary font-semibold">
-            Impact
-          </h3>
-          {incident.impact ? (
-            <p className="text-size-sm leading-comfortable text-content-secondary">
-              {incident.impact}
-            </p>
-          ) : (
-            <p className="text-size-sm text-content-disabled italic">
-              No impact specified
-            </p>
-          )}
+          <EditableTextField
+            value={incident.impact}
+            onSave={handleImpactChange}
+            label="Impact"
+            labelClassName="text-size-md font-semibold"
+            as="p"
+            multiline
+            className="text-size-sm leading-comfortable text-content-secondary"
+          />
         </div>
 
         <div>

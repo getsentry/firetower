@@ -7,7 +7,7 @@ import {SEVERITY_OPTIONS, STATUS_OPTIONS} from './incidentDetailQueryOptions';
 
 export interface UpdateIncidentFieldArgs {
   incidentId: string;
-  field: 'severity' | 'status' | 'title' | 'description';
+  field: 'severity' | 'status' | 'title' | 'description' | 'impact';
   value: string;
 }
 
