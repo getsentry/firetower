@@ -85,12 +85,14 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         />
         {incident.is_private && <Pill variant="private">Private</Pill>}
       </div>
-      <EditableTextField
-        value={incident.title}
-        onSave={handleTitleChange}
-        as="h3"
-        className="text-content-headings text-2xl font-semibold"
-      />
+      <div className="mb-space-xl">
+        <EditableTextField
+          value={incident.title}
+          onSave={handleTitleChange}
+          as="h3"
+          className="text-content-headings text-2xl font-semibold"
+        />
+      </div>
       <p className="text-content-secondary leading-comfortable">{incident.description}</p>
 
       <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-3">
