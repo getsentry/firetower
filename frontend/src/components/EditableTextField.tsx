@@ -99,9 +99,7 @@ const buttonBaseStyles = [
   'font-medium',
   'text-sm',
   'transition-colors',
-  'focus:outline-none',
-  'focus:ring-2',
-  'focus:ring-offset-2',
+  'focus:outline-auto',
   'disabled:opacity-50',
   'disabled:cursor-not-allowed',
 ];
