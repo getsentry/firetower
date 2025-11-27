@@ -8,7 +8,7 @@ const triggerStyles = cva([
   'cursor-pointer',
   'text-content-secondary',
   'hover:text-content-primary',
-  'hover:bg-background-secondary',
+  'hover:bg-gray-100',
   'rounded-radius-sm',
   'p-space-xs',
   'transition-colors',
