@@ -58,6 +58,14 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     });
   };
 
+  const handleDescriptionChange = async (newDescription: string) => {
+    await updateIncidentField.mutateAsync({
+      incidentId: incident.id,
+      field: 'description',
+      value: newDescription,
+    });
+  };
+
   return (
     <Card>
       <div className="mb-space-lg flex items-start justify-between">
@@ -93,7 +101,13 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           className="text-content-headings text-2xl font-semibold"
         />
       </div>
-      <p className="text-content-secondary leading-comfortable">{incident.description}</p>
+      <EditableTextField
+        value={incident.description}
+        onSave={handleDescriptionChange}
+        as="p"
+        multiline
+        className="text-content-secondary leading-comfortable"
+      />
 
       <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-3">
         <div>
