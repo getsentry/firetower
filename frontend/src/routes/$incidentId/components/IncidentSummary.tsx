@@ -34,45 +34,15 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     updateIncidentFieldMutationOptions(queryClient)
   );
 
-  const handleSeverityChange = async (newSeverity: (typeof SEVERITY_OPTIONS)[number]) => {
-    await updateIncidentField.mutateAsync({
-      incidentId: incident.id,
-      field: 'severity',
-      value: newSeverity,
-    });
-  };
-
-  const handleStatusChange = async (newStatus: (typeof STATUS_OPTIONS)[number]) => {
-    await updateIncidentField.mutateAsync({
-      incidentId: incident.id,
-      field: 'status',
-      value: newStatus,
-    });
-  };
-
-  const handleTitleChange = async (newTitle: string) => {
-    await updateIncidentField.mutateAsync({
-      incidentId: incident.id,
-      field: 'title',
-      value: newTitle,
-    });
-  };
-
-  const handleDescriptionChange = async (newDescription: string) => {
-    await updateIncidentField.mutateAsync({
-      incidentId: incident.id,
-      field: 'description',
-      value: newDescription,
-    });
-  };
-
-  const handleImpactChange = async (newImpact: string) => {
-    await updateIncidentField.mutateAsync({
-      incidentId: incident.id,
-      field: 'impact',
-      value: newImpact,
-    });
-  };
+  const handleFieldChange =
+    (field: 'severity' | 'status' | 'title' | 'description' | 'impact') =>
+    async (value: string) => {
+      await updateIncidentField.mutateAsync({
+        incidentId: incident.id,
+        field,
+        value,
+      });
+    };
 
   return (
     <Card>
@@ -92,26 +62,26 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         <EditablePill
           value={incident.severity}
           options={SEVERITY_OPTIONS}
-          onSave={handleSeverityChange}
+          onSave={handleFieldChange('severity')}
         />
         <EditablePill
           value={incident.status}
           options={STATUS_OPTIONS}
-          onSave={handleStatusChange}
+          onSave={handleFieldChange('status')}
         />
         {incident.is_private && <Pill variant="private">Private</Pill>}
       </div>
       <div className="mb-space-xl">
         <EditableTextField
           value={incident.title}
-          onSave={handleTitleChange}
+          onSave={handleFieldChange('title')}
           as="h3"
           className="text-content-headings text-2xl font-semibold"
         />
       </div>
       <EditableTextField
         value={incident.description}
-        onSave={handleDescriptionChange}
+        onSave={handleFieldChange('description')}
         as="p"
         multiline
         className="text-content-secondary leading-comfortable"
@@ -121,7 +91,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         <div>
           <EditableTextField
             value={incident.impact}
-            onSave={handleImpactChange}
+            onSave={handleFieldChange('impact')}
             label="Impact"
             labelClassName="text-size-md font-semibold"
             as="p"
