@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from .models import ExternalLink, ExternalLinkType, Incident
+from .models import ExternalLink, ExternalLinkType, Incident, Tag
 
 
 @dataclass
@@ -317,3 +317,12 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                     )
 
         return instance
+
+
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ["name"]
+
+    def to_representation(self, instance: Tag) -> str:
+        return instance.name

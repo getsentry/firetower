@@ -10,13 +10,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import Incident, filter_visible_to_user
+from .models import Incident, Tag, TagType, filter_visible_to_user
 from .permissions import IncidentPermission
 from .serializers import (
     IncidentDetailUISerializer,
     IncidentListUISerializer,
     IncidentReadSerializer,
     IncidentWriteSerializer,
+    TagSerializer,
 )
 from .services import ParticipantsSyncStats, sync_incident_participants_from_slack
 
@@ -290,3 +291,30 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
 
 # View alias for sync endpoint
 sync_incident_participants = SyncIncidentParticipantsView.as_view()
+
+
+class TagListAPIView(generics.ListAPIView):
+    """
+    List all tags of a given type.
+
+    GET /api/tags/?type=AFFECTED_AREA
+    GET /api/tags/?type=ROOT_CAUSE
+
+    Returns all tags filtered by type. The type query parameter is required.
+    """
+
+    serializer_class = TagSerializer
+    pagination_class = None
+
+    def get_queryset(self) -> QuerySet[Tag]:
+        tag_type = self.request.GET.get("type")
+
+        if not tag_type:
+            raise ValidationError("type query parameter is required")
+
+        if tag_type not in TagType.values:
+            raise ValidationError(
+                f"Invalid type '{tag_type}'. Must be one of: {', '.join(TagType.values)}"
+            )
+
+        return Tag.objects.filter(type=tag_type)
