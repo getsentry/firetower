@@ -82,12 +82,13 @@ describe('IncidentSummary', () => {
       expect(screen.getByText('Users experiencing 500 errors')).toBeInTheDocument();
     });
 
-    it('renders empty state when impact is not present', () => {
+    it('renders editable field when impact is empty', () => {
       const incidentWithoutImpact = {...mockIncident, impact: ''};
       renderWithQueryClient(<IncidentSummary incident={incidentWithoutImpact} />);
 
       expect(screen.getByText('Impact')).toBeInTheDocument();
-      expect(screen.getByText('No impact specified')).toBeInTheDocument();
+      const editButtons = screen.getAllByRole('button', {name: 'Edit'});
+      expect(editButtons.length).toBeGreaterThan(0);
     });
   });
 

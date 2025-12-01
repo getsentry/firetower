@@ -1,6 +1,7 @@
 import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {Card} from 'components/Card';
 import {EditablePill} from 'components/EditablePill';
+import {EditableTextField} from 'components/EditableTextField';
 import {Pill} from 'components/Pill';
 import {Tag} from 'components/Tag';
 
@@ -33,21 +34,15 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     updateIncidentFieldMutationOptions(queryClient)
   );
 
-  const handleSeverityChange = async (newSeverity: (typeof SEVERITY_OPTIONS)[number]) => {
-    await updateIncidentField.mutateAsync({
-      incidentId: incident.id,
-      field: 'severity',
-      value: newSeverity,
-    });
-  };
-
-  const handleStatusChange = async (newStatus: (typeof STATUS_OPTIONS)[number]) => {
-    await updateIncidentField.mutateAsync({
-      incidentId: incident.id,
-      field: 'status',
-      value: newStatus,
-    });
-  };
+  const handleFieldChange =
+    (field: 'severity' | 'status' | 'title' | 'description' | 'impact') =>
+    async (value: string) => {
+      await updateIncidentField.mutateAsync({
+        incidentId: incident.id,
+        field,
+        value,
+      });
+    };
 
   return (
     <Card>
@@ -67,63 +62,73 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         <EditablePill
           value={incident.severity}
           options={SEVERITY_OPTIONS}
-          onSave={handleSeverityChange}
+          onSave={handleFieldChange('severity')}
         />
         <EditablePill
           value={incident.status}
           options={STATUS_OPTIONS}
-          onSave={handleStatusChange}
+          onSave={handleFieldChange('status')}
         />
         {incident.is_private && <Pill variant="private">Private</Pill>}
       </div>
-      <Card.Title size="2xl">{incident.title}</Card.Title>
-      <p className="text-content-secondary leading-comfortable">{incident.description}</p>
+      <div className="mb-space-xl">
+        <EditableTextField
+          value={incident.title}
+          onSave={handleFieldChange('title')}
+          as="h3"
+          className="text-content-headings text-2xl font-semibold"
+        />
+      </div>
+      <EditableTextField
+        value={incident.description}
+        onSave={handleFieldChange('description')}
+        as="p"
+        multiline
+        className="text-content-secondary leading-comfortable"
+      />
 
-      <div className="mt-space-xl grid grid-cols-1 gap-space-xl md:grid-cols-3">
+      <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-3">
         <div>
-          <h3 className="mb-space-md text-size-md font-semibold text-content-secondary">
-            Impact
-          </h3>
-          {incident.impact ? (
-            <p className="text-size-sm leading-comfortable text-content-secondary">
-              {incident.impact}
-            </p>
-          ) : (
-            <p className="text-size-sm italic text-content-disabled">
-              No impact specified
-            </p>
-          )}
+          <EditableTextField
+            value={incident.impact}
+            onSave={handleFieldChange('impact')}
+            label="Impact"
+            labelClassName="text-size-md font-semibold"
+            as="p"
+            multiline
+            className="text-size-sm leading-comfortable text-content-secondary"
+          />
         </div>
 
         <div>
-          <h3 className="mb-space-md text-size-md font-semibold text-content-secondary">
+          <h3 className="mb-space-md text-size-md text-content-secondary font-semibold">
             Affected Areas
           </h3>
           {incident.affected_areas.length > 0 ? (
-            <div className="flex flex-wrap gap-space-md">
+            <div className="gap-space-md flex flex-wrap">
               {incident.affected_areas.map(area => (
                 <Tag key={area}>{area}</Tag>
               ))}
             </div>
           ) : (
-            <p className="text-size-sm italic text-content-disabled">
+            <p className="text-size-sm text-content-disabled italic">
               No affected areas specified
             </p>
           )}
         </div>
 
         <div>
-          <h3 className="mb-space-md text-size-md font-semibold text-content-secondary">
+          <h3 className="mb-space-md text-size-md text-content-secondary font-semibold">
             Root Cause
           </h3>
           {incident.root_causes.length > 0 ? (
-            <div className="flex flex-wrap gap-space-md">
+            <div className="gap-space-md flex flex-wrap">
               {incident.root_causes.map(cause => (
                 <Tag key={cause}>{cause}</Tag>
               ))}
             </div>
           ) : (
-            <p className="text-size-sm italic text-content-disabled">
+            <p className="text-size-sm text-content-disabled italic">
               No root cause specified
             </p>
           )}
