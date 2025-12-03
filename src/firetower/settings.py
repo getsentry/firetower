@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 
 import sentry_sdk
-from datadog import initialize, statsd
+from datadog import initialize
 
 
 def env_is_dev() -> bool:
@@ -239,13 +239,5 @@ DJK8S_READINESS_PROBES = [
 
 # Initialize Datadog statsd
 print("initialize")
-initialize(
-    statsd_namespace="firetower",
-)
-print("apply tags")
-statsd.constant_tags = [
-    f"env:{'production' if os.environ.get('DJANGO_ENV') == 'prod' else 'test'}",
-    "service:firetower",
-    f"version:{os.environ.get('K_REVISION', 'unknown')}",
-]
+initialize()
 print("end settings")
