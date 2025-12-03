@@ -239,5 +239,5 @@ DJK8S_READINESS_PROBES = [
 
 # Initialize Datadog statsd
 print("initialize")
-initialize()
+# initialize()
 print("end settings")
