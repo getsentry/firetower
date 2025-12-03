@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import sentry_sdk
+from datadog import initialize, statsd
 
 
 def env_is_dev() -> bool:
@@ -234,4 +235,16 @@ if not env_is_dev():
 # django-k8s proreadiness probes
 DJK8S_READINESS_PROBES = [
     "djk8s.probes.DatabaseProbe",
+]
+
+# Initialize Datadog statsd
+initialize(
+    statsd_host=os.environ.get("DATADOG_STATSD_HOST", "localhost"),
+    statsd_port=int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
+    statsd_namespace="firetower",
+)
+statsd.constant_tags = [
+    f"env:{'production' if os.environ.get('DJANGO_ENV') == 'prod' else 'test'}",
+    "service:firetower",
+    f"version:{os.environ.get('K_REVISION', 'unknown')}",
 ]
