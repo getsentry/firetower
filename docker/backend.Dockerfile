@@ -46,4 +46,4 @@ ENV DJANGO_ENV="prod"
 ENV GRANIAN_RUNTIME_THREADS="2"
 ENV GRANIAN_BACKPRESSURE="32"
 
-ENTRYPOINT ["/app/datadog-init", "sh", "-c", "export PYTHONPATH=/app:$PYTHONPATH && /app/.venv/bin/ddtrace-run /app/.venv/bin/gunicorn --host 0.0.0.0 --port $PORT firetower.wsgi:application" ]
+ENTRYPOINT ["/app/datadog-init", "sh", "-c", "export PYTHONPATH=/app:$PYTHONPATH && /app/.venv/bin/ddtrace-run /app/.venv/bin/granian --interface wsgi --host 0.0.0.0 --port $PORT firetower.wsgi:application" ]
