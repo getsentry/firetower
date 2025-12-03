@@ -32,9 +32,7 @@ const triggerStyles = cva(
     'rounded-radius-sm',
     'hover:bg-background-secondary',
     'hover:scale-110',
-    'focus:outline-none',
-    'focus:ring-2',
-    'focus:ring-offset-2',
+    'focus:outline-auto',
     'text-content-secondary',
     'hover:text-content-primary',
     'cursor-pointer',
@@ -99,9 +97,7 @@ const buttonBaseStyles = [
   'font-medium',
   'text-sm',
   'transition-colors',
-  'focus:outline-none',
-  'focus:ring-2',
-  'focus:ring-offset-2',
+  'focus:outline-auto',
   'disabled:opacity-50',
   'disabled:cursor-not-allowed',
 ];
@@ -146,7 +142,6 @@ export interface EditableTextFieldProps {
 
   // Optional
   as?: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'div';
-  editable?: boolean;
   validationSchema?: z.ZodSchema<string>;
   multiline?: boolean;
   fullWidth?: boolean; // Whether display text should expand to full width (default: false)
@@ -162,7 +157,6 @@ export function EditableTextField({
   value,
   onSave,
   as: Component = 'div',
-  editable = true,
   validationSchema,
   multiline = false,
   fullWidth = false,
@@ -180,12 +174,11 @@ export function EditableTextField({
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
   const startEditing = useCallback(() => {
-    if (!editable) return;
     setIsEditing(true);
     setError(null);
     setValidationError(null);
     setDraftValue(value);
-  }, [editable, value]);
+  }, [value]);
 
   const cancelEditing = useCallback(() => {
     setIsEditing(false);
@@ -305,7 +298,7 @@ export function EditableTextField({
             <LabelComponent className={cn(labelStyles(), labelClassName)}>
               {label}
             </LabelComponent>
-            {editable && !isEditing && (
+            {!isEditing && (
               <button
                 type="button"
                 onClick={startEditing}
@@ -328,7 +321,7 @@ export function EditableTextField({
           <Component className={cn(fullWidth ? 'flex-1 min-w-0' : 'inline', className)}>
             {value}
           </Component>
-          {editable && !isEditing && (
+          {!isEditing && (
             <button
               type="button"
               onClick={startEditing}

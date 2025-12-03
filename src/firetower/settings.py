@@ -71,6 +71,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
     "https://firetower.getsentry.net",
     "https://*.firetower.getsentry.net",
 ]
@@ -197,6 +198,10 @@ SLACK = {
     "BOT_TOKEN": dev_default("SLACK_BOT_TOKEN"),
     "TEAM_ID": os.environ.get("SLACK_TEAM_ID", "sentry"),
 }
+
+PARTICIPANT_SYNC_THROTTLE_SECONDS = int(
+    os.environ.get("PARTICIPANT_SYNC_THROTTLE_SECONDS", "300")
+)
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {

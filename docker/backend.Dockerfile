@@ -43,5 +43,8 @@ ENV PORT=8080
 EXPOSE $PORT
 
 ENV DJANGO_ENV="prod"
+ENV GRANIAN_RUNTIME_THREADS="2"
+ENV GRANIAN_BACKPRESSURE="32"
+
 ENTRYPOINT ["/app/datadog-init"]
 CMD [ "sh", "-c", "export PYTHONPATH=/app:$PYTHONPATH && /app/.venv/bin/ddtrace-run /app/.venv/bin/gunicorn --bind :${PORT:-5001} --workers 1 --threads 8 --timeout 0 firetower.wsgi:application" ]

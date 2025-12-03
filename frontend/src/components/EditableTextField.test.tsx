@@ -13,18 +13,11 @@ describe('EditableTextField', () => {
     expect(display).toBeInTheDocument();
   });
 
-  it('shows trigger button when editable', async () => {
-    render(<EditableTextField value="Test" onSave={async () => {}} editable={true} />);
+  it('shows trigger button', async () => {
+    render(<EditableTextField value="Test" onSave={async () => {}} />);
 
     const trigger = await screen.findByLabelText('Edit');
     expect(trigger).toBeInTheDocument();
-  });
-
-  it('hides trigger button when not editable', async () => {
-    render(<EditableTextField value="Test" onSave={async () => {}} editable={false} />);
-
-    const trigger = screen.queryByLabelText('Edit');
-    expect(trigger).not.toBeInTheDocument();
   });
 
   it('enters edit mode when trigger is clicked', async () => {

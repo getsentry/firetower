@@ -5,6 +5,7 @@ from firetower.incidents.models import Incident
 
 
 class ExternalProfileType(models.TextChoices):
+    IAP = "IAP", "IAP"
     SLACK = "SLACK", "Slack"
     PAGERDUTY = "PAGERDUTY", "PagerDuty"
     LINEAR = "LINEAR", "Linear"
@@ -16,11 +17,13 @@ class UserProfile(models.Model):
     Extended profile for users.
 
     Linked to Django's built-in User model which provides:
-    - username (populated with IAP user ID for IAP-authenticated users)
+    - username (set to user's email)
     - email
     - first_name
     - last_name
     - is_superuser (for admin access)
+
+    External identities (IAP, Slack, etc.) are stored in ExternalProfile.
     """
 
     user = models.OneToOneField(
@@ -56,6 +59,11 @@ class UserProfile(models.Model):
     def get_pagerduty_id(self) -> str | None:
         """Convenience method for getting PagerDuty user ID"""
         profile = self.get_external_profile(ExternalProfileType.PAGERDUTY)
+        return profile.external_id if profile else None
+
+    def get_iap_id(self) -> str | None:
+        """Convenience method for getting IAP user ID"""
+        profile = self.get_external_profile(ExternalProfileType.IAP)
         return profile.external_id if profile else None
 
     def __str__(self) -> str:
