@@ -1,4 +1,25 @@
 services:
+  ftwr-migrate:
+    image: firetower
+    environment:
+    - "DJANGO_SECRET_KEY=some_random_bullshit"
+    - "DJANGO_PG_USER=postgres"
+    - "DJANGO_PG_PASS=dummy_dev_password"
+    - "DJANGO_PG_DB=firetower"
+    - "DJANGO_PG_HOST=ftwr-postgres"
+    - "JIRA_ACCOUNT=blah"
+    - "JIRA_API_KEY=blah"
+    - "JIRA_PROJECT_KEY=INC"
+    - "JIRA_SEVERITY_FIELD=dummy"
+    - "SLACK_BOT_TOKEN=dummy"
+    - "SLACK_TEAM_ID=dummy"
+    - "IAP_AUDIENCE=dummy"
+    - "DJANGO_ENV=dev"
+    entrypoint: [
+       "/app/.venv/bin/django-admin",
+       "migrate",
+       "--settings", "firetower.settings",
+    ]
   ftwr-postgres:
     image: postgres:17.6-alpine3.22
     environment:
