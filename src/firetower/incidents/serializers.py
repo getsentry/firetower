@@ -262,10 +262,10 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "is_private": {"required": True},
         }
 
-    def validate_affected_area_tags(self, value: list[str]) -> list[str]:
+    def _validate_tags_exist(self, value: list[str], tag_type: str) -> list[str]:
         value_lower = {v.lower() for v in value}
         existing = set(
-            Tag.objects.filter(type=TagType.AFFECTED_AREA)
+            Tag.objects.filter(type=tag_type)
             .annotate(name_lower=Lower("name"))
             .filter(name_lower__in=value_lower)
             .values_list("name_lower", flat=True)
@@ -273,24 +273,15 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         missing = [v for v in value if v.lower() not in existing]
         if missing:
             raise serializers.ValidationError(
-                f"Tag '{missing[0]}' does not exist for type AFFECTED_AREA"
+                f"Tag '{missing[0]}' does not exist for type {tag_type}"
             )
         return value
 
+    def validate_affected_area_tags(self, value: list[str]) -> list[str]:
+        return self._validate_tags_exist(value, TagType.AFFECTED_AREA)
+
     def validate_root_cause_tags(self, value: list[str]) -> list[str]:
-        value_lower = {v.lower() for v in value}
-        existing = set(
-            Tag.objects.filter(type=TagType.ROOT_CAUSE)
-            .annotate(name_lower=Lower("name"))
-            .filter(name_lower__in=value_lower)
-            .values_list("name_lower", flat=True)
-        )
-        missing = [v for v in value if v.lower() not in existing]
-        if missing:
-            raise serializers.ValidationError(
-                f"Tag '{missing[0]}' does not exist for type ROOT_CAUSE"
-            )
-        return value
+        return self._validate_tags_exist(value, TagType.ROOT_CAUSE)
 
     def validate_external_links(
         self, value: dict[str, str | None]
