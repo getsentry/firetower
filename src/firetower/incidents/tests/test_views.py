@@ -984,7 +984,7 @@ class TestIncidentAPIViews:
 
 
 @pytest.mark.django_db
-class TestTagListAPIView:
+class TestTagListCreateAPIView:
     def setup_method(self):
         self.client = APIClient()
         self.user = User.objects.create_user(
@@ -1039,3 +1039,84 @@ class TestTagListAPIView:
 
         assert response.status_code == 200
         assert response.data == []
+
+    def test_create_tag(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "New Tag", "type": "AFFECTED_AREA"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert response.data["name"] == "New Tag"
+        assert response.data["type"] == "AFFECTED_AREA"
+        assert Tag.objects.filter(name="New Tag", type=TagType.AFFECTED_AREA).exists()
+
+    def test_create_tag_root_cause(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "Human Error", "type": "ROOT_CAUSE"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert response.data["name"] == "Human Error"
+        assert response.data["type"] == "ROOT_CAUSE"
+        assert Tag.objects.filter(name="Human Error", type=TagType.ROOT_CAUSE).exists()
+
+    def test_create_tag_missing_name(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"type": "AFFECTED_AREA"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    def test_create_tag_missing_type(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "New Tag"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    def test_create_tag_invalid_type(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "New Tag", "type": "INVALID"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    def test_create_tag_duplicate_case_insensitive(self):
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "DATABASE", "type": "AFFECTED_AREA"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    def test_create_tag_same_name_different_type(self):
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "Database", "type": "ROOT_CAUSE"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert Tag.objects.filter(name="Database", type=TagType.ROOT_CAUSE).exists()

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+from typing import Any
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import ExternalLink, ExternalLinkType, Incident, Tag
@@ -326,3 +328,15 @@ class TagSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance: Tag) -> str:
         return instance.name
+
+
+class TagCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ["name", "type"]
+
+    def create(self, validated_data: dict[str, Any]) -> Tag:
+        try:
+            return Tag.objects.create(**validated_data)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict)
