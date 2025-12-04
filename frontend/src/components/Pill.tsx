@@ -4,13 +4,16 @@ import {cn} from 'utils/cn';
 
 const pill = cva(
   [
+    'inline-flex',
+    'items-center',
+    'justify-center',
     'px-space-lg',
     'py-space-xs',
     'rounded-radius-full',
     'text-size-sm',
     'font-medium',
     'uppercase',
-    'leading-none ',
+    'leading-none',
   ],
   {
     variants: {
