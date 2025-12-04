@@ -132,6 +132,7 @@ export function EditableTags({
   const [inputValue, setInputValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -140,6 +141,7 @@ export function EditableTags({
     setIsEditing(true);
     setInputValue('');
     setFocusedIndex(-1);
+    setError(null);
   }, [tags]);
 
   const cancel = useCallback(() => {
@@ -191,13 +193,18 @@ export function EditableTags({
     async (tag: string) => {
       const trimmed = tag.trim();
       if (trimmed && !draftTags.includes(trimmed)) {
-        if (onCreate) {
-          await onCreate(trimmed);
+        setError(null);
+        try {
+          if (onCreate) {
+            await onCreate(trimmed);
+          }
+          setDraftTags(prev => [...prev, trimmed]);
+          setInputValue('');
+          setFocusedIndex(-1);
+          inputRef.current?.focus();
+        } catch {
+          setError(`Failed to create "${trimmed}"`);
         }
-        setDraftTags(prev => [...prev, trimmed]);
-        setInputValue('');
-        setFocusedIndex(-1);
-        inputRef.current?.focus();
       }
     },
     [draftTags, onCreate]
@@ -385,6 +392,11 @@ export function EditableTags({
                   </button>
                 )}
               </div>
+            )}
+            {error && (
+              <p className="text-content-danger px-space-sm pt-space-sm text-size-sm">
+                {error}
+              </p>
             )}
             <div className="gap-space-sm p-space-sm flex justify-end border-t border-gray-200">
               <button
