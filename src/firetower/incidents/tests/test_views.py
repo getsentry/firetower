@@ -212,8 +212,8 @@ class TestIncidentViews:
         assert data["participants"][0]["role"] == "Captain"
 
         # Detail view includes full data
-        assert "affected_areas" in data
-        assert "API" in data["affected_areas"]
+        assert "affected_area_tags" in data
+        assert "API" in data["affected_area_tags"]
         assert "external_links" in data
         assert data["external_links"]["slack"] == "https://slack.com/test"
 
@@ -982,8 +982,8 @@ class TestIncidentAPIViews:
         assert data["external_links"]["slack"] == "https://slack.com/channel"
         assert data["external_links"]["jira"] == "https://jira.example.com/issue"
 
-    def test_update_affected_areas_via_patch(self):
-        """Test setting affected_areas via PATCH"""
+    def test_update_affected_area_tags_via_patch(self):
+        """Test setting affected_area_tags via PATCH"""
         Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
         Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
 
@@ -997,7 +997,7 @@ class TestIncidentAPIViews:
 
         self.client.force_authenticate(user=self.captain)
 
-        payload = {"affected_areas": ["API", "Database"]}
+        payload = {"affected_area_tags": ["API", "Database"]}
         response = self.client.patch(
             f"/api/incidents/{incident.incident_number}/", payload, format="json"
         )
@@ -1006,10 +1006,10 @@ class TestIncidentAPIViews:
 
         response = self.client.get(f"/api/incidents/{incident.incident_number}/")
         data = response.json()
-        assert set(data["affected_areas"]) == {"API", "Database"}
+        assert set(data["affected_area_tags"]) == {"API", "Database"}
 
-    def test_update_root_causes_via_patch(self):
-        """Test setting root_causes via PATCH"""
+    def test_update_root_cause_tags_via_patch(self):
+        """Test setting root_cause_tags via PATCH"""
         Tag.objects.create(name="Human Error", type=TagType.ROOT_CAUSE)
         Tag.objects.create(name="Config Change", type=TagType.ROOT_CAUSE)
 
@@ -1023,7 +1023,7 @@ class TestIncidentAPIViews:
 
         self.client.force_authenticate(user=self.captain)
 
-        payload = {"root_causes": ["Human Error"]}
+        payload = {"root_cause_tags": ["Human Error"]}
         response = self.client.patch(
             f"/api/incidents/{incident.incident_number}/", payload, format="json"
         )
@@ -1032,7 +1032,7 @@ class TestIncidentAPIViews:
 
         response = self.client.get(f"/api/incidents/{incident.incident_number}/")
         data = response.json()
-        assert data["root_causes"] == ["Human Error"]
+        assert data["root_cause_tags"] == ["Human Error"]
 
     def test_replace_existing_tags_via_patch(self):
         """Test that PATCH replaces existing tags"""
@@ -1052,7 +1052,7 @@ class TestIncidentAPIViews:
         self.client.force_authenticate(user=self.captain)
 
         # Replace with just Frontend
-        payload = {"affected_areas": ["Frontend"]}
+        payload = {"affected_area_tags": ["Frontend"]}
         response = self.client.patch(
             f"/api/incidents/{incident.incident_number}/", payload, format="json"
         )
@@ -1061,7 +1061,7 @@ class TestIncidentAPIViews:
 
         response = self.client.get(f"/api/incidents/{incident.incident_number}/")
         data = response.json()
-        assert data["affected_areas"] == ["Frontend"]
+        assert data["affected_area_tags"] == ["Frontend"]
 
     def test_clear_tags_with_empty_list(self):
         """Test that sending empty list clears all tags"""
@@ -1078,7 +1078,7 @@ class TestIncidentAPIViews:
 
         self.client.force_authenticate(user=self.captain)
 
-        payload = {"affected_areas": []}
+        payload = {"affected_area_tags": []}
         response = self.client.patch(
             f"/api/incidents/{incident.incident_number}/", payload, format="json"
         )
@@ -1087,7 +1087,7 @@ class TestIncidentAPIViews:
 
         response = self.client.get(f"/api/incidents/{incident.incident_number}/")
         data = response.json()
-        assert data["affected_areas"] == []
+        assert data["affected_area_tags"] == []
 
     def test_patch_without_tags_preserves_existing(self):
         """Test that PATCH without tag fields preserves existing tags"""
@@ -1104,7 +1104,7 @@ class TestIncidentAPIViews:
 
         self.client.force_authenticate(user=self.captain)
 
-        # PATCH without affected_areas field
+        # PATCH without affected_area_tags field
         payload = {"title": "Updated Title"}
         response = self.client.patch(
             f"/api/incidents/{incident.incident_number}/", payload, format="json"
@@ -1114,7 +1114,7 @@ class TestIncidentAPIViews:
 
         response = self.client.get(f"/api/incidents/{incident.incident_number}/")
         data = response.json()
-        assert data["affected_areas"] == ["API"]
+        assert data["affected_area_tags"] == ["API"]
 
     def test_update_tags_nonexistent_tag(self):
         """Test that using a nonexistent tag returns 400"""
@@ -1128,7 +1128,7 @@ class TestIncidentAPIViews:
 
         self.client.force_authenticate(user=self.captain)
 
-        payload = {"affected_areas": ["NonexistentTag"]}
+        payload = {"affected_area_tags": ["NonexistentTag"]}
         response = self.client.patch(
             f"/api/incidents/{incident.incident_number}/", payload, format="json"
         )
@@ -1149,8 +1149,8 @@ class TestIncidentAPIViews:
 
         self.client.force_authenticate(user=self.captain)
 
-        # Try to use ROOT_CAUSE tag as affected_area
-        payload = {"affected_areas": ["Human Error"]}
+        # Try to use ROOT_CAUSE tag as affected_area_tags
+        payload = {"affected_area_tags": ["Human Error"]}
         response = self.client.patch(
             f"/api/incidents/{incident.incident_number}/", payload, format="json"
         )

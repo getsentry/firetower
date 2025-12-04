@@ -86,10 +86,12 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
     participants = serializers.SerializerMethodField()
 
     # Tags as arrays of strings (not full objects)
-    affected_areas = serializers.ListField(
-        child=serializers.CharField(), read_only=True
+    affected_area_tags = serializers.ListField(
+        child=serializers.CharField(), source="affected_areas", read_only=True
     )
-    root_causes = serializers.ListField(child=serializers.CharField(), read_only=True)
+    root_cause_tags = serializers.ListField(
+        child=serializers.CharField(), source="root_causes", read_only=True
+    )
 
     # External links as dict for easy frontend access
     external_links = serializers.DictField(source="external_links_dict", read_only=True)
@@ -105,8 +107,8 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
             "severity",
             "is_private",
             "participants",
-            "affected_areas",
-            "root_causes",
+            "affected_area_tags",
+            "root_cause_tags",
             "external_links",
             "created_at",
             "updated_at",
@@ -163,10 +165,12 @@ class IncidentReadSerializer(serializers.ModelSerializer):
     captain = serializers.SerializerMethodField()
     reporter = serializers.SerializerMethodField()
     participants = serializers.SerializerMethodField()
-    affected_areas = serializers.ListField(
-        child=serializers.CharField(), read_only=True
+    affected_area_tags = serializers.ListField(
+        child=serializers.CharField(), source="affected_areas", read_only=True
     )
-    root_causes = serializers.ListField(child=serializers.CharField(), read_only=True)
+    root_cause_tags = serializers.ListField(
+        child=serializers.CharField(), source="root_causes", read_only=True
+    )
     external_links = serializers.DictField(source="external_links_dict", read_only=True)
 
     class Meta:
@@ -182,8 +186,8 @@ class IncidentReadSerializer(serializers.ModelSerializer):
             "captain",
             "reporter",
             "participants",
-            "affected_areas",
-            "root_causes",
+            "affected_area_tags",
+            "root_cause_tags",
             "external_links",
             "created_at",
             "updated_at",
@@ -208,14 +212,14 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
     Required fields: title, severity, is_private, captain, reporter
     Optional fields: description, impact, status, external_links,
-                     affected_areas, root_causes
+                     affected_area_tags, root_cause_tags
 
     external_links format: {"slack": "url", "jira": "url", ...}
     - Merges with existing links (only updates provided links)
     - Use null to delete a specific link: {"slack": null}
     - Omit external_links field to leave existing links unchanged
 
-    affected_areas/root_causes format: ["tag1", "tag2", ...]
+    affected_area_tags/root_cause_tags format: ["tag1", "tag2", ...]
     - Replaces all existing tags with the provided list
     - Tags must already exist (create via POST /api/tags/)
     - Omit field to leave existing tags unchanged
@@ -228,10 +232,12 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         allow_null=False,
         write_only=True,
     )
-    affected_areas = serializers.ListField(
-        child=serializers.CharField(), required=False
+    affected_area_tags = serializers.ListField(
+        child=serializers.CharField(), source="affected_areas", required=False
     )
-    root_causes = serializers.ListField(child=serializers.CharField(), required=False)
+    root_cause_tags = serializers.ListField(
+        child=serializers.CharField(), source="root_causes", required=False
+    )
 
     class Meta:
         model = Incident
@@ -246,8 +252,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "captain",
             "reporter",
             "external_links",
-            "affected_areas",
-            "root_causes",
+            "affected_area_tags",
+            "root_cause_tags",
         ]
         extra_kwargs = {
             "captain": {"required": True},
@@ -255,7 +261,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "is_private": {"required": True},
         }
 
-    def validate_affected_areas(self, value: list[str]) -> list[str]:
+    def validate_affected_area_tags(self, value: list[str]) -> list[str]:
         for tag_name in value:
             if not Tag.objects.filter(
                 name__iexact=tag_name, type=TagType.AFFECTED_AREA
@@ -265,7 +271,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                 )
         return value
 
-    def validate_root_causes(self, value: list[str]) -> list[str]:
+    def validate_root_cause_tags(self, value: list[str]) -> list[str]:
         for tag_name in value:
             if not Tag.objects.filter(
                 name__iexact=tag_name, type=TagType.ROOT_CAUSE
