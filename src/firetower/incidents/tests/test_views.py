@@ -981,3 +981,61 @@ class TestIncidentAPIViews:
         assert len(data["external_links"]) == 2
         assert data["external_links"]["slack"] == "https://slack.com/channel"
         assert data["external_links"]["jira"] == "https://jira.example.com/issue"
+
+
+@pytest.mark.django_db
+class TestTagListAPIView:
+    def setup_method(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test@example.com",
+            email="test@example.com",
+            password="testpass123",
+        )
+
+    def test_list_tags_by_type(self):
+        Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Human Error", type=TagType.ROOT_CAUSE)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/tags/?type=AFFECTED_AREA")
+
+        assert response.status_code == 200
+        assert len(response.data) == 2
+        assert "API" in response.data
+        assert "Database" in response.data
+        assert "Human Error" not in response.data
+
+    def test_list_root_cause_tags(self):
+        Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Human Error", type=TagType.ROOT_CAUSE)
+        Tag.objects.create(name="Config Change", type=TagType.ROOT_CAUSE)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/tags/?type=ROOT_CAUSE")
+
+        assert response.status_code == 200
+        assert len(response.data) == 2
+        assert "Human Error" in response.data
+        assert "Config Change" in response.data
+        assert "API" not in response.data
+
+    def test_list_tags_missing_type_param(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/tags/")
+
+        assert response.status_code == 400
+
+    def test_list_tags_invalid_type(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/tags/?type=INVALID")
+
+        assert response.status_code == 400
+
+    def test_list_tags_empty_result(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/tags/?type=AFFECTED_AREA")
+
+        assert response.status_code == 200
+        assert response.data == []
