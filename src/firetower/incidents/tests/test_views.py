@@ -212,8 +212,8 @@ class TestIncidentViews:
         assert data["participants"][0]["role"] == "Captain"
 
         # Detail view includes full data
-        assert "affected_areas" in data
-        assert "API" in data["affected_areas"]
+        assert "affected_area_tags" in data
+        assert "API" in data["affected_area_tags"]
         assert "external_links" in data
         assert data["external_links"]["slack"] == "https://slack.com/test"
 
@@ -982,9 +982,212 @@ class TestIncidentAPIViews:
         assert data["external_links"]["slack"] == "https://slack.com/channel"
         assert data["external_links"]["jira"] == "https://jira.example.com/issue"
 
+    def test_update_affected_area_tags_via_patch(self):
+        """Test setting affected_area_tags via PATCH"""
+        Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {"affected_area_tags": ["API", "Database"]}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+        assert set(data["affected_area_tags"]) == {"API", "Database"}
+
+    def test_update_root_cause_tags_via_patch(self):
+        """Test setting root_cause_tags via PATCH"""
+        Tag.objects.create(name="Human Error", type=TagType.ROOT_CAUSE)
+        Tag.objects.create(name="Config Change", type=TagType.ROOT_CAUSE)
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {"root_cause_tags": ["Human Error"]}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+        assert data["root_cause_tags"] == ["Human Error"]
+
+    def test_replace_existing_tags_via_patch(self):
+        """Test that PATCH replaces existing tags"""
+        tag1 = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        tag2 = Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Frontend", type=TagType.AFFECTED_AREA)
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        incident.affected_area_tags.add(tag1, tag2)
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Replace with just Frontend
+        payload = {"affected_area_tags": ["Frontend"]}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+        assert data["affected_area_tags"] == ["Frontend"]
+
+    def test_clear_tags_with_empty_list(self):
+        """Test that sending empty list clears all tags"""
+        tag = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        incident.affected_area_tags.add(tag)
+
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {"affected_area_tags": []}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+        assert data["affected_area_tags"] == []
+
+    def test_patch_without_tags_preserves_existing(self):
+        """Test that PATCH without tag fields preserves existing tags"""
+        tag = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        incident.affected_area_tags.add(tag)
+
+        self.client.force_authenticate(user=self.captain)
+
+        # PATCH without affected_area_tags field
+        payload = {"title": "Updated Title"}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+        assert data["affected_area_tags"] == ["API"]
+
+    def test_update_tags_nonexistent_tag(self):
+        """Test that using a nonexistent tag returns 400"""
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {"affected_area_tags": ["NonexistentTag"]}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 400
+
+    def test_update_tags_wrong_type(self):
+        """Test that using a tag of wrong type returns 400"""
+        Tag.objects.create(name="Human Error", type=TagType.ROOT_CAUSE)
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Try to use ROOT_CAUSE tag as affected_area_tags
+        payload = {"affected_area_tags": ["Human Error"]}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 400
+
+    def test_update_tags_case_insensitive(self):
+        """Test that tag matching is case-insensitive"""
+        Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Use different casing than stored in DB
+        payload = {"affected_area_tags": ["api", "DATABASE"]}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+        # Should match the tags (preserving original DB casing)
+        assert set(data["affected_area_tags"]) == {"API", "Database"}
+
 
 @pytest.mark.django_db
-class TestTagListAPIView:
+class TestTagListCreateAPIView:
     def setup_method(self):
         self.client = APIClient()
         self.user = User.objects.create_user(
@@ -1039,3 +1242,84 @@ class TestTagListAPIView:
 
         assert response.status_code == 200
         assert response.data == []
+
+    def test_create_tag(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "New Tag", "type": "AFFECTED_AREA"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert response.data["name"] == "New Tag"
+        assert response.data["type"] == "AFFECTED_AREA"
+        assert Tag.objects.filter(name="New Tag", type=TagType.AFFECTED_AREA).exists()
+
+    def test_create_tag_root_cause(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "Human Error", "type": "ROOT_CAUSE"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert response.data["name"] == "Human Error"
+        assert response.data["type"] == "ROOT_CAUSE"
+        assert Tag.objects.filter(name="Human Error", type=TagType.ROOT_CAUSE).exists()
+
+    def test_create_tag_missing_name(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"type": "AFFECTED_AREA"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    def test_create_tag_missing_type(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "New Tag"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    def test_create_tag_invalid_type(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "New Tag", "type": "INVALID"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    def test_create_tag_duplicate_case_insensitive(self):
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "DATABASE", "type": "AFFECTED_AREA"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+    def test_create_tag_same_name_different_type(self):
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "Database", "type": "ROOT_CAUSE"},
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert Tag.objects.filter(name="Database", type=TagType.ROOT_CAUSE).exists()
