@@ -239,6 +239,8 @@ export function EditableTags({
             (focusedIndex === filteredSuggestions.length || focusedIndex === -1)
           ) {
             handleCreate(inputValue);
+          } else if (!inputValue.trim()) {
+            save();
           }
           break;
         case ' ':
@@ -270,6 +272,7 @@ export function EditableTags({
       inputValue,
       handleAdd,
       handleCreate,
+      save,
       cancel,
       draftTags,
       handleRemove,
