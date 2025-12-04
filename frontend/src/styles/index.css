@@ -1,38 +1,9 @@
 @import 'tailwindcss';
 @import './design-tokens.css';
 
-/* Avenir has slightly off vertical metrics, causing text to appear higher than center.
-   We use ascent-override to adjust this globally. */
-@font-face {
-  font-family: 'Avenir Adjusted';
-  src: local('Avenir');
-  ascent-override: 105%;
-}
-
-@font-face {
-  font-family: 'Avenir Adjusted';
-  src: local('Avenir-Medium');
-  font-weight: 500;
-  ascent-override: 105%;
-}
-
-@font-face {
-  font-family: 'Avenir Adjusted';
-  src: local('Avenir-Black');
-  font-weight: 600;
-  ascent-override: 105%;
-}
-
-@font-face {
-  font-family: 'Avenir Adjusted';
-  src: local('Avenir-Heavy');
-  font-weight: 700;
-  ascent-override: 105%;
-}
-
 /* Global styles */
 body {
-  font-family: 'Avenir Adjusted', Avenir, 'Helvetica Neue', sans-serif;
+  font-family: Avenir, 'Helvetica Neue', sans-serif;
 }
 
 /* Custom utilities using design tokens */
