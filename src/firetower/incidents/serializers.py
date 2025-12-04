@@ -87,10 +87,10 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
 
     # Tags as arrays of strings (not full objects)
     affected_area_tags = serializers.ListField(
-        child=serializers.CharField(), source="affected_areas", read_only=True
+        child=serializers.CharField(), source="affected_area_tag_names", read_only=True
     )
     root_cause_tags = serializers.ListField(
-        child=serializers.CharField(), source="root_causes", read_only=True
+        child=serializers.CharField(), source="root_cause_tag_names", read_only=True
     )
 
     # External links as dict for easy frontend access
@@ -166,10 +166,10 @@ class IncidentReadSerializer(serializers.ModelSerializer):
     reporter = serializers.SerializerMethodField()
     participants = serializers.SerializerMethodField()
     affected_area_tags = serializers.ListField(
-        child=serializers.CharField(), source="affected_areas", read_only=True
+        child=serializers.CharField(), source="affected_area_tag_names", read_only=True
     )
     root_cause_tags = serializers.ListField(
-        child=serializers.CharField(), source="root_causes", read_only=True
+        child=serializers.CharField(), source="root_cause_tag_names", read_only=True
     )
     external_links = serializers.DictField(source="external_links_dict", read_only=True)
 
@@ -233,10 +233,10 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         write_only=True,
     )
     affected_area_tags = serializers.ListField(
-        child=serializers.CharField(), source="affected_areas", required=False
+        child=serializers.CharField(), source="affected_area_tag_names", required=False
     )
     root_cause_tags = serializers.ListField(
-        child=serializers.CharField(), source="root_causes", required=False
+        child=serializers.CharField(), source="root_cause_tag_names", required=False
     )
 
     class Meta:
@@ -308,8 +308,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict) -> Incident:
         """Create incident with external links"""
         external_links_data = validated_data.pop("external_links", None)
-        validated_data.pop("affected_areas", None)
-        validated_data.pop("root_causes", None)
+        validated_data.pop("affected_area_tag_names", None)
+        validated_data.pop("root_cause_tag_names", None)
 
         # Create the incident
         incident = super().create(validated_data)
@@ -335,8 +335,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         Tags are replaced - the provided list replaces all existing tags.
         """
         external_links_data = validated_data.pop("external_links", None)
-        affected_areas_data = validated_data.pop("affected_areas", None)
-        root_causes_data = validated_data.pop("root_causes", None)
+        affected_area_tag_names = validated_data.pop("affected_area_tag_names", None)
+        root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
 
         # Update basic fields
         instance = super().update(instance, validated_data)
@@ -360,16 +360,16 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                     )
 
         # Replace affected area tags if provided
-        if affected_areas_data is not None:
+        if affected_area_tag_names is not None:
             tags = Tag.objects.filter(
-                name__in=affected_areas_data, type=TagType.AFFECTED_AREA
+                name__in=affected_area_tag_names, type=TagType.AFFECTED_AREA
             )
             instance.affected_area_tags.set(tags)
 
         # Replace root cause tags if provided
-        if root_causes_data is not None:
+        if root_cause_tag_names is not None:
             tags = Tag.objects.filter(
-                name__in=root_causes_data, type=TagType.ROOT_CAUSE
+                name__in=root_cause_tag_names, type=TagType.ROOT_CAUSE
             )
             instance.root_cause_tags.set(tags)
 

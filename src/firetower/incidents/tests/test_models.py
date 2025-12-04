@@ -178,8 +178,8 @@ class TestIncident:
 
         assert incident.is_visible_to_user(superuser) is True
 
-    def test_affected_areas_property(self):
-        """Test affected_areas property returns list of tag names"""
+    def test_affected_area_tag_names_property(self):
+        """Test affected_area_tag_names property returns list of tag names"""
         incident = Incident.objects.create(
             title="Test", status=IncidentStatus.ACTIVE, severity=IncidentSeverity.P1
         )
@@ -189,13 +189,13 @@ class TestIncident:
 
         incident.affected_area_tags.add(tag1, tag2)
 
-        areas = incident.affected_areas
-        assert len(areas) == 2
-        assert "API" in areas  # Preserves original casing
-        assert "Database" in areas
+        names = incident.affected_area_tag_names
+        assert len(names) == 2
+        assert "API" in names  # Preserves original casing
+        assert "Database" in names
 
-    def test_root_causes_property(self):
-        """Test root_causes property returns list of tag names"""
+    def test_root_cause_tag_names_property(self):
+        """Test root_cause_tag_names property returns list of tag names"""
         incident = Incident.objects.create(
             title="Test", status=IncidentStatus.ACTIVE, severity=IncidentSeverity.P1
         )
@@ -205,10 +205,10 @@ class TestIncident:
 
         incident.root_cause_tags.add(tag1, tag2)
 
-        causes = incident.root_causes
-        assert len(causes) == 2
-        assert "Resource Exhaustion" in causes
-        assert "Traffic Spike" in causes
+        names = incident.root_cause_tag_names
+        assert len(names) == 2
+        assert "Resource Exhaustion" in names
+        assert "Traffic Spike" in names
 
     def test_external_links_dict_property(self):
         """Test external_links_dict property returns dict with lowercase keys"""

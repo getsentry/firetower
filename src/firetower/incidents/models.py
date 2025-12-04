@@ -161,12 +161,12 @@ class Incident(models.Model):
         return f"{settings.PROJECT_KEY}-{self.id}"
 
     @property
-    def affected_areas(self) -> list[str]:
+    def affected_area_tag_names(self) -> list[str]:
         """Return list of affected area names (uses prefetch cache if available)"""
         return [tag.name for tag in self.affected_area_tags.all()]
 
     @property
-    def root_causes(self) -> list[str]:
+    def root_cause_tag_names(self) -> list[str]:
         """Return list of root cause names (uses prefetch cache if available)"""
         return [tag.name for tag in self.root_cause_tags.all()]
 
