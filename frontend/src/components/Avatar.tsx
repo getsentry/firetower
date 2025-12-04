@@ -44,7 +44,7 @@ export function Avatar({name, src, alt, className, size = 'md'}: AvatarProps) {
 
   return (
     <div className={avatarClasses} style={{lineHeight: 1}}>
-      {getInitials(name)}
+      <span className="mt-[2px]">{getInitials(name)}</span>
     </div>
   );
 }
