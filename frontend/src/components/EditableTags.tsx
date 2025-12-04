@@ -109,6 +109,7 @@ const cancelButtonStyles = cva([
 export interface EditableTagsProps {
   tags: string[];
   onSave: (tags: string[]) => Promise<void>;
+  onCreate?: (name: string) => Promise<void>;
   label?: string;
   suggestions?: string[];
   placeholder?: string;
@@ -119,6 +120,7 @@ export interface EditableTagsProps {
 export function EditableTags({
   tags,
   onSave,
+  onCreate,
   label,
   suggestions = [],
   placeholder = 'Add...',
@@ -185,6 +187,22 @@ export function EditableTags({
     [draftTags]
   );
 
+  const handleCreate = useCallback(
+    async (tag: string) => {
+      const trimmed = tag.trim();
+      if (trimmed && !draftTags.includes(trimmed)) {
+        if (onCreate) {
+          await onCreate(trimmed);
+        }
+        setDraftTags(prev => [...prev, trimmed]);
+        setInputValue('');
+        setFocusedIndex(-1);
+        inputRef.current?.focus();
+      }
+    },
+    [draftTags, onCreate]
+  );
+
   const handleRemove = useCallback((tag: string) => {
     setDraftTags(prev => prev.filter(t => t !== tag));
     inputRef.current?.focus();
@@ -213,9 +231,9 @@ export function EditableTags({
             showCreateOption &&
             (focusedIndex === filteredSuggestions.length || focusedIndex === -1)
           ) {
-            handleAdd(inputValue);
+            handleCreate(inputValue);
           } else if (inputValue.trim()) {
-            handleAdd(inputValue);
+            handleCreate(inputValue);
           }
           break;
         case ' ':
@@ -224,7 +242,7 @@ export function EditableTags({
             if (focusedIndex < filteredSuggestions.length) {
               handleAdd(filteredSuggestions[focusedIndex]);
             } else if (showCreateOption) {
-              handleAdd(inputValue);
+              handleCreate(inputValue);
             }
           }
           break;
@@ -246,6 +264,7 @@ export function EditableTags({
       showCreateOption,
       inputValue,
       handleAdd,
+      handleCreate,
       cancel,
       draftTags,
       handleRemove,
@@ -354,7 +373,7 @@ export function EditableTags({
                 {showCreateOption && (
                   <button
                     type="button"
-                    onClick={() => handleAdd(inputValue)}
+                    onClick={() => handleCreate(inputValue)}
                     className={cn(
                       suggestionStyles(),
                       'w-full text-left',
