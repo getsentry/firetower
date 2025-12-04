@@ -23,7 +23,6 @@ describe('Tag', () => {
 
   it('accepts custom className', () => {
     render(
-      // eslint-disable-next-line tailwindcss/no-custom-classname
       <Tag className="custom-class" data-testid="tag">
         Custom
       </Tag>

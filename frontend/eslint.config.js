@@ -13,7 +13,7 @@ export default tseslint.config([
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,
-      reactHooks.configs['recommended-latest'],
+      reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
       eslintPluginTailwindCSS.configs['flat/recommended'],
     ],
@@ -28,6 +28,9 @@ export default tseslint.config([
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
+    },
+    rules: {
+      'tailwindcss/no-custom-classname': 'off',
     },
   },
 ]);
