@@ -3,6 +3,7 @@ from typing import Any
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models.functions import Lower
 from rest_framework import serializers
 
 from .models import ExternalLink, ExternalLinkType, Incident, Tag, TagType
@@ -262,23 +263,33 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         }
 
     def validate_affected_area_tags(self, value: list[str]) -> list[str]:
-        for tag_name in value:
-            if not Tag.objects.filter(
-                name__iexact=tag_name, type=TagType.AFFECTED_AREA
-            ).exists():
-                raise serializers.ValidationError(
-                    f"Tag '{tag_name}' does not exist for type AFFECTED_AREA"
-                )
+        value_lower = {v.lower() for v in value}
+        existing = set(
+            Tag.objects.filter(type=TagType.AFFECTED_AREA)
+            .annotate(name_lower=Lower("name"))
+            .filter(name_lower__in=value_lower)
+            .values_list("name_lower", flat=True)
+        )
+        missing = [v for v in value if v.lower() not in existing]
+        if missing:
+            raise serializers.ValidationError(
+                f"Tag '{missing[0]}' does not exist for type AFFECTED_AREA"
+            )
         return value
 
     def validate_root_cause_tags(self, value: list[str]) -> list[str]:
-        for tag_name in value:
-            if not Tag.objects.filter(
-                name__iexact=tag_name, type=TagType.ROOT_CAUSE
-            ).exists():
-                raise serializers.ValidationError(
-                    f"Tag '{tag_name}' does not exist for type ROOT_CAUSE"
-                )
+        value_lower = {v.lower() for v in value}
+        existing = set(
+            Tag.objects.filter(type=TagType.ROOT_CAUSE)
+            .annotate(name_lower=Lower("name"))
+            .filter(name_lower__in=value_lower)
+            .values_list("name_lower", flat=True)
+        )
+        missing = [v for v in value if v.lower() not in existing]
+        if missing:
+            raise serializers.ValidationError(
+                f"Tag '{missing[0]}' does not exist for type ROOT_CAUSE"
+            )
         return value
 
     def validate_external_links(
