@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import ExternalLink, ExternalLinkType, Incident, Tag
+from .models import ExternalLink, ExternalLinkType, Incident, Tag, TagType
 
 
 @dataclass
@@ -163,12 +163,10 @@ class IncidentReadSerializer(serializers.ModelSerializer):
     captain = serializers.SerializerMethodField()
     reporter = serializers.SerializerMethodField()
     participants = serializers.SerializerMethodField()
-    affected_area_tags = serializers.ListField(
-        child=serializers.CharField(), source="affected_areas", read_only=True
+    affected_areas = serializers.ListField(
+        child=serializers.CharField(), read_only=True
     )
-    root_cause_tags = serializers.ListField(
-        child=serializers.CharField(), source="root_causes", read_only=True
-    )
+    root_causes = serializers.ListField(child=serializers.CharField(), read_only=True)
     external_links = serializers.DictField(source="external_links_dict", read_only=True)
 
     class Meta:
@@ -184,8 +182,8 @@ class IncidentReadSerializer(serializers.ModelSerializer):
             "captain",
             "reporter",
             "participants",
-            "affected_area_tags",
-            "root_cause_tags",
+            "affected_areas",
+            "root_causes",
             "external_links",
             "created_at",
             "updated_at",
@@ -209,12 +207,18 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     Serializer for creating and updating incidents via the service API.
 
     Required fields: title, severity, is_private, captain, reporter
-    Optional fields: description, impact, status, external_links
+    Optional fields: description, impact, status, external_links,
+                     affected_areas, root_causes
 
     external_links format: {"slack": "url", "jira": "url", ...}
     - Merges with existing links (only updates provided links)
     - Use null to delete a specific link: {"slack": null}
     - Omit external_links field to leave existing links unchanged
+
+    affected_areas/root_causes format: ["tag1", "tag2", ...]
+    - Replaces all existing tags with the provided list
+    - Tags must already exist (create via POST /api/tags/)
+    - Omit field to leave existing tags unchanged
     """
 
     id = serializers.CharField(source="incident_number", read_only=True)
@@ -222,6 +226,16 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         child=serializers.CharField(allow_null=True),
         required=False,
         allow_null=False,
+        write_only=True,
+    )
+    affected_areas = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        write_only=True,
+    )
+    root_causes = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
         write_only=True,
     )
 
@@ -238,6 +252,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "captain",
             "reporter",
             "external_links",
+            "affected_areas",
+            "root_causes",
         ]
         extra_kwargs = {
             "captain": {"required": True},
@@ -269,9 +285,33 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
         return value
 
+    def validate_affected_areas(self, value: list[str]) -> list[str]:
+        """Validate that all affected area tags exist"""
+        for tag_name in value:
+            if not Tag.objects.filter(
+                name__iexact=tag_name, type=TagType.AFFECTED_AREA
+            ).exists():
+                raise serializers.ValidationError(
+                    f"Tag '{tag_name}' does not exist for type AFFECTED_AREA"
+                )
+        return value
+
+    def validate_root_causes(self, value: list[str]) -> list[str]:
+        """Validate that all root cause tags exist"""
+        for tag_name in value:
+            if not Tag.objects.filter(
+                name__iexact=tag_name, type=TagType.ROOT_CAUSE
+            ).exists():
+                raise serializers.ValidationError(
+                    f"Tag '{tag_name}' does not exist for type ROOT_CAUSE"
+                )
+        return value
+
     def create(self, validated_data: dict) -> Incident:
         """Create incident with external links"""
         external_links_data = validated_data.pop("external_links", None)
+        validated_data.pop("affected_areas", None)
+        validated_data.pop("root_causes", None)
 
         # Create the incident
         incident = super().create(validated_data)
@@ -290,12 +330,15 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Incident, validated_data: dict) -> Incident:
         """
-        Update incident with merge behavior for external links.
+        Update incident with merge behavior for external links and tag replacement.
 
         Only updates fields provided in the request (partial update).
         External links are merged - only provided links are updated/deleted.
+        Tags are replaced - the provided list replaces all existing tags.
         """
         external_links_data = validated_data.pop("external_links", None)
+        affected_areas_data = validated_data.pop("affected_areas", None)
+        root_causes_data = validated_data.pop("root_causes", None)
 
         # Update basic fields
         instance = super().update(instance, validated_data)
@@ -317,6 +360,20 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                         type=link_type_upper,
                         defaults={"url": url},
                     )
+
+        # Replace affected area tags if provided
+        if affected_areas_data is not None:
+            tags = Tag.objects.filter(
+                name__in=affected_areas_data, type=TagType.AFFECTED_AREA
+            )
+            instance.affected_area_tags.set(tags)
+
+        # Replace root cause tags if provided
+        if root_causes_data is not None:
+            tags = Tag.objects.filter(
+                name__in=root_causes_data, type=TagType.ROOT_CAUSE
+            )
+            instance.root_cause_tags.set(tags)
 
         return instance
 
