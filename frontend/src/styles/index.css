@@ -1,9 +1,40 @@
 @import 'tailwindcss';
 @import './design-tokens.css';
 
+/* Rubik font with modified vertical metrics (copied from Sentry) */
+@font-face {
+  font-family: 'Rubik';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    url('/fonts/rubik-regular.woff2') format('woff2'),
+    url('/fonts/rubik-regular.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Rubik';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src:
+    url('/fonts/rubik-medium.woff2') format('woff2'),
+    url('/fonts/rubik-medium.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Rubik';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src:
+    url('/fonts/rubik-medium.woff2') format('woff2'),
+    url('/fonts/rubik-medium.woff') format('woff');
+}
+
 /* Global styles */
 body {
-  font-family: Avenir, 'Helvetica Neue', sans-serif;
+  font-family: 'Rubik', sans-serif;
 }
 
 /* Custom utilities using design tokens */

@@ -9,6 +9,8 @@ import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {SEVERITY_OPTIONS, STATUS_OPTIONS} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
+import {OverflowMenu} from './OverflowMenu';
+
 interface IncidentSummaryProps {
   incident: IncidentDetail;
 }
@@ -44,19 +46,33 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
       });
     };
 
+  const handleVisibilityToggle = async () => {
+    await updateIncidentField.mutateAsync({
+      incidentId: incident.id,
+      field: 'is_private',
+      value: !incident.is_private,
+    });
+  };
+
   return (
     <Card>
-      <div className="mb-space-lg flex items-start justify-between">
+      <div className="mb-space-lg flex items-center justify-between">
         <span className="text-content-secondary gap-space-xs flex items-center text-sm leading-none">
           {incident.is_private && <span aria-label="Private incident">🔒</span>}
           {incident.id}
         </span>
-        <time
-          className="text-content-secondary text-right text-sm"
-          dateTime={incident.created_at}
-        >
-          {formatDateTime(incident.created_at)}
-        </time>
+        <div className="gap-space-md flex items-center">
+          <time
+            className="text-content-secondary text-right text-sm"
+            dateTime={incident.created_at}
+          >
+            {formatDateTime(incident.created_at)}
+          </time>
+          <OverflowMenu
+            isPrivate={incident.is_private}
+            onToggleVisibility={handleVisibilityToggle}
+          />
+        </div>
       </div>
       <div className="gap-space-lg mb-space-xl flex">
         <EditablePill

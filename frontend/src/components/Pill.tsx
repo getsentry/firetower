@@ -4,13 +4,16 @@ import {cn} from 'utils/cn';
 
 const pill = cva(
   [
+    'inline-flex',
+    'items-center',
+    'justify-center',
     'px-space-lg',
     'py-space-xs',
     'rounded-radius-full',
     'text-size-sm',
     'font-medium',
     'uppercase',
-    'leading-none ',
+    'leading-none',
   ],
   {
     variants: {
@@ -54,8 +57,7 @@ const Pill = ({className, variant, ref, ...props}: PillProps) => {
   const {children, ...rest} = props;
   return (
     <div ref={ref} className={cn(pill({variant, className}))} {...rest}>
-      {/* mt-[2px] and mb-auto is to align the text inside the div properly. I think the font is messed up slightly based on internet reading.*/}
-      <span className="mt-[2px] mb-auto block">{children}</span>
+      {children}
     </div>
   );
 };
