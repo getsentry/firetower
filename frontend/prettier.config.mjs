@@ -2,7 +2,7 @@
  * @type {import("prettier").Config}
  */
 const config = {
-  plugins: ['@prettier/plugin-oxc', '@ianvs/prettier-plugin-sort-imports'],
+  plugins: ['@ianvs/prettier-plugin-sort-imports'],
   importOrder: [
     // Node.js builtins.
     '<BUILTIN_MODULES>',

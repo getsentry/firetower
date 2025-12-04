@@ -33,7 +33,6 @@ describe('Pill', () => {
 
   it('accepts custom className', () => {
     render(
-      // eslint-disable-next-line tailwindcss/no-custom-classname
       <Pill className="custom-class" data-testid="pill">
         Custom
       </Pill>
