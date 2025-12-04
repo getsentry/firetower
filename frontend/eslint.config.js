@@ -25,6 +25,10 @@ export default tseslint.config([
         cssFiles: ['src/styles/index.css', 'src/styles/design-tokens.css'],
       },
     },
+    rules: {
+      // Disable until plugin properly supports Tailwind v4 CSS-based config
+      'tailwindcss/no-custom-classname': 'off',
+    },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
