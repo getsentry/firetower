@@ -11,7 +11,8 @@ export type UpdateIncidentFieldArgs =
       field: 'severity' | 'status' | 'title' | 'description' | 'impact';
       value: string;
     }
-  | {incidentId: string; field: 'is_private'; value: boolean};
+  | {incidentId: string; field: 'is_private'; value: boolean}
+  | {incidentId: string; field: 'affected_areas' | 'root_causes'; value: string[]};
 
 const PatchResponseSchema = z.object({
   id: z.string(),
@@ -21,6 +22,8 @@ const PatchResponseSchema = z.object({
   status: z.enum(STATUS_OPTIONS),
   severity: z.enum(SEVERITY_OPTIONS),
   is_private: z.boolean(),
+  affected_areas: z.array(z.string()),
+  root_causes: z.array(z.string()),
 });
 
 export function updateIncidentFieldMutationOptions(queryClient: QueryClient) {
