@@ -228,16 +228,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         allow_null=False,
         write_only=True,
     )
-    affected_areas = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        write_only=True,
-    )
-    root_causes = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        write_only=True,
-    )
+    affected_areas = serializers.SerializerMethodField()
+    root_causes = serializers.SerializerMethodField()
 
     class Meta:
         model = Incident
@@ -261,6 +253,58 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "is_private": {"required": True},
         }
 
+    def get_affected_areas(self, obj: Incident) -> list[str]:
+        return list(obj.affected_area_tags.values_list("name", flat=True))
+
+    def get_root_causes(self, obj: Incident) -> list[str]:
+        return list(obj.root_cause_tags.values_list("name", flat=True))
+
+    def to_internal_value(self, data: dict) -> dict:
+        # Extract tag fields before standard validation (since SerializerMethodField is read-only)
+        affected_areas = data.get("affected_areas")
+        root_causes = data.get("root_causes")
+
+        result = super().to_internal_value(data)
+
+        # Add back tag fields if provided, with validation
+        if affected_areas is not None:
+            if not isinstance(affected_areas, list):
+                raise serializers.ValidationError(
+                    {"affected_areas": ["Expected a list of strings."]}
+                )
+            for tag_name in affected_areas:
+                if not Tag.objects.filter(
+                    name__iexact=tag_name, type=TagType.AFFECTED_AREA
+                ).exists():
+                    raise serializers.ValidationError(
+                        {
+                            "affected_areas": [
+                                f"Tag '{tag_name}' does not exist for type AFFECTED_AREA"
+                            ]
+                        }
+                    )
+            result["affected_areas"] = affected_areas
+
+        if root_causes is not None:
+            if not isinstance(root_causes, list):
+                raise serializers.ValidationError(
+                    {"root_causes": ["Expected a list of strings."]}
+                )
+            for tag_name in root_causes:
+                if not Tag.objects.filter(
+                    name__iexact=tag_name, type=TagType.ROOT_CAUSE
+                ).exists():
+                    raise serializers.ValidationError(
+                        {
+                            "root_causes": [
+                                f"Tag '{tag_name}' does not exist for type ROOT_CAUSE"
+                            ]
+                        }
+                    )
+            result["root_causes"] = root_causes
+
+        return result
+
     def validate_external_links(
         self, value: dict[str, str | None]
     ) -> dict[str, str | None]:
@@ -283,28 +327,6 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                         f"Invalid URL for {link_type}: {e.detail[0]}"
                     )
 
-        return value
-
-    def validate_affected_areas(self, value: list[str]) -> list[str]:
-        """Validate that all affected area tags exist"""
-        for tag_name in value:
-            if not Tag.objects.filter(
-                name__iexact=tag_name, type=TagType.AFFECTED_AREA
-            ).exists():
-                raise serializers.ValidationError(
-                    f"Tag '{tag_name}' does not exist for type AFFECTED_AREA"
-                )
-        return value
-
-    def validate_root_causes(self, value: list[str]) -> list[str]:
-        """Validate that all root cause tags exist"""
-        for tag_name in value:
-            if not Tag.objects.filter(
-                name__iexact=tag_name, type=TagType.ROOT_CAUSE
-            ).exists():
-                raise serializers.ValidationError(
-                    f"Tag '{tag_name}' does not exist for type ROOT_CAUSE"
-                )
         return value
 
     def create(self, validated_data: dict) -> Incident:
