@@ -33,8 +33,20 @@ export function createTagMutationOptions(queryClient: QueryClient) {
         body: {name, type},
         responseSchema: TagSchema,
       }),
-    onSuccess: (_data: string, variables: CreateTagArgs) => {
-      queryClient.invalidateQueries({queryKey: ['Tags', variables.type]});
+    onMutate: async ({name, type}: CreateTagArgs) => {
+      await queryClient.cancelQueries({queryKey: ['Tags', type]});
+      const previousTags = queryClient.getQueryData<string[]>(['Tags', type]);
+      queryClient.setQueryData<string[]>(['Tags', type], old => [...(old ?? []), name]);
+      return {previousTags};
+    },
+    onError: (
+      _error: Error,
+      variables: CreateTagArgs,
+      context: {previousTags: string[] | undefined} | undefined
+    ) => {
+      if (context?.previousTags) {
+        queryClient.setQueryData(['Tags', variables.type], context.previousTags);
+      }
     },
   };
 }
