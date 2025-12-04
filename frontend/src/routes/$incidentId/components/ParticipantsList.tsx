@@ -31,11 +31,11 @@ export function ParticipantsList({participants}: ParticipantsListProps) {
           <div key={index} className="gap-space-lg flex items-center">
             <Avatar name={participant.name} src={participant.avatar_url} />
             <div className="text-content-headings flex-1 font-medium">
-              <span className="mt-[2px] block">{participant.name}</span>
+              {participant.name}
             </div>
             {participant.role && participant.role !== 'Participant' && (
               <div className="text-content-secondary text-sm uppercase">
-                <span className="mt-[2px] block">{participant.role}</span>
+                {participant.role}
               </div>
             )}
           </div>
