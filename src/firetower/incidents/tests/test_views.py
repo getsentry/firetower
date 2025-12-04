@@ -1157,6 +1157,34 @@ class TestIncidentAPIViews:
 
         assert response.status_code == 400
 
+    def test_update_tags_case_insensitive(self):
+        """Test that tag matching is case-insensitive"""
+        Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Use different casing than stored in DB
+        payload = {"affected_area_tags": ["api", "DATABASE"]}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+        # Should match the tags (preserving original DB casing)
+        assert set(data["affected_area_tags"]) == {"API", "Database"}
+
 
 @pytest.mark.django_db
 class TestTagListCreateAPIView:

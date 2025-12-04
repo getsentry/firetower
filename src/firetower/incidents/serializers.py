@@ -363,15 +363,17 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
         # Replace affected area tags if provided
         if affected_area_tag_names is not None:
-            tags = Tag.objects.filter(
-                name__in=affected_area_tag_names, type=TagType.AFFECTED_AREA
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in affected_area_tag_names],
+                type=TagType.AFFECTED_AREA,
             )
             instance.affected_area_tags.set(tags)
 
         # Replace root cause tags if provided
         if root_cause_tag_names is not None:
-            tags = Tag.objects.filter(
-                name__in=root_cause_tag_names, type=TagType.ROOT_CAUSE
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in root_cause_tag_names],
+                type=TagType.ROOT_CAUSE,
             )
             instance.root_cause_tags.set(tags)
 
