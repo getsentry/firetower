@@ -120,9 +120,9 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           <h3 className="mb-space-md text-size-md text-content-secondary font-semibold">
             Affected Areas
           </h3>
-          {incident.affected_areas.length > 0 ? (
+          {incident.affected_area_tags.length > 0 ? (
             <div className="gap-space-md flex flex-wrap">
-              {incident.affected_areas.map(area => (
+              {incident.affected_area_tags.map(area => (
                 <Tag key={area}>{area}</Tag>
               ))}
             </div>
@@ -137,9 +137,9 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           <h3 className="mb-space-md text-size-md text-content-secondary font-semibold">
             Root Cause
           </h3>
-          {incident.root_causes.length > 0 ? (
+          {incident.root_cause_tags.length > 0 ? (
             <div className="gap-space-md flex flex-wrap">
-              {incident.root_causes.map(cause => (
+              {incident.root_cause_tags.map(cause => (
                 <Tag key={cause}>{cause}</Tag>
               ))}
             </div>

@@ -132,9 +132,9 @@ class TestIncidentDetailUISerializer:
         assert data["participants"][2]["role"] == "Participant"
         assert "avatar_url" in data["participants"][2]
 
-        # Check affected_areas and root_causes as arrays of strings
-        assert "API" in data["affected_areas"]
-        assert "Database" in data["root_causes"]
+        # Check affected_area_tags and root_cause_tags as arrays of strings
+        assert "API" in data["affected_area_tags"]
+        assert "Database" in data["root_cause_tags"]
 
         # Check external links (dict format for frontend compatibility, only includes existing links)
         assert "slack" in data["external_links"]

@@ -3,7 +3,7 @@ from django.urls import path
 from .views import (
     IncidentListCreateAPIView,
     IncidentRetrieveUpdateAPIView,
-    TagListAPIView,
+    TagListCreateAPIView,
     incident_detail_ui,
     incident_list_ui,
     sync_incident_participants,
@@ -35,7 +35,7 @@ urlpatterns = [
     ),
     path(
         "tags/",
-        TagListAPIView.as_view(),
-        name="tag-list",
+        TagListCreateAPIView.as_view(),
+        name="tag-list-create",
     ),
 ]

@@ -25,8 +25,8 @@ const mockIncident: IncidentDetail = {
   created_at: '2024-01-01T12:00:00Z',
   updated_at: '2024-01-01T12:00:00Z',
   is_private: false,
-  affected_areas: ['API', 'Database'],
-  root_causes: ['Resource Exhaustion'],
+  affected_area_tags: ['API', 'Database'],
+  root_cause_tags: ['Resource Exhaustion'],
   participants: [],
   external_links: {
     slack: null,
@@ -102,7 +102,7 @@ describe('IncidentSummary', () => {
     });
 
     it('renders empty state when no affected areas', () => {
-      const incidentWithoutAreas = {...mockIncident, affected_areas: []};
+      const incidentWithoutAreas = {...mockIncident, affected_area_tags: []};
       renderWithQueryClient(<IncidentSummary incident={incidentWithoutAreas} />);
 
       expect(screen.getByText('Affected Areas')).toBeInTheDocument();
@@ -119,7 +119,7 @@ describe('IncidentSummary', () => {
     });
 
     it('renders empty state when no root causes', () => {
-      const incidentWithoutCauses = {...mockIncident, root_causes: []};
+      const incidentWithoutCauses = {...mockIncident, root_cause_tags: []};
       renderWithQueryClient(<IncidentSummary incident={incidentWithoutCauses} />);
 
       expect(screen.getByText('Root Cause')).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe('IncidentSummary', () => {
     it('renders multiple root causes', () => {
       const incidentWithMultipleCauses = {
         ...mockIncident,
-        root_causes: ['Resource Exhaustion', 'Traffic Spike', 'Configuration Error'],
+        root_cause_tags: ['Resource Exhaustion', 'Traffic Spike', 'Configuration Error'],
       };
       renderWithQueryClient(<IncidentSummary incident={incidentWithMultipleCauses} />);
 

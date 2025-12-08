@@ -161,14 +161,14 @@ class Incident(models.Model):
         return f"{settings.PROJECT_KEY}-{self.id}"
 
     @property
-    def affected_areas(self) -> list[str]:
-        """Return list of affected area names"""
-        return list(self.affected_area_tags.values_list("name", flat=True))
+    def affected_area_tag_names(self) -> list[str]:
+        """Return list of affected area names (uses prefetch cache if available)"""
+        return [tag.name for tag in self.affected_area_tags.all()]
 
     @property
-    def root_causes(self) -> list[str]:
-        """Return list of root cause names"""
-        return list(self.root_cause_tags.values_list("name", flat=True))
+    def root_cause_tag_names(self) -> list[str]:
+        """Return list of root cause names (uses prefetch cache if available)"""
+        return [tag.name for tag in self.root_cause_tags.all()]
 
     @property
     def external_links_dict(self) -> dict[str, str]:

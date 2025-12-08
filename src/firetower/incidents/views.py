@@ -17,6 +17,7 @@ from .serializers import (
     IncidentListUISerializer,
     IncidentReadSerializer,
     IncidentWriteSerializer,
+    TagCreateSerializer,
     TagSerializer,
 )
 from .services import ParticipantsSyncStats, sync_incident_participants_from_slack
@@ -293,18 +294,24 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
 sync_incident_participants = SyncIncidentParticipantsView.as_view()
 
 
-class TagListAPIView(generics.ListAPIView):
+class TagListCreateAPIView(generics.ListCreateAPIView):
     """
-    List all tags of a given type.
+    List or create tags.
 
     GET /api/tags/?type=AFFECTED_AREA
     GET /api/tags/?type=ROOT_CAUSE
+    POST /api/tags/
 
-    Returns all tags filtered by type. The type query parameter is required.
+    GET returns all tags filtered by type. The type query parameter is required.
+    POST creates a new tag with name and type in the request body.
     """
 
-    serializer_class = TagSerializer
     pagination_class = None
+
+    def get_serializer_class(self) -> type[serializers.Serializer]:
+        if self.request.method == "POST":
+            return TagCreateSerializer
+        return TagSerializer
 
     def get_queryset(self) -> QuerySet[Tag]:
         tag_type = self.request.GET.get("type")
