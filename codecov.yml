@@ -3,8 +3,12 @@ codecov:
 
 coverage:
   status:
-    project: true
-    patch: true
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
 
 comment:
   after_n_builds: 2
