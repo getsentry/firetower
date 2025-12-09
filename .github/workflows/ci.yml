@@ -82,7 +82,13 @@ jobs:
       - name: Run Python tests
         run: |
           cd src
-          uv run pytest --verbose
+          uv run pytest --verbose --cov --cov-branch --cov-report=xml
+
+      - name: Upload backend coverage to Codecov
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        with:
+          flags: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   frontend-check:
     name: Frontend checks
@@ -127,7 +133,13 @@ jobs:
       - name: Run frontend tests
         run: |
           cd frontend
-          bun test
+          bun test --coverage --coverage-reporter=lcov
+
+      - name: Upload frontend coverage to Codecov
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        with:
+          flags: frontend
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Type-check frontend
         run: |
