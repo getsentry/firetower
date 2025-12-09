@@ -127,11 +127,11 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
 
         <EditableTags
           label="Affected Areas"
-          tags={incident.affected_areas}
+          tags={incident.affected_area_tags}
           onSave={async newTags => {
             await updateIncidentField.mutateAsync({
               incidentId: incident.id,
-              field: 'affected_areas',
+              field: 'affected_area_tags',
               value: newTags,
             });
           }}
@@ -144,11 +144,11 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
 
         <EditableTags
           label="Root Cause"
-          tags={incident.root_causes}
+          tags={incident.root_cause_tags}
           onSave={async newTags => {
             await updateIncidentField.mutateAsync({
               incidentId: incident.id,
-              field: 'root_causes',
+              field: 'root_cause_tags',
               value: newTags,
             });
           }}
