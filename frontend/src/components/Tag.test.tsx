@@ -43,13 +43,13 @@ describe('Tag', () => {
     expect(tag).toHaveAttribute('data-custom', 'test');
   });
 
-  it('wraps content in paragraph with margin fix', () => {
+  it('wraps content in span with margin fix', () => {
     render(<Tag data-testid="tag">Content</Tag>);
     const tag = screen.getByTestId('tag');
-    const paragraph = tag.querySelector('p');
+    const inner = tag.querySelector('span');
 
-    expect(paragraph).toBeInTheDocument();
-    expect(paragraph).toHaveClass('mt-[2px]');
-    expect(paragraph).toHaveClass('mb-auto');
+    expect(inner).toBeInTheDocument();
+    expect(inner).toHaveClass('mt-[2px]');
+    expect(inner).toHaveClass('mb-auto');
   });
 });
