@@ -1,78 +1,10 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {cva} from 'class-variance-authority';
 import {Pencil, X} from 'lucide-react';
 import {cn} from 'utils/cn';
 
 import {Spinner} from './Spinner';
 import {Tag} from './Tag';
-
-const labelContainerStyles = cva(['flex', 'items-center', 'gap-space-xs', 'mb-space-md']);
-
-const labelStyles = cva(['text-size-md', 'font-semibold', 'text-content-secondary']);
-
-const triggerStyles = cva([
-  'inline-flex',
-  'items-center',
-  'justify-center',
-  'transition-all',
-  'p-space-xs',
-  'rounded-radius-sm',
-  'hover:bg-background-secondary',
-  'hover:scale-110',
-  'text-content-secondary',
-  'hover:text-content-primary',
-  'cursor-pointer',
-]);
-
-const dropdownStyles = cva([
-  'absolute',
-  'left-0',
-  'right-0',
-  'z-50',
-  'mt-space-xs',
-  'rounded-radius-md',
-  'border',
-  'border-gray-200',
-  'bg-background-primary',
-  'shadow-lg',
-]);
-
-const dropdownScrollStyles = cva([
-  'max-h-[200px]',
-  'overflow-y-auto',
-  'p-space-sm',
-  '[&::-webkit-scrollbar]:hidden',
-  '[-ms-overflow-style:none]',
-  '[scrollbar-width:none]',
-]);
-
-const overlayStyles = cva(['fixed', 'inset-0', 'z-40', 'bg-transparent']);
-
-const removeButtonStyles = cva([
-  'text-content-disabled',
-  'hover:text-content-primary',
-  'transition-colors',
-  'cursor-pointer',
-]);
-
-const inlineInputStyles = cva([
-  'min-w-[100px]',
-  'flex-1',
-  'px-space-sm',
-  'py-space-xs',
-  'text-size-sm',
-  'bg-transparent',
-  'placeholder:text-content-disabled',
-  'focus:outline-none',
-]);
-
-const suggestionStyles = cva([
-  'px-space-md',
-  'py-space-sm',
-  'cursor-pointer',
-  'rounded-radius-sm',
-  'text-size-sm',
-]);
 
 const buttonBaseStyles = [
   'inline-flex',
@@ -133,37 +65,38 @@ export function EditableTags({
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const open = useCallback(() => {
+  const resetState = () => {
+    setInputValue('');
+    setFocusedIndex(-1);
+  };
+
+  const open = () => {
     setDraftTags(tags);
     setIsEditing(true);
-    setInputValue('');
-    setFocusedIndex(-1);
     setError(null);
-  }, [tags]);
+    resetState();
+  };
 
-  const cancel = useCallback(() => {
+  const cancel = () => {
     setIsEditing(false);
     setDraftTags(tags);
-    setInputValue('');
-    setFocusedIndex(-1);
-  }, [tags]);
+    resetState();
+  };
 
-  const save = useCallback(async () => {
+  const save = async () => {
     setIsSaving(true);
     try {
       await onSave(draftTags);
       setIsEditing(false);
-      setInputValue('');
-      setFocusedIndex(-1);
+      resetState();
     } catch (err) {
       console.error('Failed to save:', err);
     } finally {
       setIsSaving(false);
     }
-  }, [draftTags, onSave]);
+  };
 
   const filteredSuggestions = suggestions.filter(
     s => !draftTags.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
@@ -176,108 +109,83 @@ export function EditableTags({
 
   const totalOptions = filteredSuggestions.length + (showCreateOption ? 1 : 0);
 
-  const handleAdd = useCallback(
-    (tag: string) => {
-      const trimmed = tag.trim();
-      if (trimmed && !draftTags.includes(trimmed)) {
-        setDraftTags(prev => [...prev, trimmed]);
-        setInputValue('');
-        setFocusedIndex(-1);
-        inputRef.current?.focus();
-      }
-    },
-    [draftTags]
-  );
+  const addTag = (tag: string) => {
+    const trimmed = tag.trim();
+    if (trimmed && !draftTags.includes(trimmed)) {
+      setDraftTags(prev => [...prev, trimmed]);
+      resetState();
+      inputRef.current?.focus();
+    }
+  };
 
-  const handleCreate = useCallback(
-    async (tag: string) => {
-      const trimmed = tag.trim();
-      if (trimmed && !draftTags.includes(trimmed)) {
-        setError(null);
-        try {
-          if (onCreate) {
-            await onCreate(trimmed);
-          }
-          setDraftTags(prev => [...prev, trimmed]);
-          setInputValue('');
-          setFocusedIndex(-1);
-          inputRef.current?.focus();
-        } catch {
-          setError(`Failed to create "${trimmed}"`);
+  const createTag = async (tag: string) => {
+    const trimmed = tag.trim();
+    if (trimmed && !draftTags.includes(trimmed)) {
+      setError(null);
+      try {
+        if (onCreate) {
+          await onCreate(trimmed);
         }
+        addTag(trimmed);
+      } catch {
+        setError(`Failed to create "${trimmed}"`);
       }
-    },
-    [draftTags, onCreate]
-  );
+    }
+  };
 
-  const handleRemove = useCallback((tag: string) => {
+  const removeTag = (tag: string) => {
     setDraftTags(prev => prev.filter(t => t !== tag));
     inputRef.current?.focus();
-  }, []);
+  };
 
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent) => {
-      switch (event.key) {
-        case 'ArrowDown':
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        if (totalOptions > 0) {
+          setFocusedIndex(prev => (prev + 1) % totalOptions);
+        }
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        if (totalOptions > 0) {
+          setFocusedIndex(prev => (prev - 1 + totalOptions) % totalOptions);
+        }
+        break;
+      case 'Enter':
+        event.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < filteredSuggestions.length) {
+          addTag(filteredSuggestions[focusedIndex]);
+        } else if (
+          showCreateOption &&
+          (focusedIndex === filteredSuggestions.length || focusedIndex === -1)
+        ) {
+          createTag(inputValue);
+        } else if (!inputValue.trim()) {
+          save();
+        }
+        break;
+      case ' ':
+        if (focusedIndex >= 0) {
           event.preventDefault();
-          if (totalOptions > 0) {
-            setFocusedIndex(prev => (prev + 1) % totalOptions);
+          if (focusedIndex < filteredSuggestions.length) {
+            addTag(filteredSuggestions[focusedIndex]);
+          } else if (showCreateOption) {
+            createTag(inputValue);
           }
-          break;
-        case 'ArrowUp':
-          event.preventDefault();
-          if (totalOptions > 0) {
-            setFocusedIndex(prev => (prev - 1 + totalOptions) % totalOptions);
-          }
-          break;
-        case 'Enter':
-          event.preventDefault();
-          if (focusedIndex >= 0 && focusedIndex < filteredSuggestions.length) {
-            handleAdd(filteredSuggestions[focusedIndex]);
-          } else if (
-            showCreateOption &&
-            (focusedIndex === filteredSuggestions.length || focusedIndex === -1)
-          ) {
-            handleCreate(inputValue);
-          } else if (!inputValue.trim()) {
-            save();
-          }
-          break;
-        case ' ':
-          if (focusedIndex >= 0) {
-            event.preventDefault();
-            if (focusedIndex < filteredSuggestions.length) {
-              handleAdd(filteredSuggestions[focusedIndex]);
-            } else if (showCreateOption) {
-              handleCreate(inputValue);
-            }
-          }
-          break;
-        case 'Escape':
-          event.preventDefault();
-          cancel();
-          break;
-        case 'Backspace':
-          if (inputValue === '' && draftTags.length > 0) {
-            handleRemove(draftTags[draftTags.length - 1]);
-          }
-          break;
-      }
-    },
-    [
-      totalOptions,
-      focusedIndex,
-      filteredSuggestions,
-      showCreateOption,
-      inputValue,
-      handleAdd,
-      handleCreate,
-      save,
-      cancel,
-      draftTags,
-      handleRemove,
-    ]
-  );
+        }
+        break;
+      case 'Escape':
+        event.preventDefault();
+        cancel();
+        break;
+      case 'Backspace':
+        if (inputValue === '' && draftTags.length > 0) {
+          removeTag(draftTags[draftTags.length - 1]);
+        }
+        break;
+    }
+  };
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -285,29 +193,21 @@ export function EditableTags({
     }
   }, [isEditing]);
 
-  useEffect(() => {
-    if (!isEditing) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        cancel();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isEditing, cancel]);
-
   return (
-    <div className={className} ref={containerRef}>
+    <div className={className}>
       {label && (
-        <div className={cn(labelContainerStyles())}>
-          <h3 className={cn(labelStyles())}>{label}</h3>
+        <div className="mb-space-md flex items-center gap-space-xs">
+          <h3 className="text-size-md font-semibold text-content-secondary">{label}</h3>
           <button
             type="button"
             onClick={open}
             aria-label={`Edit ${label}`}
-            className={cn(triggerStyles(), isEditing && 'invisible')}
+            className={cn(
+              'inline-flex items-center justify-center p-space-xs rounded-radius-sm',
+              'hover:bg-background-secondary hover:scale-110 transition-all cursor-pointer',
+              'text-content-secondary hover:text-content-primary',
+              isEditing && 'invisible'
+            )}
           >
             <Pencil className="h-4 w-4" />
           </button>
@@ -316,40 +216,38 @@ export function EditableTags({
 
       <div className={cn('relative', isEditing && 'z-50')}>
         {isEditing ? (
-          <>
-            <div className="gap-space-sm flex flex-wrap items-center">
-              {draftTags.map(tag => (
-                <Tag
-                  key={tag}
-                  action={
-                    <button
-                      onClick={() => handleRemove(tag)}
-                      className={cn(removeButtonStyles())}
-                      aria-label={`Remove ${tag}`}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  }
-                >
-                  {tag}
-                </Tag>
-              ))}
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={e => {
-                  setInputValue(e.target.value);
-                  setFocusedIndex(-1);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder={placeholder}
-                className={cn(inlineInputStyles())}
-              />
-            </div>
-          </>
+          <div className="flex flex-wrap items-center gap-space-sm">
+            {draftTags.map(tag => (
+              <Tag
+                key={tag}
+                action={
+                  <button
+                    onClick={() => removeTag(tag)}
+                    className="text-content-disabled hover:text-content-primary transition-colors cursor-pointer"
+                    aria-label={`Remove ${tag}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                }
+              >
+                {tag}
+              </Tag>
+            ))}
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={e => {
+                setInputValue(e.target.value);
+                setFocusedIndex(-1);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              className="min-w-[100px] flex-1 px-space-sm py-space-xs text-size-sm bg-transparent placeholder:text-content-disabled focus:outline-none"
+            />
+          </div>
         ) : tags.length > 0 ? (
-          <div className="gap-space-sm flex flex-wrap">
+          <div className="flex flex-wrap gap-space-sm">
             {tags.map(tag => (
               <Tag key={tag}>{tag}</Tag>
             ))}
@@ -359,17 +257,16 @@ export function EditableTags({
         )}
 
         {isEditing && (
-          <div className={cn(dropdownStyles())}>
+          <div className="absolute left-0 right-0 z-50 mt-space-xs rounded-radius-md border border-gray-200 bg-background-primary shadow-lg">
             {(filteredSuggestions.length > 0 || showCreateOption) && (
-              <div className={cn(dropdownScrollStyles())}>
+              <div className="max-h-[200px] overflow-y-auto p-space-sm [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {filteredSuggestions.map((suggestion, index) => (
                   <button
                     key={suggestion}
                     type="button"
-                    onClick={() => handleAdd(suggestion)}
+                    onClick={() => addTag(suggestion)}
                     className={cn(
-                      suggestionStyles(),
-                      'w-full text-left',
+                      'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
                       index === focusedIndex
                         ? 'bg-background-secondary'
                         : 'hover:bg-background-tertiary'
@@ -381,14 +278,12 @@ export function EditableTags({
                 {showCreateOption && (
                   <button
                     type="button"
-                    onClick={() => handleCreate(inputValue)}
+                    onClick={() => createTag(inputValue)}
                     className={cn(
-                      suggestionStyles(),
-                      'w-full text-left',
+                      'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm text-content-accent',
                       focusedIndex === filteredSuggestions.length
                         ? 'bg-background-secondary'
-                        : 'hover:bg-background-tertiary',
-                      'text-content-accent'
+                        : 'hover:bg-background-tertiary'
                     )}
                   >
                     Create "{inputValue.trim()}"
@@ -401,7 +296,7 @@ export function EditableTags({
                 {error}
               </p>
             )}
-            <div className="gap-space-sm p-space-sm flex justify-end border-t border-gray-200">
+            <div className="flex justify-end gap-space-sm p-space-sm border-t border-gray-200">
               <button
                 type="button"
                 onClick={save}
@@ -423,7 +318,13 @@ export function EditableTags({
         )}
       </div>
 
-      {isEditing && <div className={cn(overlayStyles())} aria-hidden="true" />}
+      {isEditing && (
+        <div
+          className="fixed inset-0 z-40 bg-transparent"
+          aria-hidden="true"
+          onClick={cancel}
+        />
+      )}
     </div>
   );
 }
