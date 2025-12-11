@@ -15,6 +15,7 @@ const ParticipantSchema = z.object({
   name: z.string(),
   avatar_url: z.string().nullable(),
   role: z.string(),
+  email: z.string(),
 });
 
 const ExternalLinksSchema = z.object({

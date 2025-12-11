@@ -1,3 +1,4 @@
+import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {render, screen} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -5,34 +6,87 @@ import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 
 import {ParticipantsList} from './ParticipantsList';
 
+function renderWithQueryClient(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {retry: false},
+      mutations: {retry: false},
+    },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
 const mockParticipants: IncidentDetail['participants'] = [
-  {name: 'John Smith', avatar_url: null, role: 'Captain'},
-  {name: 'Jane Doe', avatar_url: null, role: 'Reporter'},
-  {name: 'Alice Brown', avatar_url: null, role: 'Participant'},
-  {name: 'Charlie Davis', avatar_url: null, role: 'Participant'},
-  {name: 'Eva Foster', avatar_url: null, role: 'Participant'},
-  {name: 'Frank Garcia', avatar_url: null, role: 'Participant'},
-  {name: 'Grace Lee', avatar_url: null, role: 'Participant'},
-  {name: 'Henry Wilson', avatar_url: null, role: 'Participant'},
+  {
+    name: 'John Smith',
+    avatar_url: null,
+    role: 'Captain',
+    email: 'john.smith@example.com',
+  },
+  {name: 'Jane Doe', avatar_url: null, role: 'Reporter', email: 'jane.doe@example.com'},
+  {
+    name: 'Alice Brown',
+    avatar_url: null,
+    role: 'Participant',
+    email: 'alice.brown@example.com',
+  },
+  {
+    name: 'Charlie Davis',
+    avatar_url: null,
+    role: 'Participant',
+    email: 'charlie.davis@example.com',
+  },
+  {
+    name: 'Eva Foster',
+    avatar_url: null,
+    role: 'Participant',
+    email: 'eva.foster@example.com',
+  },
+  {
+    name: 'Frank Garcia',
+    avatar_url: null,
+    role: 'Participant',
+    email: 'frank.garcia@example.com',
+  },
+  {
+    name: 'Grace Lee',
+    avatar_url: null,
+    role: 'Participant',
+    email: 'grace.lee@example.com',
+  },
+  {
+    name: 'Henry Wilson',
+    avatar_url: null,
+    role: 'Participant',
+    email: 'henry.wilson@example.com',
+  },
 ];
 
 describe('ParticipantsList', () => {
   it('returns null when participants array is empty', () => {
-    const {container} = render(<ParticipantsList participants={[]} />);
+    const {container} = renderWithQueryClient(
+      <ParticipantsList incidentId="INC-123" participants={[]} />
+    );
     expect(container.firstChild).toBeNull();
   });
 
   it('renders all participants when 5 or fewer', () => {
     const fiveParticipants = mockParticipants.slice(0, 5);
-    render(<ParticipantsList participants={fiveParticipants} />);
+    renderWithQueryClient(
+      <ParticipantsList incidentId="INC-123" participants={fiveParticipants} />
+    );
 
     expect(screen.getByText('John Smith')).toBeInTheDocument();
     expect(screen.getByText('Eva Foster')).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {name: /show.*participants/i})
+    ).not.toBeInTheDocument();
   });
 
   it('shows only first 5 participants when more than 5 exist', () => {
-    render(<ParticipantsList participants={mockParticipants} />);
+    renderWithQueryClient(
+      <ParticipantsList incidentId="INC-123" participants={mockParticipants} />
+    );
 
     expect(screen.getByText('John Smith')).toBeInTheDocument();
     expect(screen.getByText('Eva Foster')).toBeInTheDocument();
@@ -42,7 +96,9 @@ describe('ParticipantsList', () => {
   });
 
   it('shows "Show X more participants" button when more than 5 participants', () => {
-    render(<ParticipantsList participants={mockParticipants} />);
+    renderWithQueryClient(
+      <ParticipantsList incidentId="INC-123" participants={mockParticipants} />
+    );
 
     expect(
       screen.getByRole('button', {name: 'Show 3 more participants'})
@@ -51,7 +107,9 @@ describe('ParticipantsList', () => {
 
   it('expands to show all participants when button is clicked', async () => {
     const user = userEvent.setup();
-    render(<ParticipantsList participants={mockParticipants} />);
+    renderWithQueryClient(
+      <ParticipantsList incidentId="INC-123" participants={mockParticipants} />
+    );
 
     await user.click(screen.getByRole('button', {name: 'Show 3 more participants'}));
 
@@ -65,7 +123,9 @@ describe('ParticipantsList', () => {
 
   it('collapses back to 5 participants when "Show fewer" is clicked', async () => {
     const user = userEvent.setup();
-    render(<ParticipantsList participants={mockParticipants} />);
+    renderWithQueryClient(
+      <ParticipantsList incidentId="INC-123" participants={mockParticipants} />
+    );
 
     await user.click(screen.getByRole('button', {name: 'Show 3 more participants'}));
     await user.click(screen.getByRole('button', {name: 'Show fewer participants'}));
@@ -77,7 +137,12 @@ describe('ParticipantsList', () => {
   });
 
   it('displays participant roles for non-Participant roles', () => {
-    render(<ParticipantsList participants={mockParticipants.slice(0, 3)} />);
+    renderWithQueryClient(
+      <ParticipantsList
+        incidentId="INC-123"
+        participants={mockParticipants.slice(0, 3)}
+      />
+    );
 
     expect(screen.getByText('Captain')).toBeInTheDocument();
     expect(screen.getByText('Reporter')).toBeInTheDocument();
