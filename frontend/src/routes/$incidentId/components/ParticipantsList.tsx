@@ -116,10 +116,12 @@ function ParticipantDropdown({
     setFocusedIndex(currentIndex >= 0 ? currentIndex : 0);
   }, [currentIndex]);
 
-  const close = useCallback(() => {
+  const close = useCallback((refocus = false) => {
     setIsOpen(false);
     setFocusedIndex(-1);
-    triggerRef.current?.focus();
+    if (refocus) {
+      triggerRef.current?.focus();
+    }
   }, []);
 
   const handleSelect = useCallback(
@@ -158,7 +160,7 @@ function ParticipantDropdown({
           break;
         case 'Escape':
           event.preventDefault();
-          close();
+          close(true);
           break;
         case 'Tab':
           close();
@@ -177,6 +179,11 @@ function ParticipantDropdown({
     },
     [close]
   );
+
+  // Focus trigger on mount
+  useEffect(() => {
+    triggerRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (isOpen && focusedIndex >= 0 && menuRef.current) {

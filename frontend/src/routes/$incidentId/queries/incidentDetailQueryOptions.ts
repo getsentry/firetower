@@ -14,7 +14,7 @@ export const STATUS_OPTIONS = [
 const ParticipantSchema = z.object({
   name: z.string(),
   avatar_url: z.string().nullable(),
-  role: z.string(),
+  role: z.enum(['Captain', 'Reporter', 'Participant']),
   email: z.string(),
 });
 

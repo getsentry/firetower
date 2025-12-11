@@ -53,9 +53,11 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const close = useCallback(() => {
+  const close = useCallback((refocus = false) => {
     setIsOpen(false);
-    triggerRef.current?.focus();
+    if (refocus) {
+      triggerRef.current?.focus();
+    }
   }, []);
 
   const handleMenuItemClick = useCallback(() => {
@@ -88,6 +90,16 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
     [close]
   );
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        e.preventDefault();
+        close(true);
+      }
+    },
+    [isOpen, close]
+  );
+
   const dialogTitle = isPrivate
     ? 'Make incident public?'
     : 'Convert to private incident?';
@@ -98,7 +110,12 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
 
   return (
     <>
-      <div className="relative" ref={menuRef} onBlur={handleBlur}>
+      <div
+        className="relative"
+        ref={menuRef}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+      >
         <button
           ref={triggerRef}
           type="button"

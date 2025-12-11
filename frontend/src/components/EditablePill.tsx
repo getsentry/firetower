@@ -75,10 +75,12 @@ export function EditablePill<T extends string>({
     setFocusedIndex(currentIndex);
   }, [isSaving, options, value]);
 
-  const close = useCallback(() => {
+  const close = useCallback((refocus = false) => {
     setIsOpen(false);
     setFocusedIndex(-1);
-    triggerRef.current?.focus();
+    if (refocus) {
+      triggerRef.current?.focus();
+    }
   }, []);
 
   const handleSelect = useCallback(
@@ -131,7 +133,7 @@ export function EditablePill<T extends string>({
           break;
         case 'Escape':
           event.preventDefault();
-          close();
+          close(true);
           break;
       }
     },
