@@ -150,8 +150,6 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
                 obj.reporter, context={"incident": obj, "role": "Reporter"}
             )
             participants_list.append(serializer.data)
-            # Don't add to seen_users here - we want to allow duplicates for captain/reporter
-            # but still track for "other participants" deduplication
             seen_users.add(obj.reporter.id)
 
         # Add other participants (excluding those who are captain or reporter)
@@ -227,9 +225,9 @@ class UserEmailField(serializers.EmailField):
     def run_validation(self, data: str) -> User:
         # Validate as email first (runs email format validators)
         email = super().run_validation(data)
-        # Then convert to User
+        # Look up by username (indexed) since username=email in this codebase
         try:
-            return User.objects.get(email=email)
+            return User.objects.get(username=email)
         except User.DoesNotExist:
             raise serializers.ValidationError(
                 f"User with email '{email}' does not exist"

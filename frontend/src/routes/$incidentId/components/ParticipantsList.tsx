@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {cva} from 'class-variance-authority';
 import {Avatar} from 'components/Avatar';
@@ -168,23 +168,15 @@ function ParticipantDropdown({
     [isOpen, open, close, focusedIndex, participants, handleSelect]
   );
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(event.target as Node)
-      ) {
+  const handleBlur = useCallback(
+    (e: React.FocusEvent) => {
+      // Close if focus moves outside the dropdown container
+      if (!e.currentTarget.contains(e.relatedTarget)) {
         close();
       }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, close]);
+    },
+    [close]
+  );
 
   useEffect(() => {
     if (isOpen && focusedIndex >= 0 && menuRef.current) {
@@ -206,7 +198,7 @@ function ParticipantDropdown({
   }, [isOpen, containerRef]);
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" onBlur={handleBlur}>
       <button
         ref={triggerRef}
         type="button"
@@ -240,6 +232,7 @@ function ParticipantDropdown({
             <div
               key={participant.email}
               role="option"
+              tabIndex={-1}
               aria-selected={participant.email === value}
               className={cn(
                 dropdownItemStyles({
@@ -276,23 +269,18 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
   const [editingRole, setEditingRole] = useState<EditableRole | null>(null);
   const [selectedParticipantEmail, setSelectedParticipantEmail] = useState<string>('');
 
+  // Memoize sorted participants list
+  const displayParticipants = useMemo(() => {
+    const sorted = [...participants].sort((a, b) => a.name.localeCompare(b.name));
+    const captain = sorted.find(p => p.role === 'Captain');
+    const reporter = sorted.find(p => p.role === 'Reporter');
+    const others = sorted.filter(p => p.role !== 'Captain' && p.role !== 'Reporter');
+    return [captain, reporter, ...others].filter(Boolean) as Participant[];
+  }, [participants]);
+
   if (participants.length === 0) {
     return null;
   }
-
-  const sortedParticipants = [...participants].sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
-
-  // For display: captain first, then reporter, then alphabetized rest
-  const captain = sortedParticipants.find(p => p.role === 'Captain');
-  const reporter = sortedParticipants.find(p => p.role === 'Reporter');
-  const others = sortedParticipants.filter(
-    p => p.role !== 'Captain' && p.role !== 'Reporter'
-  );
-  const displayParticipants = [captain, reporter, ...others].filter(
-    Boolean
-  ) as Participant[];
 
   const hasMore = displayParticipants.length > MAX_VISIBLE_PARTICIPANTS;
   const visibleParticipants = expanded
@@ -300,11 +288,8 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
     : displayParticipants.slice(0, MAX_VISIBLE_PARTICIPANTS);
   const hiddenCount = displayParticipants.length - MAX_VISIBLE_PARTICIPANTS;
 
-  const getParticipantRole = (participant: Participant): EditableRole | null => {
-    if (participant.role === 'Captain') return 'Captain';
-    if (participant.role === 'Reporter') return 'Reporter';
-    return null;
-  };
+  const getParticipantRole = (participant: Participant): EditableRole | null =>
+    participant.role === 'Participant' ? null : participant.role;
 
   const startEditing = (role: EditableRole, currentHolderEmail: string) => {
     setEditingRole(role);
