@@ -239,11 +239,11 @@ DJK8S_READINESS_PROBES = [
 
 # Initialize Datadog statsd
 initialize(
-    statsd_host=os.environ.get("DATADOG_STATSD_HOST", "localhost"),
-    statsd_port=int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
-    api_key=os.environ.get("DD_API_KEY"),
-    app_key=os.environ.get("DD_APP_KEY"),
-    statsd_namespace="firetower",
+    #    statsd_host=os.environ.get("DATADOG_STATSD_HOST", "localhost"),
+    #    statsd_port=int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
+    #    api_key=os.environ.get("DD_API_KEY"),
+    #    app_key=os.environ.get("DD_APP_KEY"),
+    #    statsd_namespace="firetower",
 )
 statsd.constant_tags = [
     f"env:{'production' if os.environ.get('DJANGO_ENV') == 'prod' else 'test'}",
