@@ -269,7 +269,7 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
   const [editingRole, setEditingRole] = useState<EditableRole | null>(null);
   const [selectedParticipantEmail, setSelectedParticipantEmail] = useState<string>('');
 
-  // Memoize sorted participants list
+  // Memoize sorted participants list for display (may have duplicates if captain === reporter)
   const displayParticipants = useMemo(() => {
     const sorted = [...participants].sort((a, b) => a.name.localeCompare(b.name));
     const captain = sorted.find(p => p.role === 'Captain');
@@ -277,6 +277,16 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
     const others = sorted.filter(p => p.role !== 'Captain' && p.role !== 'Reporter');
     return [captain, reporter, ...others].filter(Boolean) as Participant[];
   }, [participants]);
+
+  // Deduplicated list for dropdown selection
+  const dropdownParticipants = useMemo(() => {
+    const seen = new Set<string>();
+    return displayParticipants.filter(p => {
+      if (seen.has(p.email)) return false;
+      seen.add(p.email);
+      return true;
+    });
+  }, [displayParticipants]);
 
   if (participants.length === 0) {
     return null;
@@ -324,7 +334,7 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
         <div className="gap-space-sm flex flex-1 items-center">
           <div className="flex-1">
             <ParticipantDropdown
-              participants={sortedParticipants}
+              participants={dropdownParticipants}
               value={selectedParticipantEmail}
               onChange={handleRoleChange}
               containerRef={containerRef}
