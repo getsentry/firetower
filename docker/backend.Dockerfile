@@ -1,4 +1,4 @@
-FROM python:3.12.11-alpine3.22 AS build_backend
+FROM python:3.12.11-trixie AS build_backend
 COPY --from=ghcr.io/astral-sh/uv:0.8.18 /uv /uvx /bin/
 
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY README.md .
 COPY src/ src/
 RUN uv sync --group prod --no-dev --frozen --compile-bytecode --no-editable
 
-FROM python:3.12.11-alpine3.22
+FROM python:3.12.11-trixie
 
 ENV \
       PYTHONUNBUFFERED="True" \
@@ -28,7 +28,7 @@ ENV \
       DD_LOGS_INJECTION="false" \
       DD_SOURCE="python"
 
-RUN adduser app -h /app -u 1100 -D && chown -R 1100 /app
+RUN adduser app --home /app --uid 901 --system && chown -R 901 /app
 
 # DD agent setup
 COPY --from=datadog/serverless-init:1.8.2-alpine /datadog-init /app/datadog-init
@@ -37,7 +37,7 @@ COPY --from=datadog/serverless-init:1.8.2-alpine /datadog-init /app/datadog-init
 COPY --from=build_backend --chown=1100 /app/.venv /app/.venv
 
 WORKDIR /app
-USER 1100
+USER 901
 
 ENV PORT=8080
 EXPOSE $PORT
