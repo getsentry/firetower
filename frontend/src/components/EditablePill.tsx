@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 import {cva} from 'class-variance-authority';
 import {cn} from 'utils/cn';
 
@@ -138,32 +138,20 @@ export function EditablePill<T extends string>({
     [isSaving, isOpen, open, close, focusedIndex, options, handleSelect]
   );
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(event.target as Node) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(event.target as Node)
-      ) {
+  const handleBlur = useCallback(
+    (e: React.FocusEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget)) {
         close();
       }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen, close]);
+    },
+    [close]
+  );
 
   const variant = getVariant ? getVariant(value) : (value as PillProps['variant']);
 
   return (
     <>
-      <div className="relative inline-block">
+      <div className="relative inline-block" onBlur={handleBlur}>
         <button
           ref={triggerRef}
           onClick={open}
@@ -190,6 +178,7 @@ export function EditablePill<T extends string>({
               return (
                 <div
                   key={option}
+                  tabIndex={-1}
                   className={cn(optionRowStyles(), isFocused && 'bg-gray-100')}
                   onClick={() => handleSelect(option)}
                   role="option"
