@@ -63,6 +63,91 @@ const mockParticipants: IncidentDetail['participants'] = [
 ];
 
 describe('ParticipantsList', () => {
+  it('shows edit button for captain and reporter roles', () => {
+    renderWithQueryClient(
+      <ParticipantsList
+        incidentId="INC-123"
+        participants={mockParticipants.slice(0, 3)}
+      />
+    );
+
+    expect(screen.getByRole('button', {name: 'Edit Captain'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Edit Reporter'})).toBeInTheDocument();
+  });
+
+  it('enters edit mode when clicking edit button', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <ParticipantsList
+        incidentId="INC-123"
+        participants={mockParticipants.slice(0, 3)}
+      />
+    );
+
+    await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
+
+    // Should show dropdown trigger and cancel button
+    expect(screen.getByRole('button', {name: 'Cancel'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: /John Smith/})).toBeInTheDocument();
+  });
+
+  it('opens dropdown when clicking the dropdown trigger', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <ParticipantsList
+        incidentId="INC-123"
+        participants={mockParticipants.slice(0, 3)}
+      />
+    );
+
+    await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
+    await user.click(screen.getByRole('button', {name: /John Smith/}));
+
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    expect(screen.getAllByRole('option')).toHaveLength(3);
+  });
+
+  it('closes edit mode when clicking cancel button', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <ParticipantsList
+        incidentId="INC-123"
+        participants={mockParticipants.slice(0, 3)}
+      />
+    );
+
+    await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
+    expect(screen.getByRole('button', {name: 'Cancel'})).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', {name: 'Cancel'}));
+    expect(screen.queryByRole('button', {name: 'Cancel'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Edit Captain'})).toBeInTheDocument();
+  });
+
+  it('deduplicates dropdown when captain and reporter are same person', async () => {
+    const user = userEvent.setup();
+    const samePersonParticipants: IncidentDetail['participants'] = [
+      {name: 'John Smith', avatar_url: null, role: 'Captain', email: 'john@example.com'},
+      {name: 'John Smith', avatar_url: null, role: 'Reporter', email: 'john@example.com'},
+      {
+        name: 'Jane Doe',
+        avatar_url: null,
+        role: 'Participant',
+        email: 'jane@example.com',
+      },
+    ];
+
+    renderWithQueryClient(
+      <ParticipantsList incidentId="INC-123" participants={samePersonParticipants} />
+    );
+
+    await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
+    await user.click(screen.getByRole('button', {name: /John Smith/}));
+
+    // Should only show 2 options (deduplicated), not 3
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+  });
+
   it('returns null when participants array is empty', () => {
     const {container} = renderWithQueryClient(
       <ParticipantsList incidentId="INC-123" participants={[]} />
