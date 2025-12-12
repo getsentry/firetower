@@ -49,7 +49,8 @@ const pill = cva(
 );
 
 interface PillProps
-  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof pill> {
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof pill> {
   ref?: React.Ref<HTMLDivElement>;
 }
 

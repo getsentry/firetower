@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
-import sentry_sdk
 from datadog import initialize, statsd
 
 
@@ -32,11 +31,14 @@ def dev_default(key: str, default: str = "") -> str:
     )
 
 
-sentry_sdk.init(
-    dsn="https://ef9a24c7ef0f1a8ba7e8f821d6ab1dd9@o1.ingest.us.sentry.io/4510076289548288",
-    send_default_pii=False,
-    environment=os.environ.get("DJANGO_ENV", "dev"),
-)
+if not env_is_dev():
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn="https://ef9a24c7ef0f1a8ba7e8f821d6ab1dd9@o1.ingest.us.sentry.io/4510076289548288",
+        send_default_pii=False,
+        environment=os.environ.get("DJANGO_ENV", "dev"),
+    )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

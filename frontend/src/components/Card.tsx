@@ -10,7 +10,8 @@ const card = cva([
 ]);
 
 interface CardProps
-  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof card> {
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof card> {
   ref?: React.Ref<HTMLDivElement>;
 }
 
@@ -34,7 +35,8 @@ const title = cva(['text-lg', 'font-semibold', 'mb-space-xl', 'text-content-head
 });
 
 interface TitleProps
-  extends React.HTMLAttributes<HTMLHeadingElement>, VariantProps<typeof title> {
+  extends React.HTMLAttributes<HTMLHeadingElement>,
+    VariantProps<typeof title> {
   ref?: React.Ref<HTMLHeadingElement>;
 }
 

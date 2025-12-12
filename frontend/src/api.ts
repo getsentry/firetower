@@ -36,9 +36,8 @@ interface FetchArgs<ResponseSchemaT extends z.ZodType> {
   responseSchema: ResponseSchemaT;
 }
 
-interface FetchArgsWithMethod<
-  ResponseSchemaT extends z.ZodType,
-> extends FetchArgs<ResponseSchemaT> {
+interface FetchArgsWithMethod<ResponseSchemaT extends z.ZodType>
+  extends FetchArgs<ResponseSchemaT> {
   method: string;
 }
 
