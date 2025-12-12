@@ -225,13 +225,6 @@ if IAP_ENABLED and not IAP_AUDIENCE:
         "Set the IAP_AUDIENCE environment variable."
     )
 
-# Logging Configuration
-if not env_is_dev():
-    import google.cloud.logging
-
-    client = google.cloud.logging.Client()
-    client.setup_logging()
-
 # django-k8s proreadiness probes
 DJK8S_READINESS_PROBES = [
     "djk8s.probes.DatabaseProbe",
