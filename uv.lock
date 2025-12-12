@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -508,7 +508,6 @@ dependencies = [
     { name = "google-auth" },
     { name = "jira" },
     { name = "psycopg", extra = ["binary"] },
-    { name = "sentry-sdk", extra = ["django"] },
     { name = "slack-sdk" },
 ]
 
@@ -527,6 +526,7 @@ dev = [
 ]
 prod = [
     { name = "granian" },
+    { name = "sentry-sdk", extra = ["django"] },
 ]
 
 [package.metadata]
@@ -541,7 +541,6 @@ requires-dist = [
     { name = "google-auth", specifier = ">=2.37.0" },
     { name = "jira", specifier = ">=3.5.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.11" },
-    { name = "sentry-sdk", extras = ["django"], specifier = ">=2.39.0" },
     { name = "slack-sdk", specifier = ">=3.31.0" },
 ]
 
@@ -558,7 +557,10 @@ dev = [
     { name = "ruff", specifier = ">=0.12.11" },
     { name = "ty", specifier = ">=0.0.1a19" },
 ]
-prod = [{ name = "granian", specifier = ">=2.6.0" }]
+prod = [
+    { name = "granian", specifier = ">=2.6.0" },
+    { name = "sentry-sdk", extras = ["django"], specifier = ">=2.47.0" },
+]
 
 [[package]]
 name = "google-auth"
@@ -1110,15 +1112,15 @@ wheels = [
 
 [[package]]
 name = "sentry-sdk"
-version = "2.39.0"
+version = "2.47.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4c/72/43294fa4bdd75c51610b5104a3ff834459ba653abb415150aa7826a249dd/sentry_sdk-2.39.0.tar.gz", hash = "sha256:8c185854d111f47f329ab6bc35993f28f7a6b7114db64aa426b326998cfa14e9", size = 348556, upload-time = "2025-09-25T09:15:39.064Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/2a/d225cbf87b6c8ecce5664db7bcecb82c317e448e3b24a2dcdaacb18ca9a7/sentry_sdk-2.47.0.tar.gz", hash = "sha256:8218891d5e41b4ea8d61d2aed62ed10c80e39d9f2959d6f939efbf056857e050", size = 381895, upload-time = "2025-12-03T14:06:36.846Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/44/4356cc64246ba7b2b920f7c97a85c3c52748e213e250b512ee8152eb559d/sentry_sdk-2.39.0-py2.py3-none-any.whl", hash = "sha256:ba655ca5e57b41569b18e2a5552cb3375209760a5d332cdd87c6c3f28f729602", size = 370851, upload-time = "2025-09-25T09:15:36.35Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/ac/d6286ea0d49e7b58847faf67b00e56bb4ba3d525281e2ac306e1f1f353da/sentry_sdk-2.47.0-py2.py3-none-any.whl", hash = "sha256:d72f8c61025b7d1d9e52510d03a6247b280094a327dd900d987717a4fce93412", size = 411088, upload-time = "2025-12-03T14:06:35.374Z" },
 ]
 
 [package.optional-dependencies]

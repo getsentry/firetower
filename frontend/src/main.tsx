@@ -6,11 +6,13 @@ import {createRouter, RouterProvider} from '@tanstack/react-router';
 
 import {routeTree} from './routeTree.gen';
 
-Sentry.init({
-  dsn: 'https://82cb16514b69a48430dc945408138e0d@o1.ingest.us.sentry.io/4510076293283840',
-  sendDefaultPii: false,
-  environment: String(import.meta.env.MODE),
-});
+if (import.meta.env.MODE != 'development') {
+  Sentry.init({
+    dsn: 'https://82cb16514b69a48430dc945408138e0d@o1.ingest.us.sentry.io/4510076293283840',
+    sendDefaultPii: false,
+    environment: String(import.meta.env.MODE),
+  });
+}
 
 const queryClient = new QueryClient();
 const router = createRouter({
