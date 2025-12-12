@@ -35,6 +35,7 @@ COPY --from=datadog/serverless-init:1.8.2-alpine /datadog-init /app/datadog-init
 
 # Copy the environment, but not the source code
 COPY --from=build_backend --chown=1100 /app/.venv /app/.venv
+COPY docker/entrypoint.sh /app/entrypoint.sh
 
 WORKDIR /app
 USER 1100
@@ -46,4 +47,5 @@ ENV DJANGO_ENV="prod"
 ENV GRANIAN_RUNTIME_THREADS="2"
 ENV GRANIAN_BACKPRESSURE="32"
 
-ENTRYPOINT ["/app/datadog-init", "sh", "-c", "export PYTHONPATH=/app:$PYTHONPATH && /app/.venv/bin/ddtrace-run /app/.venv/bin/granian --interface wsgi --host 0.0.0.0 --port $PORT firetower.wsgi:application" ]
+ENTRYPOINT [ "/app/datadog-init" ]
+CMD [ "entrypoint.sh", "server" ]
