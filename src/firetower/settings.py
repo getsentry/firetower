@@ -64,6 +64,7 @@ ALLOWED_HOSTS = [
     "firetower.getsentry.net",
     "test.firetower.getsentry.net",
     "firetower",
+    "backend",  # name from the nginx proxy_pass
 ]
 
 CORS_ALLOWED_ORIGINS = [
