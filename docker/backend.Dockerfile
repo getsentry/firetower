@@ -48,4 +48,4 @@ ENV GRANIAN_RUNTIME_THREADS="2"
 ENV GRANIAN_BACKPRESSURE="32"
 
 ENTRYPOINT [ "/app/datadog-init" ]
-CMD [ "entrypoint.sh", "server" ]
+CMD [ "/app/entrypoint.sh", "server" ]
