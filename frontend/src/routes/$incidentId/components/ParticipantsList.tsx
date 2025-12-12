@@ -328,6 +328,8 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
         field,
         value: email,
       });
+    } catch (err) {
+      console.error('Failed to save:', err);
     } finally {
       setEditingRole(null);
       setSelectedParticipantEmail('');
