@@ -322,14 +322,16 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
     if (!editingRole) return;
 
     const field = editingRole.toLowerCase() as 'captain' | 'reporter';
-    await updateIncidentField.mutateAsync({
-      incidentId,
-      field,
-      value: email,
-    });
-
-    setEditingRole(null);
-    setSelectedParticipantEmail('');
+    try {
+      await updateIncidentField.mutateAsync({
+        incidentId,
+        field,
+        value: email,
+      });
+    } finally {
+      setEditingRole(null);
+      setSelectedParticipantEmail('');
+    }
   };
 
   const renderRoleDisplay = (participant: Participant, role: string) => {
