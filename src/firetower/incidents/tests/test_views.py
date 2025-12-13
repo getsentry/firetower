@@ -428,8 +428,8 @@ class TestIncidentAPIViews:
             "title": "New Incident",
             "severity": IncidentSeverity.P1,
             "is_private": False,
-            "captain": self.captain.id,
-            "reporter": self.reporter.id,
+            "captain": self.captain.email,
+            "reporter": self.reporter.email,
         }
         response = self.client.post("/api/incidents/", data)
 
@@ -454,8 +454,8 @@ class TestIncidentAPIViews:
             "status": IncidentStatus.MITIGATED,
             "severity": IncidentSeverity.P2,
             "is_private": True,
-            "captain": self.captain.id,
-            "reporter": self.reporter.id,
+            "captain": self.captain.email,
+            "reporter": self.reporter.email,
         }
         response = self.client.post("/api/incidents/", data)
 
@@ -474,7 +474,7 @@ class TestIncidentAPIViews:
             "title": "Incomplete",
             "severity": IncidentSeverity.P1,
             "is_private": False,
-            "reporter": self.reporter.id,
+            "reporter": self.reporter.email,
         }
         response = self.client.post("/api/incidents/", data)
         assert response.status_code == 400
@@ -485,7 +485,7 @@ class TestIncidentAPIViews:
             "title": "Incomplete",
             "severity": IncidentSeverity.P1,
             "is_private": False,
-            "captain": self.captain.id,
+            "captain": self.captain.email,
         }
         response = self.client.post("/api/incidents/", data)
         assert response.status_code == 400
@@ -710,8 +710,8 @@ class TestIncidentAPIViews:
             "title": "Timestamp Test",
             "severity": "P2",
             "is_private": False,
-            "captain": self.captain.id,
-            "reporter": self.reporter.id,
+            "captain": self.captain.email,
+            "reporter": self.reporter.email,
         }
         response = self.client.post("/api/incidents/", payload, format="json")
         assert response.status_code == 201
@@ -767,8 +767,8 @@ class TestIncidentAPIViews:
             "title": "Incident with Links",
             "severity": "P1",
             "is_private": False,
-            "captain": self.captain.id,
-            "reporter": self.reporter.id,
+            "captain": self.captain.email,
+            "reporter": self.reporter.email,
             "external_links": {
                 "slack": "https://slack.com/channel/123",
                 "jira": "https://jira.company.com/browse/INC-1",
@@ -897,8 +897,8 @@ class TestIncidentAPIViews:
             "title": "Test",
             "severity": "P1",
             "is_private": False,
-            "captain": self.captain.id,
-            "reporter": self.reporter.id,
+            "captain": self.captain.email,
+            "reporter": self.reporter.email,
             "external_links": {"invalid_type": "https://example.com"},
         }
 
@@ -914,8 +914,8 @@ class TestIncidentAPIViews:
             "title": "Test",
             "severity": "P1",
             "is_private": False,
-            "captain": self.captain.id,
-            "reporter": self.reporter.id,
+            "captain": self.captain.email,
+            "reporter": self.reporter.email,
             "external_links": {"slack": "not-a-valid-url"},
         }
 
@@ -938,8 +938,8 @@ class TestIncidentAPIViews:
             "title": "Updated",
             "severity": "P2",
             "is_private": False,
-            "captain": self.captain.id,
-            "reporter": self.reporter.id,
+            "captain": self.captain.email,
+            "reporter": self.reporter.email,
         }
         response = self.client.put(f"/api/incidents/{incident.incident_number}/", data)
         assert response.status_code == 405
@@ -953,8 +953,8 @@ class TestIncidentAPIViews:
             "title": "Test",
             "severity": "P1",
             "is_private": False,
-            "captain": self.captain.id,
-            "reporter": self.reporter.id,
+            "captain": self.captain.email,
+            "reporter": self.reporter.email,
             "external_links": {
                 "slack": "https://slack.com/channel",
                 "jira": "https://jira.example.com/issue",

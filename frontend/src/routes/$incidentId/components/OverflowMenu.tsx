@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 import {cva} from 'class-variance-authority';
 import {ConfirmationDialog} from 'components/ConfirmationDialog';
 import {EllipsisVertical} from 'lucide-react';
@@ -53,9 +53,11 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const close = useCallback(() => {
+  const close = useCallback((refocus = false) => {
     setIsOpen(false);
-    triggerRef.current?.focus();
+    if (refocus) {
+      triggerRef.current?.focus();
+    }
   }, []);
 
   const handleMenuItemClick = useCallback(() => {
@@ -79,23 +81,24 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
     setShowConfirmation(false);
   }, []);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(event.target as Node)
-      ) {
+  const handleBlur = useCallback(
+    (e: React.FocusEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget)) {
         close();
       }
-    }
+    },
+    [close]
+  );
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, close]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        e.preventDefault();
+        close(true);
+      }
+    },
+    [isOpen, close]
+  );
 
   const dialogTitle = isPrivate
     ? 'Make incident public?'
@@ -107,7 +110,12 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
 
   return (
     <>
-      <div className="relative" ref={menuRef}>
+      <div
+        className="relative"
+        ref={menuRef}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+      >
         <button
           ref={triggerRef}
           type="button"

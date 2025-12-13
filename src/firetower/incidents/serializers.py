@@ -16,6 +16,7 @@ class ParticipantData:
     name: str
     avatar_url: str | None
     role: str
+    email: str
 
 
 class IncidentListUISerializer(serializers.ModelSerializer):
@@ -48,19 +49,26 @@ class ParticipantSerializer(serializers.Serializer):
     """
     Serializer for participants in incident detail view.
 
-    Matches frontend expectation: {name, avatar_url, role}
+    Matches frontend expectation: {name, avatar_url, role, email}
     """
 
     name = serializers.SerializerMethodField()
     avatar_url = serializers.CharField(source="userprofile.avatar_url", read_only=True)
     role = serializers.SerializerMethodField()
+    email = serializers.EmailField(read_only=True)
 
     def get_name(self, obj: User) -> str:
         """Get user's full name or username"""
         return obj.get_full_name() or obj.username
 
     def get_role(self, obj: User) -> str:
-        """Determine role based on incident context"""
+        """Get role from context, or determine based on incident"""
+        # If role is explicitly provided in context, use it
+        explicit_role = self.context.get("role")
+        if explicit_role:
+            return explicit_role
+
+        # Otherwise determine from incident
         incident = self.context.get("incident")
         if not incident:
             return "Participant"
@@ -122,29 +130,33 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
 
         Order:
         1. Captain (if exists)
-        2. Reporter (if exists)
-        3. Other participants
+        2. Reporter (if exists) - same user can appear twice if also captain
+        3. Other participants (excluding captain/reporter)
         """
         participants_list = []
         seen_users = set()
 
-        # Add captain first
-        if obj.captain and obj.captain.id not in seen_users:
-            serializer = ParticipantSerializer(obj.captain, context={"incident": obj})
+        # Add captain first with explicit role
+        if obj.captain:
+            serializer = ParticipantSerializer(
+                obj.captain, context={"incident": obj, "role": "Captain"}
+            )
             participants_list.append(serializer.data)
             seen_users.add(obj.captain.id)
 
-        # Add reporter second
-        if obj.reporter and obj.reporter.id not in seen_users:
-            serializer = ParticipantSerializer(obj.reporter, context={"incident": obj})
+        # Add reporter second with explicit role (even if same as captain)
+        if obj.reporter:
+            serializer = ParticipantSerializer(
+                obj.reporter, context={"incident": obj, "role": "Reporter"}
+            )
             participants_list.append(serializer.data)
             seen_users.add(obj.reporter.id)
 
-        # Add other participants
+        # Add other participants (excluding those who are captain or reporter)
         for participant in obj.participants.all():
             if participant.id not in seen_users:
                 serializer = ParticipantSerializer(
-                    participant, context={"incident": obj}
+                    participant, context={"incident": obj, "role": "Participant"}
                 )
                 participants_list.append(serializer.data)
                 seen_users.add(participant.id)
@@ -207,6 +219,24 @@ class IncidentReadSerializer(serializers.ModelSerializer):
         return [user.email for user in obj.participants.all()]
 
 
+class UserEmailField(serializers.EmailField):
+    """Field that accepts email and converts to User instance."""
+
+    def run_validation(self, data: str) -> User:
+        # Validate as email first (runs email format validators)
+        email = super().run_validation(data)
+        # Look up by username (indexed) since username=email in this codebase
+        try:
+            return User.objects.get(username=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                f"User with email '{email}' does not exist"
+            )
+
+    def to_representation(self, value: User | None) -> str | None:
+        return value.email if value else None
+
+
 class IncidentWriteSerializer(serializers.ModelSerializer):
     """
     Serializer for creating and updating incidents via the service API.
@@ -215,6 +245,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     Optional fields: description, impact, status, external_links,
                      affected_area_tags, root_cause_tags
 
+    captain/reporter: Email address of the user
     external_links format: {"slack": "url", "jira": "url", ...}
     - Merges with existing links (only updates provided links)
     - Use null to delete a specific link: {"slack": null}
@@ -227,6 +258,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     """
 
     id = serializers.CharField(source="incident_number", read_only=True)
+    captain = UserEmailField(required=True)
+    reporter = UserEmailField(required=True)
     external_links = serializers.DictField(
         child=serializers.CharField(allow_null=True),
         required=False,
@@ -257,8 +290,6 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "root_cause_tags",
         ]
         extra_kwargs = {
-            "captain": {"required": True},
-            "reporter": {"required": True},
             "is_private": {"required": True},
         }
 

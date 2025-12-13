@@ -8,7 +8,14 @@ import {SEVERITY_OPTIONS, STATUS_OPTIONS} from './incidentDetailQueryOptions';
 export type UpdateIncidentFieldArgs =
   | {
       incidentId: string;
-      field: 'severity' | 'status' | 'title' | 'description' | 'impact';
+      field:
+        | 'severity'
+        | 'status'
+        | 'title'
+        | 'description'
+        | 'impact'
+        | 'captain'
+        | 'reporter';
       value: string;
     }
   | {incidentId: string; field: 'is_private'; value: boolean};
