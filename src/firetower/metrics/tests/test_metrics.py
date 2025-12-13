@@ -25,8 +25,8 @@ class TestMetricsMiddleware:
 
         mock_increment.assert_has_calls(
             [
-                call("firetower.django.request./api/users/me"),
-                call("firetower.django.response./api/users/me", tags=["code:200"]),
+                call("django.request./api/users/me"),
+                call("django.response./api/users/me", tags=["code:200"]),
             ]
         )
         assert mock_increment.call_count == 2
@@ -41,11 +41,8 @@ class TestMetricsMiddleware:
 
         mock_increment.assert_has_calls(
             [
-                call("firetower.django.request./api/ui/incidents/inc-:NUM:"),
-                call(
-                    "firetower.django.response./api/ui/incidents/inc-:NUM:",
-                    tags=["code:500"],
-                ),
+                call("django.request./api/ui/incidents/inc-:NUM:"),
+                call("django.response./api/ui/incidents/inc-:NUM:", tags=["code:500"]),
             ]
         )
         assert mock_increment.call_count == 2
@@ -60,10 +57,8 @@ class TestMetricsMiddleware:
 
         mock_increment.assert_has_calls(
             [
-                call("firetower.django.request./weird_/stuff_/_here"),
-                call(
-                    "firetower.django.response./weird_/stuff_/_here", tags=["code:200"]
-                ),
+                call("django.request./weird_/stuff_/_here"),
+                call("django.response./weird_/stuff_/_here", tags=["code:200"]),
             ]
         )
         assert mock_increment.call_count == 2
