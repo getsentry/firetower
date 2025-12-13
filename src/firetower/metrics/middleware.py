@@ -25,7 +25,10 @@ class MetricsMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         key = MetricsMiddleware._clean_path(request.path)
         statsd.increment(f"django.request.{key}")
-        response = self.get_response(request)
+
+        with statsd.timed(f"django.request.{key}.duration"):
+            response = self.get_response(request)
+
         tags = [f"code:{response.status_code}"]
         statsd.increment(f"django.response.{key}", tags=tags)
         return response
