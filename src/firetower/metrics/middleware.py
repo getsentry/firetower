@@ -9,13 +9,13 @@ class MetricsMiddleware:
     @staticmethod
     def _clean_path(path: str) -> str:
         """
-        Clean up the path to use in the metric name.
+        Clean up the path to use in the metric tags.
 
         Reference:
         https://docs.datadoghq.com/developers/guide/what-best-practices-are-recommended-for-naming-metrics-and-tags/#rules-and-best-practices-for-naming-metrics
         """
         # Remove numerics to limit cardinality
-        valid_chars = re.sub(r"[^a-z0-9./\-]", "_", path.lower())
+        valid_chars = re.sub(r"[^a-z0-9_/\-.]", "_", path.lower())
         no_num = re.sub(r"[\d]+", ":NUM:", valid_chars)
         return no_num
 
@@ -23,12 +23,15 @@ class MetricsMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        key = MetricsMiddleware._clean_path(request.path)
-        statsd.increment(f"django.request.{key}")
+        path_tag = MetricsMiddleware._clean_path(request.path)
+        tags = [
+            f"path:{path_tag}",
+        ]
+        statsd.increment("django.request", tags=tags)
 
-        with statsd.timed(f"django.request.{key}.duration"):
+        with statsd.timed("django.request.duration", tags=tags):
             response = self.get_response(request)
 
-        tags = [f"code:{response.status_code}"]
-        statsd.increment(f"django.response.{key}", tags=tags)
+        response_tags = tags + [f"code:{response.status_code}"]
+        statsd.increment("django.response", tags=response_tags)
         return response

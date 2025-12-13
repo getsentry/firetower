@@ -25,8 +25,8 @@ class TestMetricsMiddleware:
 
         mock_increment.assert_has_calls(
             [
-                call("django.request./api/users/me"),
-                call("django.response./api/users/me", tags=["code:200"]),
+                call("django.request", tags=["path:/api/users/me"]),
+                call("django.response", tags=["path:/api/users/me", "code:200"]),
             ]
         )
         assert mock_increment.call_count == 2
@@ -41,8 +41,11 @@ class TestMetricsMiddleware:
 
         mock_increment.assert_has_calls(
             [
-                call("django.request./api/ui/incidents/inc-:NUM:"),
-                call("django.response./api/ui/incidents/inc-:NUM:", tags=["code:500"]),
+                call("django.request", tags=["path:/api/ui/incidents/inc-:NUM:"]),
+                call(
+                    "django.response",
+                    tags=["path:/api/ui/incidents/inc-:NUM:", "code:500"],
+                ),
             ]
         )
         assert mock_increment.call_count == 2
@@ -57,8 +60,11 @@ class TestMetricsMiddleware:
 
         mock_increment.assert_has_calls(
             [
-                call("django.request./weird_/stuff_/_here"),
-                call("django.response./weird_/stuff_/_here", tags=["code:200"]),
+                call("django.request", tags=["path:/weird_/stuff_/_here"]),
+                call(
+                    "django.response",
+                    tags=["path:/weird_/stuff_/_here", "code:200"],
+                ),
             ]
         )
         assert mock_increment.call_count == 2
