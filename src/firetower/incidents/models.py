@@ -112,6 +112,13 @@ class Incident(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     participants_last_synced_at = models.DateTimeField(null=True, blank=True)
 
+    # Milestone timestamps (for postmortem)
+    time_started = models.DateTimeField(null=True, blank=True)
+    time_detected = models.DateTimeField(null=True, blank=True)
+    time_diagnosed = models.DateTimeField(null=True, blank=True)
+    time_mitigated = models.DateTimeField(null=True, blank=True)
+    time_recovered = models.DateTimeField(null=True, blank=True)
+
     # Relationships
     captain = models.ForeignKey(
         "auth.User",
