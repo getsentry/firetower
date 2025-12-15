@@ -21,6 +21,7 @@ def log_datadog_event(
             tags += ["source:firetower"]
             result = Event.create(
                 True,
+                title=title,
                 text=text,
                 tags=tags,
                 alert_type=alert_type,
