@@ -394,7 +394,7 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
           const role = getParticipantRole(participant);
           const isEditingThisRow = editingRole !== null && role === editingRole;
           return (
-            <div key={index} className="gap-space-lg flex items-center">
+            <div key={index} className="gap-space-lg flex min-h-10 items-center">
               {!isEditingThisRow && (
                 <>
                   <Avatar name={participant.name} src={participant.avatar_url} />
