@@ -20,12 +20,13 @@ def log_datadog_event(
     if not env_is_dev():
         try:
             tags += ["source:firetower"]
-            Event.create(
+            result = Event.create(
                 True,
                 text=text,
                 tags=tags,
                 alert_type=alert_type,
             )
+            print(repr(result))
         except (ImportError, DatadogException) as e:
             warning(f"Failed to log datadog event: {e}")
 
