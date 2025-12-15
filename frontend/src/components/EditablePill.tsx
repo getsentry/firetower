@@ -43,6 +43,7 @@ const triggerStyles = cva([
   'active:scale-95',
   'relative',
   'rounded-full',
+  'select-none',
 ]);
 
 const overlayStyles = cva(['fixed', 'inset-0', 'z-40', 'bg-transparent']);

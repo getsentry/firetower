@@ -37,6 +37,7 @@ const triggerStyles = cva(
     'hover:text-content-primary',
     'cursor-pointer',
     'my-auto',
+    'select-none',
   ],
   {
     variants: {
@@ -100,6 +101,7 @@ const buttonBaseStyles = [
   'focus:outline-auto',
   'disabled:opacity-50',
   'disabled:cursor-not-allowed',
+  'select-none',
 ];
 
 const saveButtonStyles = cva([

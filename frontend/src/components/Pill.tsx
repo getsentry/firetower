@@ -14,6 +14,7 @@ const pill = cva(
     'font-medium',
     'uppercase',
     'leading-none',
+    'select-none',
   ],
   {
     variants: {

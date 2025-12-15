@@ -27,6 +27,7 @@ const triggerStyles = cva([
   'text-content-secondary',
   'hover:text-content-primary',
   'cursor-pointer',
+  'select-none',
 ]);
 
 const dropdownTriggerStyles = cva([
@@ -44,6 +45,7 @@ const dropdownTriggerStyles = cva([
   'items-center',
   'focus:outline-auto',
   'focus:border-content-accent',
+  'select-none',
 ]);
 
 const dropdownMenuStyles = cva([
@@ -74,6 +76,7 @@ const dropdownItemStyles = cva(
     'items-center',
     'rounded-radius-sm',
     'text-sm',
+    'select-none',
   ],
   {
     variants: {
