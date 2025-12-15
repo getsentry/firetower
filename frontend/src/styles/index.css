@@ -61,6 +61,9 @@ body {
   .bg-background-warning-vibrant {
     background-color: var(--tokens-color-background-warning-vibrant);
   }
+  .bg-background-promotion-vibrant {
+    background-color: var(--tokens-color-background-promotion-vibrant);
+  }
   .bg-background-transparent-accent-muted {
     background-color: var(--tokens-color-background-transparent-accent-muted);
   }
@@ -75,6 +78,9 @@ body {
   }
   .bg-background-transparent-promotion-muted {
     background-color: var(--tokens-color-background-transparent-promotion-muted);
+  }
+  .bg-background-transparent-neutral-muted {
+    background-color: var(--tokens-color-background-transparent-neutral-muted);
   }
 
   /* Text colors */

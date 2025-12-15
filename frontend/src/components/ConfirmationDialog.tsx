@@ -28,6 +28,7 @@ const button = cva(
     'text-sm',
     'font-medium',
     'transition-colors',
+    'select-none',
   ],
   {
     variants: {

@@ -12,6 +12,7 @@ const triggerStyles = cva([
   'rounded-radius-sm',
   'p-space-xs',
   'transition-colors',
+  'select-none',
 ]);
 
 const popoverStyles = cva([
@@ -39,6 +40,7 @@ const menuItemStyles = cva([
   'text-sm',
   'transition-colors',
   'hover:bg-gray-100',
+  'select-none',
 ]);
 
 interface OverflowMenuProps {

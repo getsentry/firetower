@@ -27,6 +27,7 @@ const triggerStyles = cva([
   'text-content-secondary',
   'hover:text-content-primary',
   'cursor-pointer',
+  'select-none',
 ]);
 
 const dropdownTriggerStyles = cva([
@@ -44,6 +45,7 @@ const dropdownTriggerStyles = cva([
   'items-center',
   'focus:outline-auto',
   'focus:border-content-accent',
+  'select-none',
 ]);
 
 const dropdownMenuStyles = cva([
@@ -74,6 +76,7 @@ const dropdownItemStyles = cva(
     'items-center',
     'rounded-radius-sm',
     'text-sm',
+    'select-none',
   ],
   {
     variants: {
@@ -391,7 +394,7 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
           const role = getParticipantRole(participant);
           const isEditingThisRow = editingRole !== null && role === editingRole;
           return (
-            <div key={index} className="gap-space-lg flex items-center">
+            <div key={index} className="gap-space-lg flex min-h-10 items-center">
               {!isEditingThisRow && (
                 <>
                   <Avatar name={participant.name} src={participant.avatar_url} />
