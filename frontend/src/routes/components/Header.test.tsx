@@ -145,7 +145,7 @@ describe('Header - Root Route (Incident List)', () => {
     expect(stored).not.toBeNull();
 
     const parsed = JSON.parse(stored!);
-    expect(parsed).toEqual({status: ['Postmortem', 'Actions Pending']});
+    expect(parsed).toEqual({status: ['Postmortem']});
   });
 
   it('stores empty search params in sessionStorage on initial load', async () => {
@@ -202,10 +202,7 @@ describe('Header - Incident Detail Route', () => {
   });
 
   it('back button preserves search params from sessionStorage', async () => {
-    sessionStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({status: ['Postmortem', 'Actions Pending']})
-    );
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({status: ['Postmortem']}));
 
     renderRoute('/INC-1247');
 
@@ -216,7 +213,6 @@ describe('Header - Incident Detail Route', () => {
 
     expect(href).toContain('status');
     expect(href).toContain('Postmortem');
-    expect(href).toContain('Actions+Pending');
   });
 
   it('navigates back to list with preserved filters', async () => {
@@ -377,7 +373,7 @@ describe('Header - sessionStorage Handling', () => {
 
     stored = sessionStorage.getItem(STORAGE_KEY);
     parsed = JSON.parse(stored!);
-    expect(parsed).toEqual({status: ['Postmortem', 'Actions Pending']});
+    expect(parsed).toEqual({status: ['Postmortem']});
 
     const closedButton = screen.getByTestId('filter-closed');
     await user.click(closedButton);

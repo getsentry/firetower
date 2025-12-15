@@ -197,7 +197,7 @@ describe('StatusFilter', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Postmortem', 'Actions Pending'], page: 1},
+        query: {status: ['Postmortem'], page: 1},
       })
     );
   });

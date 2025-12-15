@@ -5,13 +5,7 @@ import {describe, expect, it, jest} from 'bun:test';
 import {EditablePill} from './EditablePill';
 
 const SEVERITY_OPTIONS = ['P0', 'P1', 'P2', 'P3', 'P4'] as const;
-const STATUS_OPTIONS = [
-  'Active',
-  'Mitigated',
-  'Actions Pending',
-  'Postmortem',
-  'Done',
-] as const;
+const STATUS_OPTIONS = ['Active', 'Mitigated', 'Postmortem', 'Done'] as const;
 
 describe('EditablePill', () => {
   it('renders current value', async () => {

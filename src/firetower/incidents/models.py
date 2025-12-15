@@ -11,7 +11,6 @@ class IncidentStatus(models.TextChoices):
     ACTIVE = "Active", "Active"
     MITIGATED = "Mitigated", "Mitigated"
     POSTMORTEM = "Postmortem", "Postmortem"
-    ACTIONS_PENDING = "Actions Pending", "Actions Pending"
     DONE = "Done", "Done"
 
 
