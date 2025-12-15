@@ -99,7 +99,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "firetower.metrics.middleware.MetricsMiddleware",
+    "firetower.incidents.metrics.middleware.MetricsMiddleware",
     "djk8s.middleware.ProbeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

@@ -3,7 +3,7 @@ from unittest.mock import Mock, call, patch
 import pytest
 from django.test import RequestFactory
 
-from firetower.metrics.middleware import MetricsMiddleware
+from firetower.incidents.metrics.middleware import MetricsMiddleware
 
 
 class TestMetricsMiddleware:
