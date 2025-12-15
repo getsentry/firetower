@@ -36,6 +36,11 @@ const IncidentDetailSchema = z.object({
   root_cause_tags: z.array(z.string()),
   participants: z.array(ParticipantSchema),
   external_links: ExternalLinksSchema,
+  time_started: z.string().nullable(),
+  time_detected: z.string().nullable(),
+  time_diagnosed: z.string().nullable(),
+  time_mitigated: z.string().nullable(),
+  time_recovered: z.string().nullable(),
 });
 
 export type IncidentDetail = z.infer<typeof IncidentDetailSchema>;

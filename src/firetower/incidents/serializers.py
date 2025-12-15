@@ -121,8 +121,22 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
             "external_links",
             "created_at",
             "updated_at",
+            "time_started",
+            "time_detected",
+            "time_diagnosed",
+            "time_mitigated",
+            "time_recovered",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "time_started",
+            "time_detected",
+            "time_diagnosed",
+            "time_mitigated",
+            "time_recovered",
+        ]
 
     def get_participants(self, obj: Incident) -> list[ParticipantData]:
         """
@@ -204,6 +218,11 @@ class IncidentReadSerializer(serializers.ModelSerializer):
             "external_links",
             "created_at",
             "updated_at",
+            "time_started",
+            "time_detected",
+            "time_diagnosed",
+            "time_mitigated",
+            "time_recovered",
         ]
 
     def get_captain(self, obj: Incident) -> str | None:
@@ -288,6 +307,11 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "external_links",
             "affected_area_tags",
             "root_cause_tags",
+            "time_started",
+            "time_detected",
+            "time_diagnosed",
+            "time_mitigated",
+            "time_recovered",
         ]
         extra_kwargs = {
             "is_private": {"required": False},
