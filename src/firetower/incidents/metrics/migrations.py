@@ -3,7 +3,6 @@ from typing import TypedDict, Unpack
 
 from datadog.api.events import Event
 from datadog.api.exceptions import DatadogException
-from django.apps import AppConfig
 from django.db.models.signals import post_migrate, pre_migrate
 from django.dispatch import receiver
 
@@ -32,7 +31,7 @@ def log_datadog_event(
 
 
 @receiver(pre_migrate)
-def log_pre_migrate(_sender: AppConfig, **kwargs: Unpack[MigrationSignalArgs]) -> None:
+def log_pre_migrate(**kwargs: Unpack[MigrationSignalArgs]) -> None:
     plan = kwargs.get("plan")
     log_datadog_event(
         title="Firetower: Django migration started", text=f"Plan:\n\n{repr(plan)}"
@@ -40,7 +39,7 @@ def log_pre_migrate(_sender: AppConfig, **kwargs: Unpack[MigrationSignalArgs]) -
 
 
 @receiver(post_migrate)
-def log_post_migrate(_sender: AppConfig, **kwargs: Unpack[MigrationSignalArgs]) -> None:
+def log_post_migrate(**kwargs: Unpack[MigrationSignalArgs]) -> None:
     plan = kwargs.get("plan")
     log_datadog_event(
         title="Firetower: Django migration finished", text=f"Plan:\n\n{repr(plan)}"
