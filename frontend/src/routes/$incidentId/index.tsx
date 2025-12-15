@@ -70,7 +70,10 @@ function Incident() {
             />
           )}
           <LinksList externalLinks={incident.external_links} />
-          <ParticipantsList participants={incident.participants} />
+          <ParticipantsList
+            incidentId={params.incidentId}
+            participants={incident.participants}
+          />
         </aside>
       </div>
     </div>
