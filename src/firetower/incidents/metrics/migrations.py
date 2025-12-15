@@ -1,4 +1,4 @@
-from logging import warning
+from logging import debug, warning
 from typing import TypedDict, Unpack
 
 from datadog.api.events import Event
@@ -26,7 +26,7 @@ def log_datadog_event(
                 tags=tags,
                 alert_type=alert_type,
             )
-            print(repr(result))
+            debug(f"datadog log: {repr(result)}")
         except (ImportError, DatadogException) as e:
             warning(f"Failed to log datadog event: {e}")
 
