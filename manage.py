@@ -18,6 +18,7 @@ def log_datadog_event(
         from firetower.settings import env_is_dev
 
         if not env_is_dev():
+            tags += ["source:firetower"]
             Event.create(
                 True,
                 text=str(repr(sys.argv)),
