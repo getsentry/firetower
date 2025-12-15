@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0005_incident_participants_last_synced_at"),
+        ("incidents", "0006_remove_actions_pending_status"),
     ]
 
     operations = [
