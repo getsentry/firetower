@@ -29,7 +29,7 @@ const pill = cva(
         P1: ['bg-background-transparent-danger-muted', 'text-content-danger'],
         P2: ['bg-background-transparent-warning-muted', 'text-content-warning'],
         P3: ['bg-background-transparent-accent-muted', 'text-content-accent'],
-        P4: ['bg-background-transparent-accent-muted', 'text-content-accent'],
+        P4: ['bg-background-transparent-neutral-muted', 'text-content-secondary'],
         // Other variants
         private: ['bg-background-transparent-danger-muted', 'text-content-danger'],
         default: ['bg-background-secondary', 'text-content-secondary'],
