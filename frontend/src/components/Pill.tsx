@@ -22,10 +22,6 @@ const pill = cva(
         // Status variants
         Active: ['bg-background-transparent-danger-muted', 'text-content-danger'],
         Mitigated: ['bg-background-transparent-accent-muted', 'text-content-accent'],
-        'Actions Pending': [
-          'bg-background-transparent-warning-muted',
-          'text-content-warning',
-        ],
         Postmortem: [
           'bg-background-transparent-promotion-muted',
           'text-content-promotion',

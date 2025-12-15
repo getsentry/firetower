@@ -3,13 +3,7 @@ import {Api} from 'api';
 import {z} from 'zod';
 
 export const SEVERITY_OPTIONS = ['P0', 'P1', 'P2', 'P3', 'P4'] as const;
-export const STATUS_OPTIONS = [
-  'Active',
-  'Mitigated',
-  'Postmortem',
-  'Actions Pending',
-  'Done',
-] as const;
+export const STATUS_OPTIONS = ['Active', 'Mitigated', 'Postmortem', 'Done'] as const;
 
 const ParticipantSchema = z.object({
   name: z.string(),
