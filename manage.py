@@ -19,14 +19,16 @@ def log_datadog_event(
 
         if not env_is_dev():
             tags += ["source:firetower"]
-            Event.create(
+            result = Event.create(
                 True,
                 text=str(repr(sys.argv)),
                 tags=tags,
                 alert_type=alert_type,
             )
+            print(repr(result))
     except (ImportError, DatadogException) as e:
         warning(f"Failed to log datadog event: {e}")
+        print(f"Failed to log datadog event: {e}")
 
 
 def django_main():
