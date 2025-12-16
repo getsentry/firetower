@@ -18,12 +18,12 @@ def log_datadog_event(
 ) -> None:
     if not env_is_dev():
         try:
-            tags += ["source:firetower"]
+            final_tags = tags + ["source:firetower"]
             result = Event.create(
                 True,
                 title=title,
                 text=text,
-                tags=tags,
+                tags=final_tags,
                 alert_type=alert_type,
             )
             debug(f"datadog log: {repr(result)}")
