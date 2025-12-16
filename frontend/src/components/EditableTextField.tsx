@@ -148,6 +148,7 @@ export interface EditableTextFieldProps {
   multiline?: boolean;
   fullWidth?: boolean; // Whether display text should expand to full width (default: false)
   className?: string;
+  emptyText?: string; // Text to show when value is empty (e.g., "No description provided")
 
   // Label layout (if present, pencil appears next to label instead of value)
   label?: string;
@@ -163,6 +164,7 @@ export function EditableTextField({
   multiline = false,
   fullWidth = false,
   className,
+  emptyText,
   label,
   labelAs: LabelComponent = 'div',
   labelClassName,
@@ -313,16 +315,25 @@ export function EditableTextField({
           </div>
 
           {/* Display Value (no pencil) */}
-          {!isEditing && <Component className={cn(className)}>{value}</Component>}
+          {!isEditing &&
+            (value ? (
+              <Component className={cn(className)}>{value}</Component>
+            ) : emptyText ? (
+              <p className="text-size-sm text-content-disabled italic">{emptyText}</p>
+            ) : null)}
         </>
       ) : (
         // Default layout: Pencil next to value
         <div
           className={cn(displayContainerStyles(), displayStyles({editing: isEditing}))}
         >
-          <Component className={cn(fullWidth ? 'flex-1 min-w-0' : 'inline', className)}>
-            {value}
-          </Component>
+          {value ? (
+            <Component className={cn(fullWidth ? 'flex-1 min-w-0' : 'inline', className)}>
+              {value}
+            </Component>
+          ) : emptyText ? (
+            <p className="text-size-sm text-content-disabled italic">{emptyText}</p>
+          ) : null}
           {!isEditing && (
             <button
               type="button"
