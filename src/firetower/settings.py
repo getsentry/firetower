@@ -105,7 +105,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    "firetower.auth.middleware.ConditionalCsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "firetower.auth.middleware.IAPAuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -215,6 +215,11 @@ REST_FRAMEWORK = {
     # Authentication
     "DEFAULT_PERMISSION_CLASSES": [
         "firetower.incidents.permissions.IsAuthenticated",
+    ],
+    # Only accept JSON - rejects form-encoded requests which bypass CORS preflight.
+    # Defense in depth alongside browser third-party cookie blocking and CORS.
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
     ],
 }
 

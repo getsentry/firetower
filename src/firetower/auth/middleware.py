@@ -5,7 +5,8 @@ from collections.abc import Callable
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.middleware.csrf import CsrfViewMiddleware
 
 from firetower.auth.services import get_or_create_user_from_iap
 from firetower.auth.validators import IAPTokenValidator
@@ -108,3 +109,31 @@ class IAPAuthenticationMiddleware:
             },
         )
         request.user = user
+
+
+class ConditionalCsrfViewMiddleware(CsrfViewMiddleware):
+    """
+    CSRF middleware that skips validation for IAP-authenticated requests.
+
+    Since Firetower uses IAP for all authentication (not session-based auth),
+    CSRF protection is not needed. Security is provided by:
+    - IAP: Validates identity for all requests (browser and service)
+    - CORS: Blocks cross-origin requests from malicious sites
+
+    CSRF attacks exploit session cookies, which we don't use for auth.
+    """
+
+    def _is_iap_authenticated(self, request: HttpRequest) -> bool:
+        """Check if request is authenticated via IAP."""
+        return bool(request.META.get("HTTP_X_GOOG_IAP_JWT_ASSERTION"))
+
+    def process_view(
+        self,
+        request: HttpRequest,
+        callback: Callable,
+        callback_args: tuple,
+        callback_kwargs: dict,
+    ) -> HttpResponseForbidden | None:
+        if self._is_iap_authenticated(request):
+            return None
+        return super().process_view(request, callback, callback_args, callback_kwargs)
