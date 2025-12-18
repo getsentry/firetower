@@ -5,7 +5,10 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.test import RequestFactory
 from google.auth import exceptions as google_auth_exceptions
 
-from firetower.auth.middleware import IAPAuthenticationMiddleware
+from firetower.auth.middleware import (
+    ConditionalCsrfViewMiddleware,
+    IAPAuthenticationMiddleware,
+)
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_iap
 from firetower.auth.validators import IAPTokenValidator
@@ -331,3 +334,30 @@ class TestIAPAuthenticationMiddleware:
         middleware(request)
 
         assert User.objects.filter(username="dev_user").count() == 1
+
+
+class TestConditionalCsrfViewMiddleware:
+    """Test CSRF exemption for IAP-authenticated requests."""
+
+    @pytest.fixture
+    def factory(self):
+        return RequestFactory()
+
+    @pytest.fixture
+    def get_response(self):
+        return Mock()
+
+    def test_skips_csrf_for_iap_authenticated_request(self, factory, get_response):
+        """Requests with IAP header should skip CSRF validation."""
+        middleware = ConditionalCsrfViewMiddleware(get_response)
+        request = factory.post("/api/incidents/")
+        request.META["HTTP_X_GOOG_IAP_JWT_ASSERTION"] = "valid_jwt_token"
+
+        assert middleware._is_iap_authenticated(request) is True
+
+    def test_enforces_csrf_for_request_without_iap_header(self, factory, get_response):
+        """Requests without IAP header should require CSRF."""
+        middleware = ConditionalCsrfViewMiddleware(get_response)
+        request = factory.post("/api/incidents/")
+
+        assert middleware._is_iap_authenticated(request) is False
