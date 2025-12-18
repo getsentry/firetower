@@ -134,6 +134,19 @@ class ConditionalCsrfViewMiddleware(CsrfViewMiddleware):
         callback_args: tuple,
         callback_kwargs: dict,
     ) -> HttpResponseForbidden | None:
-        if self._is_iap_authenticated(request):
+        has_iap = self._is_iap_authenticated(request)
+
+        # Log all HTTP headers for debugging
+        headers = {
+            key: value for key, value in request.META.items() if key.startswith("HTTP_")
+        }
+        logger.info(
+            f"CSRF check: method={request.method}, path={request.path}, "
+            f"has_iap_header={has_iap}, headers={headers}"
+        )
+
+        if has_iap:
+            logger.info("Skipping CSRF for IAP-authenticated request")
             return None
+        logger.info("Enforcing CSRF (no IAP header)")
         return super().process_view(request, callback, callback_args, callback_kwargs)
