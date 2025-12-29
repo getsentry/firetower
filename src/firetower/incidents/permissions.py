@@ -1,9 +1,12 @@
+import logging
 from typing import TYPE_CHECKING, Any
 
 from rest_framework import permissions
 from rest_framework.request import Request
 
 from .models import Incident
+
+logger = logging.getLogger(__name__)
 
 # Prevents circular import at runtime
 if TYPE_CHECKING:
@@ -19,7 +22,12 @@ class IsAuthenticated(permissions.BasePermission):
     """
 
     def has_permission(self, request: Request, view: "APIView") -> bool:
-        return request.user and request.user.is_authenticated
+        is_authed = request.user and request.user.is_authenticated
+        logger.info(
+            f"IsAuthenticated check: user={request.user}, "
+            f"is_authenticated={is_authed}, type={type(request.user).__name__}"
+        )
+        return is_authed
 
 
 class IncidentPermission(permissions.BasePermission):
