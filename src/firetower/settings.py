@@ -212,9 +212,11 @@ REST_FRAMEWORK = {
     # Pagination
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
-    # Authentication - empty list because we use IAP middleware, not DRF auth classes.
-    # This also disables DRF's SessionAuthentication which enforces CSRF separately.
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    # Authentication - use our custom class that reads from IAP middleware.
+    # This bridges Django middleware user to DRF's Request.user property.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "firetower.auth.authentication.IAPAuthentication",
+    ],
     # Permissions
     "DEFAULT_PERMISSION_CLASSES": [
         "firetower.incidents.permissions.IsAuthenticated",
