@@ -313,14 +313,24 @@ export function EditableTextField({
           </div>
 
           {/* Display Value (no pencil) */}
-          {!isEditing && <Component className={cn(className)}>{value}</Component>}
+          {!isEditing && (
+            <Component className={cn(multiline && 'whitespace-pre-wrap', className)}>
+              {value}
+            </Component>
+          )}
         </>
       ) : (
         // Default layout: Pencil next to value
         <div
           className={cn(displayContainerStyles(), displayStyles({editing: isEditing}))}
         >
-          <Component className={cn(fullWidth ? 'flex-1 min-w-0' : 'inline', className)}>
+          <Component
+            className={cn(
+              fullWidth ? 'flex-1 min-w-0' : 'inline',
+              multiline && 'whitespace-pre-wrap',
+              className
+            )}
+          >
             {value}
           </Component>
           {!isEditing && (
