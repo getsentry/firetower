@@ -88,9 +88,9 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
         incident_id = self.kwargs["incident_id"]
         project_key = settings.PROJECT_KEY
 
-        # Extract numeric ID from incident number (INC-2000 -> 2000)
+        # Extract numeric ID from incident number (INC-2000 -> 2000), case-insensitive
         incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
-        match = re.match(incident_pattern, incident_id)
+        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
 
         if not match:
             raise ValidationError(
@@ -187,9 +187,9 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
         incident_id = self.kwargs["incident_id"]
         project_key = settings.PROJECT_KEY
 
-        # Extract numeric ID from incident number (INC-2000 -> 2000)
+        # Extract numeric ID from incident number (INC-2000 -> 2000), case-insensitive
         incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
-        match = re.match(incident_pattern, incident_id)
+        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
 
         if not match:
             raise ValidationError(
@@ -247,8 +247,9 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
         incident_id = self.kwargs["incident_id"]
         project_key = settings.PROJECT_KEY
 
+        # Case-insensitive match for incident ID format
         incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
-        match = re.match(incident_pattern, incident_id)
+        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
 
         if not match:
             raise ValidationError(
