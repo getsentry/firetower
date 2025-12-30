@@ -148,6 +148,7 @@ export interface EditableTextFieldProps {
   multiline?: boolean;
   fullWidth?: boolean; // Whether display text should expand to full width (default: false)
   className?: string;
+  placeholder?: string; // Shown when value is empty
 
   // Label layout (if present, pencil appears next to label instead of value)
   label?: string;
@@ -163,6 +164,7 @@ export function EditableTextField({
   multiline = false,
   fullWidth = false,
   className,
+  placeholder,
   label,
   labelAs: LabelComponent = 'div',
   labelClassName,
@@ -314,8 +316,14 @@ export function EditableTextField({
 
           {/* Display Value (no pencil) */}
           {!isEditing && (
-            <Component className={cn(multiline && 'whitespace-pre-wrap', className)}>
-              {value}
+            <Component
+              className={cn(
+                multiline && 'whitespace-pre-wrap',
+                !value && placeholder && 'text-content-tertiary italic',
+                className
+              )}
+            >
+              {value || placeholder}
             </Component>
           )}
         </>
@@ -328,10 +336,11 @@ export function EditableTextField({
             className={cn(
               fullWidth ? 'flex-1 min-w-0' : 'inline',
               multiline && 'whitespace-pre-wrap',
+              !value && placeholder && 'text-content-tertiary italic',
               className
             )}
           >
-            {value}
+            {value || placeholder}
           </Component>
           {!isEditing && (
             <button

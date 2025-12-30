@@ -100,6 +100,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         onSave={handleFieldChange('description')}
         as="p"
         multiline
+        placeholder="No description provided"
         className="text-content-secondary leading-comfortable"
       />
 
@@ -112,6 +113,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
             labelClassName="text-size-md font-semibold"
             as="p"
             multiline
+            placeholder="No impact provided"
             className="text-size-sm leading-comfortable text-content-secondary"
           />
         </div>
