@@ -123,12 +123,6 @@ class ConditionalCsrfViewMiddleware(CsrfViewMiddleware):
     CSRF attacks exploit session cookies, which we don't use for auth.
     """
 
-    def process_request(self, request: HttpRequest) -> None:
-        logger.info(
-            f"ConditionalCsrfViewMiddleware.process_request: {request.method} {request.path}"
-        )
-        return super().process_request(request)
-
     def _is_iap_authenticated(self, request: HttpRequest) -> bool:
         """Check if request is authenticated via IAP."""
         return bool(request.META.get("HTTP_X_GOOG_IAP_JWT_ASSERTION"))
@@ -140,19 +134,6 @@ class ConditionalCsrfViewMiddleware(CsrfViewMiddleware):
         callback_args: tuple,
         callback_kwargs: dict,
     ) -> HttpResponseForbidden | None:
-        has_iap = self._is_iap_authenticated(request)
-
-        # Log all HTTP headers for debugging
-        headers = {
-            key: value for key, value in request.META.items() if key.startswith("HTTP_")
-        }
-        logger.info(
-            f"CSRF check: method={request.method}, path={request.path}, "
-            f"has_iap_header={has_iap}, headers={headers}"
-        )
-
-        if has_iap:
-            logger.info("Skipping CSRF for IAP-authenticated request")
+        if self._is_iap_authenticated(request):
             return None
-        logger.info("Enforcing CSRF (no IAP header)")
         return super().process_view(request, callback, callback_args, callback_kwargs)
