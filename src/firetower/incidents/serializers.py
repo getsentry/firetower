@@ -241,9 +241,9 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     """
     Serializer for creating and updating incidents via the service API.
 
-    Required fields: title, severity, is_private, captain, reporter
-    Optional fields: description, impact, status, external_links,
-                     affected_area_tags, root_cause_tags
+    Required fields: title, severity, captain, reporter
+    Optional fields: description, impact, status, is_private (default: False),
+                     external_links, affected_area_tags, root_cause_tags
 
     captain/reporter: Email address of the user
     external_links format: {"slack": "url", "jira": "url", ...}
@@ -290,7 +290,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "root_cause_tags",
         ]
         extra_kwargs = {
-            "is_private": {"required": True},
+            "is_private": {"required": False},
         }
 
     def _validate_tags_exist(self, value: list[str], tag_type: str) -> list[str]:
