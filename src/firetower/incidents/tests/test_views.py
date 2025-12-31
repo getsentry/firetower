@@ -431,7 +431,7 @@ class TestIncidentAPIViews:
             "captain": self.captain.email,
             "reporter": self.reporter.email,
         }
-        response = self.client.post("/api/incidents/", data)
+        response = self.client.post("/api/incidents/", data, format="json")
 
         assert response.status_code == 201
         assert Incident.objects.count() == 1
@@ -457,7 +457,7 @@ class TestIncidentAPIViews:
             "captain": self.captain.email,
             "reporter": self.reporter.email,
         }
-        response = self.client.post("/api/incidents/", data)
+        response = self.client.post("/api/incidents/", data, format="json")
 
         assert response.status_code == 201
         incident = Incident.objects.first()
@@ -476,7 +476,7 @@ class TestIncidentAPIViews:
             "is_private": False,
             "reporter": self.reporter.email,
         }
-        response = self.client.post("/api/incidents/", data)
+        response = self.client.post("/api/incidents/", data, format="json")
         assert response.status_code == 400
         assert "captain" in response.data
 
@@ -487,7 +487,7 @@ class TestIncidentAPIViews:
             "is_private": False,
             "captain": self.captain.email,
         }
-        response = self.client.post("/api/incidents/", data)
+        response = self.client.post("/api/incidents/", data, format="json")
         assert response.status_code == 400
         assert "reporter" in response.data
 
@@ -567,7 +567,7 @@ class TestIncidentAPIViews:
         self.client.force_authenticate(user=self.captain)
         data = {"title": "Updated Title"}
         response = self.client.patch(
-            f"/api/incidents/{incident.incident_number}/", data
+            f"/api/incidents/{incident.incident_number}/", data, format="json"
         )
 
         assert response.status_code == 200
@@ -587,7 +587,7 @@ class TestIncidentAPIViews:
         self.client.force_authenticate(user=self.reporter)
         data = {"status": IncidentStatus.MITIGATED}
         response = self.client.patch(
-            f"/api/incidents/{incident.incident_number}/", data
+            f"/api/incidents/{incident.incident_number}/", data, format="json"
         )
 
         assert response.status_code == 200
@@ -612,7 +612,7 @@ class TestIncidentAPIViews:
         self.client.force_authenticate(user=participant)
         data = {"description": "Updated by participant"}
         response = self.client.patch(
-            f"/api/incidents/{incident.incident_number}/", data
+            f"/api/incidents/{incident.incident_number}/", data, format="json"
         )
 
         assert response.status_code == 200
@@ -660,7 +660,7 @@ class TestIncidentAPIViews:
         self.client.force_authenticate(user=superuser)
         data = {"title": "Updated by admin"}
         response = self.client.patch(
-            f"/api/incidents/{incident.incident_number}/", data
+            f"/api/incidents/{incident.incident_number}/", data, format="json"
         )
 
         assert response.status_code == 200

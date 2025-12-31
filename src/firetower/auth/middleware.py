@@ -5,7 +5,8 @@ from collections.abc import Callable
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.middleware.csrf import CsrfViewMiddleware
 
 from firetower.auth.services import get_or_create_user_from_iap
 from firetower.auth.validators import IAPTokenValidator
@@ -108,3 +109,38 @@ class IAPAuthenticationMiddleware:
             },
         )
         request.user = user
+
+
+class ConditionalCsrfViewMiddleware(CsrfViewMiddleware):
+    """
+    CSRF middleware that skips validation for IAP-authenticated API requests.
+
+    Only skips CSRF for /api/* paths, which are protected by JSON-only parser.
+    Django admin and other views still get CSRF protection.
+
+    Security for API paths:
+    - JSON-only parser: Rejects form-encoded requests (blocks simple CSRF attacks)
+    - CORS: Blocks cross-origin JSON requests (preflight fails)
+    - IAP: Validates identity for all requests
+    """
+
+    def _is_iap_authenticated(self, request: HttpRequest) -> bool:
+        """Check if request is authenticated via IAP."""
+        return bool(request.META.get("HTTP_X_GOOG_IAP_JWT_ASSERTION"))
+
+    def _is_api_path(self, request: HttpRequest) -> bool:
+        """Check if request is to an API endpoint (protected by JSON-only parser)."""
+        return request.path.startswith("/api/")
+
+    def process_view(
+        self,
+        request: HttpRequest,
+        callback: Callable,
+        callback_args: tuple,
+        callback_kwargs: dict,
+    ) -> HttpResponseForbidden | None:
+        # Only skip CSRF for API paths (protected by JSON-only parser + CORS)
+        # Django admin and other views still get CSRF protection
+        if self._is_iap_authenticated(request) and self._is_api_path(request):
+            return None
+        return super().process_view(request, callback, callback_args, callback_kwargs)

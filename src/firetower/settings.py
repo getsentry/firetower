@@ -105,7 +105,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    "firetower.auth.middleware.ConditionalCsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "firetower.auth.middleware.IAPAuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -212,9 +212,19 @@ REST_FRAMEWORK = {
     # Pagination
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
-    # Authentication
+    # Authentication - use our custom class that reads from IAP middleware.
+    # This bridges Django middleware user to DRF's Request.user property.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "firetower.auth.authentication.IAPAuthentication",
+    ],
+    # Permissions
     "DEFAULT_PERMISSION_CLASSES": [
         "firetower.incidents.permissions.IsAuthenticated",
+    ],
+    # Only accept JSON - rejects form-encoded requests which bypass CORS preflight.
+    # Defense in depth alongside browser third-party cookie blocking and CORS.
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
     ],
 }
 
@@ -247,3 +257,32 @@ statsd.constant_tags = [
     "service:firetower",
     f"version:{os.environ.get('K_REVISION', 'unknown')}",
 ]
+
+# Logging configuration
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "firetower": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
