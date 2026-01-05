@@ -1,19 +1,9 @@
 import {useCallback, useRef, useState} from 'react';
 import {cva} from 'class-variance-authority';
+import {Button} from 'components/Button';
 import {ConfirmationDialog} from 'components/ConfirmationDialog';
 import {EllipsisVertical} from 'lucide-react';
 import {cn} from 'utils/cn';
-
-const triggerStyles = cva([
-  'cursor-pointer',
-  'text-content-secondary',
-  'hover:text-content-primary',
-  'hover:bg-gray-100',
-  'rounded-radius-sm',
-  'p-space-xs',
-  'transition-colors',
-  'select-none',
-]);
 
 const popoverStyles = cva([
   'absolute',
@@ -118,18 +108,17 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
       >
-        <button
+        <Button
           ref={triggerRef}
-          type="button"
+          variant="icon"
           onClick={() => setIsOpen(!isOpen)}
           disabled={isLoading}
-          className={cn(triggerStyles())}
           aria-label="More actions"
           aria-expanded={isOpen}
           aria-haspopup="menu"
         >
           <EllipsisVertical className="h-5 w-5" />
-        </button>
+        </Button>
 
         {isOpen && (
           <div role="menu" className={cn(popoverStyles())}>
