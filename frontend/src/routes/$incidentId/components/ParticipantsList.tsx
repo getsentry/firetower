@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {cva} from 'class-variance-authority';
 import {Avatar} from 'components/Avatar';
+import {Button} from 'components/Button';
 import {Card} from 'components/Card';
 import {ChevronDown, Pencil, X} from 'lucide-react';
 import {cn} from 'utils/cn';
@@ -13,22 +14,6 @@ const MAX_VISIBLE_PARTICIPANTS = 5;
 
 type Participant = IncidentDetail['participants'][number];
 type EditableRole = 'Captain' | 'Reporter';
-
-const triggerStyles = cva([
-  'inline-flex',
-  'items-center',
-  'justify-center',
-  'transition-all',
-  'p-space-xs',
-  'rounded-radius-sm',
-  'hover:bg-background-secondary',
-  'hover:scale-110',
-  'focus:outline-auto',
-  'text-content-secondary',
-  'hover:text-content-primary',
-  'cursor-pointer',
-  'select-none',
-]);
 
 const dropdownTriggerStyles = cva([
   'gap-space-sm',
@@ -356,14 +341,9 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
           </div>
           <div className="gap-space-xs flex items-center">
             <div className="text-content-secondary text-sm uppercase">{role}</div>
-            <button
-              type="button"
-              onClick={cancelEditing}
-              aria-label="Cancel"
-              className={cn(triggerStyles())}
-            >
+            <Button variant="icon" onClick={cancelEditing} aria-label="Cancel">
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       );
@@ -373,14 +353,13 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
       <div className="gap-space-xs flex items-center">
         <div className="text-content-secondary text-sm uppercase">{role}</div>
         {isEditable && (
-          <button
-            type="button"
+          <Button
+            variant="icon"
             onClick={() => startEditing(role as EditableRole, participant.email)}
             aria-label={`Edit ${role}`}
-            className={cn(triggerStyles())}
           >
             <Pencil className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
     );

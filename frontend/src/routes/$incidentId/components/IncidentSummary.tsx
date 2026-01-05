@@ -1,12 +1,13 @@
-import {useMutation, useQueryClient} from '@tanstack/react-query';
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {Card} from 'components/Card';
 import {EditablePill} from 'components/EditablePill';
+import {EditableTags} from 'components/EditableTags';
 import {EditableTextField} from 'components/EditableTextField';
 import {Pill} from 'components/Pill';
-import {Tag} from 'components/Tag';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {SEVERITY_OPTIONS, STATUS_OPTIONS} from '../queries/incidentDetailQueryOptions';
+import {tagsQueryOptions} from '../queries/tagsQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
 import {OverflowMenu} from './OverflowMenu';
@@ -35,6 +36,11 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
   const updateIncidentField = useMutation(
     updateIncidentFieldMutationOptions(queryClient)
   );
+
+  const {data: affectedAreaSuggestions = []} = useQuery(
+    tagsQueryOptions('AFFECTED_AREA')
+  );
+  const {data: rootCauseSuggestions = []} = useQuery(tagsQueryOptions('ROOT_CAUSE'));
 
   const handleFieldChange =
     (field: 'severity' | 'status' | 'title' | 'description' | 'impact') =>
@@ -113,44 +119,38 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
             labelClassName="text-size-md font-semibold"
             as="p"
             multiline
-            placeholder="No impact provided"
+            placeholder="No impact specified"
             className="text-size-sm leading-comfortable text-content-secondary"
           />
         </div>
 
-        <div>
-          <h3 className="mb-space-md text-size-md text-content-secondary font-semibold">
-            Affected Areas
-          </h3>
-          {incident.affected_area_tags.length > 0 ? (
-            <div className="gap-space-md flex flex-wrap">
-              {incident.affected_area_tags.map(area => (
-                <Tag key={area}>{area}</Tag>
-              ))}
-            </div>
-          ) : (
-            <p className="text-size-sm text-content-disabled italic">
-              No affected areas specified
-            </p>
-          )}
-        </div>
+        <EditableTags
+          label="Affected Areas"
+          tags={incident.affected_area_tags}
+          onSave={async newTags => {
+            await updateIncidentField.mutateAsync({
+              incidentId: incident.id,
+              field: 'affected_area_tags',
+              value: newTags,
+            });
+          }}
+          suggestions={affectedAreaSuggestions}
+          emptyText="No affected areas specified"
+        />
 
-        <div>
-          <h3 className="mb-space-md text-size-md text-content-secondary font-semibold">
-            Root Cause
-          </h3>
-          {incident.root_cause_tags.length > 0 ? (
-            <div className="gap-space-md flex flex-wrap">
-              {incident.root_cause_tags.map(cause => (
-                <Tag key={cause}>{cause}</Tag>
-              ))}
-            </div>
-          ) : (
-            <p className="text-size-sm text-content-disabled italic">
-              No root cause specified
-            </p>
-          )}
-        </div>
+        <EditableTags
+          label="Root Cause"
+          tags={incident.root_cause_tags}
+          onSave={async newTags => {
+            await updateIncidentField.mutateAsync({
+              incidentId: incident.id,
+              field: 'root_cause_tags',
+              value: newTags,
+            });
+          }}
+          suggestions={rootCauseSuggestions}
+          emptyText="No root cause specified"
+        />
       </div>
     </Card>
   );

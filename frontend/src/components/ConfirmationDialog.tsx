@@ -2,6 +2,8 @@ import React, {useEffect, useRef} from 'react';
 import {cva} from 'class-variance-authority';
 import {cn} from 'utils/cn';
 
+import {Button} from './Button';
+
 const overlay = cva(['fixed', 'inset-0', 'z-50', 'bg-black/50']);
 
 const dialog = cva([
@@ -18,31 +20,6 @@ const dialog = cva([
   'p-space-2xl',
   'shadow-xl',
 ]);
-
-const button = cva(
-  [
-    'cursor-pointer',
-    'px-space-xl',
-    'py-space-md',
-    'rounded-radius-md',
-    'text-sm',
-    'font-medium',
-    'transition-colors',
-    'select-none',
-  ],
-  {
-    variants: {
-      variant: {
-        primary: [
-          'bg-background-accent-vibrant',
-          'text-content-on-vibrant-light',
-          'hover:opacity-90',
-        ],
-        secondary: ['bg-gray-100', 'text-gray-900', 'hover:bg-gray-200'],
-      },
-    },
-  }
-);
 
 interface ConfirmationDialogProps {
   isOpen: boolean;
@@ -109,20 +86,12 @@ function ConfirmationDialog({
         </h2>
         <div className="mb-space-xl text-content-secondary">{message}</div>
         <div className="gap-space-md flex justify-end">
-          <button
-            type="button"
-            onClick={onCancel}
-            className={cn(button({variant: 'secondary'}))}
-          >
+          <Button variant="secondary" onClick={onCancel} className="w-auto">
             {cancelLabel}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className={cn(button({variant: 'primary'}))}
-          >
+          </Button>
+          <Button variant="primary" onClick={onConfirm} className="w-auto">
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </>
