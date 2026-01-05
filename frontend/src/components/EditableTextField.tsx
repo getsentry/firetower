@@ -22,33 +22,6 @@ const labelContainerStyles = cva(['flex', 'items-center', 'gap-space-xs', 'mb-sp
 
 const labelStyles = cva(['font-medium', 'text-content-secondary', 'text-sm']);
 
-const triggerStyles = cva(
-  [
-    'inline-flex',
-    'items-center',
-    'justify-center',
-    'transition-all',
-    'p-space-xs',
-    'rounded-radius-sm',
-    'hover:bg-background-secondary',
-    'hover:scale-110',
-    'focus:outline-auto',
-    'text-content-secondary',
-    'hover:text-content-primary',
-    'cursor-pointer',
-    'my-auto',
-    'select-none',
-  ],
-  {
-    variants: {
-      hidden: {
-        true: ['hidden'],
-        false: [],
-      },
-    },
-  }
-);
-
 const inputStyles = cva(
   [
     'w-full',
@@ -262,14 +235,9 @@ export function EditableTextField({
               {label}
             </LabelComponent>
             {!isEditing && (
-              <button
-                type="button"
-                onClick={startEditing}
-                aria-label="Edit"
-                className={cn(triggerStyles({hidden: false}))}
-              >
+              <Button variant="icon" onClick={startEditing} aria-label="Edit">
                 <Pencil className="h-4 w-4" />
-              </button>
+              </Button>
             )}
           </div>
 
@@ -302,14 +270,9 @@ export function EditableTextField({
             {value || placeholder}
           </Component>
           {!isEditing && (
-            <button
-              type="button"
-              onClick={startEditing}
-              aria-label="Edit"
-              className={cn(triggerStyles({hidden: isEditing}))}
-            >
+            <Button variant="icon" onClick={startEditing} aria-label="Edit">
               <Pencil className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
       )}

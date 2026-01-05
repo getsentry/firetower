@@ -128,24 +128,33 @@ export function EditableTags({
     }
   }, [isEditing]);
 
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancel();
+      }
+    };
+
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isEditing, cancel]);
+
   return (
     <div className={className}>
       {label && (
         <div className="mb-space-md gap-space-xs flex items-center">
           <h3 className="text-size-md text-content-secondary font-semibold">{label}</h3>
-          <button
-            type="button"
+          <Button
+            variant="icon"
             onClick={open}
             aria-label={`Edit ${label}`}
-            className={cn(
-              'inline-flex items-center justify-center p-space-xs rounded-radius-sm',
-              'hover:bg-background-secondary hover:scale-110 transition-all cursor-pointer',
-              'text-content-secondary hover:text-content-primary',
-              isEditing && 'invisible'
-            )}
+            className={cn(isEditing && 'invisible')}
           >
             <Pencil className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -156,13 +165,13 @@ export function EditableTags({
               <Tag
                 key={tag}
                 action={
-                  <button
+                  <Button
+                    variant="close"
                     onClick={() => removeTag(tag)}
-                    className="text-content-disabled hover:text-content-primary hover:bg-background-transparent-neutral-muted rounded-radius-sm cursor-pointer p-0.5 transition-colors"
                     aria-label={`Remove ${tag}`}
                   >
                     <X className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 }
               >
                 {tag}
