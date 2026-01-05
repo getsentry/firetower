@@ -1,43 +1,10 @@
 import {useEffect, useRef, useState} from 'react';
-import {cva} from 'class-variance-authority';
 import {Pencil, X} from 'lucide-react';
 import {cn} from 'utils/cn';
 
+import {Button} from './Button';
 import {GetHelpLink} from './GetHelpLink';
-import {Spinner} from './Spinner';
 import {Tag} from './Tag';
-
-const buttonBaseStyles = [
-  'inline-flex',
-  'items-center',
-  'justify-center',
-  'px-space-md',
-  'py-space-sm',
-  'rounded-radius-md',
-  'font-medium',
-  'text-sm',
-  'transition-colors',
-  'disabled:opacity-50',
-  'disabled:cursor-not-allowed',
-];
-
-const saveButtonStyles = cva([
-  ...buttonBaseStyles,
-  'bg-background-accent-vibrant',
-  'text-content-on-vibrant-light',
-  'hover:opacity-90',
-  'w-16',
-  'h-8',
-]);
-
-const cancelButtonStyles = cva([
-  ...buttonBaseStyles,
-  'bg-background-secondary',
-  'text-content-primary',
-  'hover:bg-background-tertiary',
-  'w-16',
-  'h-8',
-]);
 
 export interface EditableTagsProps {
   tags: string[];
@@ -191,7 +158,7 @@ export function EditableTags({
                 action={
                   <button
                     onClick={() => removeTag(tag)}
-                    className="text-content-disabled hover:text-content-primary cursor-pointer transition-colors"
+                    className="text-content-disabled hover:text-content-primary hover:bg-background-transparent-neutral-muted rounded-radius-sm cursor-pointer p-0.5 transition-colors"
                     aria-label={`Remove ${tag}`}
                   >
                     <X className="h-3.5 w-3.5" />
@@ -237,7 +204,7 @@ export function EditableTags({
                       'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
                       index === focusedIndex
                         ? 'bg-background-secondary'
-                        : 'hover:bg-background-tertiary'
+                        : 'hover:bg-background-transparent-neutral-muted'
                     )}
                   >
                     {suggestion}
@@ -253,22 +220,12 @@ export function EditableTags({
               </div>
             ) : null}
             <div className="gap-space-sm p-space-sm flex justify-end border-t border-gray-200">
-              <button
-                type="button"
-                onClick={save}
-                disabled={isSaving}
-                className={cn(saveButtonStyles())}
-              >
-                {isSaving ? <Spinner size="sm" /> : 'Save'}
-              </button>
-              <button
-                type="button"
-                onClick={cancel}
-                disabled={isSaving}
-                className={cn(cancelButtonStyles())}
-              >
+              <Button variant="primary" onClick={save} loading={isSaving}>
+                Save
+              </Button>
+              <Button variant="secondary" onClick={cancel} disabled={isSaving}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}

@@ -82,6 +82,9 @@ body {
   .bg-background-transparent-neutral-muted {
     background-color: var(--tokens-color-background-transparent-neutral-muted);
   }
+  .hover\:bg-background-transparent-neutral-muted:hover {
+    background-color: var(--tokens-color-background-transparent-neutral-muted);
+  }
 
   /* Text colors */
   .text-content-headings {

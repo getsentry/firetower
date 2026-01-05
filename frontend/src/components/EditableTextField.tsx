@@ -4,7 +4,7 @@ import {Pencil} from 'lucide-react';
 import {cn} from 'utils/cn';
 import {z} from 'zod';
 
-import {Spinner} from './Spinner';
+import {Button} from './Button';
 
 const displayContainerStyles = cva(['flex', 'items-center', 'gap-space-xs']);
 
@@ -86,47 +86,6 @@ const actionsStyles = cva(['flex', 'items-center', 'gap-space-sm'], {
     },
   },
 });
-
-const buttonBaseStyles = [
-  'inline-flex',
-  'items-center',
-  'justify-center',
-  'gap-space-xs',
-  'px-space-md',
-  'py-space-sm',
-  'rounded-radius-md',
-  'font-medium',
-  'text-sm',
-  'transition-colors',
-  'focus:outline-auto',
-  'disabled:opacity-50',
-  'disabled:cursor-not-allowed',
-  'select-none',
-];
-
-const saveButtonStyles = cva([
-  ...buttonBaseStyles,
-  'bg-background-accent-vibrant',
-  'text-content-on-vibrant-light',
-  'hover:opacity-90',
-  'hover:scale-105',
-  'active:scale-95',
-  'disabled:hover:opacity-50',
-  'disabled:hover:scale-100',
-  'w-16', // Fixed width to prevent layout shift
-  'h-8', // Fixed height to prevent layout shift
-]);
-
-const cancelButtonStyles = cva([
-  ...buttonBaseStyles,
-  'bg-background-secondary',
-  'text-content-primary',
-  'hover:bg-background-tertiary',
-  'hover:scale-105',
-  'active:scale-95',
-  'w-16', // Fixed width to match save button
-  'h-8', // Fixed height to match save button
-]);
 
 const messageStyles = cva(['text-sm', 'mt-space-xs'], {
   variants: {
@@ -393,22 +352,12 @@ export function EditableTextField({
                 />
               )}
               <div className={cn(actionsStyles({hidden: !isEditing}), 'mt-space-sm')}>
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={isSaving}
-                  className={cn(saveButtonStyles())}
-                >
-                  {isSaving ? <Spinner size="sm" /> : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEditing}
-                  disabled={isSaving}
-                  className={cn(cancelButtonStyles())}
-                >
+                <Button variant="primary" onClick={save} loading={isSaving}>
+                  Save
+                </Button>
+                <Button variant="secondary" onClick={cancelEditing} disabled={isSaving}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -427,22 +376,12 @@ export function EditableTextField({
                 aria-invalid={hasError}
               />
               <div className={cn(actionsStyles({hidden: !isEditing}))}>
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={isSaving}
-                  className={cn(saveButtonStyles())}
-                >
-                  {isSaving ? <Spinner size="sm" /> : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEditing}
-                  disabled={isSaving}
-                  className={cn(cancelButtonStyles())}
-                >
+                <Button variant="primary" onClick={save} loading={isSaving}>
+                  Save
+                </Button>
+                <Button variant="secondary" onClick={cancelEditing} disabled={isSaving}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
