@@ -3,6 +3,7 @@ import {cva} from 'class-variance-authority';
 import {Pencil, X} from 'lucide-react';
 import {cn} from 'utils/cn';
 
+import {GetHelpLink} from './GetHelpLink';
 import {Spinner} from './Spinner';
 import {Tag} from './Tag';
 
@@ -41,7 +42,6 @@ const cancelButtonStyles = cva([
 export interface EditableTagsProps {
   tags: string[];
   onSave: (tags: string[]) => Promise<void>;
-  onCreate?: (name: string) => Promise<void>;
   label?: string;
   suggestions?: string[];
   placeholder?: string;
@@ -52,7 +52,6 @@ export interface EditableTagsProps {
 export function EditableTags({
   tags,
   onSave,
-  onCreate,
   label,
   suggestions = [],
   placeholder = 'Add...',
@@ -64,7 +63,6 @@ export function EditableTags({
   const [inputValue, setInputValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const resetState = () => {
@@ -75,7 +73,6 @@ export function EditableTags({
   const open = () => {
     setDraftTags(tags);
     setIsEditing(true);
-    setError(null);
     resetState();
   };
 
@@ -102,34 +99,12 @@ export function EditableTags({
     s => !draftTags.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
   );
 
-  const showCreateOption =
-    inputValue.trim() &&
-    !draftTags.includes(inputValue.trim()) &&
-    !suggestions.some(s => s.toLowerCase() === inputValue.trim().toLowerCase());
-
-  const totalOptions = filteredSuggestions.length + (showCreateOption ? 1 : 0);
-
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
     if (trimmed && !draftTags.includes(trimmed)) {
       setDraftTags(prev => [...prev, trimmed]);
       resetState();
       inputRef.current?.focus();
-    }
-  };
-
-  const createTag = async (tag: string) => {
-    const trimmed = tag.trim();
-    if (trimmed && !draftTags.includes(trimmed)) {
-      setError(null);
-      try {
-        if (onCreate) {
-          await onCreate(trimmed);
-        }
-        addTag(trimmed);
-      } catch {
-        setError(`Failed to create "${trimmed}"`);
-      }
     }
   };
 
@@ -142,37 +117,30 @@ export function EditableTags({
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
-        if (totalOptions > 0) {
-          setFocusedIndex(prev => (prev + 1) % totalOptions);
+        if (filteredSuggestions.length > 0) {
+          setFocusedIndex(prev => (prev + 1) % filteredSuggestions.length);
         }
         break;
       case 'ArrowUp':
         event.preventDefault();
-        if (totalOptions > 0) {
-          setFocusedIndex(prev => (prev - 1 + totalOptions) % totalOptions);
+        if (filteredSuggestions.length > 0) {
+          setFocusedIndex(
+            prev => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length
+          );
         }
         break;
       case 'Enter':
         event.preventDefault();
         if (focusedIndex >= 0 && focusedIndex < filteredSuggestions.length) {
           addTag(filteredSuggestions[focusedIndex]);
-        } else if (
-          showCreateOption &&
-          (focusedIndex === filteredSuggestions.length || focusedIndex === -1)
-        ) {
-          createTag(inputValue);
         } else if (!inputValue.trim()) {
           save();
         }
         break;
       case ' ':
-        if (focusedIndex >= 0) {
+        if (focusedIndex >= 0 && focusedIndex < filteredSuggestions.length) {
           event.preventDefault();
-          if (focusedIndex < filteredSuggestions.length) {
-            addTag(filteredSuggestions[focusedIndex]);
-          } else if (showCreateOption) {
-            createTag(inputValue);
-          }
+          addTag(filteredSuggestions[focusedIndex]);
         }
         break;
       case 'Escape':
@@ -196,8 +164,8 @@ export function EditableTags({
   return (
     <div className={className}>
       {label && (
-        <div className="mb-space-md flex items-center gap-space-xs">
-          <h3 className="text-size-md font-semibold text-content-secondary">{label}</h3>
+        <div className="mb-space-md gap-space-xs flex items-center">
+          <h3 className="text-size-md text-content-secondary font-semibold">{label}</h3>
           <button
             type="button"
             onClick={open}
@@ -216,14 +184,14 @@ export function EditableTags({
 
       <div className={cn('relative', isEditing && 'z-50')}>
         {isEditing ? (
-          <div className="flex flex-wrap items-center gap-space-sm">
+          <div className="gap-space-sm flex flex-wrap items-center">
             {draftTags.map(tag => (
               <Tag
                 key={tag}
                 action={
                   <button
                     onClick={() => removeTag(tag)}
-                    className="text-content-disabled hover:text-content-primary transition-colors cursor-pointer"
+                    className="text-content-disabled hover:text-content-primary cursor-pointer transition-colors"
                     aria-label={`Remove ${tag}`}
                   >
                     <X className="h-3.5 w-3.5" />
@@ -243,11 +211,11 @@ export function EditableTags({
               }}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
-              className="min-w-[100px] flex-1 px-space-sm py-space-xs text-size-sm bg-transparent placeholder:text-content-disabled focus:outline-none"
+              className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
             />
           </div>
         ) : tags.length > 0 ? (
-          <div className="flex flex-wrap gap-space-sm">
+          <div className="gap-space-sm flex flex-wrap">
             {tags.map(tag => (
               <Tag key={tag}>{tag}</Tag>
             ))}
@@ -257,9 +225,9 @@ export function EditableTags({
         )}
 
         {isEditing && (
-          <div className="absolute left-0 right-0 z-50 mt-space-xs rounded-radius-md border border-gray-200 bg-background-primary shadow-lg">
-            {(filteredSuggestions.length > 0 || showCreateOption) && (
-              <div className="max-h-[200px] overflow-y-auto p-space-sm [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
+            {filteredSuggestions.length > 0 ? (
+              <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {filteredSuggestions.map((suggestion, index) => (
                   <button
                     key={suggestion}
@@ -275,28 +243,16 @@ export function EditableTags({
                     {suggestion}
                   </button>
                 ))}
-                {showCreateOption && (
-                  <button
-                    type="button"
-                    onClick={() => createTag(inputValue)}
-                    className={cn(
-                      'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm text-content-accent',
-                      focusedIndex === filteredSuggestions.length
-                        ? 'bg-background-secondary'
-                        : 'hover:bg-background-tertiary'
-                    )}
-                  >
-                    Create "{inputValue.trim()}"
-                  </button>
-                )}
               </div>
-            )}
-            {error && (
-              <p className="text-content-danger px-space-sm pt-space-sm text-size-sm">
-                {error}
-              </p>
-            )}
-            <div className="flex justify-end gap-space-sm p-space-sm border-t border-gray-200">
+            ) : inputValue.trim() ? (
+              <div className="text-size-sm text-content-secondary px-space-md py-space-lg text-center">
+                <p className="mb-space-sm">No tags match that query.</p>
+                <p>
+                  If you think we need a new tag, come ask in <GetHelpLink />.
+                </p>
+              </div>
+            ) : null}
+            <div className="gap-space-sm p-space-sm flex justify-end border-t border-gray-200">
               <button
                 type="button"
                 onClick={save}

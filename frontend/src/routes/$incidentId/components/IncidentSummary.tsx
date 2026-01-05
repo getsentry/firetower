@@ -7,7 +7,7 @@ import {Pill} from 'components/Pill';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {SEVERITY_OPTIONS, STATUS_OPTIONS} from '../queries/incidentDetailQueryOptions';
-import {createTagMutationOptions, tagsQueryOptions} from '../queries/tagsQueryOptions';
+import {tagsQueryOptions} from '../queries/tagsQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
 import {OverflowMenu} from './OverflowMenu';
@@ -41,7 +41,6 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     tagsQueryOptions('AFFECTED_AREA')
   );
   const {data: rootCauseSuggestions = []} = useQuery(tagsQueryOptions('ROOT_CAUSE'));
-  const createTag = useMutation(createTagMutationOptions(queryClient));
 
   const handleFieldChange =
     (field: 'severity' | 'status' | 'title' | 'description' | 'impact') =>
@@ -109,7 +108,6 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         multiline
         placeholder="No description provided"
         className="text-content-secondary leading-comfortable"
-        emptyText="No description provided"
       />
 
       <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-3">
@@ -121,9 +119,8 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
             labelClassName="text-size-md font-semibold"
             as="p"
             multiline
-            placeholder="No impact provided"
+            placeholder="No impact specified"
             className="text-size-sm leading-comfortable text-content-secondary"
-            emptyText="No impact specified"
           />
         </div>
 
@@ -136,9 +133,6 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
               field: 'affected_area_tags',
               value: newTags,
             });
-          }}
-          onCreate={async name => {
-            await createTag.mutateAsync({name, type: 'AFFECTED_AREA'});
           }}
           suggestions={affectedAreaSuggestions}
           emptyText="No affected areas specified"
@@ -153,9 +147,6 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
               field: 'root_cause_tags',
               value: newTags,
             });
-          }}
-          onCreate={async name => {
-            await createTag.mutateAsync({name, type: 'ROOT_CAUSE'});
           }}
           suggestions={rootCauseSuggestions}
           emptyText="No root cause specified"
