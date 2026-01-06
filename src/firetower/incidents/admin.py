@@ -28,7 +28,12 @@ class IncidentAdmin(admin.ModelAdmin):
     search_fields = ["title", "description", "id"]
     readonly_fields = ["created_at", "updated_at"]
 
-    filter_horizontal = ["participants", "affected_area_tags", "root_cause_tags"]
+    filter_horizontal = [
+        "participants",
+        "affected_area_tags",
+        "root_cause_tags",
+        "impact_tags",
+    ]
 
     actions = ["sync_participants_from_slack"]
 
@@ -37,11 +42,11 @@ class IncidentAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             "Incident Information",
-            {"fields": ("title", "description", "impact")},
+            {"fields": ("title", "description", "impact_summary")},
         ),
         ("Status", {"fields": ("status", "severity", "is_private")}),
         ("People", {"fields": ("captain", "reporter", "participants")}),
-        ("Tags", {"fields": ("affected_area_tags", "root_cause_tags")}),
+        ("Tags", {"fields": ("affected_area_tags", "root_cause_tags", "impact_tags")}),
         (
             "Timestamps",
             {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},

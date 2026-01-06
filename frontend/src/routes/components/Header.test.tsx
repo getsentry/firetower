@@ -50,7 +50,7 @@ const mockIncidentDetail: IncidentDetail = {
   title: 'Database Connection Pool Exhausted',
   description:
     'Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout.',
-  impact: 'High - affecting 30% of users',
+  impact_summary: 'High - affecting 30% of users',
   status: 'Active',
   severity: 'P1',
   created_at: '2024-08-27T18:14:00Z',
@@ -58,6 +58,7 @@ const mockIncidentDetail: IncidentDetail = {
   is_private: false,
   affected_area_tags: ['Authentication', 'Database'],
   root_cause_tags: ['Connection pool exhaustion', 'Memory leak in connection handler'],
+  impact_tags: [],
   participants: [
     {
       name: 'John Doe',
@@ -68,6 +69,11 @@ const mockIncidentDetail: IncidentDetail = {
   external_links: {
     slack: 'https://slack.com/archives/C123456',
   },
+  time_started: null,
+  time_detected: null,
+  time_analyzed: null,
+  time_mitigated: null,
+  time_recovered: null,
 };
 
 const mockCurrentUser: CurrentUser = {

@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="incident",
-            name="time_diagnosed",
+            name="time_analyzed",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
@@ -33,5 +33,32 @@ class Migration(migrations.Migration):
             model_name="incident",
             name="time_started",
             field=models.DateTimeField(blank=True, null=True),
+        ),
+        migrations.AlterField(
+            model_name="tag",
+            name="type",
+            field=models.CharField(
+                choices=[
+                    ("AFFECTED_AREA", "Affected Area"),
+                    ("ROOT_CAUSE", "Root Cause"),
+                    ("IMPACT", "Impact"),
+                ],
+                max_length=20,
+            ),
+        ),
+        migrations.RenameField(
+            model_name="incident",
+            old_name="impact",
+            new_name="impact_summary",
+        ),
+        migrations.AddField(
+            model_name="incident",
+            name="impact_tags",
+            field=models.ManyToManyField(
+                blank=True,
+                limit_choices_to={"type": "IMPACT"},
+                related_name="incidents_by_impact",
+                to="incidents.tag",
+            ),
         ),
     ]
