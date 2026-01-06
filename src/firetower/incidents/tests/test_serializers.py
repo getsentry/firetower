@@ -37,7 +37,7 @@ class TestIncidentListUISerializer:
         incident = Incident.objects.create(
             title="Test Incident",
             description="Test description",
-            impact="Test impact",
+            impact_summary="Test impact",
             status=IncidentStatus.ACTIVE,
             severity=IncidentSeverity.P1,
             is_private=False,

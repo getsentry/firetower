@@ -43,7 +43,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
   const {data: rootCauseSuggestions = []} = useQuery(tagsQueryOptions('ROOT_CAUSE'));
 
   const handleFieldChange =
-    (field: 'severity' | 'status' | 'title' | 'description' | 'impact') =>
+    (field: 'severity' | 'status' | 'title' | 'description' | 'impact_summary') =>
     async (value: string) => {
       await updateIncidentField.mutateAsync({
         incidentId: incident.id,
@@ -113,9 +113,9 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
       <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-3">
         <div>
           <EditableTextField
-            value={incident.impact}
-            onSave={handleFieldChange('impact')}
-            label="Impact"
+            value={incident.impact_summary}
+            onSave={handleFieldChange('impact_summary')}
+            label="Impact summary"
             labelClassName="text-size-md font-semibold"
             as="p"
             multiline

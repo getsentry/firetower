@@ -25,6 +25,7 @@ class IncidentSeverity(models.TextChoices):
 class TagType(models.TextChoices):
     AFFECTED_AREA = "AFFECTED_AREA", "Affected Area"
     ROOT_CAUSE = "ROOT_CAUSE", "Root Cause"
+    IMPACT = "IMPACT", "Impact"
 
 
 class ExternalLinkType(models.TextChoices):
@@ -96,7 +97,7 @@ class Incident(models.Model):
     # Core fields
     title = models.CharField(max_length=500)
     description = models.TextField(blank=True)
-    impact = models.TextField(blank=True)
+    impact_summary = models.TextField(blank=True)
 
     # Status and severity
     status = models.CharField(
@@ -115,7 +116,7 @@ class Incident(models.Model):
     # Milestone timestamps (for postmortem)
     time_started = models.DateTimeField(null=True, blank=True)
     time_detected = models.DateTimeField(null=True, blank=True)
-    time_diagnosed = models.DateTimeField(null=True, blank=True)
+    time_analyzed = models.DateTimeField(null=True, blank=True)
     time_mitigated = models.DateTimeField(null=True, blank=True)
     time_recovered = models.DateTimeField(null=True, blank=True)
 
@@ -152,6 +153,12 @@ class Incident(models.Model):
         related_name="incidents_by_root_cause",
         limit_choices_to={"type": "ROOT_CAUSE"},
     )
+    impact_tags = models.ManyToManyField(  # type: ignore[var-annotated]
+        "Tag",
+        blank=True,
+        related_name="incidents_by_impact",
+        limit_choices_to={"type": "IMPACT"},
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -175,6 +182,11 @@ class Incident(models.Model):
     def root_cause_tag_names(self) -> list[str]:
         """Return list of root cause names (uses prefetch cache if available)"""
         return [tag.name for tag in self.root_cause_tags.all()]
+
+    @property
+    def impact_tag_names(self) -> list[str]:
+        """Return list of impact tag names (uses prefetch cache if available)"""
+        return [tag.name for tag in self.impact_tags.all()]
 
     @property
     def external_links_dict(self) -> dict[str, str]:
