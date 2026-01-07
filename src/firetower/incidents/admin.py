@@ -44,7 +44,7 @@ class IncidentAdmin(admin.ModelAdmin):
             "Incident Information",
             {"fields": ("title", "description", "impact_summary")},
         ),
-        ("Status", {"fields": ("status", "severity", "is_private")}),
+        ("Status", {"fields": ("status", "severity", "service_tier", "is_private")}),
         ("People", {"fields": ("captain", "reporter", "participants")}),
         ("Tags", {"fields": ("affected_area_tags", "root_cause_tags", "impact_tags")}),
         (

@@ -3,7 +3,11 @@ import {Api} from 'api';
 import {z} from 'zod';
 
 import type {IncidentDetail} from './incidentDetailQueryOptions';
-import {SEVERITY_OPTIONS, STATUS_OPTIONS} from './incidentDetailQueryOptions';
+import {
+  SERVICE_TIER_OPTIONS,
+  SEVERITY_OPTIONS,
+  STATUS_OPTIONS,
+} from './incidentDetailQueryOptions';
 
 export type UpdateIncidentFieldArgs =
   | {
@@ -19,6 +23,7 @@ export type UpdateIncidentFieldArgs =
       value: string;
     }
   | {incidentId: string; field: 'is_private'; value: boolean}
+  | {incidentId: string; field: 'service_tier'; value: string | null}
   | {
       incidentId: string;
       field: 'affected_area_tags' | 'root_cause_tags' | 'impact_tags';
@@ -32,6 +37,7 @@ const PatchResponseSchema = z.object({
   impact_summary: z.string(),
   status: z.enum(STATUS_OPTIONS),
   severity: z.enum(SEVERITY_OPTIONS),
+  service_tier: z.enum(SERVICE_TIER_OPTIONS).nullable(),
   is_private: z.boolean(),
   affected_area_tags: z.array(z.string()),
   root_cause_tags: z.array(z.string()),

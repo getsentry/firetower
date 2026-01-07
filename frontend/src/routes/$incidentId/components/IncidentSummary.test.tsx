@@ -22,6 +22,7 @@ const mockIncident: IncidentDetail = {
   impact_summary: 'Users experiencing 500 errors',
   status: 'Active',
   severity: 'P1',
+  service_tier: null,
   created_at: '2024-01-01T12:00:00Z',
   updated_at: '2024-01-01T12:00:00Z',
   is_private: false,
@@ -98,11 +99,11 @@ describe('IncidentSummary', () => {
     });
   });
 
-  describe('Affected Areas section', () => {
+  describe('Affected areas section', () => {
     it('renders affected areas when present', () => {
       renderWithQueryClient(<IncidentSummary incident={mockIncident} />);
 
-      expect(screen.getByText('Affected Areas')).toBeInTheDocument();
+      expect(screen.getByText('Affected areas')).toBeInTheDocument();
       expect(screen.getByText('API')).toBeInTheDocument();
       expect(screen.getByText('Database')).toBeInTheDocument();
     });
@@ -111,16 +112,16 @@ describe('IncidentSummary', () => {
       const incidentWithoutAreas = {...mockIncident, affected_area_tags: []};
       renderWithQueryClient(<IncidentSummary incident={incidentWithoutAreas} />);
 
-      expect(screen.getByText('Affected Areas')).toBeInTheDocument();
+      expect(screen.getByText('Affected areas')).toBeInTheDocument();
       expect(screen.getByText('No affected areas specified')).toBeInTheDocument();
     });
   });
 
-  describe('Root Cause section', () => {
+  describe('Root cause section', () => {
     it('renders root causes when present', () => {
       renderWithQueryClient(<IncidentSummary incident={mockIncident} />);
 
-      expect(screen.getByText('Root Cause')).toBeInTheDocument();
+      expect(screen.getByText('Root cause')).toBeInTheDocument();
       expect(screen.getByText('Resource Exhaustion')).toBeInTheDocument();
     });
 
@@ -128,7 +129,7 @@ describe('IncidentSummary', () => {
       const incidentWithoutCauses = {...mockIncident, root_cause_tags: []};
       renderWithQueryClient(<IncidentSummary incident={incidentWithoutCauses} />);
 
-      expect(screen.getByText('Root Cause')).toBeInTheDocument();
+      expect(screen.getByText('Root cause')).toBeInTheDocument();
       expect(screen.getByText('No root cause specified')).toBeInTheDocument();
     });
 
