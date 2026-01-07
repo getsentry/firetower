@@ -28,6 +28,16 @@ export type UpdateIncidentFieldArgs =
       incidentId: string;
       field: 'affected_area_tags' | 'root_cause_tags' | 'impact_tags';
       value: string[];
+    }
+  | {
+      incidentId: string;
+      field:
+        | 'time_started'
+        | 'time_detected'
+        | 'time_analyzed'
+        | 'time_mitigated'
+        | 'time_recovered';
+      value: string | null;
     };
 
 const PatchResponseSchema = z.object({
@@ -42,6 +52,11 @@ const PatchResponseSchema = z.object({
   affected_area_tags: z.array(z.string()),
   root_cause_tags: z.array(z.string()),
   impact_tags: z.array(z.string()),
+  time_started: z.string().nullable(),
+  time_detected: z.string().nullable(),
+  time_analyzed: z.string().nullable(),
+  time_mitigated: z.string().nullable(),
+  time_recovered: z.string().nullable(),
 });
 
 export function updateIncidentFieldMutationOptions(queryClient: QueryClient) {

@@ -7,6 +7,7 @@ import {GetHelpLink} from 'components/GetHelpLink';
 import {IncidentDetailSkeleton} from './components/IncidentDetailSkeleton';
 import {IncidentSummary} from './components/IncidentSummary';
 import {LinksList} from './components/LinksList';
+import {MilestonesCard} from './components/MilestonesCard';
 import {ParticipantsList} from './components/ParticipantsList';
 import {SlackLink} from './components/SlackLink';
 import {incidentDetailQueryOptions} from './queries/incidentDetailQueryOptions';
@@ -48,6 +49,10 @@ function Incident() {
       <IncidentSummary incident={incident} />
 
       <div className="flex flex-col gap-4 md:flex-row">
+        <section className="flex flex-col gap-4 md:flex-[2]">
+          <MilestonesCard incident={incident} />
+        </section>
+
         <aside className="flex flex-col gap-4 md:flex-1">
           {incident.external_links.slack && (
             <SlackLink
