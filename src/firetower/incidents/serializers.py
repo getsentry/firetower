@@ -38,6 +38,7 @@ class IncidentListUISerializer(serializers.ModelSerializer):
             "impact_summary",
             "status",
             "severity",
+            "service_tier",
             "is_private",
             "created_at",
             "updated_at",
@@ -117,6 +118,7 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
             "impact_summary",
             "status",
             "severity",
+            "service_tier",
             "is_private",
             "participants",
             "affected_area_tags",
@@ -216,6 +218,7 @@ class IncidentReadSerializer(serializers.ModelSerializer):
             "impact_summary",
             "status",
             "severity",
+            "service_tier",
             "is_private",
             "captain",
             "reporter",
@@ -312,6 +315,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "impact_summary",
             "status",
             "severity",
+            "service_tier",
             "is_private",
             "captain",
             "reporter",
@@ -327,6 +331,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             "is_private": {"required": False},
+            "service_tier": {"required": False},
         }
 
     def _validate_tags_exist(self, value: list[str], tag_type: str) -> list[str]:

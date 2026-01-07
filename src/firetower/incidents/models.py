@@ -22,6 +22,14 @@ class IncidentSeverity(models.TextChoices):
     P4 = "P4", "P4"
 
 
+class ServiceTier(models.TextChoices):
+    T0 = "T0", "T0"
+    T1 = "T1", "T1"
+    T2 = "T2", "T2"
+    T3 = "T3", "T3"
+    T4 = "T4", "T4"
+
+
 class TagType(models.TextChoices):
     AFFECTED_AREA = "AFFECTED_AREA", "Affected Area"
     ROOT_CAUSE = "ROOT_CAUSE", "Root Cause"
@@ -104,6 +112,9 @@ class Incident(models.Model):
         max_length=20, choices=IncidentStatus.choices, default=IncidentStatus.ACTIVE
     )
     severity = models.CharField(max_length=2, choices=IncidentSeverity.choices)
+    service_tier = models.CharField(
+        max_length=2, choices=ServiceTier.choices, null=True, blank=True
+    )
 
     # Privacy
     is_private = models.BooleanField(default=False)

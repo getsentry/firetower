@@ -41,6 +41,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     tagsQueryOptions('AFFECTED_AREA')
   );
   const {data: rootCauseSuggestions = []} = useQuery(tagsQueryOptions('ROOT_CAUSE'));
+  const {data: impactSuggestions = []} = useQuery(tagsQueryOptions('IMPACT'));
 
   const handleFieldChange =
     (field: 'severity' | 'status' | 'title' | 'description' | 'impact_summary') =>
@@ -110,7 +111,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         className="text-content-secondary leading-comfortable"
       />
 
-      <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-3">
+      <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         <div>
           <EditableTextField
             value={incident.impact_summary}
@@ -125,7 +126,21 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         </div>
 
         <EditableTags
-          label="Affected Areas"
+          label="Impact"
+          tags={incident.impact_tags}
+          onSave={async newTags => {
+            await updateIncidentField.mutateAsync({
+              incidentId: incident.id,
+              field: 'impact_tags',
+              value: newTags,
+            });
+          }}
+          suggestions={impactSuggestions}
+          emptyText="No impact specified"
+        />
+
+        <EditableTags
+          label="Affected areas"
           tags={incident.affected_area_tags}
           onSave={async newTags => {
             await updateIncidentField.mutateAsync({
@@ -139,7 +154,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         />
 
         <EditableTags
-          label="Root Cause"
+          label="Root cause"
           tags={incident.root_cause_tags}
           onSave={async newTags => {
             await updateIncidentField.mutateAsync({

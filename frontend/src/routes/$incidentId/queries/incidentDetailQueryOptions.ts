@@ -3,6 +3,7 @@ import {Api} from 'api';
 import {z} from 'zod';
 
 export const SEVERITY_OPTIONS = ['P0', 'P1', 'P2', 'P3', 'P4'] as const;
+export const SERVICE_TIER_OPTIONS = ['T0', 'T1', 'T2', 'T3', 'T4'] as const;
 export const STATUS_OPTIONS = ['Active', 'Mitigated', 'Postmortem', 'Done'] as const;
 
 const ParticipantSchema = z.object({
@@ -29,6 +30,7 @@ const IncidentDetailSchema = z.object({
   impact_summary: z.string(),
   status: z.enum(STATUS_OPTIONS),
   severity: z.enum(SEVERITY_OPTIONS),
+  service_tier: z.enum(SERVICE_TIER_OPTIONS).nullable(),
   created_at: z.string(),
   updated_at: z.string(),
   is_private: z.boolean(),

@@ -10,6 +10,7 @@ const IncidentListItemSchema = z.object({
   description: z.string(),
   status: IncidentStatusSchema,
   severity: z.enum(['P0', 'P1', 'P2', 'P3', 'P4']),
+  service_tier: z.enum(['T0', 'T1', 'T2', 'T3', 'T4']).nullable(),
   created_at: z.string(),
   is_private: z.boolean(),
 });
