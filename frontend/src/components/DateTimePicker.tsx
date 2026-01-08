@@ -51,10 +51,12 @@ export function DateTimePicker({value, onChange}: DateTimePickerProps) {
         type="time"
         step="1"
         value={timeValue}
+        disabled={!value}
         onChange={e => {
+          if (!value) return;
           const [hours, minutes, seconds] = e.target.value.split(':').map(Number);
           if (!isNaN(hours) && !isNaN(minutes)) {
-            const newDate = value ? new Date(value) : new Date();
+            const newDate = new Date(value);
             newDate.setHours(hours);
             newDate.setMinutes(minutes);
             newDate.setSeconds(seconds || 0);
