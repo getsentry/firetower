@@ -1,24 +1,10 @@
-import {useCallback, useRef, useState} from 'react';
+import {useCallback, useState} from 'react';
 import {cva} from 'class-variance-authority';
 import {Button} from 'components/Button';
 import {ConfirmationDialog} from 'components/ConfirmationDialog';
+import {Popover, PopoverContent, PopoverTrigger} from 'components/Popover';
 import {EllipsisVertical} from 'lucide-react';
 import {cn} from 'utils/cn';
-
-const popoverStyles = cva([
-  'absolute',
-  'z-50',
-  'top-full',
-  'right-0',
-  'mt-space-xs',
-  'rounded-radius-md',
-  'border',
-  'border-gray-200',
-  'bg-background-primary',
-  'shadow-lg',
-  'p-space-sm',
-  'min-w-max',
-]);
 
 const menuItemStyles = cva([
   'w-full',
@@ -42,20 +28,11 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  const close = useCallback((refocus = false) => {
-    setIsOpen(false);
-    if (refocus) {
-      triggerRef.current?.focus();
-    }
-  }, []);
 
   const handleMenuItemClick = useCallback(() => {
-    close();
+    setIsOpen(false);
     setShowConfirmation(true);
-  }, [close]);
+  }, []);
 
   const handleConfirm = useCallback(async () => {
     setShowConfirmation(false);
@@ -73,25 +50,6 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
     setShowConfirmation(false);
   }, []);
 
-  const handleBlur = useCallback(
-    (e: React.FocusEvent) => {
-      if (!e.currentTarget.contains(e.relatedTarget)) {
-        close();
-      }
-    },
-    [close]
-  );
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        e.preventDefault();
-        close(true);
-      }
-    },
-    [isOpen, close]
-  );
-
   const dialogTitle = isPrivate
     ? 'Make incident public?'
     : 'Convert to private incident?';
@@ -102,37 +60,23 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
 
   return (
     <>
-      <div
-        className="relative"
-        ref={menuRef}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-      >
-        <Button
-          ref={triggerRef}
-          variant="icon"
-          onClick={() => setIsOpen(!isOpen)}
-          disabled={isLoading}
-          aria-label="More actions"
-          aria-expanded={isOpen}
-          aria-haspopup="menu"
-        >
-          <EllipsisVertical className="h-5 w-5" />
-        </Button>
-
-        {isOpen && (
-          <div role="menu" className={cn(popoverStyles())}>
-            <button
-              role="menuitem"
-              type="button"
-              onClick={handleMenuItemClick}
-              className={cn(menuItemStyles())}
-            >
-              {isPrivate ? 'Make incident public' : 'Convert to private incident'}
-            </button>
-          </div>
-        )}
-      </div>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="icon" disabled={isLoading} aria-label="More actions">
+            <EllipsisVertical className="h-5 w-5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="p-space-sm">
+          <button
+            role="menuitem"
+            type="button"
+            onClick={handleMenuItemClick}
+            className={cn(menuItemStyles())}
+          >
+            {isPrivate ? 'Make incident public' : 'Convert to private incident'}
+          </button>
+        </PopoverContent>
+      </Popover>
 
       <ConfirmationDialog
         isOpen={showConfirmation}

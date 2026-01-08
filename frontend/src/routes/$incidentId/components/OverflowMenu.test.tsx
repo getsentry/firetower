@@ -18,7 +18,7 @@ describe('OverflowMenu', () => {
 
     await user.click(screen.getByRole('button', {name: 'More actions'}));
 
-    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem')).toBeInTheDocument();
   });
 
   it('shows "Convert to private incident" when incident is public', async () => {
@@ -122,12 +122,12 @@ describe('OverflowMenu', () => {
     );
 
     await user.click(screen.getByRole('button', {name: 'More actions'}));
-    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem')).toBeInTheDocument();
 
     await user.click(screen.getByText('Outside'));
 
     await waitFor(() => {
-      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
     });
   });
 
