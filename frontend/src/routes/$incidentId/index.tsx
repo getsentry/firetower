@@ -1,7 +1,6 @@
 import {useEffect} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
-import {Card} from 'components/Card';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 
@@ -49,19 +48,6 @@ function Incident() {
       <IncidentSummary incident={incident} />
 
       <div className="flex flex-col gap-4 md:flex-row">
-        <section className="flex flex-col gap-4 md:flex-[2]">
-          <Card>
-            <div className="text-content-muted p-12 text-center">
-              <p className="mb-2 text-lg">
-                <span role="img" aria-label="fire">
-                  🔥
-                </span>
-              </p>
-              <p>Cool features to come</p>
-            </div>
-          </Card>
-        </section>
-
         <aside className="flex flex-col gap-4 md:flex-1">
           {incident.external_links.slack && (
             <SlackLink

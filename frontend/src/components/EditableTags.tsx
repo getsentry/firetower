@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {Pencil, X} from 'lucide-react';
 import {cn} from 'utils/cn';
 
@@ -43,11 +43,11 @@ export function EditableTags({
     resetState();
   };
 
-  const cancel = () => {
+  const cancel = useCallback(() => {
     setIsEditing(false);
     setDraftTags(tags);
     resetState();
-  };
+  }, [tags]);
 
   const save = async () => {
     setIsSaving(true);

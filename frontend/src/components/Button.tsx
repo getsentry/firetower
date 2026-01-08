@@ -4,7 +4,7 @@ import {cn} from 'utils/cn';
 
 import {Spinner} from './Spinner';
 
-const button = cva(
+const buttonVariants = cva(
   [
     'inline-flex',
     'items-center',
@@ -26,8 +26,6 @@ const button = cva(
           'rounded-radius-md',
           'font-medium',
           'text-sm',
-          'w-16',
-          'h-8',
           'bg-background-accent-vibrant',
           'text-content-on-vibrant-light',
           'hover:opacity-90',
@@ -40,9 +38,9 @@ const button = cva(
           'rounded-radius-md',
           'font-medium',
           'text-sm',
-          'w-16',
-          'h-8',
           'bg-white',
+          'border',
+          'border-gray-200',
           'text-content-primary',
           'hover:bg-background-transparent-neutral-muted',
         ],
@@ -61,21 +59,31 @@ const button = cva(
           'hover:bg-background-transparent-neutral-muted',
         ],
       },
+      size: {
+        default: 'px-space-md py-space-sm h-8',
+        sm: 'px-space-sm h-7 text-xs',
+        lg: 'px-space-lg h-10',
+        icon: 'h-8 w-8 p-0',
+      },
     },
     defaultVariants: {
       variant: 'primary',
+      size: 'default',
     },
   }
 );
 
 interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof button> {
+  extends
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
   loading?: boolean;
   ref?: React.Ref<HTMLButtonElement>;
 }
 
 const Button = ({
   variant,
+  size,
   loading,
   disabled,
   children,
@@ -88,7 +96,7 @@ const Button = ({
       ref={ref}
       type="button"
       disabled={disabled || loading}
-      className={cn(button({variant, className}))}
+      className={cn(buttonVariants({variant, size, className}))}
       {...props}
     >
       {loading ? <Spinner size="sm" /> : children}
@@ -96,4 +104,5 @@ const Button = ({
   );
 };
 
-export {Button, type ButtonProps};
+// eslint-disable-next-line react-refresh/only-export-components
+export {Button, buttonVariants, type ButtonProps};
