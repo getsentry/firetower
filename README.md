@@ -5,7 +5,7 @@ More docs to come eventually :')
 ## Starting the dev database
 
 ```sh
-docker-compose -f docker-compose.db.yml
+docker compose -f docker-compose.db.yml up -d
 uv run manage.py migrate
 ```
 
