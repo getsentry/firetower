@@ -6,7 +6,11 @@ import {EditableTextField} from 'components/EditableTextField';
 import {Pill} from 'components/Pill';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
-import {SEVERITY_OPTIONS, STATUS_OPTIONS} from '../queries/incidentDetailQueryOptions';
+import {
+  SERVICE_TIER_OPTIONS,
+  SEVERITY_OPTIONS,
+  STATUS_OPTIONS,
+} from '../queries/incidentDetailQueryOptions';
 import {tagsQueryOptions} from '../queries/tagsQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
@@ -18,17 +22,15 @@ interface IncidentSummaryProps {
 
 function formatDateTime(dateString: string): string {
   const date = new Date(dateString);
-  const dateFormatted = date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  });
-  const timeFormatted = date.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    timeZoneName: 'short',
   });
-  return `${dateFormatted} • ${timeFormatted}`;
 }
 
 export function IncidentSummary({incident}: IncidentSummaryProps) {
@@ -44,7 +46,15 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
   const {data: impactSuggestions = []} = useQuery(tagsQueryOptions('IMPACT'));
 
   const handleFieldChange =
-    (field: 'severity' | 'status' | 'title' | 'description' | 'impact_summary') =>
+    (
+      field:
+        | 'severity'
+        | 'status'
+        | 'service_tier'
+        | 'title'
+        | 'description'
+        | 'impact_summary'
+    ) =>
     async (value: string) => {
       await updateIncidentField.mutateAsync({
         incidentId: incident.id,
@@ -91,6 +101,12 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           value={incident.status}
           options={STATUS_OPTIONS}
           onSave={handleFieldChange('status')}
+        />
+        <EditablePill
+          value={incident.service_tier}
+          options={SERVICE_TIER_OPTIONS}
+          onSave={handleFieldChange('service_tier')}
+          placeholder="Set tier"
         />
         {incident.is_private && <Pill variant="private">Private</Pill>}
       </div>

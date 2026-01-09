@@ -42,6 +42,7 @@ function formatDateTime(date: Date | undefined): string {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    timeZoneName: 'short',
   });
 }
 

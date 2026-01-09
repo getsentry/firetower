@@ -32,11 +32,12 @@ const triggerStyles = cva([
 ]);
 
 export interface EditablePillProps<T extends string> {
-  value: T;
+  value: T | null;
   options: readonly T[];
   onSave: (newValue: T) => Promise<void>;
   className?: string;
   getVariant?: (value: T) => PillProps['variant'];
+  placeholder?: string;
 }
 
 export function EditablePill<T extends string>({
@@ -45,6 +46,7 @@ export function EditablePill<T extends string>({
   onSave,
   className,
   getVariant,
+  placeholder = 'Not set',
 }: EditablePillProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -55,7 +57,7 @@ export function EditablePill<T extends string>({
       if (isSaving) return;
       setIsOpen(open);
       if (open) {
-        const currentIndex = options.indexOf(value);
+        const currentIndex = value ? options.indexOf(value) : -1;
         setFocusedIndex(currentIndex);
       } else {
         setFocusedIndex(-1);
@@ -109,7 +111,11 @@ export function EditablePill<T extends string>({
     [isSaving, isOpen, focusedIndex, options, handleSelect]
   );
 
-  const variant = getVariant ? getVariant(value) : (value as PillProps['variant']);
+  const variant = value
+    ? getVariant
+      ? getVariant(value)
+      : (value as PillProps['variant'])
+    : 'default';
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
@@ -117,7 +123,7 @@ export function EditablePill<T extends string>({
         <button className={cn(triggerStyles(), className)}>
           <Pill variant={variant}>
             <span className="relative inline-flex items-center justify-center">
-              <span className={cn(isSaving && 'invisible')}>{value}</span>
+              <span className={cn(isSaving && 'invisible')}>{value ?? placeholder}</span>
               {isSaving && <Spinner size="sm" className="absolute h-3 w-3" />}
             </span>
           </Pill>
