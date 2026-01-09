@@ -1,25 +1,10 @@
-import {useCallback, useRef, useState} from 'react';
+import {useCallback, useState} from 'react';
 import {cva} from 'class-variance-authority';
 import {cn} from 'utils/cn';
 
 import {Pill, type PillProps} from './Pill';
+import {Popover, PopoverContent, PopoverTrigger} from './Popover';
 import {Spinner} from './Spinner';
-
-const popoverStyles = cva([
-  'absolute',
-  'z-50',
-  'mt-space-xs',
-  'rounded-radius-md',
-  'border',
-  'border-gray-200',
-  'bg-background-primary',
-  'shadow-lg',
-  'p-space-sm',
-  'flex',
-  'flex-col',
-  'gap-space-xs',
-  'min-w-max',
-]);
 
 const optionRowStyles = cva([
   'w-full',
@@ -46,8 +31,6 @@ const triggerStyles = cva([
   'select-none',
 ]);
 
-const overlayStyles = cva(['fixed', 'inset-0', 'z-40', 'bg-transparent']);
-
 export interface EditablePillProps<T extends string> {
   value: T;
   options: readonly T[];
@@ -66,32 +49,29 @@ export function EditablePill<T extends string>({
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
 
-  const open = useCallback(() => {
-    if (isSaving) return;
-    setIsOpen(true);
-    const currentIndex = options.indexOf(value);
-    setFocusedIndex(currentIndex);
-  }, [isSaving, options, value]);
-
-  const close = useCallback((refocus = false) => {
-    setIsOpen(false);
-    setFocusedIndex(-1);
-    if (refocus) {
-      triggerRef.current?.focus();
-    }
-  }, []);
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (isSaving) return;
+      setIsOpen(open);
+      if (open) {
+        const currentIndex = options.indexOf(value);
+        setFocusedIndex(currentIndex);
+      } else {
+        setFocusedIndex(-1);
+      }
+    },
+    [isSaving, options, value]
+  );
 
   const handleSelect = useCallback(
     async (newValue: T) => {
       if (newValue === value) {
-        close();
+        setIsOpen(false);
         return;
       }
 
-      close();
+      setIsOpen(false);
       setIsSaving(true);
       try {
         await onSave(newValue);
@@ -101,20 +81,12 @@ export function EditablePill<T extends string>({
         setIsSaving(false);
       }
     },
-    [value, onSave, close]
+    [value, onSave]
   );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      if (isSaving) return;
-
-      if (!isOpen) {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          open();
-        }
-        return;
-      }
+      if (isSaving || !isOpen) return;
 
       switch (event.key) {
         case 'ArrowDown':
@@ -132,37 +104,17 @@ export function EditablePill<T extends string>({
             handleSelect(options[focusedIndex]);
           }
           break;
-        case 'Escape':
-          event.preventDefault();
-          close(true);
-          break;
       }
     },
-    [isSaving, isOpen, open, close, focusedIndex, options, handleSelect]
-  );
-
-  const handleBlur = useCallback(
-    (e: React.FocusEvent) => {
-      if (!e.currentTarget.contains(e.relatedTarget)) {
-        close();
-      }
-    },
-    [close]
+    [isSaving, isOpen, focusedIndex, options, handleSelect]
   );
 
   const variant = getVariant ? getVariant(value) : (value as PillProps['variant']);
 
   return (
-    <>
-      <div className="relative inline-block" onBlur={handleBlur}>
-        <button
-          ref={triggerRef}
-          onClick={open}
-          onKeyDown={handleKeyDown}
-          aria-haspopup="listbox"
-          aria-expanded={isOpen}
-          className={cn(triggerStyles(), className)}
-        >
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button className={cn(triggerStyles(), className)}>
           <Pill variant={variant}>
             <span className="relative inline-flex items-center justify-center">
               <span className={cn(isSaving && 'invisible')}>{value}</span>
@@ -170,34 +122,34 @@ export function EditablePill<T extends string>({
             </span>
           </Pill>
         </button>
-
-        {isOpen && (
-          <div ref={popoverRef} className={cn(popoverStyles())} role="listbox">
-            {options.map((option, index) => {
-              const optionVariant = getVariant
-                ? getVariant(option)
-                : (option as PillProps['variant']);
-              const isFocused = index === focusedIndex;
-              return (
-                <div
-                  key={option}
-                  tabIndex={-1}
-                  className={cn(optionRowStyles(), isFocused && 'bg-gray-100')}
-                  onClick={() => handleSelect(option)}
-                  role="option"
-                  aria-selected={option === value}
-                >
-                  <Pill variant={optionVariant} className={cn(optionStyles())}>
-                    {option}
-                  </Pill>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {isOpen && <div className={cn(overlayStyles())} aria-hidden="true" />}
-    </>
+      </PopoverTrigger>
+      <PopoverContent
+        className="gap-space-xs p-space-sm flex flex-col"
+        onKeyDown={handleKeyDown}
+      >
+        <div role="listbox">
+          {options.map((option, index) => {
+            const optionVariant = getVariant
+              ? getVariant(option)
+              : (option as PillProps['variant']);
+            const isFocused = index === focusedIndex;
+            return (
+              <div
+                key={option}
+                tabIndex={-1}
+                className={cn(optionRowStyles(), isFocused && 'bg-gray-100')}
+                onClick={() => handleSelect(option)}
+                role="option"
+                aria-selected={option === value}
+              >
+                <Pill variant={optionVariant} className={cn(optionStyles())}>
+                  {option}
+                </Pill>
+              </div>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
