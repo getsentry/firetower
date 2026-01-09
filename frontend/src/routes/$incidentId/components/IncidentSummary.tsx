@@ -6,7 +6,11 @@ import {EditableTextField} from 'components/EditableTextField';
 import {Pill} from 'components/Pill';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
-import {SEVERITY_OPTIONS, STATUS_OPTIONS} from '../queries/incidentDetailQueryOptions';
+import {
+  SERVICE_TIER_OPTIONS,
+  SEVERITY_OPTIONS,
+  STATUS_OPTIONS,
+} from '../queries/incidentDetailQueryOptions';
 import {tagsQueryOptions} from '../queries/tagsQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
@@ -18,17 +22,15 @@ interface IncidentSummaryProps {
 
 function formatDateTime(dateString: string): string {
   const date = new Date(dateString);
-  const dateFormatted = date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  });
-  const timeFormatted = date.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    timeZoneName: 'short',
   });
-  return `${dateFormatted} • ${timeFormatted}`;
 }
 
 export function IncidentSummary({incident}: IncidentSummaryProps) {
@@ -41,9 +43,18 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     tagsQueryOptions('AFFECTED_AREA')
   );
   const {data: rootCauseSuggestions = []} = useQuery(tagsQueryOptions('ROOT_CAUSE'));
+  const {data: impactTypeSuggestions = []} = useQuery(tagsQueryOptions('IMPACT_TYPE'));
 
   const handleFieldChange =
-    (field: 'severity' | 'status' | 'title' | 'description' | 'impact') =>
+    (
+      field:
+        | 'severity'
+        | 'status'
+        | 'service_tier'
+        | 'title'
+        | 'description'
+        | 'impact_summary'
+    ) =>
     async (value: string) => {
       await updateIncidentField.mutateAsync({
         incidentId: incident.id,
@@ -91,6 +102,12 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           options={STATUS_OPTIONS}
           onSave={handleFieldChange('status')}
         />
+        <EditablePill
+          value={incident.service_tier}
+          options={SERVICE_TIER_OPTIONS}
+          onSave={handleFieldChange('service_tier')}
+          placeholder="Service tier"
+        />
         {incident.is_private && <Pill variant="private">Private</Pill>}
       </div>
       <div className="mb-space-xl">
@@ -110,12 +127,12 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         className="text-content-secondary leading-comfortable"
       />
 
-      <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-3">
+      <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         <div>
           <EditableTextField
-            value={incident.impact}
-            onSave={handleFieldChange('impact')}
-            label="Impact"
+            value={incident.impact_summary}
+            onSave={handleFieldChange('impact_summary')}
+            label="Impact summary"
             labelClassName="text-size-md font-semibold"
             as="p"
             multiline
@@ -125,7 +142,21 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         </div>
 
         <EditableTags
-          label="Affected Areas"
+          label="Impact type"
+          tags={incident.impact_type_tags}
+          onSave={async newTags => {
+            await updateIncidentField.mutateAsync({
+              incidentId: incident.id,
+              field: 'impact_type_tags',
+              value: newTags,
+            });
+          }}
+          suggestions={impactTypeSuggestions}
+          emptyText="No impact type specified"
+        />
+
+        <EditableTags
+          label="Affected areas"
           tags={incident.affected_area_tags}
           onSave={async newTags => {
             await updateIncidentField.mutateAsync({
@@ -139,7 +170,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         />
 
         <EditableTags
-          label="Root Cause"
+          label="Root cause"
           tags={incident.root_cause_tags}
           onSave={async newTags => {
             await updateIncidentField.mutateAsync({

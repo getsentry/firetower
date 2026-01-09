@@ -179,7 +179,7 @@ class TestIncidentViews:
         incident = Incident.objects.create(
             title="Test Incident",
             description="Test description",
-            impact="Test impact",
+            impact_summary="Test impact",
             status=IncidentStatus.ACTIVE,
             severity=IncidentSeverity.P1,
             captain=captain,
@@ -450,7 +450,7 @@ class TestIncidentAPIViews:
         data = {
             "title": "Detailed Incident",
             "description": "This is a description",
-            "impact": "High impact",
+            "impact_summary": "High impact",
             "status": IncidentStatus.MITIGATED,
             "severity": IncidentSeverity.P2,
             "is_private": True,
@@ -462,7 +462,7 @@ class TestIncidentAPIViews:
         assert response.status_code == 201
         incident = Incident.objects.first()
         assert incident.description == "This is a description"
-        assert incident.impact == "High impact"
+        assert incident.impact_summary == "High impact"
         assert incident.status == IncidentStatus.MITIGATED
 
     def test_create_incident_missing_required_fields(self):

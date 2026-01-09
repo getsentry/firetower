@@ -86,11 +86,11 @@ function ConfirmationDialog({
         </h2>
         <div className="mb-space-xl text-content-secondary">{message}</div>
         <div className="gap-space-md flex justify-end">
-          <Button variant="secondary" onClick={onCancel} className="w-auto">
-            {cancelLabel}
-          </Button>
           <Button variant="primary" onClick={onConfirm} className="w-auto">
             {confirmLabel}
+          </Button>
+          <Button variant="secondary" onClick={onCancel} className="w-auto">
+            {cancelLabel}
           </Button>
         </div>
       </div>
