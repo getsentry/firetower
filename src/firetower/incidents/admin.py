@@ -35,7 +35,7 @@ class IncidentAdmin(admin.ModelAdmin):
         "impact_tags",
     ]
 
-    actions = ["sync_participants_from_slack"]
+    actions = ["sync_participants_from_slack", "clear_milestones"]
 
     inlines = [ExternalLinkInline]
 
@@ -47,6 +47,18 @@ class IncidentAdmin(admin.ModelAdmin):
         ("Status", {"fields": ("status", "severity", "service_tier", "is_private")}),
         ("People", {"fields": ("captain", "reporter", "participants")}),
         ("Tags", {"fields": ("affected_area_tags", "root_cause_tags", "impact_tags")}),
+        (
+            "Milestones",
+            {
+                "fields": (
+                    "time_started",
+                    "time_detected",
+                    "time_analyzed",
+                    "time_mitigated",
+                    "time_recovered",
+                )
+            },
+        ),
         (
             "Timestamps",
             {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
@@ -88,6 +100,19 @@ class IncidentAdmin(admin.ModelAdmin):
             message_parts.append(f"{error_count} failed")
 
         self.message_user(request, f"Participant sync: {', '.join(message_parts)}")
+
+    @admin.action(description="Clear all milestones")
+    def clear_milestones(
+        self, request: HttpRequest, queryset: QuerySet[Incident]
+    ) -> None:
+        count = queryset.update(
+            time_started=None,
+            time_detected=None,
+            time_analyzed=None,
+            time_mitigated=None,
+            time_recovered=None,
+        )
+        self.message_user(request, f"Cleared milestones for {count} incident(s)")
 
 
 @admin.register(Tag)

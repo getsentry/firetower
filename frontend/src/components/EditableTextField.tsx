@@ -234,11 +234,14 @@ export function EditableTextField({
             <LabelComponent className={cn(labelStyles(), labelClassName)}>
               {label}
             </LabelComponent>
-            {!isEditing && (
-              <Button variant="icon" onClick={startEditing} aria-label="Edit">
-                <Pencil className="h-4 w-4" />
-              </Button>
-            )}
+            <Button
+              variant="icon"
+              onClick={startEditing}
+              aria-label="Edit"
+              className={cn(isEditing && 'invisible')}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
           </div>
 
           {/* Display Value (no pencil) */}
