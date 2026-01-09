@@ -28,7 +28,7 @@ const mockIncident: IncidentDetail = {
   is_private: false,
   affected_area_tags: ['API', 'Database'],
   root_cause_tags: ['Resource Exhaustion'],
-  impact_tags: [],
+  impact_type_tags: [],
   participants: [],
   external_links: {
     slack: null,

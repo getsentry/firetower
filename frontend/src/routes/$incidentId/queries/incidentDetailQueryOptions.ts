@@ -36,7 +36,7 @@ const IncidentDetailSchema = z.object({
   is_private: z.boolean(),
   affected_area_tags: z.array(z.string()),
   root_cause_tags: z.array(z.string()),
-  impact_tags: z.array(z.string()),
+  impact_type_tags: z.array(z.string()),
   participants: z.array(ParticipantSchema),
   external_links: ExternalLinksSchema,
   time_started: z.string().nullable(),

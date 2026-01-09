@@ -43,7 +43,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     tagsQueryOptions('AFFECTED_AREA')
   );
   const {data: rootCauseSuggestions = []} = useQuery(tagsQueryOptions('ROOT_CAUSE'));
-  const {data: impactSuggestions = []} = useQuery(tagsQueryOptions('IMPACT'));
+  const {data: impactTypeSuggestions = []} = useQuery(tagsQueryOptions('IMPACT_TYPE'));
 
   const handleFieldChange =
     (
@@ -106,7 +106,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           value={incident.service_tier}
           options={SERVICE_TIER_OPTIONS}
           onSave={handleFieldChange('service_tier')}
-          placeholder="Set tier"
+          placeholder="Service tier"
         />
         {incident.is_private && <Pill variant="private">Private</Pill>}
       </div>
@@ -142,17 +142,17 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         </div>
 
         <EditableTags
-          label="Impact"
-          tags={incident.impact_tags}
+          label="Impact type"
+          tags={incident.impact_type_tags}
           onSave={async newTags => {
             await updateIncidentField.mutateAsync({
               incidentId: incident.id,
-              field: 'impact_tags',
+              field: 'impact_type_tags',
               value: newTags,
             });
           }}
-          suggestions={impactSuggestions}
-          emptyText="No impact specified"
+          suggestions={impactTypeSuggestions}
+          emptyText="No impact type specified"
         />
 
         <EditableTags
