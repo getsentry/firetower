@@ -167,6 +167,7 @@ export function EditableTags({
                 action={
                   <Button
                     variant="close"
+                    size={null}
                     onClick={() => removeTag(tag)}
                     aria-label={`Remove ${tag}`}
                   >
