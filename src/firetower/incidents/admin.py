@@ -32,7 +32,7 @@ class IncidentAdmin(admin.ModelAdmin):
         "participants",
         "affected_area_tags",
         "root_cause_tags",
-        "impact_tags",
+        "impact_type_tags",
     ]
 
     actions = ["sync_participants_from_slack", "clear_milestones"]
@@ -46,7 +46,10 @@ class IncidentAdmin(admin.ModelAdmin):
         ),
         ("Status", {"fields": ("status", "severity", "service_tier", "is_private")}),
         ("People", {"fields": ("captain", "reporter", "participants")}),
-        ("Tags", {"fields": ("affected_area_tags", "root_cause_tags", "impact_tags")}),
+        (
+            "Tags",
+            {"fields": ("affected_area_tags", "root_cause_tags", "impact_type_tags")},
+        ),
         (
             "Milestones",
             {

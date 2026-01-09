@@ -33,7 +33,7 @@ class ServiceTier(models.TextChoices):
 class TagType(models.TextChoices):
     AFFECTED_AREA = "AFFECTED_AREA", "Affected Area"
     ROOT_CAUSE = "ROOT_CAUSE", "Root Cause"
-    IMPACT = "IMPACT", "Impact"
+    IMPACT_TYPE = "IMPACT_TYPE", "Impact Type"
 
 
 class ExternalLinkType(models.TextChoices):
@@ -164,11 +164,11 @@ class Incident(models.Model):
         related_name="incidents_by_root_cause",
         limit_choices_to={"type": "ROOT_CAUSE"},
     )
-    impact_tags = models.ManyToManyField(  # type: ignore[var-annotated]
+    impact_type_tags = models.ManyToManyField(  # type: ignore[var-annotated]
         "Tag",
         blank=True,
-        related_name="incidents_by_impact",
-        limit_choices_to={"type": "IMPACT"},
+        related_name="incidents_by_impact_type",
+        limit_choices_to={"type": "IMPACT_TYPE"},
     )
 
     class Meta:
@@ -195,9 +195,9 @@ class Incident(models.Model):
         return [tag.name for tag in self.root_cause_tags.all()]
 
     @property
-    def impact_tag_names(self) -> list[str]:
-        """Return list of impact tag names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.impact_tags.all()]
+    def impact_type_tag_names(self) -> list[str]:
+        """Return list of impact type tag names (uses prefetch cache if available)"""
+        return [tag.name for tag in self.impact_type_tags.all()]
 
     @property
     def external_links_dict(self) -> dict[str, str]:

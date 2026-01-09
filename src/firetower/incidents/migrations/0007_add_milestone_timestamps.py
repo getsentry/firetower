@@ -41,7 +41,7 @@ class Migration(migrations.Migration):
                 choices=[
                     ("AFFECTED_AREA", "Affected Area"),
                     ("ROOT_CAUSE", "Root Cause"),
-                    ("IMPACT", "Impact"),
+                    ("IMPACT_TYPE", "Impact Type"),
                 ],
                 max_length=20,
             ),
@@ -53,11 +53,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="incident",
-            name="impact_tags",
+            name="impact_type_tags",
             field=models.ManyToManyField(
                 blank=True,
-                limit_choices_to={"type": "IMPACT"},
-                related_name="incidents_by_impact",
+                limit_choices_to={"type": "IMPACT_TYPE"},
+                related_name="incidents_by_impact_type",
                 to="incidents.tag",
             ),
         ),
