@@ -67,9 +67,10 @@ class UserProfileAdmin(admin.ModelAdmin):
     def formfield_for_foreignkey(
         self, db_field: ForeignKey[Any, Any], request: HttpRequest, **kwargs: Any
     ) -> ModelChoiceField | None:
-        if db_field.name == "user":
-            kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+        field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == "user" and field:
+            setattr(field, "label_from_instance", lambda obj: obj.email or obj.username)
+        return field
 
 
 @admin.register(ExternalProfile)
@@ -81,6 +82,7 @@ class ExternalProfileAdmin(admin.ModelAdmin):
     def formfield_for_foreignkey(
         self, db_field: ForeignKey[Any, Any], request: HttpRequest, **kwargs: Any
     ) -> ModelChoiceField | None:
-        if db_field.name == "user":
-            kwargs["label_from_instance"] = lambda obj: obj.email or obj.username
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+        field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == "user" and field:
+            setattr(field, "label_from_instance", lambda obj: obj.email or obj.username)
+        return field

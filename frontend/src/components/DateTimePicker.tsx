@@ -10,14 +10,22 @@ import {Popover, PopoverContent, PopoverTrigger} from './Popover';
 export interface DateTimePickerProps {
   value: Date | undefined;
   onChange: (date: Date | undefined) => void;
+  defaultDate?: Date;
+  isPlaceholderTime?: boolean;
 }
 
-export function DateTimePicker({value, onChange}: DateTimePickerProps) {
+export function DateTimePicker({
+  value,
+  onChange,
+  defaultDate,
+  isPlaceholderTime,
+}: DateTimePickerProps) {
   const [open, setOpen] = useState(false);
 
-  const timeValue = value
-    ? `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`
-    : '';
+  const timeValue =
+    value && !isPlaceholderTime
+      ? `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`
+      : '';
 
   return (
     <div className="flex items-center gap-space-sm">
@@ -32,7 +40,7 @@ export function DateTimePicker({value, onChange}: DateTimePickerProps) {
           <Calendar
             mode="single"
             selected={value}
-            defaultMonth={value}
+            defaultMonth={value ?? defaultDate}
             captionLayout="dropdown"
             showOutsideDays={false}
             onSelect={date => {
