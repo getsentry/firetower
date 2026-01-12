@@ -29,6 +29,7 @@ const mockIncidents: PaginatedIncidents = {
         'Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout.',
       status: 'Active',
       severity: 'P1',
+      service_tier: null,
       created_at: '2024-08-27T18:14:00Z',
       is_private: false,
     },
@@ -39,6 +40,7 @@ const mockIncidents: PaginatedIncidents = {
         'Automated SSL certificate renewal process failed for api.example.com. Manual intervention required to restore HTTPS access.',
       status: 'Mitigated',
       severity: 'P2',
+      service_tier: null,
       created_at: '2024-08-27T15:32:00Z',
       is_private: true,
     },
@@ -50,14 +52,16 @@ const mockIncidentDetail: IncidentDetail = {
   title: 'Database Connection Pool Exhausted',
   description:
     'Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout.',
-  impact: 'High - affecting 30% of users',
+  impact_summary: 'High - affecting 30% of users',
   status: 'Active',
   severity: 'P1',
+  service_tier: null,
   created_at: '2024-08-27T18:14:00Z',
   updated_at: '2024-08-27T19:30:00Z',
   is_private: false,
   affected_area_tags: ['Authentication', 'Database'],
   root_cause_tags: ['Connection pool exhaustion', 'Memory leak in connection handler'],
+  impact_type_tags: [],
   participants: [
     {
       name: 'John Doe',
@@ -68,6 +72,11 @@ const mockIncidentDetail: IncidentDetail = {
   external_links: {
     slack: 'https://slack.com/archives/C123456',
   },
+  time_started: null,
+  time_detected: null,
+  time_analyzed: null,
+  time_mitigated: null,
+  time_recovered: null,
 };
 
 const mockCurrentUser: CurrentUser = {

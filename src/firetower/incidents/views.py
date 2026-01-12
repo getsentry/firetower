@@ -76,6 +76,7 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
             "participants__userprofile",
             "affected_area_tags",
             "root_cause_tags",
+            "impact_type_tags",
             "external_links",
         )
 
@@ -174,6 +175,7 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
             "participants__userprofile",
             "affected_area_tags",
             "root_cause_tags",
+            "impact_type_tags",
             "external_links",
         )
 

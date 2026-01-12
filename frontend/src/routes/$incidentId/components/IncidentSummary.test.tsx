@@ -19,14 +19,16 @@ const mockIncident: IncidentDetail = {
   id: 'INC-123',
   title: 'Test Incident',
   description: 'This is a test incident description',
-  impact: 'Users experiencing 500 errors',
+  impact_summary: 'Users experiencing 500 errors',
   status: 'Active',
   severity: 'P1',
+  service_tier: null,
   created_at: '2024-01-01T12:00:00Z',
   updated_at: '2024-01-01T12:00:00Z',
   is_private: false,
   affected_area_tags: ['API', 'Database'],
   root_cause_tags: ['Resource Exhaustion'],
+  impact_type_tags: [],
   participants: [],
   external_links: {
     slack: null,
@@ -37,6 +39,11 @@ const mockIncident: IncidentDetail = {
     notion: null,
     linear: null,
   },
+  time_started: null,
+  time_detected: null,
+  time_analyzed: null,
+  time_mitigated: null,
+  time_recovered: null,
 };
 
 describe('IncidentSummary', () => {
@@ -74,29 +81,29 @@ describe('IncidentSummary', () => {
     expect(screen.queryByText('Private')).not.toBeInTheDocument();
   });
 
-  describe('Impact section', () => {
-    it('renders impact when present', () => {
+  describe('Impact summary section', () => {
+    it('renders impact summary when present', () => {
       renderWithQueryClient(<IncidentSummary incident={mockIncident} />);
 
-      expect(screen.getByText('Impact')).toBeInTheDocument();
+      expect(screen.getByText('Impact summary')).toBeInTheDocument();
       expect(screen.getByText('Users experiencing 500 errors')).toBeInTheDocument();
     });
 
-    it('renders editable field when impact is empty', () => {
-      const incidentWithoutImpact = {...mockIncident, impact: ''};
+    it('renders editable field when impact summary is empty', () => {
+      const incidentWithoutImpact = {...mockIncident, impact_summary: ''};
       renderWithQueryClient(<IncidentSummary incident={incidentWithoutImpact} />);
 
-      expect(screen.getByText('Impact')).toBeInTheDocument();
+      expect(screen.getByText('Impact summary')).toBeInTheDocument();
       const editButtons = screen.getAllByRole('button', {name: 'Edit'});
       expect(editButtons.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Affected Areas section', () => {
+  describe('Affected areas section', () => {
     it('renders affected areas when present', () => {
       renderWithQueryClient(<IncidentSummary incident={mockIncident} />);
 
-      expect(screen.getByText('Affected Areas')).toBeInTheDocument();
+      expect(screen.getByText('Affected areas')).toBeInTheDocument();
       expect(screen.getByText('API')).toBeInTheDocument();
       expect(screen.getByText('Database')).toBeInTheDocument();
     });
@@ -105,16 +112,16 @@ describe('IncidentSummary', () => {
       const incidentWithoutAreas = {...mockIncident, affected_area_tags: []};
       renderWithQueryClient(<IncidentSummary incident={incidentWithoutAreas} />);
 
-      expect(screen.getByText('Affected Areas')).toBeInTheDocument();
+      expect(screen.getByText('Affected areas')).toBeInTheDocument();
       expect(screen.getByText('No affected areas specified')).toBeInTheDocument();
     });
   });
 
-  describe('Root Cause section', () => {
+  describe('Root cause section', () => {
     it('renders root causes when present', () => {
       renderWithQueryClient(<IncidentSummary incident={mockIncident} />);
 
-      expect(screen.getByText('Root Cause')).toBeInTheDocument();
+      expect(screen.getByText('Root cause')).toBeInTheDocument();
       expect(screen.getByText('Resource Exhaustion')).toBeInTheDocument();
     });
 
@@ -122,7 +129,7 @@ describe('IncidentSummary', () => {
       const incidentWithoutCauses = {...mockIncident, root_cause_tags: []};
       renderWithQueryClient(<IncidentSummary incident={incidentWithoutCauses} />);
 
-      expect(screen.getByText('Root Cause')).toBeInTheDocument();
+      expect(screen.getByText('Root cause')).toBeInTheDocument();
       expect(screen.getByText('No root cause specified')).toBeInTheDocument();
     });
 
