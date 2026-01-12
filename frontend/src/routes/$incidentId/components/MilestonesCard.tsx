@@ -46,38 +46,37 @@ function formatDateTime(date: Date | undefined): string {
   });
 }
 
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+interface DraftValue {
+  date: Date | undefined;
+  time: string | undefined; // "HH:MM" format
 }
 
-function isMidnight(date: Date): boolean {
-  return date.getHours() === 0 && date.getMinutes() === 0;
+type DraftValues = Record<MilestoneField, DraftValue>;
+
+function parseIncidentDateTime(isoString: string | null): DraftValue {
+  if (!isoString) return {date: undefined, time: undefined};
+  const d = new Date(isoString);
+  return {
+    date: d,
+    time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+  };
 }
 
-function toMidnight(date: Date): Date {
+function combineDateAndTime(date: Date, time: string): Date {
+  const [hours, minutes] = time.split(':').map(Number);
   const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
+  result.setHours(hours, minutes, 0, 0);
   return result;
 }
-
-type DraftValues = Record<MilestoneField, Date | undefined>;
 
 export function MilestonesCard({incident}: MilestonesCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftValues, setDraftValues] = useState<DraftValues>(() => ({
-    time_started: incident.time_started ? new Date(incident.time_started) : undefined,
-    time_detected: incident.time_detected ? new Date(incident.time_detected) : undefined,
-    time_analyzed: incident.time_analyzed ? new Date(incident.time_analyzed) : undefined,
-    time_mitigated: incident.time_mitigated
-      ? new Date(incident.time_mitigated)
-      : undefined,
-    time_recovered: incident.time_recovered
-      ? new Date(incident.time_recovered)
-      : undefined,
+    time_started: parseIncidentDateTime(incident.time_started),
+    time_detected: parseIncidentDateTime(incident.time_detected),
+    time_analyzed: parseIncidentDateTime(incident.time_analyzed),
+    time_mitigated: parseIncidentDateTime(incident.time_mitigated),
+    time_recovered: parseIncidentDateTime(incident.time_recovered),
   }));
   const [isSaving, setIsSaving] = useState(false);
 
@@ -86,32 +85,37 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
     updateIncidentFieldMutationOptions(queryClient)
   );
 
+  const getDefaultDate = (fieldIndex: number): Date => {
+    for (let i = fieldIndex - 1; i >= 0; i--) {
+      const prevField = MILESTONES[i].field;
+      if (draftValues[prevField].date) {
+        return draftValues[prevField].date;
+      }
+    }
+    return new Date(incident.created_at);
+  };
+
   const startEditing = () => {
-    // Build draft values, pre-filling unset fields with default date at midnight
     const drafts: DraftValues = {
-      time_started: undefined,
-      time_detected: undefined,
-      time_analyzed: undefined,
-      time_mitigated: undefined,
-      time_recovered: undefined,
+      time_started: parseIncidentDateTime(incident.time_started),
+      time_detected: parseIncidentDateTime(incident.time_detected),
+      time_analyzed: parseIncidentDateTime(incident.time_analyzed),
+      time_mitigated: parseIncidentDateTime(incident.time_mitigated),
+      time_recovered: parseIncidentDateTime(incident.time_recovered),
     };
 
+    // Pre-fill dates for unset fields
     for (let i = 0; i < MILESTONES.length; i++) {
       const {field} = MILESTONES[i];
-      if (incident[field]) {
-        // Field has a real value
-        drafts[field] = new Date(incident[field]);
-      } else {
-        // Pre-fill with default date at midnight
+      if (!drafts[field].date) {
         let defaultDate = new Date(incident.created_at);
         for (let j = i - 1; j >= 0; j--) {
-          const prevField = MILESTONES[j].field;
-          if (drafts[prevField]) {
-            defaultDate = drafts[prevField];
+          if (drafts[MILESTONES[j].field].date) {
+            defaultDate = drafts[MILESTONES[j].field].date!;
             break;
           }
         }
-        drafts[field] = toMidnight(defaultDate);
+        drafts[field] = {date: defaultDate, time: undefined};
       }
     }
 
@@ -126,19 +130,12 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      for (let i = 0; i < MILESTONES.length; i++) {
-        const {field} = MILESTONES[i];
-        const draftValue = draftValues[field];
+      for (const {field} of MILESTONES) {
+        const {date, time} = draftValues[field];
         const oldValue = incident[field] ? new Date(incident[field]) : undefined;
 
-        // Compute effective value: if it's default date + midnight, treat as unset
-        let effectiveValue: Date | undefined = draftValue;
-        if (draftValue && isMidnight(draftValue)) {
-          const defaultDate = getDefaultDate(i);
-          if (isSameDay(draftValue, defaultDate)) {
-            effectiveValue = undefined;
-          }
-        }
+        // Only save if both date and time are set
+        const effectiveValue = date && time ? combineDateAndTime(date, time) : undefined;
 
         if (effectiveValue?.getTime() !== oldValue?.getTime()) {
           await updateIncidentField.mutateAsync({
@@ -154,27 +151,12 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
     }
   };
 
-  const updateDraft = (field: MilestoneField) => (date: Date | undefined) => {
-    setDraftValues(prev => ({...prev, [field]: date}));
+  const updateDraftDate = (field: MilestoneField) => (date: Date | undefined) => {
+    setDraftValues(prev => ({...prev, [field]: {...prev[field], date}}));
   };
 
-  const getDefaultDate = (fieldIndex: number): Date => {
-    // Look for the most recent previous milestone that has a value
-    for (let i = fieldIndex - 1; i >= 0; i--) {
-      const prevField = MILESTONES[i].field;
-      if (draftValues[prevField]) {
-        return draftValues[prevField];
-      }
-    }
-    // Fall back to incident created_at
-    return new Date(incident.created_at);
-  };
-
-  const isPlaceholderTime = (fieldIndex: number): boolean => {
-    const draftValue = draftValues[MILESTONES[fieldIndex].field];
-    if (!draftValue || !isMidnight(draftValue)) return false;
-    const defaultDate = getDefaultDate(fieldIndex);
-    return isSameDay(draftValue, defaultDate);
+  const updateDraftTime = (field: MilestoneField) => (time: string | undefined) => {
+    setDraftValues(prev => ({...prev, [field]: {...prev[field], time}}));
   };
 
   return (
@@ -196,10 +178,11 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
             <div className="flex flex-1 items-center justify-end">
               {isEditing ? (
                 <DateTimePicker
-                  value={draftValues[field]}
-                  onChange={updateDraft(field)}
+                  date={draftValues[field].date}
+                  time={draftValues[field].time}
+                  onDateChange={updateDraftDate(field)}
+                  onTimeChange={updateDraftTime(field)}
                   defaultDate={getDefaultDate(index)}
-                  isPlaceholderTime={isPlaceholderTime(index)}
                 />
               ) : (
                 <span
