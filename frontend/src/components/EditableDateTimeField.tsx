@@ -24,6 +24,24 @@ function formatDateTime(date: Date | undefined): string {
   });
 }
 
+function parseDateTime(date: Date | undefined): {
+  date: Date | undefined;
+  time: string | undefined;
+} {
+  if (!date) return {date: undefined, time: undefined};
+  return {
+    date,
+    time: `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`,
+  };
+}
+
+function combineDateAndTime(date: Date, time: string): Date {
+  const [hours, minutes] = time.split(':').map(Number);
+  const result = new Date(date);
+  result.setHours(hours, minutes, 0, 0);
+  return result;
+}
+
 export function EditableDateTimeField({
   value,
   onSave,
@@ -31,28 +49,34 @@ export function EditableDateTimeField({
   placeholder = 'Not set',
 }: EditableDateTimeFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [draftValue, setDraftValue] = useState<Date | undefined>(value);
+  const [draftDate, setDraftDate] = useState<Date | undefined>(undefined);
+  const [draftTime, setDraftTime] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
 
   const startEditing = useCallback(() => {
+    const parsed = parseDateTime(value);
+    setDraftDate(parsed.date);
+    setDraftTime(parsed.time);
     setIsEditing(true);
-    setDraftValue(value);
   }, [value]);
 
   const save = useCallback(async () => {
-    if (draftValue?.getTime() === value?.getTime()) {
+    const newValue =
+      draftDate && draftTime ? combineDateAndTime(draftDate, draftTime) : undefined;
+
+    if (newValue?.getTime() === value?.getTime()) {
       setIsEditing(false);
       return;
     }
 
     setIsSaving(true);
     try {
-      await onSave(draftValue);
+      await onSave(newValue);
       setIsEditing(false);
     } finally {
       setIsSaving(false);
     }
-  }, [draftValue, value, onSave]);
+  }, [draftDate, draftTime, value, onSave]);
 
   return (
     <div className="flex items-center gap-space-md">
@@ -63,7 +87,12 @@ export function EditableDateTimeField({
       <div className="flex flex-1 items-center justify-end">
         {isEditing ? (
           <div className="flex shrink-0 items-center gap-space-sm">
-            <DateTimePicker value={draftValue} onChange={setDraftValue} />
+            <DateTimePicker
+              date={draftDate}
+              time={draftTime}
+              onDateChange={setDraftDate}
+              onTimeChange={setDraftTime}
+            />
             <Button variant="icon" onClick={save} disabled={isSaving} aria-label="Save">
               <Check className="h-4 w-4" />
             </Button>
