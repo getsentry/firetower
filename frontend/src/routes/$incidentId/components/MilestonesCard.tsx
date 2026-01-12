@@ -85,6 +85,8 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
     updateIncidentFieldMutationOptions(queryClient)
   );
 
+  // For the calendar's default month: use the nearest previous milestone's date,
+  // or fall back to incident created_at. This will probably be the correct date and if so, saves the user from inputting date, if not, it's same effort to select date as if it were unset.
   const getDefaultDate = (fieldIndex: number): Date => {
     for (let i = fieldIndex - 1; i >= 0; i--) {
       const prevField = MILESTONES[i].field;
