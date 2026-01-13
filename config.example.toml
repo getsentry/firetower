@@ -1,0 +1,28 @@
+project_key = "INC"
+django_secret_key = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69"
+sentry_dsn = "https://your-sentry-dsn@o1.ingest.us.sentry.io/project-id"
+
+[postgres]
+db = "firetower"
+host = "localhost"
+user = "postgres"
+password = "dummy_dev_password"
+
+[jira]
+domain = "https://<jira-domain>.atlassian.net"
+account = ""
+api_key = ""
+severity_field = "customfield_11023"
+
+[slack]
+bot_token = ""
+team_id = "<slack-team-id>"
+participant_sync_throttle_seconds = 300
+
+[auth]
+iap_enabled = false
+iap_audience = ""
+
+[datadog]
+api_key = ""
+app_key = ""
