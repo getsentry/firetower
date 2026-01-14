@@ -89,3 +89,36 @@ class ConfigFile:
             ConfigFile instance with loaded configuration.
         """
         return from_dict(ConfigFile, data)
+
+
+class DummyConfigFile(ConfigFile):
+    """
+    A dummy configuration file for use when running collectstatic.
+    """
+
+    def __init__(self) -> None:
+        self.postgres = PostgresConfig(
+            db="firetower",
+            host="localhost",
+            user="postgres",
+            password="dummy_dev_password",
+        )
+        self.jira = JIRAConfig(
+            domain="",
+            account="",
+            api_key="",
+            severity_field="",
+        )
+        self.slack = SlackConfig(
+            bot_token="",
+            team_id="",
+            participant_sync_throttle_seconds=0,
+        )
+        self.auth = AuthConfig(
+            iap_enabled=False,
+            iap_audience="",
+        )
+        self.datadog = None
+        self.project_key = ""
+        self.django_secret_key = ""
+        self.sentry_dsn = ""

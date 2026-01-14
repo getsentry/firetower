@@ -11,16 +11,26 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from datadog import initialize
 from datadog.dogstatsd.base import statsd
 
-from firetower.config import ConfigFile
+from firetower.config import ConfigFile, DummyConfigFile
 
 
 def env_is_dev() -> bool:
     return os.environ.get("DJANGO_ENV", "dev") == "dev"
+
+
+def cmd_needs_dummy_config() -> bool:
+    cmds = ["collectstatic", "mypy"]
+    for arg in sys.argv:
+        for cmd in cmds:
+            if cmd in arg:
+                return True
+    return False
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -28,8 +38,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load configuration from TOML file
 # Set CONFIG_FILE_PATH environment variable to override default location
+# Hack: There are a few things that load settings.py where we don't expect to have a working config.toml.
 CONFIG_FILE_PATH = os.environ.get("CONFIG_FILE_PATH", BASE_DIR.parent / "config.toml")
-config = ConfigFile.from_file(CONFIG_FILE_PATH)
+config: ConfigFile = (
+    DummyConfigFile()
+    if cmd_needs_dummy_config()
+    else ConfigFile.from_file(CONFIG_FILE_PATH)
+)
 
 
 if not env_is_dev():

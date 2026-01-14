@@ -58,11 +58,7 @@ jobs:
           --health-retries 5
 
     env:
-      DJANGO_PG_DB: firetower_test
-      DJANGO_PG_USER: postgres
-      DJANGO_PG_PASS: postgres
-      DJANGO_PG_HOST: localhost
-      DJANGO_PG_PORT: 5432
+      CONFIG_FILE_PATH: ../config.ci.toml
 
     steps:
       - name: Checkout code
