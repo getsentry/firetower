@@ -53,7 +53,7 @@ export function DateTimePicker({
         onChange={e => {
           onTimeChange(e.target.value || undefined);
         }}
-        className="bg-background text-size-md w-16 px-2 appearance-none disabled:opacity-30 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+        className="bg-background text-size-md w-[85px] px-2 appearance-none disabled:opacity-30 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
       />
       <Button
         variant="icon"
