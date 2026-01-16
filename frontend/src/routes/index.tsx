@@ -16,12 +16,14 @@ import {STATUS_FILTER_GROUPS} from './types';
 
 // Zod schema for search params - coerce single values to arrays, accept any strings
 const incidentListSearchSchema = z.object({
-  status: z.preprocess(val => {
-    if (val === undefined) return undefined;
-    if (Array.isArray(val) && val.every(v => typeof v === 'string')) return val;
-    if (typeof val === 'string') return [val];
-    return [String(val)]; // Convert weird formats to string
-  }, z.array(z.string()).optional()),
+  status: z
+    .preprocess(val => {
+      if (val === undefined) return undefined;
+      if (Array.isArray(val) && val.every(v => typeof v === 'string')) return val;
+      if (typeof val === 'string') return [val];
+      return [String(val)]; // Convert weird formats to string
+    }, z.array(z.string()).optional())
+    .optional(),
 });
 
 function IncidentsLayout({children}: {children: React.ReactNode}) {
