@@ -3,8 +3,29 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, User
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q, QuerySet
+
+INCIDENT_ID_START = 2000
+
+
+class IncidentCounter(models.Model):
+    """Stores the next available incident ID for gapless sequencing."""
+
+    next_id = models.PositiveIntegerField(default=INCIDENT_ID_START)
+
+    class Meta:
+        db_table = "incidents_incident_counter"
+
+
+def get_next_incident_id() -> int:
+    """Atomically get and increment the incident ID counter."""
+    with transaction.atomic():
+        counter = IncidentCounter.objects.select_for_update().get()
+        next_id = counter.next_id
+        counter.next_id += 1
+        counter.save()
+        return next_id
 
 
 class IncidentStatus(models.TextChoices):
@@ -100,7 +121,8 @@ class Incident(models.Model):
     """
 
     # Primary key - numeric ID (2000, 2001, etc.)
-    id = models.AutoField(primary_key=True)
+    # Uses IncidentCounter for gapless sequential IDs
+    id = models.PositiveIntegerField(primary_key=True)
 
     # Core fields
     title = models.CharField(max_length=500)
@@ -235,9 +257,12 @@ class Incident(models.Model):
             raise ValidationError({"severity": "Severity must be set"})
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Override save to run validation"""
-        self.full_clean()
-        super().save(*args, **kwargs)
+        """Override save to run validation and assign gapless ID"""
+        with transaction.atomic():
+            if self._state.adding and self.id is None:
+                self.id = get_next_incident_id()
+            self.full_clean()
+            super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.incident_number}: {self.title}"

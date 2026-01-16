@@ -8,6 +8,7 @@ from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
     Incident,
+    IncidentCounter,
     IncidentSeverity,
     IncidentStatus,
     Tag,
@@ -46,6 +47,35 @@ class TestIncident:
 
         # Should be 2000 or higher (in case other tests ran first)
         assert incident.id >= 2000
+
+    def test_incident_ids_are_gapless_after_failed_save(self):
+        """Test that failed saves don't consume IDs (gapless sequence)"""
+        incident1 = Incident.objects.create(
+            title="First",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        first_id = incident1.id
+
+        # Attempt to create an incident that will fail validation (empty title)
+        with pytest.raises(ValidationError):
+            Incident.objects.create(
+                title="",  # Invalid - will fail validation
+                status=IncidentStatus.ACTIVE,
+                severity=IncidentSeverity.P1,
+            )
+
+        # The counter should NOT have incremented due to the failed save
+        counter = IncidentCounter.objects.get()
+        assert counter.next_id == first_id + 1
+
+        # Create another valid incident - should be exactly first_id + 1
+        incident2 = Incident.objects.create(
+            title="Second",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        assert incident2.id == first_id + 1
 
     def test_incident_number_property(self):
         """Test incident_number property returns correct format"""
