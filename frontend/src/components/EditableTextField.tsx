@@ -18,7 +18,7 @@ const displayStyles = cva(['transition-opacity'], {
 });
 
 // Label layout styles
-const labelContainerStyles = cva(['flex', 'items-center', 'gap-space-xs', 'mb-space-xs']);
+const labelContainerStyles = cva(['flex', 'items-center', 'gap-space-xs', 'mb-space-md']);
 
 const labelStyles = cva(['font-medium', 'text-content-secondary', 'text-sm']);
 
@@ -249,8 +249,8 @@ export function EditableTextField({
             <Component
               className={cn(
                 multiline && 'whitespace-pre-wrap',
-                !value && placeholder && 'text-content-tertiary italic',
-                className
+                className,
+                !value && placeholder && 'text-content-disabled italic'
               )}
             >
               {value || placeholder}
@@ -266,8 +266,8 @@ export function EditableTextField({
             className={cn(
               fullWidth ? 'flex-1 min-w-0' : 'inline',
               multiline && 'whitespace-pre-wrap',
-              !value && placeholder && 'text-content-tertiary italic',
-              className
+              className,
+              !value && placeholder && 'text-content-disabled italic'
             )}
           >
             {value || placeholder}

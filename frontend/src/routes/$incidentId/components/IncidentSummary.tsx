@@ -124,7 +124,9 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         as="p"
         multiline
         placeholder="No description provided"
-        className="text-content-secondary leading-comfortable"
+        className="text-content-secondary"
+        label="Description"
+        labelClassName="text-size-md font-semibold"
       />
 
       <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
@@ -137,7 +139,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
             as="p"
             multiline
             placeholder="No impact specified"
-            className="text-size-sm leading-comfortable text-content-secondary"
+            className="text-size-sm text-content-secondary"
           />
         </div>
 
