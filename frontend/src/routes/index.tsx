@@ -20,7 +20,10 @@ import {STATUS_FILTER_GROUPS} from './types';
 
 // Zod schema for search params
 const incidentListSearchSchema = z.object({
-  status: z.array(IncidentStatusSchema).optional(),
+  status: z.preprocess(
+    val => (val === undefined ? undefined : Array.isArray(val) ? val : [val]),
+    z.array(IncidentStatusSchema).optional()
+  ),
 });
 
 function IncidentsLayout({children}: {children: React.ReactNode}) {
