@@ -1,0 +1,25 @@
+project_key = "INC"
+django_secret_key = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69"
+sentry_dsn = ""
+
+# This is the actual essential part. Values match the container set up by GHA
+[postgres]
+db = "firetower_test"
+host = "localhost"
+user = "postgres"
+password = "postgres"
+
+[jira]
+domain = ""
+account = ""
+api_key = ""
+severity_field = ""
+
+[slack]
+bot_token = ""
+team_id = ""
+participant_sync_throttle_seconds = 300
+
+[auth]
+iap_enabled = false
+iap_audience = ""

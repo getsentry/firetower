@@ -11,50 +11,58 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
-from datadog import initialize, statsd
+from datadog import initialize
+from datadog.dogstatsd.base import statsd
+
+from firetower.config import ConfigFile, DummyConfigFile
 
 
 def env_is_dev() -> bool:
     return os.environ.get("DJANGO_ENV", "dev") == "dev"
 
 
-def dev_default(key: str, default: str = "") -> str:
-    value = os.environ.get(key)
-    if value is not None and value != "":
-        return value
-    if env_is_dev():
-        return default
-    raise Exception(
-        f"ERROR: Environment variable {key} must be set when not in the dev environment!"
-    )
+def cmd_needs_dummy_config() -> bool:
+    cmds = ["collectstatic", "mypy"]
+    for arg in sys.argv:
+        for cmd in cmds:
+            if cmd in arg:
+                return True
+    return False
+
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load configuration from TOML file
+# Set CONFIG_FILE_PATH environment variable to override default location
+# Hack: There are a few things that load settings.py where we don't expect to have a working config.toml.
+CONFIG_FILE_PATH = os.environ.get("CONFIG_FILE_PATH", BASE_DIR.parent / "config.toml")
+config: ConfigFile = (
+    DummyConfigFile()
+    if cmd_needs_dummy_config()
+    else ConfigFile.from_file(CONFIG_FILE_PATH)
+)
 
 
 if not env_is_dev():
     import sentry_sdk
 
     sentry_sdk.init(
-        dsn="https://ef9a24c7ef0f1a8ba7e8f821d6ab1dd9@o1.ingest.us.sentry.io/4510076289548288",
+        dsn=config.sentry_dsn,
         send_default_pii=False,
-        environment=os.environ.get("DJANGO_ENV", "dev"),
+        environment=os.environ.get("DJANGO_ENV", "unknown"),
     )
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
 # Global project settings
-PROJECT_KEY = os.environ.get("PROJECT_KEY", "INC")
+PROJECT_KEY = config.project_key
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = dev_default(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69",
-)
-
+SECRET_KEY = config.django_secret_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_is_dev()
@@ -138,10 +146,10 @@ WSGI_APPLICATION = "firetower.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": dev_default("DJANGO_PG_DB", "firetower"),
-        "HOST": dev_default("DJANGO_PG_HOST", "localhost"),
-        "USER": dev_default("DJANGO_PG_USER", "postgres"),
-        "PASSWORD": dev_default("DJANGO_PG_PASS", "dummy_dev_password"),
+        "NAME": config.postgres.db,
+        "HOST": config.postgres.host,
+        "USER": config.postgres.user,
+        "PASSWORD": config.postgres.password,
     },
 }
 
@@ -189,23 +197,20 @@ STATIC_ROOT = "static/backend/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Jira Integration Configuration
-# Defaults to test environment setup (matching opsbot test config)
 JIRA = {
-    "DOMAIN": os.environ.get("JIRA_DOMAIN", "https://getsentry.atlassian.net"),
-    "ACCOUNT": dev_default("JIRA_ACCOUNT"),
-    "API_KEY": dev_default("JIRA_API_KEY"),
-    "SEVERITY_FIELD": dev_default("JIRA_SEVERITY_FIELD", "customfield_11023"),
+    "DOMAIN": config.jira.domain,
+    "ACCOUNT": config.jira.account,
+    "API_KEY": config.jira.api_key,
+    "SEVERITY_FIELD": config.jira.severity_field,
 }
 
 # Slack Integration Configuration
 SLACK = {
-    "BOT_TOKEN": dev_default("SLACK_BOT_TOKEN"),
-    "TEAM_ID": os.environ.get("SLACK_TEAM_ID", "sentry"),
+    "BOT_TOKEN": config.slack.bot_token,
+    "TEAM_ID": config.slack.team_id,
 }
 
-PARTICIPANT_SYNC_THROTTLE_SECONDS = int(
-    os.environ.get("PARTICIPANT_SYNC_THROTTLE_SECONDS", "300")
-)
+PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
@@ -229,14 +234,14 @@ REST_FRAMEWORK = {
 }
 
 # Google IAP Authentication Configuration
-IAP_ENABLED = not env_is_dev()
-IAP_AUDIENCE = dev_default("IAP_AUDIENCE")
+IAP_ENABLED = config.auth.iap_enabled
+IAP_AUDIENCE = config.auth.iap_audience
 
 # Validate IAP settings in production
 if IAP_ENABLED and not IAP_AUDIENCE:
     raise Exception(
         "IAP_AUDIENCE must be set when IAP is enabled in production. "
-        "Set the IAP_AUDIENCE environment variable."
+        "Set the iap_audience value in the configuration file."
     )
 
 # django-k8s proreadiness probes
@@ -248,8 +253,8 @@ DJK8S_READINESS_PROBES = [
 initialize(
     statsd_host=os.environ.get("DATADOG_STATSD_HOST", "localhost"),
     statsd_port=int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
-    api_key=os.environ.get("DD_API_KEY"),
-    app_key=os.environ.get("DD_APP_KEY"),
+    api_key=config.datadog.api_key if config.datadog else None,
+    app_key=config.datadog.app_key if config.datadog else None,
     statsd_namespace="firetower",
 )
 statsd.constant_tags = [
