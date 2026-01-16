@@ -249,6 +249,39 @@ describe('StatusFilter', () => {
   });
 });
 
+describe('Search Params', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    setupDefaultMocks();
+  });
+
+  it('coerces single status value to array', async () => {
+    renderRoute('/?status=Active');
+
+    await screen.findByText('INC-1247');
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/incidents/',
+        query: {status: ['Active'], page: 1},
+      })
+    );
+  });
+
+  it('passes invalid status values to API', async () => {
+    renderRoute('/?status=InvalidStatus');
+
+    await screen.findByText('INC-1247');
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/incidents/',
+        query: {status: ['InvalidStatus'], page: 1},
+      })
+    );
+  });
+});
+
 describe('Route States', () => {
   beforeEach(() => {
     queryClient.clear();
