@@ -1383,3 +1383,32 @@ class TestTagListCreateAPIView:
 
         assert response.status_code == 201
         assert Tag.objects.filter(name="Database", type=TagType.ROOT_CAUSE).exists()
+
+    def test_list_tags_sorted_by_usage(self):
+        Tag.objects.create(name="Unused", type=TagType.AFFECTED_SERVICE)
+        tag_used_once = Tag.objects.create(
+            name="UsedOnce", type=TagType.AFFECTED_SERVICE
+        )
+        tag_used_twice = Tag.objects.create(
+            name="UsedTwice", type=TagType.AFFECTED_SERVICE
+        )
+
+        inc1 = Incident.objects.create(
+            title="Incident 1",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc1.affected_service_tags.add(tag_used_once, tag_used_twice)
+
+        inc2 = Incident.objects.create(
+            title="Incident 2",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2.affected_service_tags.add(tag_used_twice)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/tags/?type=AFFECTED_SERVICE")
+
+        assert response.status_code == 200
+        assert response.data == ["UsedTwice", "UsedOnce", "Unused"]
