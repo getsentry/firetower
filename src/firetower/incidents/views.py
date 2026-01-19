@@ -303,8 +303,10 @@ class TagListCreateAPIView(generics.ListCreateAPIView):
     """
     List or create tags.
 
-    GET /api/tags/?type=AFFECTED_AREA
+    GET /api/tags/?type=AFFECTED_SERVICE
+    GET /api/tags/?type=AFFECTED_REGION
     GET /api/tags/?type=ROOT_CAUSE
+    GET /api/tags/?type=IMPACT_TYPE
     POST /api/tags/
 
     GET returns all tags filtered by type. The type query parameter is required.
