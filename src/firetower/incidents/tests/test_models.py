@@ -8,6 +8,7 @@ from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
     Incident,
+    IncidentCounter,
     IncidentSeverity,
     IncidentStatus,
     Tag,
@@ -46,6 +47,61 @@ class TestIncident:
 
         # Should be 2000 or higher (in case other tests ran first)
         assert incident.id >= 2000
+
+    def test_incident_ids_are_gapless_after_failed_save(self):
+        """Test that failed saves don't consume IDs (gapless sequence)"""
+        incident1 = Incident.objects.create(
+            title="First",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        first_id = incident1.id
+
+        # Attempt to create an incident that will fail validation (empty title)
+        with pytest.raises(ValidationError):
+            Incident.objects.create(
+                title="",  # Invalid - will fail validation
+                status=IncidentStatus.ACTIVE,
+                severity=IncidentSeverity.P1,
+            )
+
+        # The counter should NOT have incremented due to the failed save
+        counter = IncidentCounter.objects.get()
+        assert counter.next_id == first_id + 1
+
+        # Create another valid incident - should be exactly first_id + 1
+        incident2 = Incident.objects.create(
+            title="Second",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        assert incident2.id == first_id + 1
+
+    def test_incident_counter_self_heals_when_missing(self):
+        """Test that a missing counter row is recreated from existing incidents"""
+        incident1 = Incident.objects.create(
+            title="First",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        first_id = incident1.id
+
+        # Simulate accidental deletion of counter row
+        IncidentCounter.objects.all().delete()
+        assert IncidentCounter.objects.count() == 0
+
+        # Creating a new incident should self-heal and continue from correct ID
+        incident2 = Incident.objects.create(
+            title="Second",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        assert incident2.id == first_id + 1
+
+        # Counter should be recreated
+        assert IncidentCounter.objects.count() == 1
+        counter = IncidentCounter.objects.get()
+        assert counter.next_id == first_id + 2
 
     def test_incident_number_property(self):
         """Test incident_number property returns correct format"""
