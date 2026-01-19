@@ -3,7 +3,7 @@ import re
 from dataclasses import asdict
 
 from django.conf import settings
-from django.db.models import QuerySet
+from django.db.models import Count, QuerySet
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
@@ -331,4 +331,16 @@ class TagListCreateAPIView(generics.ListCreateAPIView):
                 f"Invalid type '{tag_type}'. Must be one of: {', '.join(TagType.values)}"
             )
 
-        return Tag.objects.filter(type=tag_type)
+        related_name_map = {
+            "AFFECTED_SERVICE": "incidents_by_affected_service",
+            "ROOT_CAUSE": "incidents_by_root_cause",
+            "IMPACT_TYPE": "incidents_by_impact_type",
+            "AFFECTED_REGION": "incidents_by_affected_region",
+        }
+        related_name = related_name_map[tag_type]
+
+        return (
+            Tag.objects.filter(type=tag_type)
+            .annotate(usage_count=Count(related_name))
+            .order_by("-usage_count", "name")
+        )
