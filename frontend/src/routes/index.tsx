@@ -11,16 +11,19 @@ import {z} from 'zod';
 import {IncidentCard} from './components/IncidentCard';
 import {IncidentListSkeleton} from './components/IncidentListSkeleton';
 import {StatusFilter} from './components/StatusFilter';
-import {
-  incidentsQueryOptions,
-  IncidentStatusSchema,
-  type IncidentStatus,
-} from './queries/incidentsQueryOptions';
+import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
 import {STATUS_FILTER_GROUPS} from './types';
 
-// Zod schema for search params
+// Zod schema for search params - coerce single values to arrays, accept any strings
 const incidentListSearchSchema = z.object({
-  status: z.array(IncidentStatusSchema).optional(),
+  status: z
+    .preprocess(val => {
+      if (val === undefined) return undefined;
+      if (Array.isArray(val) && val.every(v => typeof v === 'string')) return val;
+      if (typeof val === 'string') return [val];
+      return [String(val)]; // Convert weird formats to string
+    }, z.array(z.string()).optional())
+    .optional(),
 });
 
 function IncidentsLayout({children}: {children: React.ReactNode}) {
@@ -67,7 +70,7 @@ export const Route = createFileRoute('/')({
 
 const STORAGE_KEY = 'firetower_list_search';
 
-function IncidentsEmptyState({status}: {status?: IncidentStatus[]}) {
+function IncidentsEmptyState({status}: {status?: string[]}) {
   if (!status || arraysEqual(status, STATUS_FILTER_GROUPS.active)) {
     return (
       <div className="text-content-secondary py-space-4xl text-center">
