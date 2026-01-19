@@ -26,7 +26,8 @@ const mockIncident: IncidentDetail = {
   created_at: '2024-01-01T12:00:00Z',
   updated_at: '2024-01-01T12:00:00Z',
   is_private: false,
-  affected_area_tags: ['API', 'Database'],
+  affected_service_tags: ['API', 'Database'],
+  affected_region_tags: [],
   root_cause_tags: ['Resource Exhaustion'],
   impact_type_tags: [],
   participants: [],
@@ -99,21 +100,21 @@ describe('IncidentSummary', () => {
     });
   });
 
-  describe('Affected areas section', () => {
-    it('renders affected areas when present', () => {
+  describe('Affected services section', () => {
+    it('renders affected services when present', () => {
       renderWithQueryClient(<IncidentSummary incident={mockIncident} />);
 
-      expect(screen.getByText('Affected areas')).toBeInTheDocument();
+      expect(screen.getByText('Affected services')).toBeInTheDocument();
       expect(screen.getByText('API')).toBeInTheDocument();
       expect(screen.getByText('Database')).toBeInTheDocument();
     });
 
-    it('renders empty state when no affected areas', () => {
-      const incidentWithoutAreas = {...mockIncident, affected_area_tags: []};
-      renderWithQueryClient(<IncidentSummary incident={incidentWithoutAreas} />);
+    it('renders empty state when no affected services', () => {
+      const incidentWithoutServices = {...mockIncident, affected_service_tags: []};
+      renderWithQueryClient(<IncidentSummary incident={incidentWithoutServices} />);
 
-      expect(screen.getByText('Affected areas')).toBeInTheDocument();
-      expect(screen.getByText('No affected areas specified')).toBeInTheDocument();
+      expect(screen.getByText('Affected services')).toBeInTheDocument();
+      expect(screen.getByText('No affected services specified')).toBeInTheDocument();
     });
   });
 

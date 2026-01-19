@@ -74,7 +74,8 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
             "captain__userprofile",
             "reporter__userprofile",
             "participants__userprofile",
-            "affected_area_tags",
+            "affected_service_tags",
+            "affected_region_tags",
             "root_cause_tags",
             "impact_type_tags",
             "external_links",
@@ -173,7 +174,8 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
             "captain__userprofile",
             "reporter__userprofile",
             "participants__userprofile",
-            "affected_area_tags",
+            "affected_service_tags",
+            "affected_region_tags",
             "root_cause_tags",
             "impact_type_tags",
             "external_links",
@@ -301,8 +303,10 @@ class TagListCreateAPIView(generics.ListCreateAPIView):
     """
     List or create tags.
 
-    GET /api/tags/?type=AFFECTED_AREA
+    GET /api/tags/?type=AFFECTED_SERVICE
+    GET /api/tags/?type=AFFECTED_REGION
     GET /api/tags/?type=ROOT_CAUSE
+    GET /api/tags/?type=IMPACT_TYPE
     POST /api/tags/
 
     GET returns all tags filtered by type. The type query parameter is required.

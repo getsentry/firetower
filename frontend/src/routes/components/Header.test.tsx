@@ -59,7 +59,8 @@ const mockIncidentDetail: IncidentDetail = {
   created_at: '2024-08-27T18:14:00Z',
   updated_at: '2024-08-27T19:30:00Z',
   is_private: false,
-  affected_area_tags: ['Authentication', 'Database'],
+  affected_service_tags: ['Authentication', 'Database'],
+  affected_region_tags: [],
   root_cause_tags: ['Connection pool exhaustion', 'Memory leak in connection handler'],
   impact_type_tags: [],
   participants: [

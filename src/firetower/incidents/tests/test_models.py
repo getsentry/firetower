@@ -234,18 +234,18 @@ class TestIncident:
 
         assert incident.is_visible_to_user(superuser) is True
 
-    def test_affected_area_tag_names_property(self):
-        """Test affected_area_tag_names property returns list of tag names"""
+    def test_affected_service_tag_names_property(self):
+        """Test affected_service_tag_names property returns list of tag names"""
         incident = Incident.objects.create(
             title="Test", status=IncidentStatus.ACTIVE, severity=IncidentSeverity.P1
         )
 
-        tag1 = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
-        tag2 = Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+        tag1 = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        tag2 = Tag.objects.create(name="Database", type=TagType.AFFECTED_SERVICE)
 
-        incident.affected_area_tags.add(tag1, tag2)
+        incident.affected_service_tags.add(tag1, tag2)
 
-        names = incident.affected_area_tag_names
+        names = incident.affected_service_tag_names
         assert len(names) == 2
         assert "API" in names  # Preserves original casing
         assert "Database" in names
@@ -292,37 +292,37 @@ class TestIncident:
 class TestTag:
     def test_tag_creation(self):
         """Test creating a tag"""
-        tag = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        tag = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
 
         assert tag.name == "API"  # Preserves original casing
-        assert tag.type == "AFFECTED_AREA"
+        assert tag.type == "AFFECTED_SERVICE"
         assert tag.created_at is not None
 
     def test_tag_unique_together(self):
         """Test same name can exist for different tag types"""
-        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_SERVICE)
         Tag.objects.create(name="Database", type=TagType.ROOT_CAUSE)
 
         assert Tag.objects.filter(name="Database").count() == 2
 
     def test_tag_unique_constraint(self):
         """Test duplicate name+type combination is not allowed"""
-        Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
 
         # Now raises ValidationError from clean() instead of IntegrityError
         with pytest.raises(ValidationError):
-            Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+            Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
 
     def test_tag_case_insensitive_uniqueness(self):
         """Test tags are case-insensitive unique"""
-        Tag.objects.create(name="Database", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Database", type=TagType.AFFECTED_SERVICE)
 
         # Should raise validation error for case-insensitive duplicates
         with pytest.raises(ValidationError):
-            Tag.objects.create(name="database", type=TagType.AFFECTED_AREA)
+            Tag.objects.create(name="database", type=TagType.AFFECTED_SERVICE)
 
         with pytest.raises(ValidationError):
-            Tag.objects.create(name="DATABASE", type=TagType.AFFECTED_AREA)
+            Tag.objects.create(name="DATABASE", type=TagType.AFFECTED_SERVICE)
 
         # But same name with different type should work
         tag = Tag.objects.create(name="database", type=TagType.ROOT_CAUSE)
@@ -330,9 +330,9 @@ class TestTag:
 
     def test_tag_ordering(self):
         """Test tags are ordered alphabetically by name"""
-        Tag.objects.create(name="Zebra", type=TagType.AFFECTED_AREA)
-        Tag.objects.create(name="Apple", type=TagType.AFFECTED_AREA)
-        Tag.objects.create(name="Banana", type=TagType.AFFECTED_AREA)
+        Tag.objects.create(name="Zebra", type=TagType.AFFECTED_SERVICE)
+        Tag.objects.create(name="Apple", type=TagType.AFFECTED_SERVICE)
+        Tag.objects.create(name="Banana", type=TagType.AFFECTED_SERVICE)
 
         tags = list(Tag.objects.all())
         assert tags[0].name == "Apple"
@@ -341,9 +341,9 @@ class TestTag:
 
     def test_tag_str(self):
         """Test tag string representation"""
-        tag = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        tag = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
 
-        assert str(tag) == "API (Affected Area)"
+        assert str(tag) == "API (Affected Service)"
 
 
 @pytest.mark.django_db

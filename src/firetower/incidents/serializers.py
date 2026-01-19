@@ -96,14 +96,21 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
     participants = serializers.SerializerMethodField()
 
     # Tags as arrays of strings (not full objects)
-    affected_area_tags = serializers.ListField(
-        child=serializers.CharField(), source="affected_area_tag_names", read_only=True
+    affected_service_tags = serializers.ListField(
+        child=serializers.CharField(),
+        source="affected_service_tag_names",
+        read_only=True,
     )
     root_cause_tags = serializers.ListField(
         child=serializers.CharField(), source="root_cause_tag_names", read_only=True
     )
     impact_type_tags = serializers.ListField(
         child=serializers.CharField(), source="impact_type_tag_names", read_only=True
+    )
+    affected_region_tags = serializers.ListField(
+        child=serializers.CharField(),
+        source="affected_region_tag_names",
+        read_only=True,
     )
 
     # External links as dict for easy frontend access
@@ -121,7 +128,8 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
             "service_tier",
             "is_private",
             "participants",
-            "affected_area_tags",
+            "affected_service_tags",
+            "affected_region_tags",
             "root_cause_tags",
             "impact_type_tags",
             "external_links",
@@ -198,14 +206,21 @@ class IncidentReadSerializer(serializers.ModelSerializer):
     captain = serializers.SerializerMethodField()
     reporter = serializers.SerializerMethodField()
     participants = serializers.SerializerMethodField()
-    affected_area_tags = serializers.ListField(
-        child=serializers.CharField(), source="affected_area_tag_names", read_only=True
+    affected_service_tags = serializers.ListField(
+        child=serializers.CharField(),
+        source="affected_service_tag_names",
+        read_only=True,
     )
     root_cause_tags = serializers.ListField(
         child=serializers.CharField(), source="root_cause_tag_names", read_only=True
     )
     impact_type_tags = serializers.ListField(
         child=serializers.CharField(), source="impact_type_tag_names", read_only=True
+    )
+    affected_region_tags = serializers.ListField(
+        child=serializers.CharField(),
+        source="affected_region_tag_names",
+        read_only=True,
     )
     external_links = serializers.DictField(source="external_links_dict", read_only=True)
 
@@ -223,7 +238,8 @@ class IncidentReadSerializer(serializers.ModelSerializer):
             "captain",
             "reporter",
             "participants",
-            "affected_area_tags",
+            "affected_service_tags",
+            "affected_region_tags",
             "root_cause_tags",
             "impact_type_tags",
             "external_links",
@@ -273,7 +289,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
     Required fields: title, severity, captain, reporter
     Optional fields: description, impact_summary, status, is_private (default: False),
-                     external_links, affected_area_tags, root_cause_tags, impact_type_tags
+                     external_links, affected_service_tags, affected_region_tags,
+                     root_cause_tags, impact_type_tags
 
     captain/reporter: Email address of the user
     external_links format: {"slack": "url", "jira": "url", ...}
@@ -281,7 +298,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     - Use null to delete a specific link: {"slack": null}
     - Omit external_links field to leave existing links unchanged
 
-    affected_area_tags/root_cause_tags/impact_type_tags format: ["tag1", "tag2", ...]
+    affected_service_tags/affected_region_tags/root_cause_tags/impact_type_tags format: ["tag1", "tag2", ...]
     - Replaces all existing tags with the provided list
     - Tags must already exist (create via POST /api/tags/)
     - Omit field to leave existing tags unchanged
@@ -296,14 +313,21 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         allow_null=False,
         write_only=True,
     )
-    affected_area_tags = serializers.ListField(
-        child=serializers.CharField(), source="affected_area_tag_names", required=False
+    affected_service_tags = serializers.ListField(
+        child=serializers.CharField(),
+        source="affected_service_tag_names",
+        required=False,
     )
     root_cause_tags = serializers.ListField(
         child=serializers.CharField(), source="root_cause_tag_names", required=False
     )
     impact_type_tags = serializers.ListField(
         child=serializers.CharField(), source="impact_type_tag_names", required=False
+    )
+    affected_region_tags = serializers.ListField(
+        child=serializers.CharField(),
+        source="affected_region_tag_names",
+        required=False,
     )
 
     class Meta:
@@ -320,7 +344,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "captain",
             "reporter",
             "external_links",
-            "affected_area_tags",
+            "affected_service_tags",
+            "affected_region_tags",
             "root_cause_tags",
             "impact_type_tags",
             "time_started",
@@ -349,14 +374,17 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             )
         return value
 
-    def validate_affected_area_tags(self, value: list[str]) -> list[str]:
-        return self._validate_tags_exist(value, TagType.AFFECTED_AREA)
+    def validate_affected_service_tags(self, value: list[str]) -> list[str]:
+        return self._validate_tags_exist(value, TagType.AFFECTED_SERVICE)
 
     def validate_root_cause_tags(self, value: list[str]) -> list[str]:
         return self._validate_tags_exist(value, TagType.ROOT_CAUSE)
 
     def validate_impact_type_tags(self, value: list[str]) -> list[str]:
         return self._validate_tags_exist(value, TagType.IMPACT_TYPE)
+
+    def validate_affected_region_tags(self, value: list[str]) -> list[str]:
+        return self._validate_tags_exist(value, TagType.AFFECTED_REGION)
 
     def validate_external_links(
         self, value: dict[str, str | None]
@@ -383,11 +411,16 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data: dict) -> Incident:
-        """Create incident with external links"""
+        """Create incident with external links and tags"""
         external_links_data = validated_data.pop("external_links", None)
-        validated_data.pop("affected_area_tag_names", None)
-        validated_data.pop("root_cause_tag_names", None)
-        validated_data.pop("impact_type_tag_names", None)
+        affected_service_tag_names = validated_data.pop(
+            "affected_service_tag_names", None
+        )
+        affected_region_tag_names = validated_data.pop(
+            "affected_region_tag_names", None
+        )
+        root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
+        impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
 
         # Create the incident
         incident = super().create(validated_data)
@@ -402,6 +435,35 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                         url=url,
                     )
 
+        # Set tags if provided
+        if affected_service_tag_names:
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in affected_service_tag_names],
+                type=TagType.AFFECTED_SERVICE,
+            )
+            incident.affected_service_tags.set(tags)
+
+        if affected_region_tag_names:
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in affected_region_tag_names],
+                type=TagType.AFFECTED_REGION,
+            )
+            incident.affected_region_tags.set(tags)
+
+        if root_cause_tag_names:
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in root_cause_tag_names],
+                type=TagType.ROOT_CAUSE,
+            )
+            incident.root_cause_tags.set(tags)
+
+        if impact_type_tag_names:
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in impact_type_tag_names],
+                type=TagType.IMPACT_TYPE,
+            )
+            incident.impact_type_tags.set(tags)
+
         return incident
 
     def update(self, instance: Incident, validated_data: dict) -> Incident:
@@ -413,7 +475,12 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         Tags are replaced - the provided list replaces all existing tags.
         """
         external_links_data = validated_data.pop("external_links", None)
-        affected_area_tag_names = validated_data.pop("affected_area_tag_names", None)
+        affected_service_tag_names = validated_data.pop(
+            "affected_service_tag_names", None
+        )
+        affected_region_tag_names = validated_data.pop(
+            "affected_region_tag_names", None
+        )
         root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
         impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
 
@@ -438,13 +505,21 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                         defaults={"url": url},
                     )
 
-        # Replace affected area tags if provided
-        if affected_area_tag_names is not None:
+        # Replace affected service tags if provided
+        if affected_service_tag_names is not None:
             tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
-                name_lower__in=[n.lower() for n in affected_area_tag_names],
-                type=TagType.AFFECTED_AREA,
+                name_lower__in=[n.lower() for n in affected_service_tag_names],
+                type=TagType.AFFECTED_SERVICE,
             )
-            instance.affected_area_tags.set(tags)
+            instance.affected_service_tags.set(tags)
+
+        # Replace affected region tags if provided
+        if affected_region_tag_names is not None:
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in affected_region_tag_names],
+                type=TagType.AFFECTED_REGION,
+            )
+            instance.affected_region_tags.set(tags)
 
         # Replace root cause tags if provided
         if root_cause_tag_names is not None:
