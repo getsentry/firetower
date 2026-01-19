@@ -38,7 +38,7 @@ export function EditableTags({
   };
 
   const open = () => {
-    setDraftTags(tags);
+    setDraftTags([...tags].sort((a, b) => a.localeCompare(b)));
     setIsEditing(true);
     resetState();
   };
@@ -69,7 +69,7 @@ export function EditableTags({
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
     if (trimmed && !draftTags.includes(trimmed)) {
-      setDraftTags(prev => [...prev, trimmed]);
+      setDraftTags(prev => [...prev, trimmed].sort((a, b) => a.localeCompare(b)));
       resetState();
       inputRef.current?.focus();
     }
