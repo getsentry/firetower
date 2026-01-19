@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0008_rename_affected_area_to_affected_service"),
+        ("incidents", "0009_rename_affected_area_to_affected_service"),
     ]
 
     operations = [

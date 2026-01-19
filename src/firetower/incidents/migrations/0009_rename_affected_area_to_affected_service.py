@@ -3,7 +3,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0007_add_milestone_timestamps"),
+        ("incidents", "0008_gapless_incident_ids"),
     ]
 
     operations = [
