@@ -21,7 +21,13 @@ class IncidentCounter(models.Model):
 def get_next_incident_id() -> int:
     """Atomically get and increment the incident ID counter."""
     with transaction.atomic():
-        counter = IncidentCounter.objects.select_for_update().get()
+        try:
+            counter = IncidentCounter.objects.select_for_update().get()
+        except IncidentCounter.DoesNotExist:
+            max_id = Incident.objects.aggregate(max_id=models.Max("id"))["max_id"]
+            counter = IncidentCounter.objects.create(
+                next_id=(max_id + 1) if max_id else INCIDENT_ID_START
+            )
         next_id = counter.next_id
         counter.next_id += 1
         counter.save()
