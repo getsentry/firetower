@@ -26,7 +26,7 @@ export type UpdateIncidentFieldArgs =
   | {incidentId: string; field: 'service_tier'; value: string | null}
   | {
       incidentId: string;
-      field: 'affected_area_tags' | 'root_cause_tags' | 'impact_type_tags';
+      field: 'affected_service_tags' | 'root_cause_tags' | 'impact_type_tags';
       value: string[];
     }
   | {
@@ -49,7 +49,7 @@ const PatchResponseSchema = z.object({
   severity: z.enum(SEVERITY_OPTIONS),
   service_tier: z.enum(SERVICE_TIER_OPTIONS).nullable(),
   is_private: z.boolean(),
-  affected_area_tags: z.array(z.string()),
+  affected_service_tags: z.array(z.string()),
   root_cause_tags: z.array(z.string()),
   impact_type_tags: z.array(z.string()),
   time_started: z.string().nullable(),

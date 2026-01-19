@@ -39,8 +39,8 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     updateIncidentFieldMutationOptions(queryClient)
   );
 
-  const {data: affectedAreaSuggestions = []} = useQuery(
-    tagsQueryOptions('AFFECTED_AREA')
+  const {data: affectedServiceSuggestions = []} = useQuery(
+    tagsQueryOptions('AFFECTED_SERVICE')
   );
   const {data: rootCauseSuggestions = []} = useQuery(tagsQueryOptions('ROOT_CAUSE'));
   const {data: impactTypeSuggestions = []} = useQuery(tagsQueryOptions('IMPACT_TYPE'));
@@ -158,17 +158,17 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         />
 
         <EditableTags
-          label="Affected areas"
-          tags={incident.affected_area_tags}
+          label="Affected services"
+          tags={incident.affected_service_tags}
           onSave={async newTags => {
             await updateIncidentField.mutateAsync({
               incidentId: incident.id,
-              field: 'affected_area_tags',
+              field: 'affected_service_tags',
               value: newTags,
             });
           }}
-          suggestions={affectedAreaSuggestions}
-          emptyText="No affected areas specified"
+          suggestions={affectedServiceSuggestions}
+          emptyText="No affected services specified"
         />
 
         <EditableTags

@@ -64,7 +64,7 @@ class ServiceTier(models.TextChoices):
 
 
 class TagType(models.TextChoices):
-    AFFECTED_AREA = "AFFECTED_AREA", "Affected Area"
+    AFFECTED_SERVICE = "AFFECTED_SERVICE", "Affected Service"
     ROOT_CAUSE = "ROOT_CAUSE", "Root Cause"
     IMPACT_TYPE = "IMPACT_TYPE", "Impact Type"
 
@@ -83,7 +83,7 @@ class Tag(models.Model):
     """
     Tag for categorizing incidents.
 
-    type determines if this is an affected area or root cause.
+    type determines if this is an affected service or root cause.
     Same name can exist for both types (e.g., "Database").
 
     Names preserve original casing but are case-insensitive unique.
@@ -186,11 +186,11 @@ class Incident(models.Model):
 
     # Tags (many-to-many)
     # Django ManyToManyField descriptor type is too complex for mypy (var-annotated)
-    affected_area_tags = models.ManyToManyField(  # type: ignore[var-annotated]
+    affected_service_tags = models.ManyToManyField(  # type: ignore[var-annotated]
         "Tag",
         blank=True,
-        related_name="incidents_by_affected_area",
-        limit_choices_to={"type": "AFFECTED_AREA"},
+        related_name="incidents_by_affected_service",
+        limit_choices_to={"type": "AFFECTED_SERVICE"},
     )
     root_cause_tags = models.ManyToManyField(  # type: ignore[var-annotated]
         "Tag",
@@ -219,9 +219,9 @@ class Incident(models.Model):
         return f"{settings.PROJECT_KEY}-{self.id}"
 
     @property
-    def affected_area_tag_names(self) -> list[str]:
-        """Return list of affected area names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.affected_area_tags.all()]
+    def affected_service_tag_names(self) -> list[str]:
+        """Return list of affected service names (uses prefetch cache if available)"""
+        return [tag.name for tag in self.affected_service_tags.all()]
 
     @property
     def root_cause_tag_names(self) -> list[str]:

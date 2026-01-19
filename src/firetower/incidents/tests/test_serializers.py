@@ -46,9 +46,9 @@ class TestIncidentListUISerializer:
         )
 
         # Add tags
-        area_tag = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        area_tag = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
         cause_tag = Tag.objects.create(name="Database", type=TagType.ROOT_CAUSE)
-        incident.affected_area_tags.add(area_tag)
+        incident.affected_service_tags.add(area_tag)
         incident.root_cause_tags.add(cause_tag)
 
         serializer = IncidentListUISerializer(incident)
@@ -95,9 +95,9 @@ class TestIncidentDetailUISerializer:
         incident.participants.add(participant)
 
         # Add tags
-        area_tag = Tag.objects.create(name="API", type=TagType.AFFECTED_AREA)
+        area_tag = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
         cause_tag = Tag.objects.create(name="Database", type=TagType.ROOT_CAUSE)
-        incident.affected_area_tags.add(area_tag)
+        incident.affected_service_tags.add(area_tag)
         incident.root_cause_tags.add(cause_tag)
 
         # Add external links
@@ -132,8 +132,8 @@ class TestIncidentDetailUISerializer:
         assert data["participants"][2]["role"] == "Participant"
         assert "avatar_url" in data["participants"][2]
 
-        # Check affected_area_tags and root_cause_tags as arrays of strings
-        assert "API" in data["affected_area_tags"]
+        # Check affected_service_tags and root_cause_tags as arrays of strings
+        assert "API" in data["affected_service_tags"]
         assert "Database" in data["root_cause_tags"]
 
         # Check external links (dict format for frontend compatibility, only includes existing links)
