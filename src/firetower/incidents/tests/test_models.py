@@ -343,7 +343,7 @@ class TestTag:
         """Test tag string representation"""
         tag = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
 
-        assert str(tag) == "API (Affected Area)"
+        assert str(tag) == "API (Affected Service)"
 
 
 @pytest.mark.django_db

@@ -42,6 +42,9 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
   const {data: affectedServiceSuggestions = []} = useQuery(
     tagsQueryOptions('AFFECTED_SERVICE')
   );
+  const {data: affectedRegionSuggestions = []} = useQuery(
+    tagsQueryOptions('AFFECTED_REGION')
+  );
   const {data: rootCauseSuggestions = []} = useQuery(tagsQueryOptions('ROOT_CAUSE'));
   const {data: impactTypeSuggestions = []} = useQuery(tagsQueryOptions('IMPACT_TYPE'));
 
@@ -129,7 +132,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         labelClassName="text-size-md font-semibold"
       />
 
-      <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5">
         <div>
           <EditableTextField
             value={incident.impact_summary}
@@ -169,6 +172,20 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           }}
           suggestions={affectedServiceSuggestions}
           emptyText="No affected services specified"
+        />
+
+        <EditableTags
+          label="Affected regions"
+          tags={incident.affected_region_tags}
+          onSave={async newTags => {
+            await updateIncidentField.mutateAsync({
+              incidentId: incident.id,
+              field: 'affected_region_tags',
+              value: newTags,
+            });
+          }}
+          suggestions={affectedRegionSuggestions}
+          emptyText="No affected regions specified"
         />
 
         <EditableTags

@@ -31,6 +31,7 @@ class IncidentAdmin(admin.ModelAdmin):
     filter_horizontal = [
         "participants",
         "affected_service_tags",
+        "affected_region_tags",
         "root_cause_tags",
         "impact_type_tags",
     ]
@@ -51,6 +52,7 @@ class IncidentAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "affected_service_tags",
+                    "affected_region_tags",
                     "root_cause_tags",
                     "impact_type_tags",
                 )

@@ -65,6 +65,7 @@ class ServiceTier(models.TextChoices):
 
 class TagType(models.TextChoices):
     AFFECTED_SERVICE = "AFFECTED_SERVICE", "Affected Service"
+    AFFECTED_REGION = "AFFECTED_REGION", "Affected Region"
     ROOT_CAUSE = "ROOT_CAUSE", "Root Cause"
     IMPACT_TYPE = "IMPACT_TYPE", "Impact Type"
 
@@ -204,6 +205,12 @@ class Incident(models.Model):
         related_name="incidents_by_impact_type",
         limit_choices_to={"type": "IMPACT_TYPE"},
     )
+    affected_region_tags = models.ManyToManyField(  # type: ignore[var-annotated]
+        "Tag",
+        blank=True,
+        related_name="incidents_by_affected_region",
+        limit_choices_to={"type": "AFFECTED_REGION"},
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -232,6 +239,11 @@ class Incident(models.Model):
     def impact_type_tag_names(self) -> list[str]:
         """Return list of impact type tag names (uses prefetch cache if available)"""
         return [tag.name for tag in self.impact_type_tags.all()]
+
+    @property
+    def affected_region_tag_names(self) -> list[str]:
+        """Return list of affected region names (uses prefetch cache if available)"""
+        return [tag.name for tag in self.affected_region_tags.all()]
 
     @property
     def external_links_dict(self) -> dict[str, str]:
