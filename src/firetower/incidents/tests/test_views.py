@@ -788,6 +788,38 @@ class TestIncidentAPIViews:
         assert data["external_links"]["jira"] == "https://jira.company.com/browse/INC-1"
         assert "datadog" not in data["external_links"]
 
+    def test_create_incident_with_tags(self):
+        """Test creating incident with tags"""
+        Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        Tag.objects.create(name="US-East", type=TagType.AFFECTED_REGION)
+        Tag.objects.create(name="Human Error", type=TagType.ROOT_CAUSE)
+
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {
+            "title": "Incident with Tags",
+            "severity": "P1",
+            "is_private": False,
+            "captain": self.captain.email,
+            "reporter": self.reporter.email,
+            "affected_service_tags": ["API"],
+            "affected_region_tags": ["US-East"],
+            "root_cause_tags": ["Human Error"],
+        }
+
+        response = self.client.post("/api/incidents/", payload, format="json")
+        assert response.status_code == 201
+
+        incident_id = response.json()["id"]
+
+        # Verify tags were set
+        response = self.client.get(f"/api/incidents/{incident_id}/")
+        data = response.json()
+
+        assert data["affected_service_tags"] == ["API"]
+        assert data["affected_region_tags"] == ["US-East"]
+        assert data["root_cause_tags"] == ["Human Error"]
+
     def test_add_external_link_via_patch(self):
         """Test adding a single external link via PATCH (merge behavior)"""
         # Create incident with one link

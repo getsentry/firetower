@@ -411,12 +411,16 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data: dict) -> Incident:
-        """Create incident with external links"""
+        """Create incident with external links and tags"""
         external_links_data = validated_data.pop("external_links", None)
-        validated_data.pop("affected_service_tag_names", None)
-        validated_data.pop("affected_region_tag_names", None)
-        validated_data.pop("root_cause_tag_names", None)
-        validated_data.pop("impact_type_tag_names", None)
+        affected_service_tag_names = validated_data.pop(
+            "affected_service_tag_names", None
+        )
+        affected_region_tag_names = validated_data.pop(
+            "affected_region_tag_names", None
+        )
+        root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
+        impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
 
         # Create the incident
         incident = super().create(validated_data)
@@ -430,6 +434,35 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                         type=link_type.upper(),
                         url=url,
                     )
+
+        # Set tags if provided
+        if affected_service_tag_names:
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in affected_service_tag_names],
+                type=TagType.AFFECTED_SERVICE,
+            )
+            incident.affected_service_tags.set(tags)
+
+        if affected_region_tag_names:
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in affected_region_tag_names],
+                type=TagType.AFFECTED_REGION,
+            )
+            incident.affected_region_tags.set(tags)
+
+        if root_cause_tag_names:
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in root_cause_tag_names],
+                type=TagType.ROOT_CAUSE,
+            )
+            incident.root_cause_tags.set(tags)
+
+        if impact_type_tag_names:
+            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                name_lower__in=[n.lower() for n in impact_type_tag_names],
+                type=TagType.IMPACT_TYPE,
+            )
+            incident.impact_type_tags.set(tags)
 
         return incident
 
