@@ -1008,6 +1008,32 @@ class TestIncidentAPIViews:
         data = response.json()
         assert set(data["affected_service_tags"]) == {"API", "Database"}
 
+    def test_update_affected_region_tags_via_patch(self):
+        """Test setting affected_region_tags via PATCH"""
+        Tag.objects.create(name="US-East", type=TagType.AFFECTED_REGION)
+        Tag.objects.create(name="EU-West", type=TagType.AFFECTED_REGION)
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        payload = {"affected_region_tags": ["US-East", "EU-West"]}
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/", payload, format="json"
+        )
+
+        assert response.status_code == 200
+
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/")
+        data = response.json()
+        assert set(data["affected_region_tags"]) == {"US-East", "EU-West"}
+
     def test_update_root_cause_tags_via_patch(self):
         """Test setting root_cause_tags via PATCH"""
         Tag.objects.create(name="Human Error", type=TagType.ROOT_CAUSE)
