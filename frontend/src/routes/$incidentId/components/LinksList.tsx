@@ -24,7 +24,7 @@ const linkConfigs = {
     icon: '/pagerduty.svg',
   },
   statuspage: {
-    label: 'StatusPage',
+    label: 'Statuspage',
     icon: '/statuspage.svg',
   },
 } as const;

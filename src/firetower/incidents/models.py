@@ -75,7 +75,7 @@ class ExternalLinkType(models.TextChoices):
     JIRA = "JIRA", "Jira"
     DATADOG = "DATADOG", "Datadog"
     PAGERDUTY = "PAGERDUTY", "PagerDuty"
-    STATUSPAGE = "STATUSPAGE", "StatusPage"
+    STATUSPAGE = "STATUSPAGE", "Statuspage"
     NOTION = "NOTION", "Notion"
     LINEAR = "LINEAR", "Linear"
 
