@@ -22,12 +22,18 @@ def get_next_incident_id() -> int:
     """Atomically get and increment the incident ID counter."""
     with transaction.atomic():
         try:
-            counter = IncidentCounter.objects.select_for_update().get()
+            counter = IncidentCounter.objects.select_for_update().get(pk=1)
         except IncidentCounter.DoesNotExist:
+            # Self-heal: recreate counter from existing incidents.
+            # get_or_create handles the race condition where two threads both
+            # hit DoesNotExist - one succeeds at create, other retries get.
             max_id = Incident.objects.aggregate(max_id=models.Max("id"))["max_id"]
-            counter = IncidentCounter.objects.create(
-                next_id=(max_id + 1) if max_id else INCIDENT_ID_START
+            counter, _ = IncidentCounter.objects.get_or_create(
+                pk=1,
+                defaults={"next_id": (max_id + 1) if max_id else INCIDENT_ID_START},
             )
+            # Re-lock the row after get_or_create
+            counter = IncidentCounter.objects.select_for_update().get(pk=1)
         next_id = counter.next_id
         counter.next_id += 1
         counter.save()
