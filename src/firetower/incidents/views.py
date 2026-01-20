@@ -10,11 +10,18 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import Incident, Tag, TagType, filter_visible_to_user
+from .models import (
+    INCIDENT_ID_START,
+    Incident,
+    IncidentOrRedirect,
+    Tag,
+    TagType,
+    filter_visible_to_user,
+)
 from .permissions import IncidentPermission
 from .serializers import (
-    IncidentDetailUISerializer,
     IncidentListUISerializer,
+    IncidentOrRedirectReadSerializer,
     IncidentReadSerializer,
     IncidentWriteSerializer,
     TagCreateSerializer,
@@ -65,7 +72,7 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
     Authentication enforced via DEFAULT_PERMISSION_CLASSES in settings.
     """
 
-    serializer_class = IncidentDetailUISerializer
+    serializer_class = IncidentOrRedirectReadSerializer
     lookup_field = "id"
 
     def get_queryset(self) -> QuerySet[Incident]:
@@ -81,7 +88,7 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
             "external_links",
         )
 
-    def get_object(self) -> Incident:
+    def get_object(self) -> IncidentOrRedirect:
         """
         Parse INC-2000 format and filter by visibility.
 
@@ -99,8 +106,13 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
                 f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
             )
 
-        # Get incident by numeric ID
         numeric_id = int(match.group(1))
+        if numeric_id < INCIDENT_ID_START:
+            return IncidentOrRedirect(
+                redirect=f"{settings.JIRA['DOMAIN']}/browse/{project_key}-{numeric_id}"
+            )
+
+        # Get incident by numeric ID
         queryset = self.get_queryset()
         queryset = filter_visible_to_user(queryset, self.request.user)
 
@@ -114,7 +126,7 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
                 exc_info=True,
             )
 
-        return incident
+        return IncidentOrRedirect(incident=incident)
 
 
 # View aliases for cleaner URL imports

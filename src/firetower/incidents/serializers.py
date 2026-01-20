@@ -8,7 +8,14 @@ from rest_framework import serializers
 
 from firetower.auth.services import get_or_create_user_from_email
 
-from .models import ExternalLink, ExternalLinkType, Incident, Tag, TagType
+from .models import (
+    ExternalLink,
+    ExternalLinkType,
+    Incident,
+    IncidentOrRedirect,
+    Tag,
+    TagType,
+)
 
 
 @dataclass
@@ -561,3 +568,15 @@ class TagCreateSerializer(serializers.ModelSerializer):
             return Tag.objects.create(**validated_data)
         except DjangoValidationError as e:
             raise serializers.ValidationError(e.message_dict)
+
+
+class IncidentOrRedirectReadSerializer(serializers.Serializer):
+    def to_representation(self, instance: IncidentOrRedirect) -> dict[str, Any]:
+        serializer = IncidentReadSerializer()
+        if instance.incident:
+            return {
+                "incident": serializer.to_representation(instance.incident),
+            }
+        return {
+            "redirect": instance.redirect,
+        }

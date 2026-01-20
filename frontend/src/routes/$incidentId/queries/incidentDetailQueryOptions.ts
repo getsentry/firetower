@@ -53,6 +53,11 @@ const IncidentDetailSchema = z.object({
   time_recovered: z.string().nullable(),
 });
 
+const IncidentOrRedirectSchema = z.union([
+  z.object({incident: IncidentDetailSchema}),
+  z.object({redirect: z.url()}),
+]);
+
 export type IncidentDetail = z.infer<typeof IncidentDetailSchema>;
 export {IncidentDetailSchema};
 
@@ -67,7 +72,7 @@ export function incidentDetailQueryOptions({incidentId}: IncidentDetailQueryArgs
       Api.get({
         path: `/ui/incidents/${incidentId}/`,
         signal,
-        responseSchema: IncidentDetailSchema,
+        responseSchema: IncidentOrRedirectSchema,
       }),
   });
 }
