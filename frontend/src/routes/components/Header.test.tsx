@@ -390,6 +390,6 @@ describe('Header - sessionStorage Handling', () => {
 
     stored = sessionStorage.getItem(STORAGE_KEY);
     parsed = JSON.parse(stored!);
-    expect(parsed).toEqual({status: ['Done']});
+    expect(parsed).toEqual({status: ['Done', 'Cancelled']});
   });
 });

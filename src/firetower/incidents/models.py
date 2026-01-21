@@ -45,6 +45,7 @@ class IncidentStatus(models.TextChoices):
     MITIGATED = "Mitigated", "Mitigated"
     POSTMORTEM = "Postmortem", "Postmortem"
     DONE = "Done", "Done"
+    CANCELLED = "Cancelled", "Cancelled"
 
 
 class IncidentSeverity(models.TextChoices):
