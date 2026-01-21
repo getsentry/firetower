@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import (
+    get_or_create_user_from_email,
     get_or_create_user_from_slack_id,
     sync_user_profile_from_slack,
 )
@@ -271,6 +272,102 @@ class TestGetOrCreateUserFromSlackId:
             mock_get_info.return_value = mock_user_info
 
             user = get_or_create_user_from_slack_id("U_BAD_AVATAR")
+
+            assert user is not None
+            assert user.userprofile.avatar_url == ""
+
+
+@pytest.mark.django_db
+class TestGetOrCreateUserFromEmail:
+    def test_returns_existing_user(self):
+        existing_user = User.objects.create_user(
+            username="john@example.com",
+            email="john@example.com",
+        )
+
+        user = get_or_create_user_from_email("john@example.com")
+
+        assert user == existing_user
+        assert User.objects.count() == 1
+
+    def test_creates_new_user_from_slack(self):
+        mock_slack_profile = {
+            "slack_user_id": "U12345",
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "avatar_url": "https://example.com/avatar.jpg",
+        }
+
+        with patch(
+            "firetower.auth.services._slack_service.get_user_profile_by_email"
+        ) as mock_get_profile:
+            mock_get_profile.return_value = mock_slack_profile
+
+            user = get_or_create_user_from_email("jane@example.com")
+
+            assert user is not None
+            assert user.username == "jane@example.com"
+            assert user.email == "jane@example.com"
+            assert user.first_name == "Jane"
+            assert user.last_name == "Smith"
+            assert user.userprofile.avatar_url == "https://example.com/avatar.jpg"
+
+            external_profile = ExternalProfile.objects.get(
+                user=user, type=ExternalProfileType.SLACK
+            )
+            assert external_profile.external_id == "U12345"
+
+    def test_returns_none_if_slack_lookup_fails(self):
+        with patch(
+            "firetower.auth.services._slack_service.get_user_profile_by_email"
+        ) as mock_get_profile:
+            mock_get_profile.return_value = None
+
+            user = get_or_create_user_from_email("unknown@example.com")
+
+            assert user is None
+            assert User.objects.count() == 0
+
+    def test_returns_none_if_empty_email(self):
+        user = get_or_create_user_from_email("")
+
+        assert user is None
+
+    def test_creates_user_without_slack_id(self):
+        mock_slack_profile = {
+            "slack_user_id": "",
+            "first_name": "John",
+            "last_name": "Doe",
+            "avatar_url": "https://example.com/avatar.jpg",
+        }
+
+        with patch(
+            "firetower.auth.services._slack_service.get_user_profile_by_email"
+        ) as mock_get_profile:
+            mock_get_profile.return_value = mock_slack_profile
+
+            user = get_or_create_user_from_email("john@example.com")
+
+            assert user is not None
+            assert user.email == "john@example.com"
+            assert not ExternalProfile.objects.filter(
+                user=user, type=ExternalProfileType.SLACK
+            ).exists()
+
+    def test_skips_invalid_avatar_url(self):
+        mock_slack_profile = {
+            "slack_user_id": "U12345",
+            "first_name": "Test",
+            "last_name": "User",
+            "avatar_url": "http://insecure.com/avatar.jpg",
+        }
+
+        with patch(
+            "firetower.auth.services._slack_service.get_user_profile_by_email"
+        ) as mock_get_profile:
+            mock_get_profile.return_value = mock_slack_profile
+
+            user = get_or_create_user_from_email("test@example.com")
 
             assert user is not None
             assert user.userprofile.avatar_url == ""

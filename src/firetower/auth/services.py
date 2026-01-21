@@ -78,6 +78,65 @@ def sync_user_profile_from_slack(user: User) -> bool:
     return needs_save
 
 
+def get_or_create_user_from_email(email: str) -> User | None:
+    """
+    Get or create a Django user from email address.
+
+    Args:
+        email: User's email address
+
+    Returns:
+        User instance or None if user doesn't exist and Slack lookup fails
+    """
+    if not email:
+        logger.warning("Cannot get/create user - no email provided")
+        return None
+
+    existing_user = User.objects.filter(email=email).first()
+    if existing_user:
+        return existing_user
+
+    slack_profile = _slack_service.get_user_profile_by_email(email)
+
+    if not slack_profile:
+        logger.warning(f"Could not find Slack profile for email: {email}")
+        return None
+
+    slack_user_id = slack_profile.get("slack_user_id", "")
+    first_name = slack_profile.get("first_name", "")
+    last_name = slack_profile.get("last_name", "")
+    avatar_url = slack_profile.get("avatar_url", "")
+
+    user = User.objects.create(
+        username=email,
+        email=email,
+        first_name=first_name[:150],
+        last_name=last_name[:150],
+        is_active=True,
+    )
+    user.set_unusable_password()
+    user.save()
+
+    if avatar_url:
+        try:
+            URLValidator(schemes=["https"])(avatar_url)
+            user.userprofile.avatar_url = avatar_url
+            user.userprofile.save()
+        except ValidationError:
+            logger.warning(f"Invalid avatar URL for email {email}")
+
+    if slack_user_id:
+        ExternalProfile.objects.create(
+            user=user,
+            type=ExternalProfileType.SLACK,
+            external_id=slack_user_id,
+        )
+
+    logger.info(f"Created new user from email via Slack: {email}")
+
+    return user
+
+
 def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
     """
     Get or create a Django user from Slack user ID.

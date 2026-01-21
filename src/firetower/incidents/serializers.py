@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models.functions import Lower
 from rest_framework import serializers
 
+from firetower.auth.services import get_or_create_user_from_email
+
 from .models import ExternalLink, ExternalLinkType, Incident, Tag, TagType
 
 
@@ -271,13 +273,13 @@ class UserEmailField(serializers.EmailField):
     def run_validation(self, data: str) -> User:
         # Validate as email first (runs email format validators)
         email = super().run_validation(data)
-        # Look up by username (indexed) since username=email in this codebase
-        try:
-            return User.objects.get(username=email)
-        except User.DoesNotExist:
+        # Get or create user from email (provisions from Slack if needed)
+        user = get_or_create_user_from_email(email)
+        if user is None:
             raise serializers.ValidationError(
-                f"User with email '{email}' does not exist"
+                f"User with email '{email}' does not exist and could not be provisioned from Slack"
             )
+        return user
 
     def to_representation(self, value: User | None) -> str | None:
         return value.email if value else None
