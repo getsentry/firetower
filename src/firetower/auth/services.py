@@ -86,7 +86,12 @@ def get_or_create_user_from_email(email: str) -> User | None:
         email: User's email address
 
     Returns:
-        User instance or None if user doesn't exist and Slack lookup fails
+        User instance or None if email is empty
+
+    Note:
+        If user doesn't exist, attempts to fetch profile from Slack.
+        Creates a stub user with just the email if Slack lookup fails,
+        ensuring incident creation is never blocked by Slack availability.
     """
     if not email:
         logger.warning("Cannot get/create user - no email provided")
@@ -98,20 +103,23 @@ def get_or_create_user_from_email(email: str) -> User | None:
 
     slack_profile = _slack_service.get_user_profile_by_email(email)
 
-    if not slack_profile:
-        logger.warning(f"Could not find Slack profile for email: {email}")
-        return None
-
-    slack_user_id = slack_profile.get("slack_user_id", "")
-    first_name = slack_profile.get("first_name", "")
-    last_name = slack_profile.get("last_name", "")
-    avatar_url = slack_profile.get("avatar_url", "")
+    if slack_profile:
+        slack_user_id = slack_profile.get("slack_user_id", "")
+        first_name = slack_profile.get("first_name", "")
+        last_name = slack_profile.get("last_name", "")
+        avatar_url = slack_profile.get("avatar_url", "")
+    else:
+        logger.info(f"Could not find Slack profile for {email}, creating stub user")
+        slack_user_id = ""
+        first_name = ""
+        last_name = ""
+        avatar_url = ""
 
     user = User.objects.create(
         username=email,
         email=email,
-        first_name=first_name[:150],
-        last_name=last_name[:150],
+        first_name=first_name[:150] if first_name else "",
+        last_name=last_name[:150] if last_name else "",
         is_active=True,
     )
     user.set_unusable_password()
@@ -132,7 +140,10 @@ def get_or_create_user_from_email(email: str) -> User | None:
             external_id=slack_user_id,
         )
 
-    logger.info(f"Created new user from email via Slack: {email}")
+    if slack_profile:
+        logger.info(f"Created new user from email via Slack: {email}")
+    else:
+        logger.info(f"Created stub user from email: {email}")
 
     return user
 

@@ -277,7 +277,7 @@ class UserEmailField(serializers.EmailField):
         user = get_or_create_user_from_email(email)
         if user is None:
             raise serializers.ValidationError(
-                f"User with email '{email}' does not exist and could not be provisioned from Slack"
+                f"Could not create user with email '{email}'"
             )
         return user
 

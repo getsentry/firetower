@@ -524,8 +524,8 @@ class TestIncidentAPIViews:
         assert incident.captain.first_name == "New"
         assert incident.captain.last_name == "Person"
 
-    def test_create_incident_fails_if_user_not_in_slack(self):
-        """Test creating incident with non-existent user fails if not in Slack"""
+    def test_create_incident_creates_stub_user_if_slack_fails(self):
+        """Test creating incident with non-existent user creates stub if Slack lookup fails"""
         self.client.force_authenticate(user=self.user)
 
         with patch(
@@ -542,8 +542,12 @@ class TestIncidentAPIViews:
             }
             response = self.client.post("/api/incidents/", data, format="json")
 
-            assert response.status_code == 400
-            assert "captain" in response.data
+            assert response.status_code == 201
+
+        incident = Incident.objects.first()
+        assert incident.captain.email == "unknown@example.com"
+        assert incident.captain.first_name == ""
+        assert incident.captain.last_name == ""
 
     def test_list_api_incidents(self):
         """Test GET /api/incidents/ returns all visible incidents"""

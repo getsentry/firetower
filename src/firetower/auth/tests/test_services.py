@@ -317,7 +317,7 @@ class TestGetOrCreateUserFromEmail:
             )
             assert external_profile.external_id == "U12345"
 
-    def test_returns_none_if_slack_lookup_fails(self):
+    def test_creates_stub_user_if_slack_lookup_fails(self):
         with patch(
             "firetower.auth.services._slack_service.get_user_profile_by_email"
         ) as mock_get_profile:
@@ -325,8 +325,11 @@ class TestGetOrCreateUserFromEmail:
 
             user = get_or_create_user_from_email("unknown@example.com")
 
-            assert user is None
-            assert User.objects.count() == 0
+            assert user is not None
+            assert user.email == "unknown@example.com"
+            assert user.first_name == ""
+            assert user.last_name == ""
+            assert User.objects.count() == 1
 
     def test_returns_none_if_empty_email(self):
         user = get_or_create_user_from_email("")
