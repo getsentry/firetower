@@ -572,7 +572,7 @@ class TagCreateSerializer(serializers.ModelSerializer):
 
 class IncidentOrRedirectReadSerializer(serializers.Serializer):
     def to_representation(self, instance: IncidentOrRedirect) -> dict[str, Any]:
-        serializer = IncidentReadSerializer()
+        serializer = IncidentDetailUISerializer()
         if instance.incident:
             return {
                 "incident": serializer.to_representation(instance.incident),

@@ -201,8 +201,11 @@ class TestIncidentViews:
 
         assert response.status_code == 200
 
+        # Check that response contains incident (not redirect)
+        assert "incident" in response.data
+        data = response.data["incident"]
+
         # Check detail serializer format
-        data = response.data
         assert data["id"] == incident.incident_number
         assert data["title"] == "Test Incident"
 
@@ -313,7 +316,8 @@ class TestIncidentViews:
             response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
 
             assert response.status_code == 200
-            assert response.data["id"] == incident.incident_number
+            assert "incident" in response.data
+            assert response.data["incident"]["id"] == incident.incident_number
 
     def test_sync_participants_endpoint(self):
         """Test POST /api/incidents/{id}/sync-participants/ forces sync"""
