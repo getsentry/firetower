@@ -2,7 +2,13 @@ import {infiniteQueryOptions} from '@tanstack/react-query';
 import {Api} from 'api';
 import {z} from 'zod';
 
-export const IncidentStatusSchema = z.enum(['Active', 'Mitigated', 'Postmortem', 'Done']);
+export const IncidentStatusSchema = z.enum([
+  'Active',
+  'Mitigated',
+  'Postmortem',
+  'Done',
+  'Cancelled',
+]);
 
 const IncidentListItemSchema = z.object({
   id: z.string(),
