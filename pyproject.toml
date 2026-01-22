@@ -40,6 +40,9 @@ prod = [
     "granian>=2.6.0",
     "sentry-sdk[django]>=2.47.0",
 ]
+scripts = [
+    "pygithub>=2.8.1",
+]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "firetower.settings"
