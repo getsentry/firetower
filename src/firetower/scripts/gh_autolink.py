@@ -60,14 +60,16 @@ def main() -> None:
                 link
                 for link in autolinks
                 if link.key_prefix == INC_TEMPLATE["key_prefix"]
-            ]
+            ],
+            None,
         )
         possibly_testinc = first(
             [
                 link
                 for link in autolinks
                 if link.key_prefix == TESTINC_TEMPLATE["key_prefix"]
-            ]
+            ],
+            None,
         )
 
         print(possibly_inc)  # noqa: T201
