@@ -40,6 +40,13 @@ export const Redirect = ({
             You will be redirected in {timeRemaining} second
             {timeRemaining !== 1 ? 's' : ''}
           </p>
+          <p className="text-content-secondary">
+            Or,{' '}
+            <a href={redirect} className="text-content-accent">
+              click here
+            </a>{' '}
+            to be redirected now.
+          </p>
         </div>
       </div>
     );
