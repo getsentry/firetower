@@ -180,7 +180,7 @@ describe('Header - Incident Detail Route', () => {
         return Promise.resolve(mockIncidents);
       }
       if (args.path === '/ui/incidents/INC-1247/') {
-        return Promise.resolve(mockIncidentDetail);
+        return Promise.resolve({incident: mockIncidentDetail});
       }
       if (args.path === '/ui/users/me/') {
         return Promise.resolve(mockCurrentUser);
@@ -309,7 +309,7 @@ describe('Header - User Avatar', () => {
         return Promise.resolve(mockIncidents);
       }
       if (args.path === '/ui/incidents/INC-1247/') {
-        return Promise.resolve(mockIncidentDetail);
+        return Promise.resolve({incident: mockIncidentDetail});
       }
       if (args.path === '/ui/users/me/') {
         return Promise.resolve(mockCurrentUser);
@@ -335,7 +335,7 @@ describe('Header - sessionStorage Handling', () => {
         return Promise.resolve(mockIncidents);
       }
       if (args.path === '/ui/incidents/INC-1247/') {
-        return Promise.resolve(mockIncidentDetail);
+        return Promise.resolve({incident: mockIncidentDetail});
       }
       if (args.path === '/ui/users/me/') {
         return Promise.resolve(mockCurrentUser);

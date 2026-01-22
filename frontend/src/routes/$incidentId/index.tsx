@@ -10,6 +10,7 @@ import {IncidentSummary} from './components/IncidentSummary';
 import {LinksList} from './components/LinksList';
 import {MilestonesCard} from './components/MilestonesCard';
 import {ParticipantsList} from './components/ParticipantsList';
+import {Redirect} from './components/Redirect';
 import {SlackLink} from './components/SlackLink';
 import {incidentDetailQueryOptions} from './queries/incidentDetailQueryOptions';
 
@@ -36,7 +37,7 @@ export const Route = createFileRoute('/$incidentId/')({
 
 function Incident() {
   const params = Route.useParams();
-  const {data: incident} = useSuspenseQuery(incidentDetailQueryOptions(params));
+  const {data: inc_or_redir} = useSuspenseQuery(incidentDetailQueryOptions(params));
 
   useEffect(() => {
     document.title = `${params.incidentId} • Firetower`;
@@ -45,6 +46,17 @@ function Incident() {
     };
   }, [params.incidentId]);
 
+  if ('redirect' in inc_or_redir) {
+    return (
+      <Redirect
+        redirect={inc_or_redir.redirect}
+        message="Old incidents are stored in Jira."
+        countdown={5}
+      />
+    );
+  }
+
+  const incident = inc_or_redir.incident;
   return (
     <div className="space-y-4 p-2">
       <IncidentSummary incident={incident} />

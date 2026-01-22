@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any
 
 from django.conf import settings
@@ -338,3 +339,15 @@ def filter_visible_to_user(
     return queryset.filter(
         Q(is_private=False) | Q(captain=user) | Q(reporter=user) | Q(participants=user)
     ).distinct()
+
+
+@dataclass
+class IncidentOrRedirect:
+    incident: Incident | None = None
+    redirect: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.incident and self.redirect:
+            raise ValueError("Cannot have both incident and redirect")
+        if not self.incident and not self.redirect:
+            raise ValueError("Must have either incident or redirect")
