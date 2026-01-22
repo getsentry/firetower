@@ -49,7 +49,7 @@ function Incident() {
   if ('redirect' in inc_or_redir) {
     return (
       <Redirect
-        redirect={() => inc_or_redir['redirect']}
+        redirect={inc_or_redir.redirect}
         message="Old incidents are stored in Jira."
         countdown={5}
       />

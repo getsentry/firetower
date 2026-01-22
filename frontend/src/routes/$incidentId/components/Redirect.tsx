@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
 
 type RedirectProps = {
-  redirect?: () => string;
+  redirect?: string;
   message?: string;
   countdown?: number; // Countdown duration in seconds
 };
@@ -13,11 +13,8 @@ export const Redirect = ({
 }: RedirectProps) => {
   const [timeRemaining, setTimeRemaining] = useState(countdown);
 
-  // Get the redirect URL by calling the closure
-  const redirectUrl = redirect ? redirect() : null;
-
   useEffect(() => {
-    if (!redirectUrl) return;
+    if (!redirect) return;
 
     // Countdown timer
     if (timeRemaining > 0) {
@@ -29,12 +26,12 @@ export const Redirect = ({
 
     // Redirect when countdown reaches 0
     if (timeRemaining === 0) {
-      window.location.href = redirectUrl;
+      window.location.href = redirect;
     }
-  }, [redirectUrl, timeRemaining]);
+  }, [redirect, timeRemaining]);
 
   // If redirect URL is set, show countdown message
-  if (redirectUrl) {
+  if (redirect) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <div className="text-center">
