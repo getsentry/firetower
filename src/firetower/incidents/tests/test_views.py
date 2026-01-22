@@ -491,6 +491,64 @@ class TestIncidentAPIViews:
         assert response.status_code == 400
         assert "reporter" in response.data
 
+    def test_create_incident_provisions_user_from_slack(self):
+        """Test creating incident with non-existent user auto-provisions from Slack"""
+        self.client.force_authenticate(user=self.user)
+
+        mock_slack_profile = {
+            "slack_user_id": "U12345",
+            "first_name": "New",
+            "last_name": "Person",
+            "avatar_url": "https://example.com/avatar.jpg",
+        }
+
+        with patch(
+            "firetower.auth.services._slack_service.get_user_profile_by_email"
+        ) as mock_get_profile:
+            mock_get_profile.return_value = mock_slack_profile
+
+            data = {
+                "title": "New Incident",
+                "severity": IncidentSeverity.P1,
+                "is_private": False,
+                "captain": "newperson@example.com",
+                "reporter": self.reporter.email,
+            }
+            response = self.client.post("/api/incidents/", data, format="json")
+
+            assert response.status_code == 201
+            mock_get_profile.assert_called_once_with("newperson@example.com")
+
+        incident = Incident.objects.first()
+        assert incident.captain.email == "newperson@example.com"
+        assert incident.captain.first_name == "New"
+        assert incident.captain.last_name == "Person"
+
+    def test_create_incident_creates_stub_user_if_slack_fails(self):
+        """Test creating incident with non-existent user creates stub if Slack lookup fails"""
+        self.client.force_authenticate(user=self.user)
+
+        with patch(
+            "firetower.auth.services._slack_service.get_user_profile_by_email"
+        ) as mock_get_profile:
+            mock_get_profile.return_value = None
+
+            data = {
+                "title": "New Incident",
+                "severity": IncidentSeverity.P1,
+                "is_private": False,
+                "captain": "unknown@example.com",
+                "reporter": self.reporter.email,
+            }
+            response = self.client.post("/api/incidents/", data, format="json")
+
+            assert response.status_code == 201
+
+        incident = Incident.objects.first()
+        assert incident.captain.email == "unknown@example.com"
+        assert incident.captain.first_name == ""
+        assert incident.captain.last_name == ""
+
     def test_list_api_incidents(self):
         """Test GET /api/incidents/ returns all visible incidents"""
         Incident.objects.create(
