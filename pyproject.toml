@@ -41,6 +41,7 @@ prod = [
     "sentry-sdk[django]>=2.47.0",
 ]
 scripts = [
+    "more-itertools>=10.8.0",
     "pygithub>=2.8.1",
 ]
 
