@@ -275,7 +275,7 @@ export function EditableTags({
                     ) : (
                       <Plus className="h-4 w-4" />
                     )}
-                    Create tag "{trimmedInput}"
+                    <span className="mt-[1px] mb-auto">Create tag "{trimmedInput}"</span>
                   </button>
                 )}
                 {filteredSuggestions.map((suggestion, index) => {
