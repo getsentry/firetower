@@ -14,6 +14,7 @@ const optionRowStyles = cva([
   'rounded-radius-md',
   'transition-all',
   'hover:bg-gray-100',
+  'dark:hover:bg-neutral-800',
   'p-space-xs',
   '-m-space-xs',
 ]);
@@ -143,7 +144,10 @@ export function EditablePill<T extends string>({
               <div
                 key={option}
                 tabIndex={-1}
-                className={cn(optionRowStyles(), isFocused && 'bg-gray-100')}
+                className={cn(
+                  optionRowStyles(),
+                  isFocused && 'bg-gray-100 dark:bg-neutral-700'
+                )}
                 onClick={() => handleSelect(option)}
                 role="option"
                 aria-selected={option === value}
