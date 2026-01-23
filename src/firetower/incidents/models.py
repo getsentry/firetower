@@ -94,6 +94,7 @@ class Tag(models.Model):
 
     name = models.CharField(max_length=100)
     type = models.CharField(max_length=20, choices=TagType.choices)
+    approved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

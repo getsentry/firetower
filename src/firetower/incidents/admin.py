@@ -128,9 +128,15 @@ class IncidentAdmin(admin.ModelAdmin):
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ["name", "type", "created_at"]
-    list_filter = ["type"]
+    list_display = ["name", "type", "approved", "created_at"]
+    list_filter = ["type", "approved"]
     search_fields = ["name"]
+    actions = ["approve_tags"]
+
+    @admin.action(description="Approve selected tags")
+    def approve_tags(self, request: HttpRequest, queryset: QuerySet[Tag]) -> None:
+        count = queryset.update(approved=True)
+        self.message_user(request, f"Approved {count} tag(s).")
 
 
 @admin.register(ExternalLink)
