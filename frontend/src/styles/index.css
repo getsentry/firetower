@@ -159,13 +159,13 @@ body {
       background-color: var(--base-color-neutral-dark-opaque-200);
     }
     .bg-background-accent-vibrant {
-      background-color: var(--base-color-blue-dark-opaque-1000);
+      background-color: var(--base-color-blue-dark-opaque-900);
     }
     .bg-background-danger-vibrant {
-      background-color: var(--base-color-red-dark-opaque-1000);
+      background-color: var(--base-color-red-dark-opaque-900);
     }
     .bg-background-success-vibrant {
-      background-color: var(--base-color-green-dark-opaque-800);
+      background-color: var(--base-color-green-dark-opaque-900);
     }
     .bg-background-warning-vibrant {
       background-color: var(--base-color-yellow-dark-opaque-1000);
@@ -174,25 +174,25 @@ body {
       background-color: var(--base-color-pink-dark-opaque-800);
     }
     .bg-background-transparent-accent-muted {
-      background-color: var(--base-color-blue-dark-transparent-200);
+      background-color: var(--base-color-blue-dark-transparent-600);
     }
     .bg-background-transparent-danger-muted {
-      background-color: var(--base-color-red-dark-transparent-200);
+      background-color: var(--base-color-red-dark-transparent-600);
     }
     .bg-background-transparent-success-muted {
-      background-color: var(--base-color-green-dark-transparent-200);
+      background-color: var(--base-color-green-dark-transparent-400);
     }
     .bg-background-transparent-warning-muted {
-      background-color: var(--base-color-yellow-dark-transparent-200);
+      background-color: var(--base-color-yellow-dark-transparent-600);
     }
     .bg-background-transparent-promotion-muted {
-      background-color: var(--base-color-pink-dark-transparent-200);
+      background-color: var(--base-color-pink-dark-transparent-600);
     }
     .bg-background-transparent-neutral-muted {
-      background-color: var(--base-color-neutral-dark-transparent-200);
+      background-color: var(--base-color-neutral-dark-transparent-400);
     }
     .hover\:bg-background-transparent-neutral-muted:hover {
-      background-color: var(--base-color-neutral-dark-transparent-200);
+      background-color: var(--base-color-neutral-dark-transparent-300);
     }
 
     /* Text colors */
@@ -212,7 +212,7 @@ body {
       color: var(--base-color-red-dark-opaque-1300);
     }
     .text-content-success {
-      color: var(--base-color-green-dark-opaque-1300);
+      color: var(--base-color-green-dark-opaque-1400);
     }
     .text-content-warning {
       color: var(--base-color-yellow-dark-opaque-1300);
@@ -221,7 +221,7 @@ body {
       color: var(--base-color-pink-dark-opaque-1300);
     }
     .text-content-disabled {
-      color: var(--base-color-neutral-dark-opaque-900);
+      color: var(--base-color-neutral-dark-opaque-1000);
     }
     .text-content-on-vibrant-light {
       color: var(--base-color-white);
