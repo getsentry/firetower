@@ -4,7 +4,7 @@ import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 
 const linkConfigs = {
   datadog: {
-    label: 'Datadog',
+    label: 'Datadog notebook',
     icon: '/datadog.svg',
   },
   jira: {
@@ -16,7 +16,7 @@ const linkConfigs = {
     icon: '/linear.svg',
   },
   notion: {
-    label: 'Notion',
+    label: 'Postmortem document',
     icon: '/notion.svg',
   },
   pagerduty: {
@@ -34,10 +34,9 @@ type LinkType = keyof typeof linkConfigs;
 interface LinkProps {
   type: LinkType;
   url: string;
-  isLast?: boolean;
 }
 
-function Link({type, url, isLast = false}: LinkProps) {
+function Link({type, url}: LinkProps) {
   const config = linkConfigs[type];
 
   return (
@@ -45,9 +44,7 @@ function Link({type, url, isLast = false}: LinkProps) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className={`text-content-accent py-space-lg hover:text-content-accent/80 flex items-center gap-3 no-underline transition-colors ${
-        !isLast ? 'border-b border-gray-200' : ''
-      }`}
+      className="text-content-accent py-space-lg hover:text-content-accent/80 flex items-center gap-3 no-underline transition-colors"
     >
       <img src={config.icon} alt={config.label} className="h-[18px] w-[18px]" />
       <span>{config.label}</span>
@@ -74,9 +71,7 @@ export function LinksList({externalLinks}: LinksListProps) {
           const url = externalLinks[type];
           if (!url) return null;
 
-          const isLast = type === visibleLinks[visibleLinks.length - 1];
-
-          return <Link key={type} type={type} url={url} isLast={isLast} />;
+          return <Link key={type} type={type} url={url} />;
         })}
       </div>
     </Card>
