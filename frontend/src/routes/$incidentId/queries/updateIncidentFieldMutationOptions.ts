@@ -73,34 +73,41 @@ export function updateIncidentFieldMutationOptions(queryClient: QueryClient) {
         responseSchema: PatchResponseSchema,
       });
     },
-    onMutate: async variables => {
-      await queryClient.cancelQueries({
+    onMutate: variables => {
+      // Cancel without awaiting - we want setQueryData to run synchronously
+      queryClient.cancelQueries({
         queryKey: ['IncidentDetail', variables.incidentId],
       });
 
-      const previousIncident = queryClient.getQueryData([
+      const previousData = queryClient.getQueryData([
         'IncidentDetail',
         variables.incidentId,
       ]);
 
       queryClient.setQueryData(
         ['IncidentDetail', variables.incidentId],
-        (old: IncidentDetail | undefined) => {
-          if (!old) return old;
+        (old: {incident: IncidentDetail} | {redirect: string} | undefined) => {
+          if (!old || 'redirect' in old) return old;
+          const value =
+            Array.isArray(variables.value) && variables.field.endsWith('_tags')
+              ? [...variables.value].sort()
+              : variables.value;
           return {
-            ...old,
-            [variables.field]: variables.value,
+            incident: {
+              ...old.incident,
+              [variables.field]: value,
+            },
           };
         }
       );
 
-      return {previousIncident};
+      return {previousData};
     },
     onError: (_err, variables, context) => {
-      if (context?.previousIncident) {
+      if (context?.previousData) {
         queryClient.setQueryData(
           ['IncidentDetail', variables.incidentId],
-          context.previousIncident
+          context.previousData
         );
       }
     },

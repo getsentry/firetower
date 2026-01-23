@@ -27,9 +27,9 @@ export function EditableTags({
 }: EditableTagsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftTags, setDraftTags] = useState<string[]>(tags);
+  const [optimisticTags, setOptimisticTags] = useState<string[] | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const resetState = () => {
@@ -39,28 +39,27 @@ export function EditableTags({
 
   const open = () => {
     setDraftTags([...tags].sort((a, b) => a.localeCompare(b)));
+    setOptimisticTags(null); // Clear for next edit session
     setIsEditing(true);
     resetState();
   };
 
-  const cancel = useCallback(() => {
-    setIsEditing(false);
-    setDraftTags(tags);
-    resetState();
-  }, [tags]);
-
-  const save = async () => {
-    setIsSaving(true);
-    try {
-      await onSave(draftTags);
-      setIsEditing(false);
-      resetState();
-    } catch (err) {
+  const close = useCallback(() => {
+    // Set optimistic tags immediately for display
+    setOptimisticTags(draftTags);
+    // Trigger mutation
+    onSave(draftTags).catch(err => {
       console.error('Failed to save:', err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    });
+    setIsEditing(false);
+    resetState();
+  }, [draftTags, onSave]);
+
+  // Use optimistic tags until props catch up, then use props
+  const sortedTags = [...tags].sort((a, b) => a.localeCompare(b));
+  const tagsHaveCaughtUp =
+    optimisticTags && JSON.stringify(sortedTags) === JSON.stringify(optimisticTags);
+  const displayTags = optimisticTags && !tagsHaveCaughtUp ? optimisticTags : sortedTags;
 
   const filteredSuggestions = suggestions.filter(
     s => !draftTags.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
@@ -69,14 +68,14 @@ export function EditableTags({
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
     if (trimmed && !draftTags.includes(trimmed)) {
-      setDraftTags(prev => [...prev, trimmed].sort((a, b) => a.localeCompare(b)));
+      setDraftTags([...draftTags, trimmed].sort((a, b) => a.localeCompare(b)));
       resetState();
       inputRef.current?.focus();
     }
   };
 
   const removeTag = (tag: string) => {
-    setDraftTags(prev => prev.filter(t => t !== tag));
+    setDraftTags(draftTags.filter(t => t !== tag));
     inputRef.current?.focus();
   };
 
@@ -101,7 +100,7 @@ export function EditableTags({
         if (focusedIndex >= 0 && focusedIndex < filteredSuggestions.length) {
           addTag(filteredSuggestions[focusedIndex]);
         } else if (!inputValue.trim()) {
-          save();
+          close();
         }
         break;
       case ' ':
@@ -112,7 +111,7 @@ export function EditableTags({
         break;
       case 'Escape':
         event.preventDefault();
-        cancel();
+        close();
         break;
       case 'Backspace':
         if (inputValue === '' && draftTags.length > 0) {
@@ -134,13 +133,13 @@ export function EditableTags({
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        cancel();
+        close();
       }
     };
 
     document.addEventListener('keydown', handleGlobalKeyDown);
     return () => document.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isEditing, cancel]);
+  }, [isEditing, close]);
 
   return (
     <div className={className}>
@@ -191,9 +190,9 @@ export function EditableTags({
               className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
             />
           </div>
-        ) : tags.length > 0 ? (
+        ) : displayTags.length > 0 ? (
           <div className="gap-space-sm flex flex-wrap">
-            {tags.map(tag => (
+            {displayTags.map(tag => (
               <Tag key={tag}>{tag}</Tag>
             ))}
           </div>
@@ -229,14 +228,6 @@ export function EditableTags({
                 </p>
               </div>
             ) : null}
-            <div className="gap-space-sm p-space-sm flex justify-end border-t border-gray-200">
-              <Button variant="primary" onClick={save} loading={isSaving}>
-                Save
-              </Button>
-              <Button variant="secondary" onClick={cancel} disabled={isSaving}>
-                Cancel
-              </Button>
-            </div>
           </div>
         )}
       </div>
@@ -245,7 +236,7 @@ export function EditableTags({
         <div
           className="fixed inset-0 z-40 bg-transparent"
           aria-hidden="true"
-          onClick={cancel}
+          onClick={close}
         />
       )}
     </div>

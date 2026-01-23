@@ -230,22 +230,22 @@ class Incident(models.Model):
     @property
     def affected_service_tag_names(self) -> list[str]:
         """Return list of affected service names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.affected_service_tags.all()]
+        return sorted(tag.name for tag in self.affected_service_tags.all())
 
     @property
     def root_cause_tag_names(self) -> list[str]:
         """Return list of root cause names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.root_cause_tags.all()]
+        return sorted(tag.name for tag in self.root_cause_tags.all())
 
     @property
     def impact_type_tag_names(self) -> list[str]:
         """Return list of impact type tag names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.impact_type_tags.all()]
+        return sorted(tag.name for tag in self.impact_type_tags.all())
 
     @property
     def affected_region_tag_names(self) -> list[str]:
         """Return list of affected region names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.affected_region_tags.all()]
+        return sorted(tag.name for tag in self.affected_region_tags.all())
 
     @property
     def external_links_dict(self) -> dict[str, str]:
