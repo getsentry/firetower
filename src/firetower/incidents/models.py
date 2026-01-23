@@ -72,6 +72,13 @@ class TagType(models.TextChoices):
     IMPACT_TYPE = "IMPACT_TYPE", "Impact Type"
 
 
+USER_ADDABLE_TAG_TYPES = [
+    TagType.AFFECTED_SERVICE,
+    TagType.AFFECTED_REGION,
+    TagType.ROOT_CAUSE,
+]
+
+
 class ExternalLinkType(models.TextChoices):
     SLACK = "SLACK", "Slack"
     JIRA = "JIRA", "Jira"

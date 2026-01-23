@@ -1421,6 +1421,17 @@ class TestTagListCreateAPIView:
 
         assert response.status_code == 400
 
+    def test_create_tag_impact_type_not_allowed(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/tags/",
+            {"name": "New Impact", "type": "IMPACT_TYPE"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "cannot be created via API" in str(response.data)
+
     def test_create_tag_duplicate_case_insensitive(self):
         Tag.objects.create(name="Database", type=TagType.AFFECTED_SERVICE)
 

@@ -9,6 +9,7 @@ from rest_framework import serializers
 from firetower.auth.services import get_or_create_user_from_email
 
 from .models import (
+    USER_ADDABLE_TAG_TYPES,
     ExternalLink,
     ExternalLinkType,
     Incident,
@@ -562,6 +563,13 @@ class TagCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ["name", "type"]
+
+    def validate_type(self, value: str) -> str:
+        if value not in USER_ADDABLE_TAG_TYPES:
+            raise serializers.ValidationError(
+                f"Tags of type '{value}' cannot be created via API"
+            )
+        return value
 
     def create(self, validated_data: dict[str, Any]) -> Tag:
         try:
