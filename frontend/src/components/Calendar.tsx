@@ -53,7 +53,7 @@ function Calendar({
           defaultClassNames.month_caption
         ),
         dropdowns: cn(
-          'w-full flex items-center text-sm font-medium justify-center h-(--cell-size) gap-1.5',
+          'w-full flex items-center text-sm font-medium justify-center h-(--cell-size) gap-1.5 text-content-primary',
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
