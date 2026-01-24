@@ -35,6 +35,7 @@ export function EditableTags({
   const [inputValue, setInputValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [isCreating, setIsCreating] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const resetState = () => {
@@ -44,20 +45,27 @@ export function EditableTags({
 
   const open = () => {
     setDraftTags([...tags].sort((a, b) => a.localeCompare(b)));
-    setOptimisticTags(null); // Clear for next edit session
+    setOptimisticTags(null);
     setIsEditing(true);
+    setSaveError(null);
     resetState();
   };
 
   const close = useCallback(() => {
-    // Set optimistic tags immediately for display
-    setOptimisticTags(draftTags);
-    // Trigger mutation
-    onSave(draftTags).catch(err => {
-      console.error('Failed to save:', err);
-    });
+    const tagsToSave = draftTags;
+    setOptimisticTags(tagsToSave);
     setIsEditing(false);
     resetState();
+    onSave(tagsToSave)
+      .then(() => {
+        setOptimisticTags(null);
+        setSaveError(null);
+      })
+      .catch(err => {
+        console.error('Failed to save:', err);
+        setOptimisticTags(null);
+        setSaveError('Failed to save. Please try again.');
+      });
   }, [draftTags, onSave]);
 
   // Use optimistic tags until props catch up, then use props
@@ -251,6 +259,10 @@ export function EditableTags({
           </div>
         ) : (
           <p className="text-size-sm text-content-disabled italic">{emptyText}</p>
+        )}
+
+        {saveError && (
+          <p className="text-size-sm text-content-danger mt-space-sm">{saveError}</p>
         )}
 
         {isEditing && (
