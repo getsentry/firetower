@@ -17,6 +17,8 @@ const menuItemStyles = cva([
   'transition-colors',
   'hover:bg-gray-100',
   'select-none',
+  'dark:bg-gray-100',
+  'dark:hover:bg-gray-300',
 ]);
 
 interface OverflowMenuProps {
