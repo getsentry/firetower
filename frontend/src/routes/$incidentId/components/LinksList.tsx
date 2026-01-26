@@ -46,7 +46,11 @@ function Link({type, url}: LinkProps) {
       rel="noopener noreferrer"
       className="text-content-accent py-space-lg hover:text-content-accent/80 flex items-center gap-3 no-underline transition-colors"
     >
-      <img src={config.icon} alt={config.label} className="h-[18px] w-[18px]" />
+      <img
+        src={config.icon}
+        alt={config.label}
+        className="h-[18px] w-[18px] dark:invert"
+      />
       <span>{config.label}</span>
     </a>
   );
