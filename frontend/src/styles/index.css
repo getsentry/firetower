@@ -85,6 +85,9 @@ body {
   .hover\:bg-background-transparent-neutral-muted:hover {
     background-color: var(--tokens-color-background-transparent-neutral-muted);
   }
+  .hover\:bg-background-tertiary:hover {
+    background-color: var(--tokens-color-background-tertiary);
+  }
 
   /* Text colors */
   .text-content-headings {
@@ -156,7 +159,10 @@ body {
       background-color: var(--base-color-neutral-dark-opaque-500);
     }
     .bg-background-tertiary {
-      background-color: var(--base-color-neutral-dark-opaque-100);
+      background-color: var(--base-color-neutral-dark-opaque-200);
+    }
+    .dark\:bg-background-secondary {
+      background-color: var(--base-color-neutral-dark-opaque-500);
     }
     .bg-background-accent-vibrant {
       background-color: var(--base-color-blue-dark-opaque-900);
@@ -193,6 +199,9 @@ body {
     }
     .hover\:bg-background-transparent-neutral-muted:hover {
       background-color: var(--base-color-neutral-dark-transparent-300);
+    }
+    .hover\:bg-background-tertiary:hover {
+      background-color: var(--base-color-neutral-dark-opaque-500);
     }
 
     /* Text colors */
