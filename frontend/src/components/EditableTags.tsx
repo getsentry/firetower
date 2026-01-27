@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {Pencil, X} from 'lucide-react';
+import {Loader2, Pencil, Plus, X} from 'lucide-react';
 import {cn} from 'utils/cn';
 
 import {Button} from './Button';
@@ -14,6 +14,8 @@ export interface EditableTagsProps {
   placeholder?: string;
   emptyText?: string;
   className?: string;
+  allowTagCreation?: boolean;
+  onCreateTag?: (name: string) => Promise<void>;
 }
 
 export function EditableTags({
@@ -24,12 +26,16 @@ export function EditableTags({
   placeholder = 'Add...',
   emptyText = 'None specified',
   className,
+  allowTagCreation = false,
+  onCreateTag,
 }: EditableTagsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftTags, setDraftTags] = useState<string[]>(tags);
+  const [optimisticTags, setOptimisticTags] = useState<string[] | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const resetState = () => {
@@ -39,44 +45,90 @@ export function EditableTags({
 
   const open = () => {
     setDraftTags([...tags].sort((a, b) => a.localeCompare(b)));
+    setOptimisticTags(null);
     setIsEditing(true);
+    setSaveError(null);
     resetState();
   };
 
-  const cancel = useCallback(() => {
+  const close = useCallback(() => {
+    const tagsToSave = draftTags;
+    setOptimisticTags(tagsToSave);
     setIsEditing(false);
-    setDraftTags(tags);
     resetState();
-  }, [tags]);
+    onSave(tagsToSave)
+      .then(() => {
+        setOptimisticTags(null);
+        setSaveError(null);
+      })
+      .catch(err => {
+        console.error('Failed to save:', err);
+        setOptimisticTags(null);
+        setSaveError('Failed to save. Please try again.');
+      });
+  }, [draftTags, onSave]);
 
-  const save = async () => {
-    setIsSaving(true);
-    try {
-      await onSave(draftTags);
-      setIsEditing(false);
-      resetState();
-    } catch (err) {
-      console.error('Failed to save:', err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  // Use optimistic tags until props catch up, then use props
+  const sortedTags = [...tags].sort((a, b) => a.localeCompare(b));
+  const tagsHaveCaughtUp =
+    optimisticTags && JSON.stringify(sortedTags) === JSON.stringify(optimisticTags);
+  const displayTags = optimisticTags && !tagsHaveCaughtUp ? optimisticTags : sortedTags;
 
   const filteredSuggestions = suggestions.filter(
     s => !draftTags.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
   );
 
+  // Show create option if:
+  // - allowTagCreation is true
+  // - onCreateTag is provided
+  // - input has content
+  // - input doesn't exactly match any suggestion (case-insensitive)
+  // - input isn't already in draftTags (case-insensitive)
+  const trimmedInput = inputValue.trim();
+  const exactMatchExists = suggestions.some(
+    s => s.toLowerCase() === trimmedInput.toLowerCase()
+  );
+  const alreadyInDraft = draftTags.some(
+    t => t.toLowerCase() === trimmedInput.toLowerCase()
+  );
+  const showCreateOption =
+    allowTagCreation &&
+    onCreateTag &&
+    trimmedInput &&
+    !exactMatchExists &&
+    !alreadyInDraft;
+
+  // Total options count (for keyboard navigation)
+  const totalOptions = filteredSuggestions.length + (showCreateOption ? 1 : 0);
+
+  const handleCreateTag = async () => {
+    if (!onCreateTag || !trimmedInput || isCreating) return;
+
+    setIsCreating(true);
+    try {
+      await onCreateTag(trimmedInput);
+      // Add to draft tags after successful creation
+      setDraftTags(prev => [...prev, trimmedInput].sort((a, b) => a.localeCompare(b)));
+      resetState();
+      inputRef.current?.focus();
+    } catch (err) {
+      console.error('Failed to create tag:', err);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const addTag = (tag: string) => {
     const trimmed = tag.trim();
     if (trimmed && !draftTags.includes(trimmed)) {
-      setDraftTags(prev => [...prev, trimmed].sort((a, b) => a.localeCompare(b)));
+      setDraftTags([...draftTags, trimmed].sort((a, b) => a.localeCompare(b)));
       resetState();
       inputRef.current?.focus();
     }
   };
 
   const removeTag = (tag: string) => {
-    setDraftTags(prev => prev.filter(t => t !== tag));
+    setDraftTags(draftTags.filter(t => t !== tag));
     inputRef.current?.focus();
   };
 
@@ -84,35 +136,43 @@ export function EditableTags({
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
-        if (filteredSuggestions.length > 0) {
-          setFocusedIndex(prev => (prev + 1) % filteredSuggestions.length);
+        if (totalOptions > 0) {
+          setFocusedIndex(prev => (prev + 1) % totalOptions);
         }
         break;
       case 'ArrowUp':
         event.preventDefault();
-        if (filteredSuggestions.length > 0) {
-          setFocusedIndex(
-            prev => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length
-          );
+        if (totalOptions > 0) {
+          setFocusedIndex(prev => (prev - 1 + totalOptions) % totalOptions);
         }
         break;
       case 'Enter':
         event.preventDefault();
-        if (focusedIndex >= 0 && focusedIndex < filteredSuggestions.length) {
-          addTag(filteredSuggestions[focusedIndex]);
+        if (focusedIndex >= 0 && focusedIndex < totalOptions) {
+          if (showCreateOption && focusedIndex === 0) {
+            handleCreateTag();
+          } else {
+            const suggestionIndex = showCreateOption ? focusedIndex - 1 : focusedIndex;
+            addTag(filteredSuggestions[suggestionIndex]);
+          }
         } else if (!inputValue.trim()) {
-          save();
+          close();
         }
         break;
       case ' ':
-        if (focusedIndex >= 0 && focusedIndex < filteredSuggestions.length) {
+        if (focusedIndex >= 0 && focusedIndex < totalOptions) {
           event.preventDefault();
-          addTag(filteredSuggestions[focusedIndex]);
+          if (showCreateOption && focusedIndex === 0) {
+            handleCreateTag();
+          } else {
+            const suggestionIndex = showCreateOption ? focusedIndex - 1 : focusedIndex;
+            addTag(filteredSuggestions[suggestionIndex]);
+          }
         }
         break;
       case 'Escape':
         event.preventDefault();
-        cancel();
+        close();
         break;
       case 'Backspace':
         if (inputValue === '' && draftTags.length > 0) {
@@ -134,13 +194,13 @@ export function EditableTags({
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        cancel();
+        close();
       }
     };
 
     document.addEventListener('keydown', handleGlobalKeyDown);
     return () => document.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isEditing, cancel]);
+  }, [isEditing, close]);
 
   return (
     <div className={className}>
@@ -191,9 +251,9 @@ export function EditableTags({
               className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
             />
           </div>
-        ) : tags.length > 0 ? (
+        ) : displayTags.length > 0 ? (
           <div className="gap-space-sm flex flex-wrap">
-            {tags.map(tag => (
+            {displayTags.map(tag => (
               <Tag key={tag}>{tag}</Tag>
             ))}
           </div>
@@ -201,42 +261,66 @@ export function EditableTags({
           <p className="text-size-sm text-content-disabled italic">{emptyText}</p>
         )}
 
+        {saveError && (
+          <p className="text-size-sm text-content-danger mt-space-sm">{saveError}</p>
+        )}
+
         {isEditing && (
           <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
-            {filteredSuggestions.length > 0 ? (
+            {totalOptions > 0 ? (
               <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {filteredSuggestions.map((suggestion, index) => (
+                {showCreateOption && (
                   <button
-                    key={suggestion}
                     type="button"
-                    onClick={() => addTag(suggestion)}
+                    onClick={handleCreateTag}
+                    disabled={isCreating}
                     className={cn(
-                      'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
-                      index === focusedIndex
+                      'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm flex items-center gap-space-sm',
+                      focusedIndex === 0
                         ? 'bg-background-secondary'
-                        : 'hover:bg-background-transparent-neutral-muted'
+                        : 'hover:bg-background-transparent-neutral-muted',
+                      isCreating && 'cursor-wait opacity-70'
                     )}
                   >
-                    {suggestion}
+                    {isCreating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                    <span className="mt-[1px] mb-auto">Create tag "{trimmedInput}"</span>
                   </button>
-                ))}
+                )}
+                {filteredSuggestions.map((suggestion, index) => {
+                  const optionIndex = showCreateOption ? index + 1 : index;
+                  return (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => addTag(suggestion)}
+                      className={cn(
+                        'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
+                        optionIndex === focusedIndex
+                          ? 'bg-background-secondary'
+                          : 'hover:bg-background-transparent-neutral-muted'
+                      )}
+                    >
+                      {suggestion}
+                    </button>
+                  );
+                })}
               </div>
             ) : inputValue.trim() ? (
               <div className="text-size-sm text-content-secondary px-space-md py-space-lg text-center">
-                <p className="mb-space-sm">No tags match that query.</p>
-                <p>
-                  If you think we need a new tag, come ask in <GetHelpLink />.
+                <p className={cn(!allowTagCreation && 'mb-space-sm')}>
+                  No tags match that query.
                 </p>
+                {!allowTagCreation && (
+                  <p>
+                    If you think we need a new tag, come ask in <GetHelpLink />.
+                  </p>
+                )}
               </div>
             ) : null}
-            <div className="gap-space-sm p-space-sm flex justify-end border-t border-gray-200">
-              <Button variant="primary" onClick={save} loading={isSaving}>
-                Save
-              </Button>
-              <Button variant="secondary" onClick={cancel} disabled={isSaving}>
-                Cancel
-              </Button>
-            </div>
           </div>
         )}
       </div>
@@ -245,7 +329,7 @@ export function EditableTags({
         <div
           className="fixed inset-0 z-40 bg-transparent"
           aria-hidden="true"
-          onClick={cancel}
+          onClick={close}
         />
       )}
     </div>

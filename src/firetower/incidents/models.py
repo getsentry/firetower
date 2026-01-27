@@ -72,6 +72,13 @@ class TagType(models.TextChoices):
     IMPACT_TYPE = "IMPACT_TYPE", "Impact Type"
 
 
+USER_ADDABLE_TAG_TYPES = [
+    TagType.AFFECTED_SERVICE,
+    TagType.AFFECTED_REGION,
+    TagType.ROOT_CAUSE,
+]
+
+
 class ExternalLinkType(models.TextChoices):
     SLACK = "SLACK", "Slack"
     JIRA = "JIRA", "Jira"
@@ -94,6 +101,7 @@ class Tag(models.Model):
 
     name = models.CharField(max_length=100)
     type = models.CharField(max_length=20, choices=TagType.choices)
+    approved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -230,22 +238,22 @@ class Incident(models.Model):
     @property
     def affected_service_tag_names(self) -> list[str]:
         """Return list of affected service names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.affected_service_tags.all()]
+        return sorted(tag.name for tag in self.affected_service_tags.all())
 
     @property
     def root_cause_tag_names(self) -> list[str]:
         """Return list of root cause names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.root_cause_tags.all()]
+        return sorted(tag.name for tag in self.root_cause_tags.all())
 
     @property
     def impact_type_tag_names(self) -> list[str]:
         """Return list of impact type tag names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.impact_type_tags.all()]
+        return sorted(tag.name for tag in self.impact_type_tags.all())
 
     @property
     def affected_region_tag_names(self) -> list[str]:
         """Return list of affected region names (uses prefetch cache if available)"""
-        return [tag.name for tag in self.affected_region_tags.all()]
+        return sorted(tag.name for tag in self.affected_region_tags.all())
 
     @property
     def external_links_dict(self) -> dict[str, str]:

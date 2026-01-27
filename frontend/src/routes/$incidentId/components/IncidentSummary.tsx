@@ -5,6 +5,7 @@ import {EditableTags} from 'components/EditableTags';
 import {EditableTextField} from 'components/EditableTextField';
 import {Pill} from 'components/Pill';
 
+import {createTagMutationOptions} from '../queries/createTagMutationOptions';
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {
   SERVICE_TIER_OPTIONS,
@@ -38,6 +39,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
   const updateIncidentField = useMutation(
     updateIncidentFieldMutationOptions(queryClient)
   );
+  const createTag = useMutation(createTagMutationOptions(queryClient));
 
   const {data: affectedServiceSuggestions = []} = useQuery(
     tagsQueryOptions('AFFECTED_SERVICE')
@@ -172,6 +174,10 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           }}
           suggestions={affectedServiceSuggestions}
           emptyText="No affected services specified"
+          allowTagCreation
+          onCreateTag={async name => {
+            await createTag.mutateAsync({name, type: 'AFFECTED_SERVICE'});
+          }}
         />
 
         <EditableTags
@@ -186,6 +192,10 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           }}
           suggestions={affectedRegionSuggestions}
           emptyText="No affected regions specified"
+          allowTagCreation
+          onCreateTag={async name => {
+            await createTag.mutateAsync({name, type: 'AFFECTED_REGION'});
+          }}
         />
 
         <EditableTags
@@ -200,6 +210,10 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           }}
           suggestions={rootCauseSuggestions}
           emptyText="No root cause specified"
+          allowTagCreation
+          onCreateTag={async name => {
+            await createTag.mutateAsync({name, type: 'ROOT_CAUSE'});
+          }}
         />
       </div>
     </Card>
