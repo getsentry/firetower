@@ -197,6 +197,9 @@ body {
     .bg-background-transparent-neutral-muted {
       background-color: var(--base-color-neutral-dark-transparent-500);
     }
+    .dark\:bg-background-transparent-neutral-muted {
+      background-color: var(--base-color-neutral-dark-transparent-500);
+    }
     .hover\:bg-background-transparent-neutral-muted:hover {
       background-color: var(--base-color-neutral-dark-transparent-300);
     }
