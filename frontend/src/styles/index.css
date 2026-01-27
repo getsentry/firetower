@@ -80,10 +80,13 @@ body {
     background-color: var(--tokens-color-background-transparent-promotion-muted);
   }
   .bg-background-transparent-neutral-muted {
-    background-color: var(--tokens-color-background-transparent-neutral-muted);
+    background-color: var(--base-color-neutral-dark-transparent-800);
   }
   .hover\:bg-background-transparent-neutral-muted:hover {
     background-color: var(--tokens-color-background-transparent-neutral-muted);
+  }
+  .hover\:bg-background-tertiary:hover {
+    background-color: var(--tokens-color-background-tertiary);
   }
 
   /* Text colors */
@@ -150,13 +153,16 @@ body {
     }
     /* Background colors */
     .bg-background-primary {
-      background-color: var(--base-color-neutral-dark-opaque-400);
+      background-color: var(--base-color-neutral-dark-opaque-300);
     }
     .bg-background-secondary {
-      background-color: var(--base-color-neutral-dark-opaque-300);
+      background-color: var(--base-color-neutral-dark-opaque-500);
     }
     .bg-background-tertiary {
       background-color: var(--base-color-neutral-dark-opaque-200);
+    }
+    .dark\:bg-background-secondary {
+      background-color: var(--base-color-neutral-dark-opaque-500);
     }
     .bg-background-accent-vibrant {
       background-color: var(--base-color-blue-dark-opaque-900);
@@ -171,7 +177,7 @@ body {
       background-color: var(--base-color-yellow-dark-opaque-1000);
     }
     .bg-background-promotion-vibrant {
-      background-color: var(--base-color-pink-dark-opaque-800);
+      background-color: var(--base-color-pink-dark-opaque-900);
     }
     .bg-background-transparent-accent-muted {
       background-color: var(--base-color-blue-dark-transparent-600);
@@ -189,10 +195,16 @@ body {
       background-color: var(--base-color-pink-dark-transparent-600);
     }
     .bg-background-transparent-neutral-muted {
-      background-color: var(--base-color-neutral-dark-transparent-400);
+      background-color: var(--base-color-neutral-dark-transparent-500);
+    }
+    .dark\:bg-background-transparent-neutral-muted {
+      background-color: var(--base-color-neutral-dark-transparent-500);
     }
     .hover\:bg-background-transparent-neutral-muted:hover {
       background-color: var(--base-color-neutral-dark-transparent-300);
+    }
+    .hover\:bg-background-tertiary:hover {
+      background-color: var(--base-color-neutral-dark-opaque-500);
     }
 
     /* Text colors */
@@ -203,22 +215,22 @@ body {
       color: var(--base-color-neutral-dark-opaque-1500);
     }
     .text-content-secondary {
-      color: var(--base-color-neutral-dark-opaque-1300);
+      color: var(--base-color-neutral-dark-opaque-1400);
     }
     .text-content-accent {
-      color: var(--base-color-blue-dark-opaque-1300);
+      color: var(--base-color-blue-dark-opaque-1500);
     }
     .text-content-danger {
-      color: var(--base-color-red-dark-opaque-1300);
+      color: var(--base-color-red-dark-opaque-1500);
     }
     .text-content-success {
-      color: var(--base-color-green-dark-opaque-1400);
+      color: var(--base-color-green-dark-opaque-1500);
     }
     .text-content-warning {
-      color: var(--base-color-yellow-dark-opaque-1300);
+      color: var(--base-color-yellow-dark-opaque-1500);
     }
     .text-content-promotion {
-      color: var(--base-color-pink-dark-opaque-1300);
+      color: var(--base-color-pink-dark-opaque-1500);
     }
     .text-content-disabled {
       color: var(--base-color-neutral-dark-opaque-1000);

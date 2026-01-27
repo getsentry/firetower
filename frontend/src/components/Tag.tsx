@@ -13,6 +13,7 @@ export function Tag({children, className, action, ...props}: TagProps) {
         'inline-flex items-center gap-space-xs',
         'px-space-md py-space-xs',
         'bg-background-tertiary',
+        'dark:bg-background-secondary',
         'rounded-radius-xs',
         'text-size-sm',
         'text-content-secondary',
