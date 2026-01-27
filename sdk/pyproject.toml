@@ -1,0 +1,27 @@
+[project]
+name = "firetower-sdk"
+version = "0.1.0"
+description = "Python SDK for interacting with the Firetower incident management API"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.32.0",
+    "google-auth>=2.48.0",
+    "google-cloud-iam>=2.21.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.2,<0.9.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.12.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
