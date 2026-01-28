@@ -1,10 +1,12 @@
 import logging
 import re
 from dataclasses import asdict
+from datetime import datetime
 
 from django.conf import settings
 from django.db.models import Count, QuerySet
 from django.shortcuts import get_object_or_404
+from django.utils.dateparse import parse_datetime
 from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
@@ -32,6 +34,50 @@ from .services import ParticipantsSyncStats, sync_incident_participants_from_sla
 logger = logging.getLogger(__name__)
 
 
+def parse_date_param(value: str) -> datetime | None:
+    """Parse a date string from query params. Accepts ISO 8601 formats."""
+    if not value:
+        return None
+    dt = parse_datetime(value)
+    if dt:
+        return dt
+    # Try parsing as date-only (YYYY-MM-DD)
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def filter_by_date_range(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    """Apply created_after and created_before filters to queryset."""
+    created_after = request.GET.get("created_after")
+    created_before = request.GET.get("created_before")
+
+    if created_after:
+        dt = parse_date_param(created_after)
+        if dt is None:
+            raise ValidationError(
+                {
+                    "created_after": "Invalid date format. Use ISO 8601 (e.g., 2024-01-15 or 2024-01-15T10:30:00Z)"
+                }
+            )
+        queryset = queryset.filter(created_at__gte=dt)
+
+    if created_before:
+        dt = parse_date_param(created_before)
+        if dt is None:
+            raise ValidationError(
+                {
+                    "created_before": "Invalid date format. Use ISO 8601 (e.g., 2024-01-15 or 2024-01-15T10:30:00Z)"
+                }
+            )
+        queryset = queryset.filter(created_at__lte=dt)
+
+    return queryset
+
+
 class IncidentListUIView(generics.ListAPIView):
     """
     List all incidents from database.
@@ -40,6 +86,7 @@ class IncidentListUIView(generics.ListAPIView):
     - Pagination (configured in settings.REST_FRAMEWORK)
     - Status filtering via query params: ?status=Active&status=Mitigated
       (defaults to Active and Mitigated if no status param provided)
+    - Date filtering: ?created_after=2024-01-15&created_before=2024-01-31
     - Privacy: users only see public incidents + their own private incidents
 
     Authentication enforced via DEFAULT_PERMISSION_CLASSES in settings.
@@ -48,7 +95,7 @@ class IncidentListUIView(generics.ListAPIView):
     serializer_class = IncidentListUISerializer
 
     def get_queryset(self) -> QuerySet[Incident]:
-        """Filter incidents by visibility and status"""
+        """Filter incidents by visibility, status, and date range"""
         queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
 
@@ -57,6 +104,9 @@ class IncidentListUIView(generics.ListAPIView):
         if not status_filters:
             status_filters = ["Active", "Mitigated"]
         queryset = queryset.filter(status__in=status_filters)
+
+        # Filter by date range
+        queryset = filter_by_date_range(queryset, self.request)
 
         return queryset
 
@@ -138,7 +188,8 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
     """
     Service API for listing and creating incidents.
 
-    GET: List all incidents visible to the user (no search/filtering for now)
+    GET: List all incidents visible to the user
+         Supports date filtering: ?created_after=2024-01-15&created_before=2024-01-31
     POST: Create a new incident
 
     Uses IncidentPermission for access control.
@@ -153,9 +204,10 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
         return IncidentReadSerializer
 
     def get_queryset(self) -> QuerySet[Incident]:
-        """Filter incidents by visibility only"""
+        """Filter incidents by visibility and date range"""
         queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
+        queryset = filter_by_date_range(queryset, self.request)
         return queryset
 
 
