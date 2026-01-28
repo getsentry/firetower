@@ -83,7 +83,7 @@ jobs:
             --container firetower-backend --image "${{ env.BACKEND_IMAGE_REF }}"
 
       - name: deploy-prod-db-migration
-        if: ${{ (github.ref ==  'refs/heads/main' && !inputs.environment ) || inputs.environment == 'prod' }}
+        if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           job: firetower-prod-db-migration
@@ -92,7 +92,7 @@ jobs:
           image: ${{ env.BACKEND_IMAGE_REF }}
           wait: true
       - name: deploy-prod
-        if: ${{ (github.ref ==  'refs/heads/main' && !inputs.environment ) || inputs.environment == 'prod' }}
+        if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
         uses: "google-github-actions/deploy-cloudrun@v3"
         with:
           service: firetower
