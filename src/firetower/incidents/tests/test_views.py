@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.utils import timezone as django_timezone
 from rest_framework.test import APIClient
 
 from firetower.incidents.models import (
@@ -280,6 +281,48 @@ class TestIncidentViews:
         # Should exclude the incident (created at 14:30, filter is after 15:00)
         response = self.client.get(
             "/api/ui/incidents/?created_after=2024-06-15T15:00:00"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 0
+
+    def test_list_incidents_filter_by_datetime_with_timezone(self):
+        """Test filtering with timezone-aware ISO 8601 datetime"""
+        inc = Incident.objects.create(
+            title="Test",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        # Incident created at 14:00 UTC
+        Incident.objects.filter(pk=inc.pk).update(
+            created_at=django_timezone.make_aware(datetime(2024, 6, 15, 14, 0, 0))
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+        # UTC (Z suffix)
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T14:00:00Z"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+
+        # EDT (UTC-4): 10:00 EDT = 14:00 UTC
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T10:00:00-04:00"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+
+        # PST (UTC-8): 06:00 PST = 14:00 UTC
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T06:00:00-08:00"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+
+        # 07:00 PST = 15:00 UTC, should exclude
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T07:00:00-08:00"
         )
         assert response.status_code == 200
         assert response.data["count"] == 0
