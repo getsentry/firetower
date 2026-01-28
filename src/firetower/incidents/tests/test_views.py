@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.utils import timezone as django_timezone
 from rest_framework.test import APIClient
 
 from firetower.incidents.models import (
@@ -167,6 +168,176 @@ class TestIncidentViews:
         assert response.status_code == 200
         assert response.data["count"] == 2
         assert len(response.data["results"]) == 2
+
+    def test_list_incidents_filter_by_created_after(self):
+        """Test filtering incidents by created_after"""
+        inc1 = Incident.objects.create(
+            title="Old Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2 = Incident.objects.create(
+            title="New Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        # Manually set created_at to test the filter
+        Incident.objects.filter(pk=inc1.pk).update(
+            created_at=datetime(2024, 1, 1, 0, 0, 0)
+        )
+        Incident.objects.filter(pk=inc2.pk).update(
+            created_at=datetime(2024, 6, 15, 12, 0, 0)
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?created_after=2024-06-01")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "New Incident"
+
+    def test_list_incidents_filter_by_created_before(self):
+        """Test filtering incidents by created_before"""
+        inc1 = Incident.objects.create(
+            title="Old Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2 = Incident.objects.create(
+            title="New Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.filter(pk=inc1.pk).update(
+            created_at=datetime(2024, 1, 1, 0, 0, 0)
+        )
+        Incident.objects.filter(pk=inc2.pk).update(
+            created_at=datetime(2024, 6, 15, 12, 0, 0)
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?created_before=2024-06-01")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Old Incident"
+
+    def test_list_incidents_filter_by_date_range(self):
+        """Test filtering incidents by date range (created_after and created_before)"""
+        inc1 = Incident.objects.create(
+            title="Too Old",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2 = Incident.objects.create(
+            title="In Range",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc3 = Incident.objects.create(
+            title="Too New",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.filter(pk=inc1.pk).update(
+            created_at=datetime(2024, 1, 1, 0, 0, 0)
+        )
+        Incident.objects.filter(pk=inc2.pk).update(
+            created_at=datetime(2024, 6, 15, 12, 0, 0)
+        )
+        Incident.objects.filter(pk=inc3.pk).update(
+            created_at=datetime(2024, 12, 1, 0, 0, 0)
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-01&created_before=2024-07-01"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "In Range"
+
+    def test_list_incidents_filter_by_datetime_with_time(self):
+        """Test filtering with full ISO 8601 datetime"""
+        inc = Incident.objects.create(
+            title="Test",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.filter(pk=inc.pk).update(
+            created_at=datetime(2024, 6, 15, 14, 30, 0)
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+        # Should include the incident (created at 14:30, filter is after 14:00)
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T14:00:00"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+
+        # Should exclude the incident (created at 14:30, filter is after 15:00)
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T15:00:00"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 0
+
+    def test_list_incidents_filter_by_datetime_with_timezone(self):
+        """Test filtering with timezone-aware ISO 8601 datetime"""
+        inc = Incident.objects.create(
+            title="Test",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        # Incident created at 14:00 UTC
+        Incident.objects.filter(pk=inc.pk).update(
+            created_at=django_timezone.make_aware(datetime(2024, 6, 15, 14, 0, 0))
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+        # UTC (Z suffix)
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T14:00:00Z"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+
+        # EDT (UTC-4): 10:00 EDT = 14:00 UTC
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T10:00:00-04:00"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+
+        # PST (UTC-8): 06:00 PST = 14:00 UTC
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T06:00:00-08:00"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+
+        # 07:00 PST = 15:00 UTC, should exclude
+        response = self.client.get(
+            "/api/ui/incidents/?created_after=2024-06-15T07:00:00-08:00"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 0
+
+    def test_list_incidents_invalid_date_format(self):
+        """Test that invalid date format returns 400"""
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/ui/incidents/?created_after=invalid-date")
+        assert response.status_code == 400
+        assert "created_after" in response.data
+
+        response = self.client.get("/api/ui/incidents/?created_before=not-a-date")
+        assert response.status_code == 400
+        assert "created_before" in response.data
 
     def test_retrieve_incident(self):
         """Test GET /api/ui/incidents/INC-2000/ returns full incident details"""
@@ -574,6 +745,54 @@ class TestIncidentAPIViews:
         assert response.status_code == 200
         assert response.data["count"] == 2
         assert len(response.data["results"]) == 2
+
+    def test_list_api_incidents_filter_by_date_range(self):
+        """Test GET /api/incidents/ supports date filtering"""
+        inc1 = Incident.objects.create(
+            title="Old Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2 = Incident.objects.create(
+            title="New Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.filter(pk=inc1.pk).update(
+            created_at=datetime(2024, 1, 1, 0, 0, 0)
+        )
+        Incident.objects.filter(pk=inc2.pk).update(
+            created_at=datetime(2024, 6, 15, 12, 0, 0)
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+        # Filter by created_after
+        response = self.client.get("/api/incidents/?created_after=2024-06-01")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "New Incident"
+
+        # Filter by created_before
+        response = self.client.get("/api/incidents/?created_before=2024-06-01")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Old Incident"
+
+        # Filter by date range
+        response = self.client.get(
+            "/api/incidents/?created_after=2024-06-01&created_before=2024-07-01"
+        )
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+
+    def test_list_api_incidents_invalid_date_format(self):
+        """Test that invalid date format returns 400"""
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/incidents/?created_after=invalid")
+        assert response.status_code == 400
+        assert "created_after" in response.data
 
     def test_retrieve_api_incident(self):
         """Test GET /api/incidents/INC-{id}/ returns incident with proper format"""
