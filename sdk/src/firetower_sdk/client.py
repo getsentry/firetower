@@ -5,10 +5,9 @@ import requests
 
 from firetower_sdk.auth import JWTInterface, JwtAuth
 from firetower_sdk.exceptions import FiretowerError
+from firetower_sdk.utils import get_base_url
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_BASE_URL = "https://firetower.getsentry.net"
 
 
 class FiretowerClient:
@@ -17,8 +16,10 @@ class FiretowerClient:
     def __init__(
         self,
         service_account: str,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: str | None = None,
     ):
+        if base_url is None:
+            base_url = get_base_url()
         self.base_url = base_url.rstrip("/")
         jwt_interface = JWTInterface(service_account)
         self.session = requests.Session()
