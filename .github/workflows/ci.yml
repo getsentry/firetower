@@ -141,3 +141,34 @@ jobs:
         run: |
           cd frontend
           bun run type-check
+
+  sdk-test:
+    name: SDK tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
+
+      - name: Install dependencies
+        run: |
+          cd sdk
+          uv sync --group dev
+
+      - name: Run SDK tests
+        run: |
+          cd sdk
+          uv run pytest --verbose --cov --cov-branch --cov-report=xml
+
+      - name: Upload SDK coverage to Codecov
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        with:
+          flags: sdk
+          token: ${{ secrets.CODECOV_TOKEN }}
