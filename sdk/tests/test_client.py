@@ -146,6 +146,25 @@ class TestListIncidents:
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["params"] == {"page": 2, "status": ["Active", "Mitigated"]}
 
+    def test_with_date_filters(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"results": [], "count": 0}
+            mock_response.content = b'{"results": []}'
+            mock_request.return_value = mock_response
+
+            client.list_incidents(
+                created_after="2024-01-01",
+                created_before="2024-12-31",
+            )
+
+            call_kwargs = mock_request.call_args[1]
+            assert call_kwargs["params"] == {
+                "page": 1,
+                "created_after": "2024-01-01",
+                "created_before": "2024-12-31",
+            }
+
 
 class TestUpdateMethods:
     def test_update_status(self, client):
