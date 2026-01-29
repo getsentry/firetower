@@ -46,6 +46,7 @@ DJANGO_SETTINGS_MODULE = "firetower.settings"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+testpaths = ["src"]
 
 [tool.django-stubs]
 django_settings_module = "firetower.settings"

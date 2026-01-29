@@ -875,6 +875,48 @@ class TestIncidentAPIViews:
         incident.refresh_from_db()
         assert incident.status == IncidentStatus.MITIGATED
 
+    def test_update_incident_status_case_insensitive(self):
+        """Test status update accepts case-insensitive values"""
+        incident = Incident.objects.create(
+            title="Original",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.captain)
+
+        # Test lowercase
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/",
+            {"status": "mitigated"},
+            format="json",
+        )
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.status == IncidentStatus.MITIGATED
+
+        # Test uppercase
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/",
+            {"status": "POSTMORTEM"},
+            format="json",
+        )
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.status == IncidentStatus.POSTMORTEM
+
+        # Test mixed case
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/",
+            {"status": "DoNe"},
+            format="json",
+        )
+        assert response.status_code == 200
+        incident.refresh_from_db()
+        assert incident.status == IncidentStatus.DONE
+
     def test_update_incident_as_participant(self):
         """Test participant can update incident"""
         participant = User.objects.create_user(

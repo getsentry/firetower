@@ -14,6 +14,7 @@ from .models import (
     ExternalLinkType,
     Incident,
     IncidentOrRedirect,
+    IncidentStatus,
     Tag,
     TagType,
 )
@@ -315,6 +316,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     """
 
     id = serializers.CharField(source="incident_number", read_only=True)
+    status = serializers.CharField(required=False)
     captain = UserEmailField(required=True)
     reporter = UserEmailField(required=True)
     external_links = serializers.DictField(
@@ -368,6 +370,16 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "is_private": {"required": False},
             "service_tier": {"required": False},
         }
+
+    def validate_status(self, value: str) -> str:
+        status_map = {s.lower(): s for s in IncidentStatus.values}
+        normalized = status_map.get(value.lower())
+        if normalized is None:
+            valid = ", ".join(IncidentStatus.values)
+            raise serializers.ValidationError(
+                f"Invalid status '{value}'. Must be one of: {valid}"
+            )
+        return normalized
 
     def _validate_tags_exist(self, value: list[str], tag_type: str) -> list[str]:
         value_lower = {v.lower() for v in value}

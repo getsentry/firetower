@@ -1,6 +1,14 @@
+import os
 import re
 
 FIRETOWER_ID_CUTOFF = 2000
+
+DEFAULT_BASE_URL = "https://firetower.getsentry.net"
+
+
+def get_base_url() -> str:
+    """Get the Firetower base URL from environment variable or default."""
+    return os.environ.get("FIRETOWER_URL", DEFAULT_BASE_URL)
 
 
 def is_firetower_incident_id(incident_id: str | int) -> bool:
@@ -30,6 +38,8 @@ def is_firetower_incident_id(incident_id: str | int) -> bool:
     return incident_num >= FIRETOWER_ID_CUTOFF
 
 
-def get_firetower_url(incident_id: str, base_url: str = "https://firetower.getsentry.net") -> str:
+def get_firetower_url(incident_id: str, base_url: str | None = None) -> str:
     """Get the Firetower UI URL for an incident."""
+    if base_url is None:
+        base_url = get_base_url()
     return f"{base_url.rstrip('/')}/{incident_id}"
