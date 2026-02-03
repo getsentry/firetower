@@ -96,6 +96,7 @@ class FiretowerClient:
     def list_incidents(
         self,
         statuses: list[str] | None = None,
+        severities: list[str] | None = None,
         created_after: str | None = None,
         created_before: str | None = None,
         page: int = 1,
@@ -104,6 +105,7 @@ class FiretowerClient:
 
         Args:
             statuses: Filter by status (e.g., ["Active", "Mitigated"])
+            severities: Filter by severity (e.g., ["P0", "P1"])
             created_after: Filter incidents created after this date (ISO 8601 format)
             created_before: Filter incidents created before this date (ISO 8601 format)
             page: Page number for pagination
@@ -111,6 +113,8 @@ class FiretowerClient:
         params: dict[str, Any] = {"page": page}
         if statuses:
             params["status"] = statuses
+        if severities:
+            params["severity"] = severities
         if created_after:
             params["created_after"] = created_after
         if created_before:

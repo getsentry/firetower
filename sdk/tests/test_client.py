@@ -165,6 +165,18 @@ class TestListIncidents:
                 "created_before": "2024-12-31",
             }
 
+    def test_with_severity_filter(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"results": [], "count": 0}
+            mock_response.content = b'{"results": []}'
+            mock_request.return_value = mock_response
+
+            client.list_incidents(severities=["P0", "P1"], page=2)
+
+            call_kwargs = mock_request.call_args[1]
+            assert call_kwargs["params"] == {"page": 2, "severity": ["P0", "P1"]}
+
 
 class TestUpdateMethods:
     def test_update_status(self, client):
