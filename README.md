@@ -1,6 +1,6 @@
 # Firetower
 
-An incident management platform for tracking, triaging, and resolving incidents. Firetower provides severity and status classification, participant management, milestone tracking, and integrations with Slack, Jira, Datadog, and PagerDuty.
+An incident management platform for tracking, triaging, and resolving incidents. Firetower provides severity and status classification, participant management, milestone tracking, and integrations with Slack.
 
 ## Tech Stack
 
@@ -48,16 +48,6 @@ bun dev
 
 The dev server will be available at http://localhost:5173.
 
-### Full Stack (Docker)
-
-To run the full stack behind an nginx proxy:
-
-```sh
-docker compose up -d
-```
-
-The app will be available at http://localhost:8080.
-
 ## Development
 
 ### Running Tests
@@ -73,33 +63,29 @@ bun test
 
 ### Linting & Formatting
 
-```sh
-# Backend
-uv run ruff check .
-uv run mypy .
+Pre-commit is set up to handle all linting and formatting automatically. Install the hooks with:
 
-# Frontend
-cd frontend
-bun run lint
-bun run format
+```sh
+uv run pre-commit install
 ```
+
+This runs ruff, mypy, eslint, and prettier on commit, with knip on push.
 
 ## Configuration
 
 All configuration lives in `config.toml` (copy `config.example.toml` as a starting point). Sections include:
 
 - **postgres**: Database connection
-- **jira**: Jira integration
 - **slack**: Slack bot token and team config
 - **auth**: IAP authentication
-- **datadog**: Datadog API keys
+- **datadog**: Datadog metrics and event logging
 
 ## Project Structure
 
 ```
 src/firetower/       # Django backend
   incidents/         # Core incident models and API
-  integrations/      # Slack, Jira, Datadog, PagerDuty
+  integrations/      # Slack
   auth/              # Authentication
 frontend/            # React frontend
 sdk/                 # Python SDK
