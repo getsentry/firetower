@@ -339,6 +339,78 @@ class TestIncidentViews:
         assert response.status_code == 400
         assert "created_before" in response.data
 
+    def test_list_incidents_filter_by_severity(self):
+        """Test filtering incidents by severity"""
+        Incident.objects.create(
+            title="P1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="P2 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P2,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?severity=P1")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert len(response.data["results"]) == 1
+        assert response.data["results"][0]["title"] == "P1 Incident"
+
+    def test_list_incidents_filter_by_multiple_severities(self):
+        """Test filtering by multiple severities"""
+        Incident.objects.create(
+            title="P1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="P2 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P2,
+        )
+        Incident.objects.create(
+            title="P3 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P3,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?severity=P1&severity=P2")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+    def test_list_incidents_filter_by_severity_and_status(self):
+        """Test filtering by both severity and status"""
+        Incident.objects.create(
+            title="Active P1",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="Mitigated P1",
+            status=IncidentStatus.MITIGATED,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="Active P2",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P2,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?severity=P1&status=Active")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert len(response.data["results"]) == 1
+        assert response.data["results"][0]["title"] == "Active P1"
+
     def test_retrieve_incident(self):
         """Test GET /api/ui/incidents/INC-2000/ returns full incident details"""
         captain = User.objects.create_user(
@@ -793,6 +865,96 @@ class TestIncidentAPIViews:
         response = self.client.get("/api/incidents/?created_after=invalid")
         assert response.status_code == 400
         assert "created_after" in response.data
+
+    def test_list_api_incidents_filter_by_severity(self):
+        """Test GET /api/incidents/ supports severity filtering"""
+        Incident.objects.create(
+            title="P1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="P2 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P2,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/?severity=P1")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert len(response.data["results"]) == 1
+        assert response.data["results"][0]["title"] == "P1 Incident"
+
+    def test_list_api_incidents_filter_by_multiple_severities(self):
+        """Test GET /api/incidents/ supports multiple severity filters"""
+        Incident.objects.create(
+            title="P1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="P2 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P2,
+        )
+        Incident.objects.create(
+            title="P3 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P3,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/?severity=P1&severity=P2")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+    def test_list_api_incidents_invalid_severity(self):
+        """Test that invalid severity value returns 400"""
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/incidents/?severity=InvalidSeverity")
+        assert response.status_code == 400
+        assert "severity" in response.data
+
+    def test_list_api_incidents_filter_by_severity_and_date(self):
+        """Test GET /api/incidents/ supports severity and date filtering"""
+        Incident.objects.create(
+            title="P1 Old",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="P1 New",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="P2 Old",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P2,
+        )
+        Incident.objects.filter(pk=Incident.objects.get(title="P1 Old").pk).update(
+            created_at=datetime(2024, 1, 1, 0, 0, 0)
+        )
+        Incident.objects.filter(pk=Incident.objects.get(title="P2 Old").pk).update(
+            created_at=datetime(2024, 1, 1, 0, 0, 0)
+        )
+        Incident.objects.filter(pk=Incident.objects.get(title="P1 New").pk).update(
+            created_at=datetime(2024, 6, 15, 12, 0, 0)
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/incidents/?severity=P1&created_after=2024-01-01"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
 
     def test_retrieve_api_incident(self):
         """Test GET /api/incidents/INC-{id}/ returns incident with proper format"""
