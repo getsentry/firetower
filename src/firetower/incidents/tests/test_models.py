@@ -394,13 +394,13 @@ class TestExternalLink:
             incident=incident, type=ExternalLinkType.SLACK, url="https://slack.com"
         )
 
-        jira = ExternalLink.objects.create(
-            incident=incident, type=ExternalLinkType.JIRA, url="https://jira.com"
+        linear = ExternalLink.objects.create(
+            incident=incident, type=ExternalLinkType.LINEAR, url="https://linear.app"
         )
 
         assert incident.external_links.count() == 2
         assert slack in incident.external_links.all()
-        assert jira in incident.external_links.all()
+        assert linear in incident.external_links.all()
 
     def test_external_link_str(self):
         """Test external link string representation"""

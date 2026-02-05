@@ -141,5 +141,5 @@ class TestIncidentDetailUISerializer:
         assert (
             data["external_links"]["slack"] == "https://slack.com/channels/incident-123"
         )
-        assert "jira" not in data["external_links"]  # Not set, so not included
+        assert "linear" not in data["external_links"]  # Not set, so not included
         assert len(data["external_links"]) == 1
