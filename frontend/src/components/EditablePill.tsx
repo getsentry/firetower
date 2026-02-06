@@ -1,4 +1,5 @@
-import {useCallback, useState, type ReactNode} from 'react';
+import type {ReactNode} from 'react';
+import {useCallback, useState} from 'react';
 import {cva} from 'class-variance-authority';
 import {cn} from 'utils/cn';
 
@@ -106,7 +107,10 @@ export function EditablePill<T extends string>({
         case 'Enter':
         case ' ':
           event.preventDefault();
-          if (focusedIndex >= 0 && !disabledOptions?.[options[focusedIndex]]) {
+          if (
+            focusedIndex >= 0 &&
+            !(disabledOptions && options[focusedIndex] in disabledOptions)
+          ) {
             handleSelect(options[focusedIndex]);
           }
           break;
@@ -143,8 +147,8 @@ export function EditablePill<T extends string>({
               ? getVariant(option)
               : (option as PillProps['variant']);
             const isFocused = index === focusedIndex;
+            const isDisabled = disabledOptions !== undefined && option in disabledOptions;
             const disabledMessage = disabledOptions?.[option];
-            const isDisabled = !!disabledMessage;
 
             const row = (
               <div
