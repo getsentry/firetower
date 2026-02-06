@@ -13,7 +13,13 @@ interface TooltipContentProps extends React.ComponentPropsWithoutRef<
   ref?: React.Ref<HTMLDivElement>;
 }
 
-function TooltipContent({className, sideOffset = 4, ref, ...props}: TooltipContentProps) {
+function TooltipContent({
+  className,
+  sideOffset = 4,
+  ref,
+  children,
+  ...props
+}: TooltipContentProps) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
@@ -36,7 +42,21 @@ function TooltipContent({className, sideOffset = 4, ref, ...props}: TooltipConte
           className
         )}
         {...props}
-      />
+      >
+        {children}
+        <TooltipPrimitive.Arrow asChild>
+          <svg
+            className="-my-px fill-background-primary stroke-gray-200"
+            width={10}
+            height={5}
+            viewBox="0 0 30 10"
+            preserveAspectRatio="none"
+          >
+            <polygon points="0,0 30,0 15,10" className="stroke-none" />
+            <polyline points="0,0 15,10 30,0" fill="none" strokeWidth={3} />
+          </svg>
+        </TooltipPrimitive.Arrow>
+      </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   );
 }
