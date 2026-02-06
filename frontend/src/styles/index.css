@@ -43,6 +43,9 @@ body {
   .bg-background-primary {
     background-color: var(--tokens-color-background-primary);
   }
+  .fill-background-primary {
+    fill: var(--tokens-color-background-primary);
+  }
   .bg-background-secondary {
     background-color: var(--tokens-color-background-secondary);
   }
@@ -154,6 +157,9 @@ body {
     /* Background colors */
     .bg-background-primary {
       background-color: var(--base-color-neutral-dark-opaque-300);
+    }
+    .fill-background-primary {
+      fill: var(--base-color-neutral-dark-opaque-300);
     }
     .bg-background-secondary {
       background-color: var(--base-color-neutral-dark-opaque-500);
