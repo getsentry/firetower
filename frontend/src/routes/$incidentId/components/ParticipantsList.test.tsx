@@ -1,5 +1,5 @@
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
-import {render, screen} from '@testing-library/react';
+import {render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
@@ -86,12 +86,13 @@ describe('ParticipantsList', () => {
 
     await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
 
-    // Should show dropdown trigger and cancel button
+    // Should show search input and cancel button
     expect(screen.getByRole('button', {name: 'Cancel'})).toBeInTheDocument();
-    expect(screen.getByRole('button', {name: /John Smith/})).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'John Smith');
   });
 
-  it('opens dropdown when clicking the dropdown trigger', async () => {
+  it('shows dropdown immediately when entering edit mode', async () => {
     const user = userEvent.setup();
     renderWithQueryClient(
       <ParticipantsList
@@ -101,7 +102,6 @@ describe('ParticipantsList', () => {
     );
 
     await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
-    await user.click(screen.getByRole('button', {name: /John Smith/}));
 
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     expect(screen.getAllByRole('option')).toHaveLength(3);
@@ -142,7 +142,6 @@ describe('ParticipantsList', () => {
     );
 
     await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
-    await user.click(screen.getByRole('button', {name: /John Smith/}));
 
     // Should only show 2 options (deduplicated), not 3
     expect(screen.getAllByRole('option')).toHaveLength(2);
@@ -232,5 +231,58 @@ describe('ParticipantsList', () => {
     expect(screen.getByText('Captain')).toBeInTheDocument();
     expect(screen.getByText('Reporter')).toBeInTheDocument();
     expect(screen.queryByText('Participant')).not.toBeInTheDocument();
+  });
+
+  it('filters participants by search input', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <ParticipantsList
+        incidentId="INC-123"
+        participants={mockParticipants.slice(0, 5)}
+      />
+    );
+
+    await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
+    await user.type(screen.getByRole('textbox'), 'Jane');
+
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('Jane Doe');
+  });
+
+  it('shows empty state when search matches no participants', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <ParticipantsList
+        incidentId="INC-123"
+        participants={mockParticipants.slice(0, 3)}
+      />
+    );
+
+    await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
+    await user.type(screen.getByRole('textbox'), 'zzzzz');
+
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(screen.getByText('No participants match')).toBeInTheDocument();
+  });
+
+  it('selects participant via keyboard navigation', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <ParticipantsList
+        incidentId="INC-123"
+        participants={mockParticipants.slice(0, 3)}
+      />
+    );
+
+    await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
+    const input = screen.getByRole('textbox');
+
+    await user.type(input, '{arrowdown}{arrowdown}{enter}');
+
+    // After selection, the async mutation resolves/rejects and edit mode closes
+    await waitFor(() => {
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    });
   });
 });
