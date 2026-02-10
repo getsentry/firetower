@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
+from firetower.auth.models import ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import ExternalLinkType, Incident
 from firetower.integrations.services import SlackService
@@ -21,6 +22,13 @@ class ParticipantsSyncStats:
     already_existed: int = 0
     errors: list[str] = field(default_factory=list)
     skipped: bool = False
+
+
+@dataclass
+class TopicSyncStats:
+    """Statistics from a topic sync operation."""
+
+    errors: list[str] = field(default_factory=list)
 
 
 def sync_incident_participants_from_slack(
@@ -112,5 +120,60 @@ def sync_incident_participants_from_slack(
         f"Sync complete for incident {incident.id}: {stats.added} added, "
         f"{stats.already_existed} already existed, {len(stats.errors)} errors"
     )
+
+    return stats
+
+
+def sync_incident_to_slack(incident: Incident) -> TopicSyncStats:
+    """
+    Sync incident changes to Slack channel topic.
+
+    Updates the Slack channel topic with the incident's title, severity, and captain.
+
+    Args:
+        incident: Incident instance to sync
+
+    Returns:
+        TopicSyncStats dataclass with sync statistics
+    """
+    stats = TopicSyncStats()
+
+    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+
+    if not slack_link:
+        error_msg = f"No Slack link found for incident {incident.id}"
+        logger.warning(error_msg)
+        stats.errors.append(error_msg)
+        return stats
+
+    channel_id = _slack_service.parse_channel_id_from_url(slack_link.url)
+
+    if not channel_id:
+        error_msg = f"Could not parse channel ID from URL: {slack_link.url}"
+        logger.warning(error_msg)
+        stats.errors.append(error_msg)
+        return stats
+
+    if incident.captain:
+        slack_profile = incident.captain.external_profiles.filter(
+            type=ExternalProfileType.SLACK
+        ).first()
+        if slack_profile:
+            captain_display = f"<@{slack_profile.external_id}>"
+        else:
+            captain_display = incident.captain.get_full_name()
+    else:
+        captain_display = "None"
+
+    topic = f"[{incident.severity}] {incident.incident_number} {incident.title} | IC: {captain_display}"
+
+    success = _slack_service.update_channel_topic(channel_id, topic)
+
+    if success:
+        logger.info(f"Successfully updated topic for incident {incident.id}")
+    else:
+        error_msg = f"Failed to update topic for incident {incident.id}"
+        logger.error(error_msg)
+        stats.errors.append(error_msg)
 
     return stats

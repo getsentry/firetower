@@ -13,7 +13,10 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
 )
-from firetower.incidents.services import sync_incident_participants_from_slack
+from firetower.incidents.services import (
+    sync_incident_participants_from_slack,
+    sync_incident_to_slack,
+)
 
 
 @pytest.mark.django_db
@@ -359,3 +362,146 @@ class TestSyncIncidentParticipantsFromSlack:
                     mock_get_user.assert_called_once_with("U11111")
                     assert stats.added == 1
                     assert stats.errors == []
+
+
+@pytest.mark.django_db
+class TestSyncIncidentToSlack:
+    def test_syncs_topic_to_slack_channel_with_slack_profile(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Captain",
+            last_name="One",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U99999",
+        )
+        incident.captain = captain
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://workspace.slack.com/archives/C12345",
+        )
+
+        with patch(
+            "firetower.incidents.services._slack_service.update_channel_topic"
+        ) as mock_update:
+            mock_update.return_value = True
+            stats = sync_incident_to_slack(incident)
+
+            mock_update.assert_called_once_with(
+                "C12345",
+                f"[P1] {incident.incident_number} Test Incident | IC: <@U99999>",
+            )
+            assert stats.errors == []
+
+    def test_syncs_topic_falls_back_to_full_name_without_slack_profile(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Captain",
+            last_name="One",
+        )
+        incident.captain = captain
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://workspace.slack.com/archives/C12345",
+        )
+
+        with patch(
+            "firetower.incidents.services._slack_service.update_channel_topic"
+        ) as mock_update:
+            mock_update.return_value = True
+            stats = sync_incident_to_slack(incident)
+
+            mock_update.assert_called_once_with(
+                "C12345",
+                f"[P1] {incident.incident_number} Test Incident | IC: Captain One",
+            )
+            assert stats.errors == []
+
+    def test_skips_if_no_slack_link(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Captain",
+            last_name="One",
+        )
+        incident.captain = captain
+
+        stats = sync_incident_to_slack(incident)
+
+        assert stats.errors == [f"No Slack link found for incident {incident.id}"]
+
+    def test_handles_invalid_channel_url(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Captain",
+            last_name="One",
+        )
+        incident.captain = captain
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://invalid-url.com",
+        )
+
+        stats = sync_incident_to_slack(incident)
+
+        assert stats.errors == [
+            "Could not parse channel ID from URL: https://invalid-url.com"
+        ]
+
+    def test_handles_slack_api_failure(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Captain",
+            last_name="One",
+        )
+        incident.captain = captain
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://workspace.slack.com/archives/C12345",
+        )
+
+        with patch(
+            "firetower.incidents.services._slack_service.update_channel_topic"
+        ) as mock_update:
+            mock_update.return_value = False
+
+            stats = sync_incident_to_slack(incident)
+
+            assert stats.errors == [
+                f"Failed to update topic for incident {incident.id}"
+            ]
