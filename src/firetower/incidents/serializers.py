@@ -18,6 +18,7 @@ from .models import (
     Tag,
     TagType,
 )
+from .services import sync_incident_to_slack
 
 
 @dataclass
@@ -558,6 +559,12 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                 type=TagType.IMPACT_TYPE,
             )
             instance.impact_type_tags.set(tags)
+
+        # Only sync to Slack if title, severity, or captain changed
+        topic_fields = {"title", "severity", "captain"}
+        sync_relevant_fields = topic_fields.intersection(validated_data.keys())
+        if sync_relevant_fields:
+            sync_incident_to_slack(instance)
 
         return instance
 

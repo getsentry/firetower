@@ -197,3 +197,30 @@ class SlackService:
                 extra={"slack_user_id": slack_user_id},
             )
             return None
+
+    def update_channel_topic(self, channel_id: str, topic: str) -> bool:
+        """
+        Update Slack channel topic.
+
+        Args:
+            channel_id: Slack channel ID (e.g., C12345678)
+            topic: New topic string
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.client:
+            logger.warning("Cannot update channel topic - Slack client not initialized")
+            return False
+
+        try:
+            self.client.conversations_setTopic(channel=channel_id, topic=topic)
+            logger.info(f"Successfully updated topic for channel {channel_id}")
+            return True
+
+        except SlackApiError as e:
+            logger.error(
+                f"Error updating channel topic: {e.response['error']}",
+                extra={"channel_id": channel_id},
+            )
+            return False
