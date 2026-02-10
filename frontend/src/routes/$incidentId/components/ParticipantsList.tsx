@@ -4,7 +4,7 @@ import {cva} from 'class-variance-authority';
 import {Avatar} from 'components/Avatar';
 import {Button} from 'components/Button';
 import {Card} from 'components/Card';
-import {ChevronDown, Pencil, X} from 'lucide-react';
+import {Pencil, X} from 'lucide-react';
 import {cn} from 'utils/cn';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
@@ -90,140 +90,116 @@ function ParticipantDropdown({
   onChange,
   containerRef,
 }: ParticipantDropdownProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const selectedParticipant = participants.find(p => p.email === value);
-  const currentIndex = participants.findIndex(p => p.email === value);
 
-  const open = useCallback(() => {
-    setIsOpen(true);
-    setFocusedIndex(currentIndex >= 0 ? currentIndex : 0);
-  }, [currentIndex]);
-
-  const close = useCallback((refocus = false) => {
-    setIsOpen(false);
-    setFocusedIndex(-1);
-    if (refocus) {
-      triggerRef.current?.focus();
-    }
-  }, []);
+  const filteredParticipants = useMemo(
+    () =>
+      participants.filter(p => p.name.toLowerCase().includes(searchValue.toLowerCase())),
+    [participants, searchValue]
+  );
 
   const handleSelect = useCallback(
     (participant: Participant) => {
       onChange(participant.email);
-      close();
     },
-    [onChange, close]
+    [onChange]
   );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      if (!isOpen) {
-        if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown') {
-          event.preventDefault();
-          open();
-        }
-        return;
-      }
-
       switch (event.key) {
         case 'ArrowDown':
           event.preventDefault();
-          setFocusedIndex(prev => (prev + 1) % participants.length);
+          setFocusedIndex(prev =>
+            filteredParticipants.length === 0
+              ? -1
+              : (prev + 1) % filteredParticipants.length
+          );
           break;
         case 'ArrowUp':
           event.preventDefault();
-          setFocusedIndex(prev => (prev - 1 + participants.length) % participants.length);
+          setFocusedIndex(prev =>
+            filteredParticipants.length === 0
+              ? -1
+              : (prev - 1 + filteredParticipants.length) % filteredParticipants.length
+          );
           break;
         case 'Enter':
-        case ' ':
           event.preventDefault();
-          if (focusedIndex >= 0) {
-            handleSelect(participants[focusedIndex]);
+          if (focusedIndex >= 0 && focusedIndex < filteredParticipants.length) {
+            handleSelect(filteredParticipants[focusedIndex]);
           }
           break;
         case 'Escape':
           event.preventDefault();
-          close(true);
+          inputRef.current?.blur();
           break;
         case 'Tab':
-          close();
           break;
       }
     },
-    [isOpen, open, close, focusedIndex, participants, handleSelect]
+    [focusedIndex, filteredParticipants, handleSelect]
   );
 
-  const handleBlur = useCallback(
-    (e: React.FocusEvent) => {
-      // Close if focus moves outside the dropdown container
-      if (!e.currentTarget.contains(e.relatedTarget)) {
-        close();
-      }
-    },
-    [close]
-  );
-
-  // Focus trigger on mount
+  // Focus input on mount
   useEffect(() => {
-    triggerRef.current?.focus();
+    inputRef.current?.focus();
   }, []);
 
   useEffect(() => {
-    if (isOpen && focusedIndex >= 0 && menuRef.current) {
+    if (focusedIndex >= 0 && menuRef.current) {
       const items = menuRef.current.querySelectorAll('[role="option"]');
       const focusedElement = items[focusedIndex] as HTMLElement;
       focusedElement?.scrollIntoView({block: 'nearest'});
     }
-  }, [isOpen, focusedIndex]);
+  }, [focusedIndex]);
 
   useEffect(() => {
-    if (isOpen && containerRef?.current && triggerRef.current) {
+    if (containerRef?.current && inputRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
-      const triggerRect = triggerRef.current.getBoundingClientRect();
+      const inputRect = inputRef.current.getBoundingClientRect();
       setMenuStyle({
-        left: containerRect.left - triggerRect.left,
+        left: containerRect.left - inputRect.left,
         width: containerRect.width,
       });
     }
-  }, [isOpen, containerRef]);
+  }, [containerRef]);
 
   return (
-    <div className="relative w-full" onBlur={handleBlur}>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => (isOpen ? close() : open())}
+    <div className="relative w-full">
+      <input
+        ref={inputRef}
+        type="text"
+        value={searchValue}
+        onChange={e => {
+          setSearchValue(e.target.value);
+          setFocusedIndex(0);
+        }}
         onKeyDown={handleKeyDown}
+        placeholder={selectedParticipant?.name ?? value}
         aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        className={cn(dropdownTriggerStyles(), 'w-full')}
-      >
-        {selectedParticipant && (
-          <Avatar
-            name={selectedParticipant.name}
-            src={selectedParticipant.avatar_url}
-            size="sm"
-          />
-        )}
-        <span className="min-w-0 flex-1 truncate text-left">
-          {selectedParticipant?.name ?? value}
-        </span>
-        <ChevronDown className="h-4 w-4 shrink-0" />
-      </button>
+        aria-expanded={true}
+        className={cn(dropdownTriggerStyles(), 'w-full cursor-text')}
+      />
 
-      {isOpen && (
-        <div
-          ref={menuRef}
-          role="listbox"
-          className={cn(dropdownMenuStyles())}
-          style={menuStyle}
-        >
-          {participants.map((participant, index) => (
+      <div
+        ref={menuRef}
+        role="listbox"
+        className={cn(dropdownMenuStyles())}
+        style={menuStyle}
+      >
+        {filteredParticipants.length === 0 ? (
+          <div className="px-space-md py-space-sm text-content-secondary text-sm">
+            No participants match
+          </div>
+        ) : (
+          filteredParticipants.map((participant, index) => (
             <div
               key={participant.email}
               role="option"
@@ -241,9 +217,9 @@ function ParticipantDropdown({
               <Avatar name={participant.name} src={participant.avatar_url} size="sm" />
               <span>{participant.name}</span>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
 }
