@@ -394,13 +394,12 @@ class TestSyncIncidentToSlack:
             "firetower.incidents.services._slack_service.update_channel_topic"
         ) as mock_update:
             mock_update.return_value = True
-            stats = sync_incident_to_slack(incident)
+            sync_incident_to_slack(incident)
 
             mock_update.assert_called_once_with(
                 "C12345",
                 f"[P1] {incident.incident_number} Test Incident | IC: <@U99999>",
             )
-            assert stats.errors == []
 
     def test_syncs_topic_falls_back_to_full_name_without_slack_profile(self):
         incident = Incident.objects.create(
@@ -425,13 +424,12 @@ class TestSyncIncidentToSlack:
             "firetower.incidents.services._slack_service.update_channel_topic"
         ) as mock_update:
             mock_update.return_value = True
-            stats = sync_incident_to_slack(incident)
+            sync_incident_to_slack(incident)
 
             mock_update.assert_called_once_with(
                 "C12345",
                 f"[P1] {incident.incident_number} Test Incident | IC: Captain One",
             )
-            assert stats.errors == []
 
     def test_skips_if_no_slack_link(self):
         incident = Incident.objects.create(
@@ -447,9 +445,7 @@ class TestSyncIncidentToSlack:
         )
         incident.captain = captain
 
-        stats = sync_incident_to_slack(incident)
-
-        assert stats.errors == [f"No Slack link found for incident {incident.id}"]
+        sync_incident_to_slack(incident)
 
     def test_handles_invalid_channel_url(self):
         incident = Incident.objects.create(
@@ -470,11 +466,7 @@ class TestSyncIncidentToSlack:
             url="https://invalid-url.com",
         )
 
-        stats = sync_incident_to_slack(incident)
-
-        assert stats.errors == [
-            "Could not parse channel ID from URL: https://invalid-url.com"
-        ]
+        sync_incident_to_slack(incident)
 
     def test_handles_slack_api_failure(self):
         incident = Incident.objects.create(
@@ -500,8 +492,4 @@ class TestSyncIncidentToSlack:
         ) as mock_update:
             mock_update.return_value = False
 
-            stats = sync_incident_to_slack(incident)
-
-            assert stats.errors == [
-                f"Failed to update topic for incident {incident.id}"
-            ]
+            sync_incident_to_slack(incident)

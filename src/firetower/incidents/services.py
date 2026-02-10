@@ -24,13 +24,6 @@ class ParticipantsSyncStats:
     skipped: bool = False
 
 
-@dataclass
-class TopicSyncStats:
-    """Statistics from a topic sync operation."""
-
-    errors: list[str] = field(default_factory=list)
-
-
 def sync_incident_participants_from_slack(
     incident: Incident, force: bool = False
 ) -> ParticipantsSyncStats:
@@ -124,35 +117,23 @@ def sync_incident_participants_from_slack(
     return stats
 
 
-def sync_incident_to_slack(incident: Incident) -> TopicSyncStats:
+def sync_incident_to_slack(incident: Incident) -> None:
     """
     Sync incident changes to Slack channel topic.
 
     Updates the Slack channel topic with the incident's title, severity, and captain.
-
-    Args:
-        incident: Incident instance to sync
-
-    Returns:
-        TopicSyncStats dataclass with sync statistics
     """
-    stats = TopicSyncStats()
-
     slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
 
     if not slack_link:
-        error_msg = f"No Slack link found for incident {incident.id}"
-        logger.warning(error_msg)
-        stats.errors.append(error_msg)
-        return stats
+        logger.warning(f"No Slack link found for incident {incident.id}")
+        return
 
     channel_id = _slack_service.parse_channel_id_from_url(slack_link.url)
 
     if not channel_id:
-        error_msg = f"Could not parse channel ID from URL: {slack_link.url}"
-        logger.warning(error_msg)
-        stats.errors.append(error_msg)
-        return stats
+        logger.warning(f"Could not parse channel ID from URL: {slack_link.url}")
+        return
 
     if incident.captain:
         slack_profile = incident.captain.external_profiles.filter(
@@ -167,13 +148,7 @@ def sync_incident_to_slack(incident: Incident) -> TopicSyncStats:
 
     topic = f"[{incident.severity}] {incident.incident_number} {incident.title} | IC: {captain_display}"
 
-    success = _slack_service.update_channel_topic(channel_id, topic)
-
-    if success:
+    if _slack_service.update_channel_topic(channel_id, topic):
         logger.info(f"Successfully updated topic for incident {incident.id}")
     else:
-        error_msg = f"Failed to update topic for incident {incident.id}"
-        logger.error(error_msg)
-        stats.errors.append(error_msg)
-
-    return stats
+        logger.error(f"Failed to update topic for incident {incident.id}")
