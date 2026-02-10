@@ -16,6 +16,7 @@ from .models import (
     INCIDENT_ID_START,
     Incident,
     IncidentOrRedirect,
+    IncidentSeverity,
     Tag,
     TagType,
     filter_visible_to_user,
@@ -78,6 +79,28 @@ def filter_by_date_range(
     return queryset
 
 
+def filter_by_severity(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    """Apply severity filter to queryset. Expects severity param in GET (can be repeated for multiple values)."""
+    severity_filters = request.GET.getlist("severity")
+
+    if severity_filters:
+        valid_severities = set(IncidentSeverity.__members__.values())
+        invalid_severities = set(severity_filters) - valid_severities
+
+        if invalid_severities:
+            raise ValidationError(
+                {
+                    "severity": f"Invalid severity value(s): {', '.join(invalid_severities)}"
+                }
+            )
+
+        queryset = queryset.filter(severity__in=severity_filters)
+
+    return queryset
+
+
 class IncidentListUIView(generics.ListAPIView):
     """
     List all incidents from database.
@@ -95,7 +118,7 @@ class IncidentListUIView(generics.ListAPIView):
     serializer_class = IncidentListUISerializer
 
     def get_queryset(self) -> QuerySet[Incident]:
-        """Filter incidents by visibility, status, and date range"""
+        """Filter incidents by visibility, status, severity, and date range"""
         queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
 
@@ -104,6 +127,9 @@ class IncidentListUIView(generics.ListAPIView):
         if not status_filters:
             status_filters = ["Active", "Mitigated"]
         queryset = queryset.filter(status__in=status_filters)
+
+        # Filter by severity
+        queryset = filter_by_severity(queryset, self.request)
 
         # Filter by date range
         queryset = filter_by_date_range(queryset, self.request)
@@ -204,9 +230,10 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
         return IncidentReadSerializer
 
     def get_queryset(self) -> QuerySet[Incident]:
-        """Filter incidents by visibility and date range"""
+        """Filter incidents by visibility, severity, and date range"""
         queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
+        queryset = filter_by_severity(queryset, self.request)
         queryset = filter_by_date_range(queryset, self.request)
         return queryset
 
