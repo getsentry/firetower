@@ -202,6 +202,9 @@ class SlackService:
         """
         Update Slack channel topic.
 
+        Joins the channel if needed, checks if the topic has actually changed,
+        and updates it if so.
+
         Args:
             channel_id: Slack channel ID (e.g., C12345678)
             topic: New topic string
@@ -214,7 +217,22 @@ class SlackService:
             return False
 
         try:
-            logger.info(f"Updating channel topic for: {channel_id}")
+            self.client.conversations_join(channel=channel_id)
+        except SlackApiError as e:
+            if e.response["error"] != "already_in_channel":
+                logger.error(
+                    f"Error joining channel: {e.response['error']}",
+                    extra={"channel_id": channel_id},
+                )
+                return False
+
+        try:
+            channel_info = self.client.conversations_info(channel=channel_id)
+            current_topic = channel_info["channel"]["topic"]["value"]
+            if current_topic == topic:
+                logger.info(f"Topic already up to date for channel {channel_id}")
+                return True
+
             self.client.conversations_setTopic(channel=channel_id, topic=topic)
             logger.info(f"Successfully updated topic for channel {channel_id}")
             return True
