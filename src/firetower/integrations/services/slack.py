@@ -221,7 +221,7 @@ class SlackService:
 
         except SlackApiError as e:
             logger.error(
-                f"Error updating channel topic: {e}",
+                f"Error updating channel topic: {e.response['error']}",
                 extra={"channel_id": channel_id},
             )
             return False
