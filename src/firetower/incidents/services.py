@@ -146,7 +146,13 @@ def sync_incident_to_slack(incident: Incident) -> None:
     else:
         captain_display = "None"
 
-    topic = f"[{incident.severity}] {incident.incident_number} {incident.title} | IC: {captain_display}"
+    # Slack topic limit is 250 chars, truncate title to fit
+    prefix = f"[{incident.severity}] {incident.incident_number} "
+    suffix = f" | IC: {captain_display}"
+    max_title_len = 250 - len(prefix) - len(suffix)
+    title = incident.title[:max_title_len]
+
+    topic = f"{prefix}{title}{suffix}"
 
     if _slack_service.update_channel_topic(channel_id, topic):
         logger.info(f"Successfully updated topic for incident {incident.id}")

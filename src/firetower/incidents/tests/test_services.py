@@ -445,7 +445,11 @@ class TestSyncIncidentToSlack:
         )
         incident.captain = captain
 
-        sync_incident_to_slack(incident)
+        with patch(
+            "firetower.incidents.services._slack_service.update_channel_topic"
+        ) as mock_update:
+            sync_incident_to_slack(incident)
+            mock_update.assert_not_called()
 
     def test_handles_invalid_channel_url(self):
         incident = Incident.objects.create(
@@ -466,7 +470,11 @@ class TestSyncIncidentToSlack:
             url="https://invalid-url.com",
         )
 
-        sync_incident_to_slack(incident)
+        with patch(
+            "firetower.incidents.services._slack_service.update_channel_topic"
+        ) as mock_update:
+            sync_incident_to_slack(incident)
+            mock_update.assert_not_called()
 
     def test_handles_slack_api_failure(self):
         incident = Incident.objects.create(
