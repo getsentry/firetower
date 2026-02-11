@@ -7,10 +7,6 @@ const linkConfigs = {
     label: 'Datadog notebook',
     icon: '/datadog.svg',
   },
-  jira: {
-    label: 'Jira',
-    icon: '/jira.svg',
-  },
   linear: {
     label: 'Linear',
     icon: '/linear.svg',
