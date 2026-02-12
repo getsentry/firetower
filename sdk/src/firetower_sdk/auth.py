@@ -1,7 +1,6 @@
 import datetime
 import json
 import logging
-from urllib.parse import urlsplit, urlunsplit
 
 import google.auth
 import requests
@@ -53,8 +52,6 @@ class JwtAuth(AuthBase):
         url = r.url
         if url is None:
             raise RuntimeError("JwtAuth error: Cannot sign request with no URL set.")
-        parsed = urlsplit(url)
-        audience = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
-        jwt = self.jwt_interface.get_signed_jwt(audience)
+        jwt = self.jwt_interface.get_signed_jwt(url)
         r.headers["Authorization"] = f"Bearer {jwt}"
         return r
