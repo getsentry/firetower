@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {createRouter, RouterProvider} from '@tanstack/react-router';
+import {TooltipProvider} from 'components/Tooltip';
 
 import {routeTree} from './routeTree.gen';
 
@@ -51,7 +52,9 @@ if (!rootElement.innerHTML) {
   });
   root.render(
     <StrictMode>
-      <RouterProvider router={router} />
+      <TooltipProvider>
+        <RouterProvider router={router} />
+      </TooltipProvider>
     </StrictMode>
   );
 }
