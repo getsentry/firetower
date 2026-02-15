@@ -304,7 +304,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                      root_cause_tags, impact_type_tags
 
     captain/reporter: Email address of the user
-    external_links format: {"slack": "url", "jira": "url", ...}
+    external_links format: {"slack": "url", "linear": "url", ...}
     - Merges with existing links (only updates provided links)
     - Use null to delete a specific link: {"slack": null}
     - Omit external_links field to leave existing links unchanged

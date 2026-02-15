@@ -1256,7 +1256,7 @@ class TestIncidentAPIViews:
             "reporter": self.reporter.email,
             "external_links": {
                 "slack": "https://slack.com/channel/123",
-                "jira": "https://jira.company.com/browse/INC-1",
+                "linear": "https://linear.app/team/issue/ENG-1",
             },
         }
 
@@ -1270,7 +1270,7 @@ class TestIncidentAPIViews:
         data = response.json()
 
         assert data["external_links"]["slack"] == "https://slack.com/channel/123"
-        assert data["external_links"]["jira"] == "https://jira.company.com/browse/INC-1"
+        assert data["external_links"]["linear"] == "https://linear.app/team/issue/ENG-1"
         assert "datadog" not in data["external_links"]
 
     def test_create_incident_with_tags(self):
@@ -1323,8 +1323,8 @@ class TestIncidentAPIViews:
 
         self.client.force_authenticate(user=self.captain)
 
-        # Add jira link, should keep slack
-        payload = {"external_links": {"jira": "https://jira.com/new"}}
+        # Add linear link, should keep slack
+        payload = {"external_links": {"linear": "https://linear.app/new"}}
         response = self.client.patch(
             f"/api/incidents/{incident.incident_number}/", payload, format="json"
         )
@@ -1336,7 +1336,7 @@ class TestIncidentAPIViews:
         data = response.json()
 
         assert data["external_links"]["slack"] == "https://slack.com/original"
-        assert data["external_links"]["jira"] == "https://jira.com/new"
+        assert data["external_links"]["linear"] == "https://linear.app/new"
 
     def test_update_existing_external_link(self):
         """Test updating an existing external link via PATCH"""
@@ -1385,13 +1385,13 @@ class TestIncidentAPIViews:
         )
         ExternalLink.objects.create(
             incident=incident,
-            type=ExternalLinkType.JIRA,
-            url="https://jira.com/test",
+            type=ExternalLinkType.LINEAR,
+            url="https://linear.app/test",
         )
 
         self.client.force_authenticate(user=self.captain)
 
-        # Delete slack link, keep jira
+        # Delete slack link, keep linear
         payload = {"external_links": {"slack": None}}
         response = self.client.patch(
             f"/api/incidents/{incident.incident_number}/", payload, format="json"
@@ -1399,12 +1399,12 @@ class TestIncidentAPIViews:
 
         assert response.status_code == 200
 
-        # Verify slack deleted, jira remains
+        # Verify slack deleted, linear remains
         response = self.client.get(f"/api/incidents/{incident.incident_number}/")
         data = response.json()
 
         assert "slack" not in data["external_links"]
-        assert data["external_links"]["jira"] == "https://jira.com/test"
+        assert data["external_links"]["linear"] == "https://linear.app/test"
 
     def test_invalid_external_link_type(self):
         """Test that invalid link types are rejected"""
@@ -1474,7 +1474,7 @@ class TestIncidentAPIViews:
             "reporter": self.reporter.email,
             "external_links": {
                 "slack": "https://slack.com/channel",
-                "jira": "https://jira.example.com/issue",
+                "linear": "https://linear.app/issue",
             },
         }
         response = self.client.post("/api/incidents/", payload, format="json")
@@ -1497,7 +1497,7 @@ class TestIncidentAPIViews:
         data = response.json()
         assert len(data["external_links"]) == 2
         assert data["external_links"]["slack"] == "https://slack.com/channel"
-        assert data["external_links"]["jira"] == "https://jira.example.com/issue"
+        assert data["external_links"]["linear"] == "https://linear.app/issue"
 
     def test_update_affected_service_tags_via_patch(self):
         """Test setting affected_service_tags via PATCH"""
