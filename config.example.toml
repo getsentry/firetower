@@ -18,6 +18,7 @@ severity_field = "customfield_11023"
 bot_token = ""
 team_id = "<slack-team-id>"
 participant_sync_throttle_seconds = 300
+signing_secret = ""
 
 [auth]
 iap_enabled = false
