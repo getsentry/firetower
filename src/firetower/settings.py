@@ -104,6 +104,7 @@ INSTALLED_APPS = [
     "firetower.auth",
     "firetower.incidents",
     "firetower.integrations",
+    "firetower.slack_app",
 ]
 
 MIDDLEWARE = [
@@ -208,6 +209,7 @@ JIRA = {
 SLACK = {
     "BOT_TOKEN": config.slack.bot_token,
     "TEAM_ID": config.slack.team_id,
+    "SIGNING_SECRET": config.slack.signing_secret,
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
