@@ -271,6 +271,12 @@ export function EditableTags({
               <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {showCreateOption && (
                   <button
+                    ref={
+                      focusedIndex === 0
+                        ? (el: HTMLButtonElement | null) =>
+                            el?.scrollIntoView({block: 'nearest'})
+                        : undefined
+                    }
                     type="button"
                     onClick={handleCreateTag}
                     disabled={isCreating}
@@ -294,6 +300,12 @@ export function EditableTags({
                   const optionIndex = showCreateOption ? index + 1 : index;
                   return (
                     <button
+                      ref={
+                        optionIndex === focusedIndex
+                          ? (el: HTMLButtonElement | null) =>
+                              el?.scrollIntoView({block: 'nearest'})
+                          : undefined
+                      }
                       key={suggestion}
                       type="button"
                       onClick={() => addTag(suggestion)}
