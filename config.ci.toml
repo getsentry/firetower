@@ -19,6 +19,7 @@ severity_field = ""
 bot_token = ""
 team_id = ""
 participant_sync_throttle_seconds = 300
+signing_secret = "test-signing-secret"
 
 [auth]
 iap_enabled = false
