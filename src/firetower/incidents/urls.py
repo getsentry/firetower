@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AvailabilityView,
     IncidentListCreateAPIView,
     IncidentRetrieveUpdateAPIView,
     TagListCreateAPIView,
@@ -17,6 +18,7 @@ urlpatterns = [
         incident_detail_ui,
         name="incident-detail-ui",
     ),
+    path("ui/availability/", AvailabilityView.as_view(), name="ui-availability"),
     # Service API endpoints
     path(
         "incidents/",

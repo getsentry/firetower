@@ -32,6 +32,15 @@ const MILESTONES: MilestoneConfig[] = [
   {field: 'time_recovered', label: 'Recovered'},
 ];
 
+function formatDowntime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours && minutes) return `${hours}h ${minutes}m`;
+  if (hours) return `${hours}h`;
+  if (minutes) return `${minutes}m`;
+  return `${seconds}s`;
+}
+
 function formatDateTime(date: Date | undefined): string {
   if (!date) return '';
 
@@ -71,6 +80,10 @@ function combineDateAndTime(date: Date, time: string): Date {
 
 export function MilestonesCard({incident}: MilestonesCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [draftDowntime, setDraftDowntime] = useState<string>(
+    incident.total_downtime != null ? String(Math.round(incident.total_downtime / 60)) : ''
+  );
+  const [downtimeError, setDowntimeError] = useState<string | null>(null);
   const [draftValues, setDraftValues] = useState<DraftValues>(() => ({
     time_started: parseIncidentDateTime(incident.time_started),
     time_detected: parseIncidentDateTime(incident.time_detected),
@@ -98,6 +111,8 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
   };
 
   const startEditing = () => {
+    setDraftDowntime(incident.total_downtime != null ? String(Math.round(incident.total_downtime / 60)) : '');
+    setDowntimeError(null);
     const drafts: DraftValues = {
       time_started: parseIncidentDateTime(incident.time_started),
       time_detected: parseIncidentDateTime(incident.time_detected),
@@ -127,11 +142,26 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
 
   const cancelEditing = () => {
     setIsEditing(false);
+    setDowntimeError(null);
   };
 
   const handleSave = async () => {
+    const trimmed = draftDowntime.trim();
+    if (trimmed !== '' && (!/^\d+$/.test(trimmed) || Number(trimmed) < 0)) {
+      setDowntimeError('Enter a whole number of seconds (e.g. 300 for 5 minutes)');
+      return;
+    }
+    setDowntimeError(null);
     setIsSaving(true);
     try {
+      const newDowntime = trimmed === '' ? null : parseInt(trimmed, 10) * 60;
+      if (newDowntime !== incident.total_downtime) {
+        await updateIncidentField.mutateAsync({
+          incidentId: incident.id,
+          field: 'total_downtime',
+          value: newDowntime,
+        });
+      }
       for (const {field} of MILESTONES) {
         const {date, time} = draftValues[field];
         const oldValue = incident[field] ? new Date(incident[field]) : undefined;
@@ -164,7 +194,7 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
   return (
     <Card>
       <div className="mb-space-lg flex items-center justify-between">
-        <h2 className="text-content-headings text-lg font-semibold">Milestones</h2>
+        <h2 className="text-content-headings text-lg font-semibold">Critical Times</h2>
         {!isEditing && (
           <Button variant="icon" onClick={startEditing} aria-label="Edit milestones">
             <Pencil className="h-4 w-4" />
@@ -198,6 +228,40 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
             </div>
           </div>
         ))}
+        <div className="flex items-center gap-space-md">
+          <div className="text-content-secondary w-20 flex-none text-sm font-medium">
+            Downtime
+          </div>
+          <div className="flex flex-1 items-center justify-end">
+            {isEditing ? (
+              <div className="flex flex-col items-end gap-space-xs">
+                <div className="flex items-center gap-space-xs">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={draftDowntime}
+                    onChange={e => {
+                      setDraftDowntime(e.target.value);
+                      setDowntimeError(null);
+                    }}
+                    placeholder="minutes"
+                    className="w-28 rounded-radius-sm border border-border-primary bg-background-primary px-space-sm py-space-xs text-right text-sm text-content-primary focus:border-content-accent focus:outline-none"
+                  />
+                  <span className="text-content-secondary text-xs">min</span>
+                </div>
+                {downtimeError && (
+                  <span className="text-xs text-content-danger">{downtimeError}</span>
+                )}
+              </div>
+            ) : (
+              <span className={`text-sm ${incident.total_downtime != null ? 'text-content-primary' : 'text-content-tertiary'}`}>
+                {incident.total_downtime != null
+                  ? formatDowntime(incident.total_downtime)
+                  : 'Not set'}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
       {isEditing && (
         <div className="mt-space-lg flex items-center justify-end gap-space-xs">

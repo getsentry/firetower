@@ -164,6 +164,11 @@ class Incident(models.Model):
     # Privacy
     is_private = models.BooleanField(default=False)
 
+    # Downtime tracking (stored in seconds)
+    total_downtime = models.IntegerField(
+        null=True, blank=True, help_text="Total downtime in seconds"
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -262,6 +267,35 @@ class Incident(models.Model):
         for link in self.external_links.all():
             links[link.type.lower()] = link.url
         return links
+
+    @property
+    def total_downtime_display(self) -> str | None:
+        """
+        Return total downtime as a human-readable string.
+
+        Examples: "1h 30m", "45m", "2h 15m 30s"
+        Returns None if total_downtime is not set.
+        """
+        if self.total_downtime is None:
+            return None
+
+        seconds = self.total_downtime
+        if seconds == 0:
+            return "0s"
+
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        secs = seconds % 60
+
+        parts = []
+        if hours > 0:
+            parts.append(f"{hours}h")
+        if minutes > 0:
+            parts.append(f"{minutes}m")
+        if secs > 0:
+            parts.append(f"{secs}s")
+
+        return " ".join(parts)
 
     def is_visible_to_user(self, user: User | AbstractUser) -> bool:
         """Check if incident is visible to the given user"""

@@ -32,6 +32,38 @@
     url('/fonts/rubik-medium.woff') format('woff');
 }
 
+/* Sentry-inspired dark color scheme */
+:root {
+  /* Page & surface backgrounds */
+  --tokens-color-background-tertiary: #18121e;
+  --tokens-color-background-primary: #1d1829;
+  --tokens-color-background-secondary: #2a2340;
+  --tokens-color-background-overlay: #1d1829;
+  --tokens-color-background-transparent-neutral-muted: rgba(255, 255, 255, 0.05);
+  --tokens-color-background-transparent-accent-muted: rgba(106, 95, 193, 0.15);
+
+  /* Text */
+  --tokens-color-content-headings: #ede8f5;
+  --tokens-color-content-primary: #cec4de;
+  --tokens-color-content-secondary: #9585b8;
+  --tokens-color-content-accent: #9d8fdf;
+  --tokens-color-content-disabled: #7a6b92;
+
+  /* Borders */
+  --tokens-color-border-primary: #3b3257;
+  --tokens-color-border-secondary: #302848;
+
+  /* Vibrant backgrounds */
+  --tokens-color-background-accent-vibrant: #7165c8;
+  --tokens-color-background-success-vibrant: #1f9e2a;
+  --tokens-color-background-danger-vibrant: #c94040;
+  --tokens-color-background-warning-vibrant: #b87c14;
+
+  /* Text on vibrant */
+  --tokens-color-content-on-vibrant-light: #ffffff;
+  --tokens-color-content-on-vibrant-dark: #ffffff;
+}
+
 /* Global styles */
 body {
   font-family: 'Rubik', sans-serif;
@@ -494,5 +526,36 @@ body {
   }
   .rounded-radius-full {
     border-radius: var(--tokens-size-radius-full);
+  }
+
+  /* Dark nav (Sentry-style) */
+  .bg-nav {
+    background-color: #1f1633;
+  }
+  .border-nav {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .text-nav-primary {
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .text-nav-secondary {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .hover\:text-nav-primary:hover {
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .bg-nav-active {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Availability cell backgrounds */
+  .bg-avail-good {
+    background-color: #1e6b28;
+  }
+  .bg-avail-warn {
+    background-color: #6b4d0a;
+  }
+  .bg-avail-bad {
+    background-color: #6b1a12;
   }
 }

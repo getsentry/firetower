@@ -13,8 +13,7 @@ const optionRowStyles = cva([
   'items-center',
   'rounded-radius-md',
   'transition-all',
-  'hover:bg-gray-100',
-  'dark:hover:bg-neutral-800',
+  'hover:bg-background-secondary',
   'p-space-xs',
   '-m-space-xs',
 ]);

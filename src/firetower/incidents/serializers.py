@@ -151,6 +151,7 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
             "time_analyzed",
             "time_mitigated",
             "time_recovered",
+            "total_downtime",
         ]
         read_only_fields = [
             "id",
@@ -365,10 +366,12 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "time_analyzed",
             "time_mitigated",
             "time_recovered",
+            "total_downtime",
         ]
         extra_kwargs = {
             "is_private": {"required": False},
             "service_tier": {"required": False},
+            "total_downtime": {"required": False},
         }
 
     def validate_status(self, value: str) -> str:

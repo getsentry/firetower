@@ -206,7 +206,7 @@ export function EditableTags({
     <div className={className}>
       {label && (
         <div className="mb-space-md gap-space-xs flex items-center">
-          <h3 className="text-size-md text-content-secondary font-semibold">{label}</h3>
+          <h3 className="text-size-md text-content-headings font-semibold">{label}</h3>
           <Button
             variant="icon"
             onClick={open}
