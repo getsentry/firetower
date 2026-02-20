@@ -2,7 +2,8 @@ import calendar
 import logging
 import re
 from dataclasses import asdict
-from datetime import datetime, tzinfo as TzInfo
+from datetime import datetime
+from datetime import tzinfo as TzInfo
 
 from django.conf import settings
 from django.db.models import Count, QuerySet, Sum
