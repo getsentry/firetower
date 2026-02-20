@@ -36,5 +36,8 @@ def handle_inc(ack: Any, body: dict, command: dict, respond: Any) -> None:
             respond(f"Unknown command: `{cmd} {subcommand}`. Try `{cmd} help`.")
         statsd.increment(f"{METRICS_PREFIX}.completed", tags=tags)
     except Exception:
+        logger.exception(
+            "Slash command failed: %s %s", command.get("command", "/inc"), subcommand
+        )
         statsd.increment(f"{METRICS_PREFIX}.failed", tags=tags)
         raise
