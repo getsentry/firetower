@@ -6,7 +6,7 @@ Usage:
     python manage.py seed_dev_data --clear   # wipe existing incidents first
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand

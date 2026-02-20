@@ -448,15 +448,21 @@ _HISTORY_YEARS = 3
 
 
 def _format_downtime(seconds: int | None) -> str | None:
-    if not seconds:
+    if seconds is None:
         return None
-    hours, remainder = divmod(seconds, 3600)
-    minutes = remainder // 60
-    if hours and minutes:
-        return f"{hours}h {minutes}m"
-    elif hours:
-        return f"{hours}h"
-    return f"{minutes}m"
+    if seconds == 0:
+        return "0s"
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    if secs > 0:
+        parts.append(f"{secs}s")
+    return " ".join(parts)
 
 
 def _get_month_periods(now: datetime) -> list[dict]:

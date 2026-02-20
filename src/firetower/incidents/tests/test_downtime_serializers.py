@@ -1,7 +1,6 @@
 """Tests for downtime parsing in serializers."""
 
 import pytest
-from rest_framework.exceptions import ValidationError
 
 from firetower.incidents.serializers import (
     format_downtime_seconds,
