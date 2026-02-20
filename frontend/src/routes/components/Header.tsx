@@ -43,7 +43,7 @@ export const Header = () => {
       <div className="px-space-md py-space-md md:px-space-xl mx-auto max-w-6xl">
         {isTopLevelRoute ? (
           <div className="flex items-center justify-between">
-            <div className="gap-space-md flex items-center">
+            <div className="flex items-center gap-space-md">
               <Link to="/" className="gap-space-sm flex items-center no-underline">
                 <img src="/firetower.svg" alt="Firetower" className="h-6 w-6" />
                 <span className="text-nav-primary text-xl font-semibold">Firetower</span>

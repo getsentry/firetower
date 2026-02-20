@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,6 +19,59 @@ from .models import (
     Tag,
     TagType,
 )
+
+
+def format_downtime_seconds(seconds: int | None) -> str | None:
+    """Format a number of seconds into a human-readable string like '1h 30m 45s'."""
+    if seconds is None:
+        return None
+    if seconds == 0:
+        return "0s"
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    if secs > 0:
+        parts.append(f"{secs}s")
+    return " ".join(parts)
+
+
+def parse_downtime_string(value: str) -> int:
+    """Parse a human-readable downtime string into seconds.
+
+    Accepts formats like '1h', '30m', '45s', '1h 30m', '2h 15m 30s'.
+    Case-insensitive. Whitespace between components is optional.
+    Raises ValueError for empty, invalid, or duplicate unit inputs.
+    """
+    if not value or not value.strip():
+        raise ValueError("Downtime string cannot be empty")
+
+    cleaned = re.sub(r"\s+", "", value.strip())
+    matches = re.findall(r"(\d+)([hHmMsS])", cleaned)
+
+    reconstructed = "".join(f"{n}{u}" for n, u in matches)
+    if not matches or reconstructed.lower() != cleaned.lower():
+        raise ValueError("Invalid downtime format. Use format like '1h 30m 45s'")
+
+    seen: set[str] = set()
+    total = 0
+    for num_str, unit in matches:
+        unit_lower = unit.lower()
+        if unit_lower in seen:
+            raise ValueError(f"Duplicate time unit '{unit_lower}'")
+        seen.add(unit_lower)
+        num = int(num_str)
+        if unit_lower == "h":
+            total += num * 3600
+        elif unit_lower == "m":
+            total += num * 60
+        elif unit_lower == "s":
+            total += num
+    return total
 
 
 @dataclass

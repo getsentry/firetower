@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useState} from 'react';
 import {ChevronLeft, ChevronRight} from 'lucide-react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute, Link} from '@tanstack/react-router';
@@ -143,10 +143,6 @@ function RegionTable({periods, selectedIndex, activePeriod}: RegionTableProps) {
   const [showIncidents, setShowIncidents] = useState(false);
   const [windowStart, setWindowStart] = useState(0);
 
-  useEffect(() => {
-    setWindowStart(0);
-  }, [activePeriod]);
-
   const visiblePeriods = periods.slice(windowStart, windowStart + MAX_VISIBLE_COLS);
   const canGoBack = windowStart > 0;
   const canGoForward = windowStart + MAX_VISIBLE_COLS < periods.length;
@@ -182,7 +178,7 @@ function RegionTable({periods, selectedIndex, activePeriod}: RegionTableProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-end gap-space-xs px-space-sm pb-space-sm">
+      <div className="flex items-center justify-end gap-space-xs pb-space-sm px-space-sm">
         <button
           onClick={() => setWindowStart(w => w - 1)}
           disabled={!canGoBack}
@@ -213,20 +209,20 @@ function RegionTable({periods, selectedIndex, activePeriod}: RegionTableProps) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left table-fixed">
+        <table className="w-full table-fixed border-collapse text-left">
           <colgroup>
             <col className="w-32" />
             {visiblePeriods.map((_, i) => <col key={i} />)}
           </colgroup>
           <thead>
             <tr className="border-secondary border-b">
-              <th className="py-space-sm px-space-sm text-size-sm font-medium text-content-secondary">
+              <th className="px-space-sm py-space-sm text-size-sm font-medium text-content-secondary">
                 Region
               </th>
               {visiblePeriods.map((p, i) => {
                 const globalIndex = windowStart + i;
                 return (
-                  <th key={p.label} className="py-space-sm px-space-sm text-size-sm font-medium">
+                  <th key={p.label} className="px-space-sm py-space-sm text-size-sm font-medium">
                     <Link
                       to="/availability/"
                       search={{period: activePeriod, subperiod: globalIndex}}
@@ -248,7 +244,7 @@ function RegionTable({periods, selectedIndex, activePeriod}: RegionTableProps) {
           <tbody>
             {sortedNames.map(name => (
               <tr key={name} className="border-secondary border-b">
-                <td className="py-space-sm px-space-sm text-lg text-content-headings align-top">
+                <td className="align-top px-space-sm py-space-sm text-lg text-content-headings">
                   {name}
                 </td>
                 {visiblePeriods.map((_, i) => {
@@ -297,13 +293,13 @@ function AvailabilityPage() {
   return (
     <div className="flex flex-col gap-space-xl">
       <div>
-        <h1 className="text-content-headings text-2xl font-semibold mb-space-xs">
+        <h1 className="mb-space-xs text-2xl font-semibold text-content-headings">
           Availability by Region
         </h1>
         <p className="text-content-secondary text-size-sm">{rangeLabel}</p>
       </div>
 
-      <div className="gap-space-2xs flex">
+      <div className="flex gap-space-2xs">
         <PeriodTab period="month" label="Month" isActive={period === 'month'} />
         <PeriodTab period="quarter" label="Quarter" isActive={period === 'quarter'} />
         <PeriodTab period="year" label="Year" isActive={period === 'year'} />
@@ -314,7 +310,7 @@ function AvailabilityPage() {
           periods={periods}
           selectedIndex={selectedIndex}
           activePeriod={period}
-          key={`${period}-${selectedIndex}`}
+          key={period}
         />
       </Card>
     </div>

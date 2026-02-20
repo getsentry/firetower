@@ -12,7 +12,13 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from firetower.incidents.models import Incident, IncidentSeverity, IncidentStatus, Tag, TagType
+from firetower.incidents.models import (
+    Incident,
+    IncidentSeverity,
+    IncidentStatus,
+    Tag,
+    TagType,
+)
 
 # ---------------------------------------------------------------------------
 # Seed data definition
