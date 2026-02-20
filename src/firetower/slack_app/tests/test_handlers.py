@@ -24,7 +24,7 @@ class TestHandleInc:
         ack.assert_called_once()
         respond.assert_called_once()
         response_text = respond.call_args[0][0]
-        assert "Firetower Incident Bot" in response_text
+        assert "Firetower Slack App" in response_text
         assert "/inc help" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
@@ -39,7 +39,7 @@ class TestHandleInc:
         ack.assert_called_once()
         respond.assert_called_once()
         response_text = respond.call_args[0][0]
-        assert "Firetower Incident Bot" in response_text
+        assert "Firetower Slack App" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
     def test_unknown_subcommand_returns_error(self, mock_statsd):
