@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 from django.conf import settings
 from django.http import HttpResponse
+from django.test import Client
 from rest_framework.test import APIClient
 
 
@@ -81,9 +82,10 @@ class TestSlackEventsEndpoint:
     def test_csrf_not_enforced(self, mock_handler):
         mock_handler.handle.return_value = HttpResponse(status=200)
 
+        csrf_client = Client(enforce_csrf_checks=True)
         body = "command=/inc&text=help"
         ts, signature = self._sign_request(body)
-        response = self.client.post(
+        response = csrf_client.post(
             self.url,
             data=body,
             content_type="application/x-www-form-urlencoded",
