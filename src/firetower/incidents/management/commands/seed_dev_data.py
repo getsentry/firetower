@@ -7,6 +7,7 @@ Usage:
 """
 
 from datetime import timedelta
+from typing import Any
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
@@ -479,14 +480,14 @@ INCIDENTS: list[tuple] = [
 class Command(BaseCommand):
     help = "Seed the database with realistic incident data for local development"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: Any) -> None:
         parser.add_argument(
             "--clear",
             action="store_true",
             help="Delete all existing incidents before seeding",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         if options["clear"]:
             count, _ = Incident.objects.all().delete()
             self.stdout.write(self.style.WARNING(f"Deleted {count} existing incidents"))
@@ -517,7 +518,7 @@ class Command(BaseCommand):
             incident = Incident(
                 title=title,
                 description=description,
-                impact=impact,
+                impact_summary=impact,
                 severity=severity,
                 status=status,
                 total_downtime=downtime_minutes * 60

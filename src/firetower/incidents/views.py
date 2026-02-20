@@ -2,7 +2,7 @@ import calendar
 import logging
 import re
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, tzinfo as TzInfo
 
 from django.conf import settings
 from django.db.models import Count, QuerySet, Sum
@@ -511,7 +511,7 @@ def _prev_fiscal_quarter(fy_year: int, quarter: int) -> tuple[int, int]:
 
 
 def _get_fiscal_quarter_bounds(
-    fy_year: int, quarter: int, tzinfo
+    fy_year: int, quarter: int, tzinfo: TzInfo
 ) -> tuple[datetime, datetime, str]:
     if quarter == 1:
         start = datetime(fy_year, 2, 1, tzinfo=tzinfo)
@@ -536,7 +536,7 @@ def _get_quarter_periods(now: datetime) -> list[dict]:
     periods = []
     fy_year, quarter = _current_fiscal_quarter(now)
     for _ in range(_HISTORY_QUARTERS):
-        start, end, label = _get_fiscal_quarter_bounds(fy_year, quarter, now.tzinfo)
+        start, end, label = _get_fiscal_quarter_bounds(fy_year, quarter, now.tzinfo)  # type: ignore[arg-type]
         periods.append({"label": label, "start": start, "end": end})
         fy_year, quarter = _prev_fiscal_quarter(fy_year, quarter)
     return periods
@@ -559,7 +559,7 @@ def _get_year_periods(now: datetime) -> list[dict]:
 
 
 def _compute_regions(
-    tags, period_start: datetime, period_end: datetime, now: datetime
+    tags: QuerySet[Tag], period_start: datetime, period_end: datetime, now: datetime
 ) -> list[dict]:
     effective_end = min(period_end, now)
     total_period_seconds = (period_end - period_start).total_seconds()

@@ -57,7 +57,7 @@ export const Header = () => {
                   Incidents
                 </Link>
                 <Link
-                  to="/availability/"
+                  to="/availability"
                   className={navLinkClass(pathname.startsWith('/availability'))}
                 >
                   Availability

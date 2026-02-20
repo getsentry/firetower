@@ -1,9 +1,10 @@
+import {beforeEach, describe, expect, it, vi} from 'bun:test';
+
 import React from 'react';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {createMemoryHistory, createRouter, RouterProvider} from '@tanstack/react-router';
 import {render, screen, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {beforeEach, describe, expect, it, vi} from 'bun:test';
 
 import {routeTree} from '../routeTree.gen';
 

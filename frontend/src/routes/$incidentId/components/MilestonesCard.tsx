@@ -81,7 +81,9 @@ function combineDateAndTime(date: Date, time: string): Date {
 export function MilestonesCard({incident}: MilestonesCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftDowntime, setDraftDowntime] = useState<string>(
-    incident.total_downtime != null ? String(Math.round(incident.total_downtime / 60)) : ''
+    incident.total_downtime != null
+      ? String(Math.round(incident.total_downtime / 60))
+      : ''
   );
   const [downtimeError, setDowntimeError] = useState<string | null>(null);
   const [draftValues, setDraftValues] = useState<DraftValues>(() => ({
@@ -111,7 +113,11 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
   };
 
   const startEditing = () => {
-    setDraftDowntime(incident.total_downtime != null ? String(Math.round(incident.total_downtime / 60)) : '');
+    setDraftDowntime(
+      incident.total_downtime != null
+        ? String(Math.round(incident.total_downtime / 60))
+        : ''
+    );
     setDowntimeError(null);
     const drafts: DraftValues = {
       time_started: parseIncidentDateTime(incident.time_started),
@@ -254,7 +260,9 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
                 )}
               </div>
             ) : (
-              <span className={`text-sm ${incident.total_downtime != null ? 'text-content-primary' : 'text-content-tertiary'}`}>
+              <span
+                className={`text-sm ${incident.total_downtime != null ? 'text-content-primary' : 'text-content-tertiary'}`}
+              >
                 {incident.total_downtime != null
                   ? formatDowntime(incident.total_downtime)
                   : 'Not set'}

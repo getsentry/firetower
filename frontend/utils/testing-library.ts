@@ -1,7 +1,8 @@
+import {afterEach, expect} from 'bun:test';
+
 import React from 'react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import {cleanup} from '@testing-library/react';
-import {afterEach, expect} from 'bun:test';
 
 // Polyfill React.act for React 19 compatibility (spencer: this is only an issue for my cursor-agent's shell it seems :shrug:)
 if (!React.act) {

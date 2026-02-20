@@ -1,11 +1,11 @@
 import {useState} from 'react';
-import {ChevronLeft, ChevronRight} from 'lucide-react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute, Link} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
 import {Card} from 'components/Card';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
+import {ChevronLeft, ChevronRight} from 'lucide-react';
 import {cn} from 'utils/cn';
 import {z} from 'zod';
 
@@ -70,7 +70,7 @@ interface PeriodTabProps {
 function PeriodTab({period, label, isActive}: PeriodTabProps) {
   return (
     <Link
-      to="/availability/"
+      to="/availability"
       search={{period}}
       preload="intent"
       aria-selected={isActive}
@@ -102,7 +102,10 @@ function AvailabilityCell({data, showIncidents}: AvailabilityCellProps) {
       <div className="text-xs text-content-secondary tabular-nums">
         {data.total_downtime_display ?? '—'}
         {data.incident_count > 0 && (
-          <> · {data.incident_count} {data.incident_count === 1 ? 'incident' : 'incidents'}</>
+          <>
+            {' '}
+            · {data.incident_count} {data.incident_count === 1 ? 'incident' : 'incidents'}
+          </>
         )}
       </div>
       {showIncidents && data.incidents.length > 0 && (
@@ -114,7 +117,7 @@ function AvailabilityCell({data, showIncidents}: AvailabilityCellProps) {
               className="flex items-baseline gap-space-xs"
             >
               <Link
-                to="/$incidentId/"
+                to="/$incidentId"
                 params={{incidentId: `INC-${incident.id}`}}
                 className="text-xs text-content-accent hover:underline font-medium shrink-0"
               >
@@ -156,9 +159,7 @@ function RegionTable({periods, selectedIndex, activePeriod}: RegionTableProps) {
   }
 
   // Build a lookup: periodIndex -> regionName -> RegionAvailability (full array for sorting)
-  const byPeriod = periods.map(p =>
-    Object.fromEntries(p.regions.map(r => [r.name, r]))
-  );
+  const byPeriod = periods.map(p => Object.fromEntries(p.regions.map(r => [r.name, r])));
 
   // Use the first period's region list as canonical (all periods have the same regions)
   const regionNames = periods[0].regions.map(r => r.name);
@@ -173,7 +174,7 @@ function RegionTable({periods, selectedIndex, activePeriod}: RegionTableProps) {
 
   const navButtonClass = cn(
     'flex items-center justify-center rounded-radius-sm p-space-xs transition-colors',
-    'text-content-secondary hover:text-content-primary hover:bg-background-secondary',
+    'text-content-secondary hover:text-content-primary hover:bg-background-secondary'
   );
 
   return (
@@ -212,7 +213,9 @@ function RegionTable({periods, selectedIndex, activePeriod}: RegionTableProps) {
         <table className="w-full table-fixed border-collapse text-left">
           <colgroup>
             <col className="w-32" />
-            {visiblePeriods.map((_, i) => <col key={i} />)}
+            {visiblePeriods.map((_, i) => (
+              <col key={i} />
+            ))}
           </colgroup>
           <thead>
             <tr className="border-secondary border-b">
@@ -222,9 +225,12 @@ function RegionTable({periods, selectedIndex, activePeriod}: RegionTableProps) {
               {visiblePeriods.map((p, i) => {
                 const globalIndex = windowStart + i;
                 return (
-                  <th key={p.label} className="px-space-sm py-space-sm text-size-sm font-medium">
+                  <th
+                    key={p.label}
+                    className="px-space-sm py-space-sm text-size-sm font-medium"
+                  >
                     <Link
-                      to="/availability/"
+                      to="/availability"
                       search={{period: activePeriod, subperiod: globalIndex}}
                       preload="intent"
                       className={cn(
@@ -281,7 +287,8 @@ function AvailabilityPage() {
   const {period = 'month', subperiod = 0} = Route.useSearch();
   const {data} = useSuspenseQuery(availabilityQueryOptions());
 
-  const periodsKey = period === 'month' ? 'months' : period === 'quarter' ? 'quarters' : 'years';
+  const periodsKey =
+    period === 'month' ? 'months' : period === 'quarter' ? 'quarters' : 'years';
   const periods = data[periodsKey];
   const selectedIndex = Math.min(subperiod, periods.length - 1);
 

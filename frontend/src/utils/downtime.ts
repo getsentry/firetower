@@ -1,8 +1,8 @@
 /**
  * Parse a human-readable downtime string to seconds.
- * 
+ *
  * Accepts formats like: "1h", "30m", "45s", "1h 30m", "2h 15m 30s"
- * 
+ *
  * @param downtimeStr - Human-readable downtime string
  * @returns Total seconds as number
  * @throws Error if format is invalid
@@ -56,7 +56,7 @@ export function parseDowntimeString(downtimeStr: string): number {
 
 /**
  * Format seconds to human-readable downtime string.
- * 
+ *
  * @param seconds - Total seconds (can be null)
  * @returns Human-readable string like "1h 30m" or null if input is null
  */
@@ -89,7 +89,7 @@ export function formatDowntimeSeconds(seconds: number | null): string | null {
 
 /**
  * Validate a downtime string without throwing errors.
- * 
+ *
  * @param downtimeStr - Human-readable downtime string
  * @returns true if valid, false otherwise
  */
