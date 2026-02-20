@@ -22,6 +22,7 @@ bot_token = "test-bot-token"
 team_id = "test-bot-id"
 participant_sync_throttle_seconds = 300
 app_token = "xapp-test-token"
+signing_secret = "test-signing-secret"
 incident_feed_channel_id = ""
 always_invited_ids = []
 incident_guide_message = ""
