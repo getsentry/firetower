@@ -18,7 +18,7 @@ jobs:
       WARDEN_MODEL: ${{ secrets.WARDEN_MODEL }}
       WARDEN_SENTRY_DSN: ${{ secrets.WARDEN_SENTRY_DSN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: getsentry/warden@v0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: getsentry/warden@1f9eace79906805de13786578aac58853d00cdc5 # v0
         with:
           anthropic-api-key: ${{ secrets.WARDEN_ANTHROPIC_API_KEY }}
