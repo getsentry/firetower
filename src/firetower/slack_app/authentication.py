@@ -60,8 +60,5 @@ class SlackSigningSecretAuthentication(BaseAuthentication):
             username=SERVICE_USERNAME,
             defaults={"is_active": True},
         )
-        if not user.has_usable_password():
-            user.set_unusable_password()
-            user.save(update_fields=["password"])
 
         return (user, None)
