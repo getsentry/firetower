@@ -470,8 +470,18 @@ def _get_month_periods(now: datetime) -> list[dict]:
     year, month = now.year, now.month
     for _ in range(_HISTORY_MONTHS):
         last_day = calendar.monthrange(year, month)[1]
-        start = now.replace(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
-        end = now.replace(year=year, month=month, day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+        start = now.replace(
+            year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        end = now.replace(
+            year=year,
+            month=month,
+            day=last_day,
+            hour=23,
+            minute=59,
+            second=59,
+            microsecond=999999,
+        )
         label = start.strftime("%B %Y")
         periods.append({"label": label, "start": start, "end": end})
         month -= 1
@@ -500,7 +510,9 @@ def _prev_fiscal_quarter(fy_year: int, quarter: int) -> tuple[int, int]:
     return fy_year, quarter - 1
 
 
-def _get_fiscal_quarter_bounds(fy_year: int, quarter: int, tzinfo) -> tuple[datetime, datetime, str]:
+def _get_fiscal_quarter_bounds(
+    fy_year: int, quarter: int, tzinfo
+) -> tuple[datetime, datetime, str]:
     if quarter == 1:
         start = datetime(fy_year, 2, 1, tzinfo=tzinfo)
         end = datetime(fy_year, 4, 30, 23, 59, 59, 999999, tzinfo=tzinfo)
@@ -546,7 +558,9 @@ def _get_year_periods(now: datetime) -> list[dict]:
     return periods
 
 
-def _compute_regions(tags, period_start: datetime, period_end: datetime, now: datetime) -> list[dict]:
+def _compute_regions(
+    tags, period_start: datetime, period_end: datetime, now: datetime
+) -> list[dict]:
     effective_end = min(period_end, now)
     total_period_seconds = (period_end - period_start).total_seconds()
     regions = []
@@ -557,8 +571,12 @@ def _compute_regions(tags, period_start: datetime, period_end: datetime, now: da
             created_at__lte=effective_end,
             total_downtime__isnull=False,
         ).order_by("-created_at")
-        total_downtime = incidents_qs.aggregate(total=Sum("total_downtime"))["total"] or 0
-        availability_pct = max(0.0, (total_period_seconds - total_downtime) / total_period_seconds * 100)
+        total_downtime = (
+            incidents_qs.aggregate(total=Sum("total_downtime"))["total"] or 0
+        )
+        availability_pct = max(
+            0.0, (total_period_seconds - total_downtime) / total_period_seconds * 100
+        )
         incident_list = [
             {
                 "id": inc.id,
@@ -569,14 +587,16 @@ def _compute_regions(tags, period_start: datetime, period_end: datetime, now: da
             }
             for inc in incidents_qs
         ]
-        regions.append({
-            "name": tag.name,
-            "total_downtime_seconds": total_downtime,
-            "total_downtime_display": _format_downtime(total_downtime),
-            "availability_percentage": round(availability_pct, 6),
-            "incident_count": len(incident_list),
-            "incidents": incident_list,
-        })
+        regions.append(
+            {
+                "name": tag.name,
+                "total_downtime_seconds": total_downtime,
+                "total_downtime_display": _format_downtime(total_downtime),
+                "availability_percentage": round(availability_pct, 6),
+                "incident_count": len(incident_list),
+                "incidents": incident_list,
+            }
+        )
     return regions
 
 
@@ -598,8 +618,10 @@ class AvailabilityView(APIView):
                 for p in raw_periods
             ]
 
-        return Response({
-            "months": build_periods(_get_month_periods(now)),
-            "quarters": build_periods(_get_quarter_periods(now)),
-            "years": build_periods(_get_year_periods(now)),
-        })
+        return Response(
+            {
+                "months": build_periods(_get_month_periods(now)),
+                "quarters": build_periods(_get_quarter_periods(now)),
+                "years": build_periods(_get_year_periods(now)),
+            }
+        )
