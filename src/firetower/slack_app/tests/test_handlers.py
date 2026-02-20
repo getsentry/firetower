@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock, call, patch
 
+import pytest
+
 from firetower.slack_app.bolt import handle_inc
 
 
@@ -90,10 +92,8 @@ class TestHandleInc:
         body = self._make_body(text="help")
         command = self._make_command()
 
-        try:
+        with pytest.raises(RuntimeError):
             handle_inc(ack=ack, body=body, command=command, respond=respond)
-        except RuntimeError:
-            pass
 
         mock_statsd.increment.assert_any_call(
             "slack_app.commands.submitted", tags=["subcommand:help"]

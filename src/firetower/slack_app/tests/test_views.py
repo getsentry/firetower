@@ -50,7 +50,7 @@ class TestSlackEventsEndpoint:
         assert response.status_code == 403
 
     def test_expired_timestamp_returns_403(self):
-        old_ts = str(int(time.time()) - 300)
+        old_ts = str(int(time.time()) - 600)
         body = "command=/inc&text=help"
         _, signature = self._sign_request(body, old_ts)
         response = self.client.post(

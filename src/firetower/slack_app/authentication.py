@@ -21,7 +21,7 @@ class SlackSigningSecretAuthentication(BaseAuthentication):
     configured signing secret. On success, returns a service user.
     """
 
-    MAX_TIMESTAMP_AGE_SECONDS = 120
+    MAX_TIMESTAMP_AGE_SECONDS = 300
 
     def authenticate(self, request: Request) -> tuple | None:
         django_request = request._request
