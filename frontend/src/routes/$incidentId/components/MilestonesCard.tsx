@@ -71,6 +71,9 @@ function combineDateAndTime(date: Date, time: string): Date {
 
 export function MilestonesCard({incident}: MilestonesCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [draftDowntime, setDraftDowntime] = useState<string>(
+    incident.total_downtime != null ? String(incident.total_downtime) : ''
+  );
   const [draftValues, setDraftValues] = useState<DraftValues>(() => ({
     time_started: parseIncidentDateTime(incident.time_started),
     time_detected: parseIncidentDateTime(incident.time_detected),
@@ -98,6 +101,9 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
   };
 
   const startEditing = () => {
+    setDraftDowntime(
+      incident.total_downtime != null ? String(incident.total_downtime) : ''
+    );
     const drafts: DraftValues = {
       time_started: parseIncidentDateTime(incident.time_started),
       time_detected: parseIncidentDateTime(incident.time_detected),
@@ -147,6 +153,15 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
           });
         }
       }
+      const newDowntime = draftDowntime.trim() === '' ? null : parseInt(draftDowntime, 10);
+      if (newDowntime !== incident.total_downtime) {
+        await updateIncidentField.mutateAsync({
+          incidentId: incident.id,
+          field: 'total_downtime',
+          value: newDowntime,
+        });
+      }
+
       setIsEditing(false);
     } finally {
       setIsSaving(false);
@@ -198,6 +213,34 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
             </div>
           </div>
         ))}
+        <div className="flex items-center gap-space-md">
+          <div className="text-content-secondary w-20 flex-none text-sm font-medium">
+            Downtime
+          </div>
+          <div className="flex flex-1 items-center justify-end">
+            {isEditing ? (
+              <div className="flex items-center gap-space-xs">
+                <input
+                  type="number"
+                  min="0"
+                  value={draftDowntime}
+                  onChange={e => setDraftDowntime(e.target.value)}
+                  placeholder="—"
+                  className="w-20 rounded-radius-sm border border-secondary bg-background-primary px-space-sm py-space-xs text-right text-sm focus:outline-none focus:ring-1"
+                />
+                <span className="text-content-secondary text-sm">min</span>
+              </div>
+            ) : (
+              <span
+                className={`text-sm ${incident.total_downtime != null ? 'text-content-primary' : 'text-content-tertiary'}`}
+              >
+                {incident.total_downtime != null
+                  ? `${incident.total_downtime} min`
+                  : 'Not set'}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
       {isEditing && (
         <div className="mt-space-lg flex items-center justify-end gap-space-xs">

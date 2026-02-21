@@ -170,6 +170,9 @@ class Incident(models.Model):
     participants_last_synced_at = models.DateTimeField(null=True, blank=True)
 
     # Milestone timestamps (for postmortem)
+    total_downtime = models.IntegerField(
+        null=True, blank=True, help_text="Total downtime in minutes"
+    )
     time_started = models.DateTimeField(null=True, blank=True)
     time_detected = models.DateTimeField(null=True, blank=True)
     time_analyzed = models.DateTimeField(null=True, blank=True)
