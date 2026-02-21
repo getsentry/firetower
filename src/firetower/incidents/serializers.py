@@ -367,6 +367,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "time_analyzed",
             "time_mitigated",
             "time_recovered",
+            "total_downtime",
         ]
         extra_kwargs = {
             "is_private": {"required": False},
