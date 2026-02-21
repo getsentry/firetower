@@ -170,6 +170,9 @@ class Incident(models.Model):
     participants_last_synced_at = models.DateTimeField(null=True, blank=True)
 
     # Milestone timestamps (for postmortem)
+    total_downtime = models.IntegerField(
+        null=True, blank=True, help_text="Total downtime in minutes"
+    )
     time_started = models.DateTimeField(null=True, blank=True)
     time_detected = models.DateTimeField(null=True, blank=True)
     time_analyzed = models.DateTimeField(null=True, blank=True)
@@ -254,6 +257,23 @@ class Incident(models.Model):
     def affected_region_tag_names(self) -> list[str]:
         """Return list of affected region names (uses prefetch cache if available)"""
         return sorted(tag.name for tag in self.affected_region_tags.all())
+
+    @property
+    def total_downtime_display(self) -> str | None:
+        """Return total downtime as a human-readable string (e.g. '1h 30m', '45m')."""
+        if self.total_downtime is None:
+            return None
+        minutes = self.total_downtime
+        if minutes == 0:
+            return "0m"
+        hours = minutes // 60
+        mins = minutes % 60
+        parts = []
+        if hours > 0:
+            parts.append(f"{hours}h")
+        if mins > 0:
+            parts.append(f"{mins}m")
+        return " ".join(parts)
 
     @property
     def external_links_dict(self) -> dict[str, str]:

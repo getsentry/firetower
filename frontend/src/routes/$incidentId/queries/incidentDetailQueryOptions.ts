@@ -51,6 +51,7 @@ const IncidentDetailSchema = z.object({
   time_analyzed: z.string().nullable(),
   time_mitigated: z.string().nullable(),
   time_recovered: z.string().nullable(),
+  total_downtime: z.number().int().nullable(),
 });
 
 const IncidentOrRedirectSchema = z.union([
