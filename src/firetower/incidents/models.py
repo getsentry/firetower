@@ -259,6 +259,23 @@ class Incident(models.Model):
         return sorted(tag.name for tag in self.affected_region_tags.all())
 
     @property
+    def total_downtime_display(self) -> str | None:
+        """Return total downtime as a human-readable string (e.g. '1h 30m', '45m')."""
+        if self.total_downtime is None:
+            return None
+        minutes = self.total_downtime
+        if minutes == 0:
+            return "0m"
+        hours = minutes // 60
+        mins = minutes % 60
+        parts = []
+        if hours > 0:
+            parts.append(f"{hours}h")
+        if mins > 0:
+            parts.append(f"{mins}m")
+        return " ".join(parts)
+
+    @property
     def external_links_dict(self) -> dict[str, str]:
         """Return external links as dict with lowercase keys (only includes existing links)"""
         links: dict[str, str] = {}

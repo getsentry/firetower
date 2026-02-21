@@ -495,4 +495,35 @@ body {
   .rounded-radius-full {
     border-radius: var(--tokens-size-radius-full);
   }
+
+  /* Dark nav */
+  .bg-nav {
+    background-color: #1f1633;
+  }
+  .border-nav {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .text-nav-primary {
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .text-nav-secondary {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .hover\:text-nav-primary:hover {
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .bg-nav-active {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Availability cell backgrounds */
+  .bg-avail-good {
+    background-color: #1e6b28;
+  }
+  .bg-avail-warn {
+    background-color: #6b4d0a;
+  }
+  .bg-avail-bad {
+    background-color: #6b1a12;
+  }
 }
