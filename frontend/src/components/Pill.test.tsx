@@ -27,8 +27,8 @@ describe('Pill', () => {
     );
     const pill = screen.getByTestId('pill');
 
-    expect(pill).toHaveClass('bg-background-danger-vibrant');
-    expect(pill).toHaveClass('text-content-on-vibrant-light');
+    expect(pill).toHaveClass('bg-background-transparent-danger-muted');
+    expect(pill).toHaveClass('text-content-danger');
   });
 
   it('accepts custom className', () => {

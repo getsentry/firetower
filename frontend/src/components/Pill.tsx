@@ -20,25 +20,18 @@ const pill = cva(
     variants: {
       variant: {
         // Status variants
-        Active: ['bg-background-danger-vibrant', 'text-content-on-vibrant-light'],
-        Mitigated: ['bg-background-warning-vibrant', 'text-content-on-vibrant-light'],
-        Postmortem: ['bg-background-accent-vibrant', 'text-content-on-vibrant-light'],
-        Done: ['bg-background-success-vibrant', 'text-content-on-vibrant-light'],
-        Cancelled: ['bg-background-secondary', 'text-content-secondary'],
+        Active: ['bg-background-transparent-danger-muted', 'text-content-danger'],
+        Mitigated: ['bg-background-transparent-warning-muted', 'text-content-warning'],
+        Postmortem: ['bg-background-transparent-accent-muted', 'text-content-accent'],
+        Done: ['bg-background-transparent-success-muted', 'text-content-success'],
         // Severity variants
         P0: ['bg-background-danger-vibrant', 'text-content-on-vibrant-light'],
-        P1: ['bg-background-danger-vibrant', 'text-content-on-vibrant-light'],
-        P2: ['bg-background-warning-vibrant', 'text-content-on-vibrant-light'],
-        P3: ['bg-background-accent-vibrant', 'text-content-on-vibrant-light'],
-        P4: ['bg-background-secondary', 'text-content-primary'],
-        // Service tier variants
-        T0: ['bg-background-danger-vibrant', 'text-content-on-vibrant-light'],
-        T1: ['bg-background-warning-vibrant', 'text-content-on-vibrant-light'],
-        T2: ['bg-background-accent-vibrant', 'text-content-on-vibrant-light'],
-        T3: ['bg-background-success-vibrant', 'text-content-on-vibrant-light'],
-        T4: ['bg-background-secondary', 'text-content-primary'],
+        P1: ['bg-background-transparent-danger-muted', 'text-content-danger'],
+        P2: ['bg-background-transparent-warning-muted', 'text-content-warning'],
+        P3: ['bg-background-transparent-accent-muted', 'text-content-accent'],
+        P4: ['bg-background-transparent-neutral-muted', 'text-content-secondary'],
         // Other variants
-        private: ['bg-background-danger-vibrant', 'text-content-on-vibrant-light'],
+        private: ['bg-background-transparent-danger-muted', 'text-content-danger'],
         default: ['bg-background-secondary', 'text-content-secondary'],
       },
     },
