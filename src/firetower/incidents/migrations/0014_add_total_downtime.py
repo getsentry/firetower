@@ -4,15 +4,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('incidents', '0013_add_tag_approved_field'),
+        ("incidents", "0013_add_tag_approved_field"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='incident',
-            name='total_downtime',
-            field=models.IntegerField(blank=True, help_text='Total downtime in minutes', null=True),
+            model_name="incident",
+            name="total_downtime",
+            field=models.IntegerField(
+                blank=True, help_text="Total downtime in minutes", null=True
+            ),
         ),
     ]

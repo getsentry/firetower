@@ -153,7 +153,8 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
           });
         }
       }
-      const newDowntime = draftDowntime.trim() === '' ? null : parseInt(draftDowntime, 10);
+      const newDowntime =
+        draftDowntime.trim() === '' ? null : parseInt(draftDowntime, 10);
       if (newDowntime !== incident.total_downtime) {
         await updateIncidentField.mutateAsync({
           incidentId: incident.id,

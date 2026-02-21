@@ -577,7 +577,9 @@ def _compute_regions(
         total_downtime_seconds = total_downtime_minutes * 60
         availability_pct = max(
             0.0,
-            (total_period_seconds - total_downtime_seconds) / total_period_seconds * 100,
+            (total_period_seconds - total_downtime_seconds)
+            / total_period_seconds
+            * 100,
         )
         incident_list = [
             {
