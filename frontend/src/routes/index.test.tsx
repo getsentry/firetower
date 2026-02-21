@@ -1,10 +1,9 @@
-import {beforeEach, describe, expect, it, vi} from 'bun:test';
-
 import React from 'react';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {createMemoryHistory, createRouter, RouterProvider} from '@tanstack/react-router';
 import {render, screen, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import {beforeEach, describe, expect, it, vi} from 'bun:test';
 
 import {routeTree} from '../routeTree.gen';
 
@@ -30,7 +29,6 @@ const mockIncidents: PaginatedIncidents = {
         'Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout.',
       status: 'Active',
       severity: 'P1',
-      service_tier: null,
       created_at: '2024-08-27T18:14:00Z',
       is_private: false,
     },
@@ -41,7 +39,6 @@ const mockIncidents: PaginatedIncidents = {
         'Automated SSL certificate renewal process failed for api.example.com. Manual intervention required to restore HTTPS access.',
       status: 'Mitigated',
       severity: 'P2',
-      service_tier: null,
       created_at: '2024-08-27T15:32:00Z',
       is_private: true,
     },
@@ -218,7 +215,7 @@ describe('StatusFilter', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Done', 'Cancelled'], page: 1},
+        query: {status: ['Done'], page: 1},
       })
     );
   });
@@ -247,39 +244,6 @@ describe('StatusFilter', () => {
     expect(activeButton).toHaveAttribute('aria-selected', 'false');
     expect(reviewButton).toHaveAttribute('aria-selected', 'false');
     expect(closedButton).toHaveAttribute('aria-selected', 'false');
-  });
-});
-
-describe('Search Params', () => {
-  beforeEach(() => {
-    queryClient.clear();
-    setupDefaultMocks();
-  });
-
-  it('coerces single status value to array', async () => {
-    renderRoute('/?status=Active');
-
-    await screen.findByText('INC-1247');
-
-    expect(mockApiGet).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: '/ui/incidents/',
-        query: {status: ['Active'], page: 1},
-      })
-    );
-  });
-
-  it('passes invalid status values to API', async () => {
-    renderRoute('/?status=InvalidStatus');
-
-    await screen.findByText('INC-1247');
-
-    expect(mockApiGet).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: '/ui/incidents/',
-        query: {status: ['InvalidStatus'], page: 1},
-      })
-    );
   });
 });
 

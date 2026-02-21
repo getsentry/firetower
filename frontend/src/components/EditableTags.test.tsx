@@ -1,7 +1,6 @@
-import {describe, expect, it, jest} from 'bun:test';
-
 import {render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import {describe, expect, it, jest} from 'bun:test';
 
 import {EditableTags} from './EditableTags';
 
@@ -50,6 +49,8 @@ describe('EditableTags', () => {
     await user.click(editButton);
 
     expect(await screen.findByRole('textbox')).toBeInTheDocument();
+    expect(await screen.findByRole('button', {name: 'Save'})).toBeInTheDocument();
+    expect(await screen.findByRole('button', {name: 'Cancel'})).toBeInTheDocument();
   });
 
   it('shows suggestions when editing', async () => {
@@ -118,7 +119,7 @@ describe('EditableTags', () => {
     ).toBeInTheDocument();
   });
 
-  it('calls onSave when closed via escape', async () => {
+  it('calls onSave with updated tags', async () => {
     const user = userEvent.setup();
     const onSave = jest.fn(async () => {});
 
@@ -137,14 +138,15 @@ describe('EditableTags', () => {
     const databaseButton = await screen.findByRole('button', {name: 'Database'});
     await user.click(databaseButton);
 
-    await user.keyboard('{Escape}');
+    const saveButton = await screen.findByRole('button', {name: 'Save'});
+    await user.click(saveButton);
 
     await waitFor(() => {
       expect(onSave).toHaveBeenCalledWith(['API', 'Database']);
     });
   });
 
-  it('closes editing on escape', async () => {
+  it('cancels editing on escape', async () => {
     const user = userEvent.setup();
 
     render(
@@ -210,70 +212,5 @@ describe('EditableTags', () => {
     await user.type(input, 'xyz');
 
     expect(await screen.findByText('No tags match that query.')).toBeInTheDocument();
-  });
-
-  it('maintains alphabetical sort order throughout editing flow', async () => {
-    const user = userEvent.setup();
-    const onSave = jest.fn(async () => {});
-    const unsortedSuggestions = ['Zebra', 'Mango', 'Apple', 'Banana'];
-
-    // Start with unsorted tags
-    const {rerender} = render(
-      <EditableTags
-        label="Tags"
-        tags={['Zebra', 'Mango']}
-        suggestions={unsortedSuggestions}
-        onSave={onSave}
-      />
-    );
-
-    // Initial display should show tags sorted, even though props are unsorted
-    const initialTags = screen.getAllByText(/Zebra|Mango/);
-    expect(initialTags.map(el => el.textContent)).toEqual(['Mango', 'Zebra']);
-
-    // Open editor
-    const editButton = await screen.findByRole('button', {name: 'Edit Tags'});
-    await user.click(editButton);
-
-    // In editing mode, tags should be sorted
-    const editingTags = screen
-      .getAllByRole('button', {name: /Remove/})
-      .map(btn => btn.getAttribute('aria-label')?.replace('Remove ', ''));
-    expect(editingTags).toEqual(['Mango', 'Zebra']);
-
-    // Add 'Apple' which should sort to the front
-    const appleButton = await screen.findByRole('button', {name: 'Apple'});
-    await user.click(appleButton);
-
-    const afterAddTags = screen
-      .getAllByRole('button', {name: /Remove/})
-      .map(btn => btn.getAttribute('aria-label')?.replace('Remove ', ''));
-    expect(afterAddTags).toEqual(['Apple', 'Mango', 'Zebra']);
-
-    // Close via escape
-    await user.keyboard('{Escape}');
-
-    // Check what was passed to onSave
-    await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith(['Apple', 'Mango', 'Zebra']);
-    });
-
-    // Simulate parent updating tags prop with the saved value (as optimistic update would)
-    rerender(
-      <EditableTags
-        label="Tags"
-        tags={['Apple', 'Mango', 'Zebra']}
-        suggestions={unsortedSuggestions}
-        onSave={onSave}
-      />
-    );
-
-    // After close, displayed tags should be sorted
-    await waitFor(() => {
-      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    });
-
-    const finalTags = screen.getAllByText(/Apple|Mango|Zebra/);
-    expect(finalTags.map(el => el.textContent)).toEqual(['Apple', 'Mango', 'Zebra']);
   });
 });

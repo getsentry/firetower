@@ -1,7 +1,6 @@
-import {describe, expect, it, jest} from 'bun:test';
-
 import {render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import {describe, expect, it, jest} from 'bun:test';
 
 import {EditablePill} from './EditablePill';
 

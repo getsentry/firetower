@@ -1,7 +1,6 @@
-import {describe, expect, it, jest} from 'bun:test';
-
 import {render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import {describe, expect, it, jest} from 'bun:test';
 
 import {OverflowMenu} from './OverflowMenu';
 
@@ -19,7 +18,7 @@ describe('OverflowMenu', () => {
 
     await user.click(screen.getByRole('button', {name: 'More actions'}));
 
-    expect(screen.getByRole('menuitem')).toBeInTheDocument();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
   it('shows "Convert to private incident" when incident is public', async () => {
@@ -123,12 +122,12 @@ describe('OverflowMenu', () => {
     );
 
     await user.click(screen.getByRole('button', {name: 'More actions'}));
-    expect(screen.getByRole('menuitem')).toBeInTheDocument();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
 
     await user.click(screen.getByText('Outside'));
 
     await waitFor(() => {
-      expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     });
   });
 

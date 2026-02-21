@@ -1,10 +1,9 @@
-import {beforeEach, describe, expect, it, vi} from 'bun:test';
-
 import React from 'react';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {createMemoryHistory, createRouter, RouterProvider} from '@tanstack/react-router';
 import {render, screen} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import {beforeEach, describe, expect, it, vi} from 'bun:test';
 
 import {routeTree} from '../../routeTree.gen';
 import type {IncidentDetail} from '../$incidentId/queries/incidentDetailQueryOptions';
@@ -30,7 +29,6 @@ const mockIncidents: PaginatedIncidents = {
         'Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout.',
       status: 'Active',
       severity: 'P1',
-      service_tier: null,
       created_at: '2024-08-27T18:14:00Z',
       is_private: false,
     },
@@ -41,7 +39,6 @@ const mockIncidents: PaginatedIncidents = {
         'Automated SSL certificate renewal process failed for api.example.com. Manual intervention required to restore HTTPS access.',
       status: 'Mitigated',
       severity: 'P2',
-      service_tier: null,
       created_at: '2024-08-27T15:32:00Z',
       is_private: true,
     },
@@ -53,17 +50,14 @@ const mockIncidentDetail: IncidentDetail = {
   title: 'Database Connection Pool Exhausted',
   description:
     'Users experiencing 500 errors when trying to access their dashboard. Database connection pool appears to be exhausted, causing new requests to timeout.',
-  impact_summary: 'High - affecting 30% of users',
+  impact: 'High - affecting 30% of users',
   status: 'Active',
   severity: 'P1',
-  service_tier: null,
   created_at: '2024-08-27T18:14:00Z',
   updated_at: '2024-08-27T19:30:00Z',
   is_private: false,
-  affected_service_tags: ['Authentication', 'Database'],
-  affected_region_tags: [],
+  affected_area_tags: ['Authentication', 'Database'],
   root_cause_tags: ['Connection pool exhaustion', 'Memory leak in connection handler'],
-  impact_type_tags: [],
   participants: [
     {
       name: 'John Doe',
@@ -74,11 +68,6 @@ const mockIncidentDetail: IncidentDetail = {
   external_links: {
     slack: 'https://slack.com/archives/C123456',
   },
-  time_started: null,
-  time_detected: null,
-  time_analyzed: null,
-  time_mitigated: null,
-  time_recovered: null,
 };
 
 const mockCurrentUser: CurrentUser = {
@@ -181,7 +170,7 @@ describe('Header - Incident Detail Route', () => {
         return Promise.resolve(mockIncidents);
       }
       if (args.path === '/ui/incidents/INC-1247/') {
-        return Promise.resolve({incident: mockIncidentDetail});
+        return Promise.resolve(mockIncidentDetail);
       }
       if (args.path === '/ui/users/me/') {
         return Promise.resolve(mockCurrentUser);
@@ -310,7 +299,7 @@ describe('Header - User Avatar', () => {
         return Promise.resolve(mockIncidents);
       }
       if (args.path === '/ui/incidents/INC-1247/') {
-        return Promise.resolve({incident: mockIncidentDetail});
+        return Promise.resolve(mockIncidentDetail);
       }
       if (args.path === '/ui/users/me/') {
         return Promise.resolve(mockCurrentUser);
@@ -336,7 +325,7 @@ describe('Header - sessionStorage Handling', () => {
         return Promise.resolve(mockIncidents);
       }
       if (args.path === '/ui/incidents/INC-1247/') {
-        return Promise.resolve({incident: mockIncidentDetail});
+        return Promise.resolve(mockIncidentDetail);
       }
       if (args.path === '/ui/users/me/') {
         return Promise.resolve(mockCurrentUser);
@@ -391,6 +380,6 @@ describe('Header - sessionStorage Handling', () => {
 
     stored = sessionStorage.getItem(STORAGE_KEY);
     parsed = JSON.parse(stored!);
-    expect(parsed).toEqual({status: ['Done', 'Cancelled']});
+    expect(parsed).toEqual({status: ['Done']});
   });
 });
