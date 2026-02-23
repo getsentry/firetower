@@ -20,7 +20,7 @@ export function AvailabilityCell({data, showIncidents}: AvailabilityCellProps) {
         {formatAvailability(pct)}
       </div>
       <div className="text-xs text-content-secondary tabular-nums">
-        {data.total_downtime_display ?? '—'}
+        {data.total_downtime_display ? data.total_downtime_display : '—'}
         {data.incident_count > 0 && (
           <>
             {' '}
@@ -33,7 +33,7 @@ export function AvailabilityCell({data, showIncidents}: AvailabilityCellProps) {
           {data.incidents.map(incident => (
             <div
               key={incident.id}
-              title={`INC-${incident.id} · ${incident.title} · ${incident.total_downtime_display ?? '—'}`}
+              title={`INC-${incident.id} · ${incident.title} · ${incident.total_downtime_display ? incident.total_downtime_display : '—'}`}
               className="flex items-baseline gap-space-xs"
             >
               <Link
@@ -44,7 +44,7 @@ export function AvailabilityCell({data, showIncidents}: AvailabilityCellProps) {
                 INC-{incident.id}
               </Link>
               <span className="text-xs text-content-secondary tabular-nums shrink-0 ml-auto">
-                {incident.total_downtime_display ?? '—'}
+                {incident.total_downtime_display ? incident.total_downtime_display : '—'}
               </span>
             </div>
           ))}
