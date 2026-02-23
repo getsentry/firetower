@@ -1,12 +1,13 @@
 import calendar
 import logging
 import re
+from collections import defaultdict
 from dataclasses import asdict
 from datetime import datetime
 from datetime import tzinfo as TzInfo
 
 from django.conf import settings
-from django.db.models import Count, QuerySet, Sum
+from django.db.models import Count, QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -557,23 +558,24 @@ def _get_year_periods(now: datetime) -> list[dict]:
 
 
 def _compute_regions(
-    tags: QuerySet[Tag], period_start: datetime, period_end: datetime, now: datetime
+    tags: list[Tag],
+    period_start: datetime,
+    period_end: datetime,
+    now: datetime,
+    incidents_by_tag: dict[int, list[Incident]],
 ) -> list[dict]:
     effective_end = min(period_end, now)
     total_period_seconds = (period_end - period_start).total_seconds()
     regions = []
     for tag in tags:
-        incidents_qs = Incident.objects.filter(
-            affected_region_tags=tag,
-            created_at__gte=period_start,
-            created_at__lte=effective_end,
-            total_downtime__isnull=False,
-            service_tier="T0",
-        ).order_by("-created_at")
+        tag_incidents = [
+            inc
+            for inc in incidents_by_tag.get(tag.id, [])
+            if period_start <= inc.created_at <= effective_end
+        ]
+        tag_incidents.sort(key=lambda inc: inc.created_at, reverse=True)
         # total_downtime is stored in minutes; convert to seconds for availability calculation
-        total_downtime_minutes = (
-            incidents_qs.aggregate(total=Sum("total_downtime"))["total"] or 0
-        )
+        total_downtime_minutes = sum(inc.total_downtime for inc in tag_incidents)
         total_downtime_seconds = total_downtime_minutes * 60
         availability_pct = max(
             0.0,
@@ -589,7 +591,7 @@ def _compute_regions(
                 "total_downtime_minutes": inc.total_downtime,
                 "total_downtime_display": inc.total_downtime_display,
             }
-            for inc in incidents_qs
+            for inc in tag_incidents
         ]
         regions.append(
             {
@@ -609,7 +611,29 @@ class AvailabilityView(APIView):
 
     def get(self, request: Request) -> Response:
         now = timezone.now()
-        tags = Tag.objects.filter(type=TagType.AFFECTED_REGION).order_by("name")
+        tags = list(Tag.objects.filter(type=TagType.AFFECTED_REGION).order_by("name"))
+
+        month_periods = _get_month_periods(now)
+        quarter_periods = _get_quarter_periods(now)
+        year_periods = _get_year_periods(now)
+        all_periods = month_periods + quarter_periods + year_periods
+
+        # Fetch all relevant incidents in 2 queries (fetch + prefetch),
+        # then filter per period×tag in Python to avoid 46×N DB queries.
+        incidents_by_tag: dict[int, list[Incident]] = defaultdict(list)
+        if all_periods and tags:
+            earliest_start = min(p["start"] for p in all_periods)
+            incidents = list(
+                Incident.objects.filter(
+                    created_at__gte=earliest_start,
+                    created_at__lte=now,
+                    total_downtime__isnull=False,
+                    service_tier="T0",
+                ).prefetch_related("affected_region_tags")
+            )
+            for incident in incidents:
+                for tag in incident.affected_region_tags.all():
+                    incidents_by_tag[tag.id].append(incident)
 
         def build_periods(raw_periods: list[dict]) -> list[dict]:
             return [
@@ -617,15 +641,17 @@ class AvailabilityView(APIView):
                     "label": p["label"],
                     "start": p["start"].isoformat(),
                     "end": p["end"].isoformat(),
-                    "regions": _compute_regions(tags, p["start"], p["end"], now),
+                    "regions": _compute_regions(
+                        tags, p["start"], p["end"], now, incidents_by_tag
+                    ),
                 }
                 for p in raw_periods
             ]
 
         return Response(
             {
-                "months": build_periods(_get_month_periods(now)),
-                "quarters": build_periods(_get_quarter_periods(now)),
-                "years": build_periods(_get_year_periods(now)),
+                "months": build_periods(month_periods),
+                "quarters": build_periods(quarter_periods),
+                "years": build_periods(year_periods),
             }
         )
