@@ -1,3 +1,4 @@
+import type {ReactNode} from 'react';
 import {useCallback, useState} from 'react';
 import {cva} from 'class-variance-authority';
 import {cn} from 'utils/cn';
@@ -5,6 +6,7 @@ import {cn} from 'utils/cn';
 import {Pill, type PillProps} from './Pill';
 import {Popover, PopoverContent, PopoverTrigger} from './Popover';
 import {Spinner} from './Spinner';
+import {Tooltip, TooltipContent, TooltipTrigger} from './Tooltip';
 
 const optionRowStyles = cva([
   'w-full',
@@ -39,6 +41,7 @@ export interface EditablePillProps<T extends string> {
   className?: string;
   getVariant?: (value: T) => PillProps['variant'];
   placeholder?: string;
+  disabledOptions?: Partial<Record<T, ReactNode>>;
 }
 
 export function EditablePill<T extends string>({
@@ -48,6 +51,7 @@ export function EditablePill<T extends string>({
   className,
   getVariant,
   placeholder = 'Not set',
+  disabledOptions,
 }: EditablePillProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -103,13 +107,16 @@ export function EditablePill<T extends string>({
         case 'Enter':
         case ' ':
           event.preventDefault();
-          if (focusedIndex >= 0) {
+          if (
+            focusedIndex >= 0 &&
+            !(disabledOptions && options[focusedIndex] in disabledOptions)
+          ) {
             handleSelect(options[focusedIndex]);
           }
           break;
       }
     },
-    [isSaving, isOpen, focusedIndex, options, handleSelect]
+    [isSaving, isOpen, focusedIndex, options, handleSelect, disabledOptions]
   );
 
   const variant = value
@@ -140,23 +147,42 @@ export function EditablePill<T extends string>({
               ? getVariant(option)
               : (option as PillProps['variant']);
             const isFocused = index === focusedIndex;
-            return (
+            const isDisabled = disabledOptions !== undefined && option in disabledOptions;
+            const disabledMessage = disabledOptions?.[option];
+
+            const row = (
               <div
                 key={option}
                 tabIndex={-1}
                 className={cn(
                   optionRowStyles(),
-                  isFocused && 'bg-gray-100 dark:bg-neutral-700'
+                  isFocused && 'bg-gray-100 dark:bg-neutral-700',
+                  isDisabled &&
+                    'cursor-default opacity-50 hover:bg-transparent dark:hover:bg-transparent'
                 )}
-                onClick={() => handleSelect(option)}
+                onClick={isDisabled ? undefined : () => handleSelect(option)}
                 role="option"
                 aria-selected={option === value}
+                aria-disabled={isDisabled}
               >
                 <Pill variant={optionVariant} className={cn(optionStyles())}>
                   {option}
                 </Pill>
               </div>
             );
+
+            if (isDisabled) {
+              return (
+                <Tooltip key={option}>
+                  <TooltipTrigger asChild>{row}</TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    {disabledMessage}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return row;
           })}
         </div>
       </PopoverContent>
