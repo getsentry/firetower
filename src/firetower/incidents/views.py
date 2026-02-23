@@ -624,11 +624,14 @@ class AvailabilityView(APIView):
         if all_periods and tags:
             earliest_start = min(p["start"] for p in all_periods)
             incidents = list(
-                Incident.objects.filter(
-                    created_at__gte=earliest_start,
-                    created_at__lte=now,
-                    total_downtime__isnull=False,
-                    service_tier="T0",
+                filter_visible_to_user(
+                    Incident.objects.filter(
+                        created_at__gte=earliest_start,
+                        created_at__lte=now,
+                        total_downtime__isnull=False,
+                        service_tier="T0",
+                    ),
+                    request.user,
                 ).prefetch_related("affected_region_tags")
             )
             for incident in incidents:
