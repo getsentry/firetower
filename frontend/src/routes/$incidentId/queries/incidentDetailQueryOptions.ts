@@ -21,7 +21,6 @@ const ParticipantSchema = z.object({
 
 const ExternalLinksSchema = z.object({
   slack: z.string().optional(),
-  jira: z.string().optional(),
   datadog: z.string().optional(),
   pagerduty: z.string().optional(),
   statuspage: z.string().optional(),
