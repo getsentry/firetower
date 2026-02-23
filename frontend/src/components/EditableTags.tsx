@@ -37,6 +37,7 @@ export function EditableTags({
   const [isCreating, setIsCreating] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const focusedOptionRef = useRef<HTMLButtonElement>(null);
 
   const resetState = () => {
     setInputValue('');
@@ -183,6 +184,10 @@ export function EditableTags({
   };
 
   useEffect(() => {
+    focusedOptionRef.current?.scrollIntoView({block: 'nearest'});
+  }, [focusedIndex]);
+
+  useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
     }
@@ -271,6 +276,7 @@ export function EditableTags({
               <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {showCreateOption && (
                   <button
+                    ref={focusedIndex === 0 ? focusedOptionRef : undefined}
                     type="button"
                     onClick={handleCreateTag}
                     disabled={isCreating}
@@ -294,6 +300,7 @@ export function EditableTags({
                   const optionIndex = showCreateOption ? index + 1 : index;
                   return (
                     <button
+                      ref={optionIndex === focusedIndex ? focusedOptionRef : undefined}
                       key={suggestion}
                       type="button"
                       onClick={() => addTag(suggestion)}
