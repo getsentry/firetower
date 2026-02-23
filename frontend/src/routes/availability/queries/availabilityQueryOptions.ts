@@ -32,6 +32,9 @@ const AvailabilitySchema = z.object({
   years: z.array(PeriodDataSchema),
 });
 
+export const PeriodSchema = z.enum(['month', 'quarter', 'year']);
+export type Period = z.infer<typeof PeriodSchema>;
+
 export type RegionAvailability = z.infer<typeof RegionAvailabilitySchema>;
 export type IncidentSummary = z.infer<typeof IncidentSummarySchema>;
 export type PeriodData = z.infer<typeof PeriodDataSchema>;

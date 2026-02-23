@@ -3,10 +3,8 @@ import {Link} from '@tanstack/react-router';
 import {ChevronLeft, ChevronRight} from 'lucide-react';
 import {cn} from 'utils/cn';
 
-import type {PeriodData} from '../queries/availabilityQueryOptions';
+import type {Period, PeriodData} from '../queries/availabilityQueryOptions';
 import {AvailabilityCell} from './AvailabilityCell';
-
-type Period = 'month' | 'quarter' | 'year';
 
 function availabilityBgClass(pct: number): string {
   if (pct >= 99.9) return 'bg-avail-good';

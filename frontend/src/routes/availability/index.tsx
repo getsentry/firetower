@@ -6,13 +6,11 @@ import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {z} from 'zod';
 
-import {availabilityQueryOptions} from './queries/availabilityQueryOptions';
+import {availabilityQueryOptions, PeriodSchema} from './queries/availabilityQueryOptions';
 import {PeriodTab} from './components/PeriodTab';
 import {RegionTable} from './components/RegionTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-const PeriodSchema = z.enum(['month', 'quarter', 'year']);
 
 const availabilitySearchSchema = z.object({
   period: PeriodSchema.optional(),
@@ -42,12 +40,14 @@ export const Route = createFileRoute('/availability/')({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const {month, quarter, year} = PeriodSchema.enum;
+
 function AvailabilityPage() {
-  const {period = 'month', subperiod = 0} = Route.useSearch();
+  const {period = month, subperiod = 0} = Route.useSearch();
   const {data} = useSuspenseQuery(availabilityQueryOptions());
 
   const periodsKey =
-    period === 'month' ? 'months' : period === 'quarter' ? 'quarters' : 'years';
+    period === month ? 'months' : period === quarter ? 'quarters' : 'years';
   const periods = data[periodsKey];
   const selectedIndex = Math.min(subperiod, periods.length - 1);
 
@@ -65,9 +65,9 @@ function AvailabilityPage() {
       </div>
 
       <div className="flex gap-space-2xs">
-        <PeriodTab period="month" label="Month" isActive={period === 'month'} />
-        <PeriodTab period="quarter" label="Quarter" isActive={period === 'quarter'} />
-        <PeriodTab period="year" label="Year" isActive={period === 'year'} />
+        <PeriodTab period={month} label="Month" isActive={period === month} />
+        <PeriodTab period={quarter} label="Quarter" isActive={period === quarter} />
+        <PeriodTab period={year} label="Year" isActive={period === year} />
       </div>
 
       <Card>

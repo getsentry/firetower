@@ -1,7 +1,7 @@
 import {Link} from '@tanstack/react-router';
 import {cn} from 'utils/cn';
 
-type Period = 'month' | 'quarter' | 'year';
+import type {Period} from '../queries/availabilityQueryOptions';
 
 interface PeriodTabProps {
   period: Period;
