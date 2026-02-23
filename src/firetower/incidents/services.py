@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
+from firetower.auth.models import ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import ExternalLinkType, Incident
 from firetower.integrations.services import SlackService
@@ -114,3 +115,46 @@ def sync_incident_participants_from_slack(
     )
 
     return stats
+
+
+def sync_incident_to_slack(incident: Incident) -> None:
+    """
+    Sync incident changes to Slack channel topic.
+
+    Updates the Slack channel topic with the incident's title, severity, and captain.
+    """
+    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+
+    if not slack_link:
+        logger.warning(f"No Slack link found for incident {incident.id}")
+        return
+
+    channel_id = _slack_service.parse_channel_id_from_url(slack_link.url)
+
+    if not channel_id:
+        logger.warning(f"Could not parse channel ID from URL: {slack_link.url}")
+        return
+
+    if incident.captain:
+        slack_profile = incident.captain.external_profiles.filter(
+            type=ExternalProfileType.SLACK
+        ).first()
+        if slack_profile:
+            captain_display = f"<@{slack_profile.external_id}>"
+        else:
+            captain_display = incident.captain.get_full_name()
+    else:
+        captain_display = "None"
+
+    # Slack topic limit is 250 chars, truncate title to fit
+    prefix = f"[{incident.severity}] {incident.incident_number} "
+    suffix = f" | IC: {captain_display}"
+    max_title_len = 250 - len(prefix) - len(suffix)
+    title = incident.title[:max_title_len]
+
+    topic = f"{prefix}{title}{suffix}"
+
+    if _slack_service.update_channel_topic(channel_id, topic):
+        logger.info(f"Successfully updated topic for incident {incident.id}")
+    else:
+        logger.error(f"Failed to update topic for incident {incident.id}")

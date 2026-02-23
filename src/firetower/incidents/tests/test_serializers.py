@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -14,6 +16,7 @@ from firetower.incidents.models import (
 from firetower.incidents.serializers import (
     IncidentDetailUISerializer,
     IncidentListUISerializer,
+    IncidentWriteSerializer,
 )
 
 
@@ -143,3 +146,87 @@ class TestIncidentDetailUISerializer:
         )
         assert "jira" not in data["external_links"]  # Not set, so not included
         assert len(data["external_links"]) == 1
+
+
+@pytest.mark.django_db
+class TestIncidentWriteSerializerSlackSync:
+    @pytest.fixture
+    def incident(self):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Jane",
+            last_name="Captain",
+        )
+        reporter = User.objects.create_user(
+            username="reporter@example.com",
+            email="reporter@example.com",
+            first_name="John",
+            last_name="Reporter",
+        )
+        return Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=captain,
+            reporter=reporter,
+        )
+
+    @pytest.fixture
+    def new_captain(self):
+        return User.objects.create_user(
+            username="newcaptain@example.com",
+            email="newcaptain@example.com",
+            first_name="New",
+            last_name="Captain",
+        )
+
+    @patch("firetower.incidents.serializers.sync_incident_to_slack")
+    def test_syncs_on_title_change(self, mock_sync, incident):
+        serializer = IncidentWriteSerializer(
+            incident, data={"title": "New Title"}, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        mock_sync.assert_called_once_with(incident)
+
+    @patch("firetower.incidents.serializers.sync_incident_to_slack")
+    def test_syncs_on_severity_change(self, mock_sync, incident):
+        serializer = IncidentWriteSerializer(
+            incident, data={"severity": IncidentSeverity.P2}, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        mock_sync.assert_called_once_with(incident)
+
+    @patch("firetower.incidents.serializers.sync_incident_to_slack")
+    def test_syncs_on_captain_change(self, mock_sync, incident, new_captain):
+        serializer = IncidentWriteSerializer(
+            incident, data={"captain": new_captain.email}, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        mock_sync.assert_called_once_with(incident)
+
+    @patch("firetower.incidents.serializers.sync_incident_to_slack")
+    def test_does_not_sync_on_description_change(self, mock_sync, incident):
+        serializer = IncidentWriteSerializer(
+            incident, data={"description": "Updated description"}, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        mock_sync.assert_not_called()
+
+    @patch("firetower.incidents.serializers.sync_incident_to_slack")
+    def test_does_not_sync_on_status_change(self, mock_sync, incident):
+        serializer = IncidentWriteSerializer(
+            incident, data={"status": IncidentStatus.MITIGATED}, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        mock_sync.assert_not_called()
