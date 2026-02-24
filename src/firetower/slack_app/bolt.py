@@ -6,6 +6,10 @@ from django.conf import settings
 from slack_bolt import App
 
 from firetower.slack_app.handlers.help import handle_help_command
+from firetower.slack_app.handlers.new_incident import (
+    handle_new_command,
+    handle_new_incident_submission,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +29,9 @@ def handle_inc(ack: Any, body: dict, command: dict, respond: Any) -> None:
     statsd.increment(f"{METRICS_PREFIX}.submitted", tags=tags)
 
     try:
-        if subcommand in ("help", ""):
+        if subcommand == "new":
+            handle_new_command(ack, body, command, respond)
+        elif subcommand in ("help", ""):
             handle_help_command(ack, command, respond)
         else:
             ack()
@@ -38,3 +44,6 @@ def handle_inc(ack: Any, body: dict, command: dict, respond: Any) -> None:
         )
         statsd.increment(f"{METRICS_PREFIX}.failed", tags=tags)
         raise
+
+
+bolt_app.view("new_incident_modal")(handle_new_incident_submission)
