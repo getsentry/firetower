@@ -146,7 +146,9 @@ def compute_regions(
         ]
         tag_incidents.sort(key=lambda inc: inc.created_at, reverse=True)
         # total_downtime is stored in minutes; convert to seconds for availability calculation
-        total_downtime_minutes = sum(inc.total_downtime for inc in tag_incidents)
+        total_downtime_minutes = sum(
+            inc.total_downtime for inc in tag_incidents if inc.total_downtime is not None
+        )
         total_downtime_seconds = total_downtime_minutes * 60
         availability_pct = max(
             0.0,
