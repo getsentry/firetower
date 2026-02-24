@@ -5,7 +5,12 @@ interface DowntimeFieldProps {
   onChange: (value: number | null) => void;
 }
 
-export function DowntimeField({isEditing, value, draftValue, onChange}: DowntimeFieldProps) {
+export function DowntimeField({
+  isEditing,
+  value,
+  draftValue,
+  onChange,
+}: DowntimeFieldProps) {
   return (
     <div className="flex items-center gap-space-md">
       <div className="text-content-secondary w-20 flex-none text-sm font-medium">

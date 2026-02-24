@@ -7,6 +7,7 @@ import {Pencil} from 'lucide-react';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
+
 import {DowntimeField} from './DowntimeField';
 
 interface MilestonesCardProps {

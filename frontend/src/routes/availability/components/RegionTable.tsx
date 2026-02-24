@@ -4,6 +4,7 @@ import {ChevronLeft, ChevronRight} from 'lucide-react';
 import {cn} from 'utils/cn';
 
 import type {Period, PeriodData} from '../queries/availabilityQueryOptions';
+
 import {AvailabilityCell} from './AvailabilityCell';
 
 function availabilityBgClass(pct: number): string {

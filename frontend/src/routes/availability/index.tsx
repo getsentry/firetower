@@ -6,9 +6,9 @@ import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {z} from 'zod';
 
-import {availabilityQueryOptions, PeriodSchema} from './queries/availabilityQueryOptions';
 import {PeriodTab} from './components/PeriodTab';
 import {RegionTable} from './components/RegionTable';
+import {availabilityQueryOptions, PeriodSchema} from './queries/availabilityQueryOptions';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
