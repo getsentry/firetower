@@ -13,7 +13,7 @@ METRICS_PREFIX = "slack_app.commands"
 
 slack_config = settings.SLACK
 
-bolt_app = App(token=slack_config["BOT_TOKEN"])
+bolt_app = App(token=slack_config["BOT_TOKEN"], token_verification_enabled=False)
 
 
 @bolt_app.command("/inc")
