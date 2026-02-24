@@ -16,6 +16,7 @@ dependencies = [
     "jira>=3.5.0",
     "psycopg[binary]>=3.2.11",
     "pyserde[toml]>=0.28.0",
+    "slack-bolt>=1.27.0",
     "slack-sdk>=3.31.0",
 ]
 

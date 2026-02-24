@@ -16,9 +16,11 @@ api_key = ""
 severity_field = ""
 
 [slack]
-bot_token = ""
-team_id = ""
+bot_token = "test-bot-token"
+team_id = "test-bot-id"
 participant_sync_throttle_seconds = 300
+signing_secret = "test-signing-secret"
+app_token = "xapp-test-token"
 
 [auth]
 iap_enabled = false

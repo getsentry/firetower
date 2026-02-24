@@ -6,6 +6,7 @@ from datetime import datetime
 from django.conf import settings
 from django.db.models import Count, QuerySet
 from django.shortcuts import get_object_or_404
+from django.utils import timezone as django_timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
@@ -40,13 +41,15 @@ def parse_date_param(value: str) -> datetime | None:
     if not value:
         return None
     dt = parse_datetime(value)
-    if dt:
-        return dt
-    # Try parsing as date-only (YYYY-MM-DD)
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
+    if dt is None:
+        # Try parsing as date-only (YYYY-MM-DD)
+        try:
+            dt = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    if django_timezone.is_naive(dt):
+        dt = django_timezone.make_aware(dt)
+    return dt
 
 
 def filter_by_date_range(
