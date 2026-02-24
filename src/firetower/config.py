@@ -63,8 +63,8 @@ class ConfigFile:
     project_key: str
     django_secret_key: str
     sentry_dsn: str
-    pinned_regions: list[str] = field(default_factory=list)
     firetower_base_url: str
+    pinned_regions: list[str] = field(default_factory=list)
 
     @classmethod
     def from_file(cls, file_path: str | Path) -> "ConfigFile":
