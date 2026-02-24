@@ -19,6 +19,7 @@ bot_token = ""
 team_id = "<slack-team-id>"
 participant_sync_throttle_seconds = 300
 signing_secret = ""
+app_token = ""
 
 [auth]
 iap_enabled = false
