@@ -82,6 +82,15 @@ jobs:
             --container nginx --image "${{ env.STATIC_IMAGE_REF }}" --port 80
             --container firetower-backend --image "${{ env.BACKEND_IMAGE_REF }}"
 
+      - name: deploy-test-slack-bot
+        if: ${{ inputs.environment == 'test' }}
+        uses: "google-github-actions/deploy-cloudrun@v3"
+        with:
+          service: firetower-slack-app-test
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: ${{ env.BACKEND_IMAGE_REF }}
+
       - name: deploy-prod-db-migration
         if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
         uses: "google-github-actions/deploy-cloudrun@v3"
