@@ -24,7 +24,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("firetower.auth.urls")),
     path("api/", include("firetower.incidents.urls")),
-    path("slack/", include("firetower.slack_app.urls")),
     # Health check endpoints with Datadog metrics
     path("readyz/", health.readiness_check, name="readiness"),
     path("livez/", health.liveness_check, name="liveness"),
