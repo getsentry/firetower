@@ -64,6 +64,7 @@ class ConfigFile:
     django_secret_key: str
     sentry_dsn: str
     pinned_regions: list[str] = field(default_factory=list)
+    firetower_base_url: str
 
     @classmethod
     def from_file(cls, file_path: str | Path) -> "ConfigFile":
@@ -127,3 +128,4 @@ class DummyConfigFile(ConfigFile):
         self.django_secret_key = ""
         self.sentry_dsn = ""
         self.pinned_regions: list[str] = []
+        self.firetower_base_url = ""
