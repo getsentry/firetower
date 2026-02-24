@@ -7,6 +7,7 @@ import {Pencil} from 'lucide-react';
 
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
+import {DowntimeField} from './DowntimeField';
 
 interface MilestonesCardProps {
   incident: IncidentDetail;
@@ -210,38 +211,12 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
             </div>
           </div>
         ))}
-        <div className="flex items-center gap-space-md">
-          <div className="text-content-secondary w-20 flex-none text-sm font-medium">
-            Downtime
-          </div>
-          <div className="flex flex-1 items-center justify-end">
-            {isEditing ? (
-              <div className="flex items-center gap-space-xs">
-                <input
-                  type="number"
-                  min="0"
-                  value={draftDowntime ?? ''}
-                  onChange={e =>
-                    setDraftDowntime(
-                      e.target.value === '' ? null : e.target.valueAsNumber
-                    )
-                  }
-                  placeholder="—"
-                  className="w-20 rounded-radius-sm border border-secondary bg-background-primary px-space-sm py-space-xs text-right text-sm focus:outline-none focus:ring-1"
-                />
-                <span className="text-content-secondary text-sm">min</span>
-              </div>
-            ) : (
-              <span
-                className={`text-sm ${incident.total_downtime != null ? 'text-content-primary' : 'text-content-tertiary'}`}
-              >
-                {incident.total_downtime != null
-                  ? `${incident.total_downtime} min`
-                  : 'Not set'}
-              </span>
-            )}
-          </div>
-        </div>
+        <DowntimeField
+          isEditing={isEditing}
+          value={incident.total_downtime}
+          draftValue={draftDowntime}
+          onChange={setDraftDowntime}
+        />
       </div>
       {isEditing && (
         <div className="mt-space-lg flex items-center justify-end gap-space-xs">
