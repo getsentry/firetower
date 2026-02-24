@@ -277,6 +277,30 @@ class SlackService:
             )
             return False
 
+    def get_channel_history(
+        self, channel_id: str, limit: int = 1000
+    ) -> list[dict] | None:
+        if not self.client:
+            logger.warning(
+                "Cannot fetch channel history - Slack client not initialized"
+            )
+            return None
+
+        try:
+            logger.info(f"Fetching history for channel {channel_id}")
+            response = self.client.conversations_history(
+                channel=channel_id, limit=limit
+            )
+            messages: list[dict] = response.get("messages", [])
+            logger.info(f"Found {len(messages)} messages in channel {channel_id}")
+            return messages
+        except SlackApiError as e:
+            logger.error(
+                f"Error fetching channel history: {e}",
+                extra={"channel_id": channel_id},
+            )
+            return None
+
     def build_channel_url(self, channel_id: str) -> str:
         return f"https://{self.team_id}.slack.com/archives/{channel_id}"
 
