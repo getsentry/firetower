@@ -8,6 +8,12 @@ from rest_framework import serializers
 
 from firetower.auth.services import get_or_create_user_from_email
 
+from .hooks import (
+    on_captain_changed,
+    on_incident_created,
+    on_severity_changed,
+    on_status_changed,
+)
 from .models import (
     USER_ADDABLE_TAG_TYPES,
     ExternalLink,
@@ -501,6 +507,10 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             )
             incident.impact_type_tags.set(tags)
 
+        # Runs synchronously — Slack API calls may add latency to the response.
+        # Consider deferring to a background task if this becomes a problem.
+        on_incident_created(incident)
+
         return incident
 
     def update(self, instance: Incident, validated_data: dict) -> Incident:
@@ -520,6 +530,10 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         )
         root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
         impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
+
+        old_status = instance.status
+        old_severity = instance.severity
+        old_captain_id = instance.captain_id
 
         # Update basic fields
         instance = super().update(instance, validated_data)
@@ -573,6 +587,13 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                 type=TagType.IMPACT_TYPE,
             )
             instance.impact_type_tags.set(tags)
+
+        if instance.status != old_status:
+            on_status_changed(instance, old_status)
+        if instance.severity != old_severity:
+            on_severity_changed(instance, old_severity)
+        if instance.captain_id != old_captain_id:
+            on_captain_changed(instance)
 
         return instance
 
