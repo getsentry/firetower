@@ -3,26 +3,11 @@ from collections import defaultdict
 from datetime import datetime
 from datetime import tzinfo as TzInfo
 
-from .models import Incident, Tag
+from .models import Incident, Tag, format_downtime_minutes
 
 _HISTORY_MONTHS = 12
 _HISTORY_QUARTERS = 8
 _HISTORY_YEARS = 3
-
-
-def format_downtime(minutes: int | None) -> str | None:
-    if minutes is None:
-        return None
-    if minutes == 0:
-        return "0m"
-    hours = minutes // 60
-    mins = minutes % 60
-    parts = []
-    if hours > 0:
-        parts.append(f"{hours}h")
-    if mins > 0:
-        parts.append(f"{mins}m")
-    return " ".join(parts)
 
 
 def get_month_periods(now: datetime) -> list[dict]:
@@ -172,7 +157,9 @@ def compute_regions(
             {
                 "name": tag.name,
                 "total_downtime_minutes": total_downtime_minutes,
-                "total_downtime_display": format_downtime(total_downtime_minutes),
+                "total_downtime_display": format_downtime_minutes(
+                    total_downtime_minutes
+                ),
                 "availability_percentage": round(availability_pct, 6),
                 "incident_count": len(incident_list),
                 "incidents": incident_list,

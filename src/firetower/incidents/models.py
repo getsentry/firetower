@@ -135,6 +135,22 @@ class Tag(models.Model):
         return f"{self.name} ({self.get_type_display()})"
 
 
+def format_downtime_minutes(minutes: int | None) -> str | None:
+    """Return a human-readable string for a duration given in minutes (e.g. '1h 30m', '45m')."""
+    if minutes is None:
+        return None
+    if minutes == 0:
+        return "0m"
+    hours = minutes // 60
+    mins = minutes % 60
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if mins > 0:
+        parts.append(f"{mins}m")
+    return " ".join(parts)
+
+
 class Incident(models.Model):
     """
     Core incident model.
@@ -261,19 +277,7 @@ class Incident(models.Model):
     @property
     def total_downtime_display(self) -> str | None:
         """Return total downtime as a human-readable string (e.g. '1h 30m', '45m')."""
-        if self.total_downtime is None:
-            return None
-        minutes = self.total_downtime
-        if minutes == 0:
-            return "0m"
-        hours = minutes // 60
-        mins = minutes % 60
-        parts = []
-        if hours > 0:
-            parts.append(f"{hours}h")
-        if mins > 0:
-            parts.append(f"{mins}m")
-        return " ".join(parts)
+        return format_downtime_minutes(self.total_downtime)
 
     @property
     def external_links_dict(self) -> dict[str, str]:
