@@ -411,6 +411,88 @@ class TestIncidentViews:
         assert len(response.data["results"]) == 1
         assert response.data["results"][0]["title"] == "Active P1"
 
+    def test_list_incidents_filter_by_tag(self):
+        inc1 = Incident.objects.create(
+            title="API Down",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2 = Incident.objects.create(
+            title="DB Down",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        tag_api = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        tag_db = Tag.objects.create(name="Database", type=TagType.AFFECTED_SERVICE)
+        inc1.affected_service_tags.add(tag_api)
+        inc2.affected_service_tags.add(tag_db)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?affected_service=API")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "API Down"
+
+    def test_list_incidents_filter_by_multiple_tags_same_type(self):
+        inc1 = Incident.objects.create(
+            title="API Down",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2 = Incident.objects.create(
+            title="DB Down",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc3 = Incident.objects.create(
+            title="Cache Down",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        tag_api = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        tag_db = Tag.objects.create(name="Database", type=TagType.AFFECTED_SERVICE)
+        tag_cache = Tag.objects.create(name="Cache", type=TagType.AFFECTED_SERVICE)
+        inc1.affected_service_tags.add(tag_api)
+        inc2.affected_service_tags.add(tag_db)
+        inc3.affected_service_tags.add(tag_cache)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/ui/incidents/?affected_service=API&affected_service=Database"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+
+    def test_list_incidents_filter_by_tags_across_types(self):
+        inc1 = Incident.objects.create(
+            title="API OOM",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2 = Incident.objects.create(
+            title="API Config",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        tag_api = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        tag_oom = Tag.objects.create(name="OOM", type=TagType.ROOT_CAUSE)
+        tag_config = Tag.objects.create(name="Config", type=TagType.ROOT_CAUSE)
+        inc1.affected_service_tags.add(tag_api)
+        inc1.root_cause_tags.add(tag_oom)
+        inc2.affected_service_tags.add(tag_api)
+        inc2.root_cause_tags.add(tag_config)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/ui/incidents/?affected_service=API&root_cause=OOM"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "API OOM"
+
     def test_retrieve_incident(self):
         """Test GET /api/ui/incidents/INC-2000/ returns full incident details"""
         captain = User.objects.create_user(
@@ -955,6 +1037,57 @@ class TestIncidentAPIViews:
         assert response.status_code == 200
         assert response.data["count"] == 2
         assert len(response.data["results"]) == 2
+
+    def test_list_api_incidents_filter_by_tag(self):
+        inc1 = Incident.objects.create(
+            title="API Down",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2 = Incident.objects.create(
+            title="DB Down",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        tag_api = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        tag_db = Tag.objects.create(name="Database", type=TagType.AFFECTED_SERVICE)
+        inc1.affected_service_tags.add(tag_api)
+        inc2.affected_service_tags.add(tag_db)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/?affected_service=API")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "API Down"
+
+    def test_list_api_incidents_filter_by_tags_across_types(self):
+        inc1 = Incident.objects.create(
+            title="API OOM",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc2 = Incident.objects.create(
+            title="API Config",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        tag_api = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        tag_oom = Tag.objects.create(name="OOM", type=TagType.ROOT_CAUSE)
+        tag_config = Tag.objects.create(name="Config", type=TagType.ROOT_CAUSE)
+        inc1.affected_service_tags.add(tag_api)
+        inc1.root_cause_tags.add(tag_oom)
+        inc2.affected_service_tags.add(tag_api)
+        inc2.root_cause_tags.add(tag_config)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/incidents/?affected_service=API&root_cause=OOM"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "API OOM"
 
     def test_retrieve_api_incident(self):
         """Test GET /api/incidents/INC-{id}/ returns incident with proper format"""

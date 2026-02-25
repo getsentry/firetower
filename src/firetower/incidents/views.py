@@ -101,6 +101,24 @@ def filter_by_severity(
     return queryset
 
 
+TAG_FILTER_PARAMS = {
+    "affected_service": "affected_service_tags",
+    "root_cause": "root_cause_tags",
+    "impact_type": "impact_type_tags",
+    "affected_region": "affected_region_tags",
+}
+
+
+def filter_by_tags(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    for param_name, field_name in TAG_FILTER_PARAMS.items():
+        tag_names = request.GET.getlist(param_name)
+        if tag_names:
+            queryset = queryset.filter(**{f"{field_name}__name__in": tag_names})
+    return queryset
+
+
 class IncidentListUIView(generics.ListAPIView):
     """
     List all incidents from database.
@@ -133,6 +151,8 @@ class IncidentListUIView(generics.ListAPIView):
 
         # Filter by date range
         queryset = filter_by_date_range(queryset, self.request)
+
+        queryset = filter_by_tags(queryset, self.request)
 
         return queryset
 
@@ -235,6 +255,7 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
         queryset = filter_visible_to_user(queryset, self.request.user)
         queryset = filter_by_severity(queryset, self.request)
         queryset = filter_by_date_range(queryset, self.request)
+        queryset = filter_by_tags(queryset, self.request)
         return queryset
 
 

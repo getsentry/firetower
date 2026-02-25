@@ -177,6 +177,25 @@ class TestListIncidents:
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["params"] == {"page": 2, "severity": ["P0", "P1"]}
 
+    def test_with_tag_filters(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"results": [], "count": 0}
+            mock_response.content = b'{"results": []}'
+            mock_request.return_value = mock_response
+
+            client.list_incidents(
+                affected_service=["API", "Database"],
+                root_cause=["OOM"],
+            )
+
+            call_kwargs = mock_request.call_args[1]
+            assert call_kwargs["params"] == {
+                "page": 1,
+                "affected_service": ["API", "Database"],
+                "root_cause": ["OOM"],
+            }
+
 
 class TestUpdateMethods:
     def test_update_status(self, client):
