@@ -18,6 +18,7 @@ from .models import (
     IncidentOrRedirect,
     IncidentSeverity,
     IncidentStatus,
+    ServiceTier,
     Tag,
     TagType,
     filter_visible_to_user,
@@ -121,6 +122,23 @@ def filter_by_status(
     return queryset
 
 
+def filter_by_service_tier(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    service_tier_filters = request.GET.getlist("service_tier")
+    if service_tier_filters:
+        valid_tiers = set(ServiceTier.__members__.values())
+        invalid_tiers = set(service_tier_filters) - valid_tiers
+        if invalid_tiers:
+            raise ValidationError(
+                {
+                    "service_tier": f"Invalid service_tier value(s): {', '.join(invalid_tiers)}"
+                }
+            )
+        queryset = queryset.filter(service_tier__in=service_tier_filters)
+    return queryset
+
+
 TAG_FILTER_PARAMS = {
     "affected_service": "affected_service_tags",
     "root_cause": "root_cause_tags",
@@ -162,6 +180,7 @@ class IncidentListUIView(generics.ListAPIView):
             queryset, self.request, default=["Active", "Mitigated"]
         )
         queryset = filter_by_severity(queryset, self.request)
+        queryset = filter_by_service_tier(queryset, self.request)
         queryset = filter_by_date_range(queryset, self.request)
         queryset = filter_by_tags(queryset, self.request)
         return queryset
@@ -264,6 +283,7 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
         queryset = filter_visible_to_user(queryset, self.request.user)
         queryset = filter_by_status(queryset, self.request)
         queryset = filter_by_severity(queryset, self.request)
+        queryset = filter_by_service_tier(queryset, self.request)
         queryset = filter_by_date_range(queryset, self.request)
         queryset = filter_by_tags(queryset, self.request)
         return queryset

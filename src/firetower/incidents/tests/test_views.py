@@ -14,6 +14,7 @@ from firetower.incidents.models import (
     Incident,
     IncidentSeverity,
     IncidentStatus,
+    ServiceTier,
     Tag,
     TagType,
 )
@@ -492,6 +493,53 @@ class TestIncidentViews:
         assert response.status_code == 200
         assert response.data["count"] == 1
         assert response.data["results"][0]["title"] == "API OOM"
+
+    def test_list_incidents_filter_by_service_tier(self):
+        Incident.objects.create(
+            title="T0 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            service_tier=ServiceTier.T0,
+        )
+        Incident.objects.create(
+            title="T1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P2,
+            service_tier=ServiceTier.T1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?service_tier=T0")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "T0 Incident"
+
+    def test_list_incidents_filter_by_multiple_service_tiers(self):
+        Incident.objects.create(
+            title="T0 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            service_tier=ServiceTier.T0,
+        )
+        Incident.objects.create(
+            title="T1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P2,
+            service_tier=ServiceTier.T1,
+        )
+        Incident.objects.create(
+            title="T2 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P3,
+            service_tier=ServiceTier.T2,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?service_tier=T0&service_tier=T1")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
 
     def test_retrieve_incident(self):
         """Test GET /api/ui/incidents/INC-2000/ returns full incident details"""
@@ -1107,6 +1155,27 @@ class TestIncidentAPIViews:
         assert response.status_code == 200
         assert response.data["count"] == 1
         assert response.data["results"][0]["title"] == "Active Incident"
+
+    def test_list_api_incidents_filter_by_service_tier(self):
+        Incident.objects.create(
+            title="T0 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            service_tier=ServiceTier.T0,
+        )
+        Incident.objects.create(
+            title="T1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            service_tier=ServiceTier.T1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/?service_tier=T0")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "T0 Incident"
 
     def test_retrieve_api_incident(self):
         """Test GET /api/incidents/INC-{id}/ returns incident with proper format"""

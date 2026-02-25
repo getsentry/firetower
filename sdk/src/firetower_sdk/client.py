@@ -99,6 +99,7 @@ class FiretowerClient:
         severities: list[str] | None = None,
         created_after: str | None = None,
         created_before: str | None = None,
+        service_tiers: list[str] | None = None,
         affected_service: list[str] | None = None,
         root_cause: list[str] | None = None,
         impact_type: list[str] | None = None,
@@ -112,6 +113,7 @@ class FiretowerClient:
             severities: Filter by severity (e.g., ["P0", "P1"])
             created_after: Filter incidents created after this date (ISO 8601 format)
             created_before: Filter incidents created before this date (ISO 8601 format)
+            service_tiers: Filter by service tier (e.g., ["T0", "T1"])
             affected_service: Filter by affected service tags (OR within type)
             root_cause: Filter by root cause tags (OR within type)
             impact_type: Filter by impact type tags (OR within type)
@@ -127,6 +129,8 @@ class FiretowerClient:
             params["created_after"] = created_after
         if created_before:
             params["created_before"] = created_before
+        if service_tiers:
+            params["service_tier"] = service_tiers
         if affected_service:
             params["affected_service"] = affected_service
         if root_cause:
