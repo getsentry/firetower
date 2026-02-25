@@ -1089,6 +1089,25 @@ class TestIncidentAPIViews:
         assert response.data["count"] == 1
         assert response.data["results"][0]["title"] == "API OOM"
 
+    def test_list_api_incidents_filter_by_status(self):
+        Incident.objects.create(
+            title="Active Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="Done Incident",
+            status=IncidentStatus.DONE,
+            severity=IncidentSeverity.P1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/?status=Active")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Active Incident"
+
     def test_retrieve_api_incident(self):
         """Test GET /api/incidents/INC-{id}/ returns incident with proper format"""
         incident = Incident.objects.create(
