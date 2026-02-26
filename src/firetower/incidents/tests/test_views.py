@@ -1156,6 +1156,20 @@ class TestIncidentAPIViews:
         assert response.data["count"] == 1
         assert response.data["results"][0]["title"] == "Active Incident"
 
+    def test_list_api_incidents_invalid_status(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/incidents/?status=InvalidStatus")
+        assert response.status_code == 400
+        assert "status" in response.data
+
+    def test_list_api_incidents_invalid_service_tier(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/incidents/?service_tier=InvalidTier")
+        assert response.status_code == 400
+        assert "service_tier" in response.data
+
     def test_list_api_incidents_filter_by_service_tier(self):
         Incident.objects.create(
             title="T0 Incident",

@@ -115,10 +115,14 @@ class FiretowerClient:
             created_after: Filter incidents created after this date (ISO 8601 format)
             created_before: Filter incidents created before this date (ISO 8601 format)
             service_tiers: Filter by service tier (e.g., ["T0", "T1"])
-            affected_service: Filter by affected service tags (OR within type)
-            root_cause: Filter by root cause tags (OR within type)
-            impact_type: Filter by impact type tags (OR within type)
-            affected_region: Filter by affected region tags (OR within type)
+            affected_service: Filter by affected service tags (OR within type).
+                Each tag name must be a separate list element, not comma-separated.
+            root_cause: Filter by root cause tags (OR within type).
+                Each tag name must be a separate list element, not comma-separated.
+            impact_type: Filter by impact type tags (OR within type).
+                Each tag name must be a separate list element, not comma-separated.
+            affected_region: Filter by affected region tags (OR within type).
+                Each tag name must be a separate list element, not comma-separated.
             page: Page number for pagination
         """
         params: dict[str, Any] = {"page": page}
