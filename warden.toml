@@ -1,0 +1,50 @@
+version = 1
+
+[defaults]
+failOn = "high"
+reportOn = "medium"
+ignorePaths = ["**/node_modules/**", "**/*.lock", "**/migrations/**"]
+
+[[skills]]
+name = "security-review"
+remote = "getsentry/skills"
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
+
+[[skills]]
+name = "django-access-review"
+remote = "getsentry/skills"
+paths = ["src/**/*.py"]
+ignorePaths = ["**/tests/**", "**/test_*.py", "**/*_test.py"]
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
+
+[[skills]]
+name = "django-perf-review"
+remote = "getsentry/skills"
+paths = ["src/**/*.py"]
+ignorePaths = ["**/tests/**", "**/test_*.py", "**/*_test.py"]
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
+
+[[skills]]
+name = "code-review"
+remote = "getsentry/skills"
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
+
+[[skills]]
+name = "find-bugs"
+remote = "getsentry/skills"
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
