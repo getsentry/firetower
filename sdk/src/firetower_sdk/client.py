@@ -105,8 +105,8 @@ class FiretowerClient:
         root_cause: list[str] | None = None,
         impact_type: list[str] | None = None,
         affected_region: list[str] | None = None,
-        captains: list[str] | None = None,
-        reporters: list[str] | None = None,
+        captain: list[str] | None = None,
+        reporter: list[str] | None = None,
         page: int = 1,
     ) -> dict[str, Any]:
         """List incidents with optional filtering.
@@ -125,8 +125,8 @@ class FiretowerClient:
                 Each tag name must be a separate list element, not comma-separated.
             affected_region: Filter by affected region tags (OR within type).
                 Each tag name must be a separate list element, not comma-separated.
-            captains: Filter by captain email addresses.
-            reporters: Filter by reporter email addresses.
+            captain: Filter by captain email addresses.
+            reporter: Filter by reporter email addresses.
             page: Page number for pagination
         """
         params: dict[str, Any] = {"page": page}
@@ -148,10 +148,10 @@ class FiretowerClient:
             params["impact_type"] = impact_type
         if affected_region:
             params["affected_region"] = affected_region
-        if captains:
-            params["captain"] = captains
-        if reporters:
-            params["reporter"] = reporters
+        if captain:
+            params["captain"] = captain
+        if reporter:
+            params["reporter"] = reporter
         return self._request("GET", "/api/incidents/", params=params)
 
     def update_incident(self, incident_id: str, **fields: Any) -> dict[str, Any]:

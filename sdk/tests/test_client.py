@@ -221,7 +221,7 @@ class TestListIncidents:
             mock_response.content = b'{"results": []}'
             mock_request.return_value = mock_response
 
-            client.list_incidents(captains=["captain@example.com"])
+            client.list_incidents(captain=["captain@example.com"])
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["params"] == {
@@ -236,7 +236,7 @@ class TestListIncidents:
             mock_response.content = b'{"results": []}'
             mock_request.return_value = mock_response
 
-            client.list_incidents(reporters=["reporter@example.com", "other@example.com"])
+            client.list_incidents(reporter=["reporter@example.com", "other@example.com"])
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["params"] == {
