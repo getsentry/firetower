@@ -150,10 +150,14 @@ TAG_FILTER_PARAMS = {
 def filter_by_tags(
     queryset: QuerySet[Incident], request: Request
 ) -> QuerySet[Incident]:
+    applied = False
     for param_name, field_name in TAG_FILTER_PARAMS.items():
         tag_names = request.GET.getlist(param_name)
         if tag_names:
             queryset = queryset.filter(**{f"{field_name}__name__in": tag_names})
+            applied = True
+    if applied:
+        queryset = queryset.distinct()
     return queryset
 
 
