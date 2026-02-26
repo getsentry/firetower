@@ -4,6 +4,7 @@ from typing import Any
 import requests
 
 from firetower_sdk.auth import JWTInterface, JwtAuth
+from firetower_sdk.enums import IncidentSeverity, IncidentStatus, ServiceTier
 from firetower_sdk.exceptions import FiretowerError
 from firetower_sdk.utils import get_base_url
 
@@ -57,12 +58,12 @@ class FiretowerClient:
     def create_incident(
         self,
         title: str,
-        severity: str,
+        severity: str | IncidentSeverity,
         captain_email: str,
         reporter_email: str,
         description: str | None = None,
         impact_summary: str | None = None,
-        status: str = "Active",
+        status: str | IncidentStatus = IncidentStatus.ACTIVE,
         is_private: bool = False,
     ) -> str:
         """
@@ -95,11 +96,11 @@ class FiretowerClient:
 
     def list_incidents(
         self,
-        statuses: list[str] | None = None,
-        severities: list[str] | None = None,
+        statuses: list[str | IncidentStatus] | None = None,
+        severities: list[str | IncidentSeverity] | None = None,
         created_after: str | None = None,
         created_before: str | None = None,
-        service_tiers: list[str] | None = None,
+        service_tiers: list[str | ServiceTier] | None = None,
         affected_service: list[str] | None = None,
         root_cause: list[str] | None = None,
         impact_type: list[str] | None = None,
@@ -145,11 +146,11 @@ class FiretowerClient:
         """Update an incident with arbitrary fields."""
         return self._request("PATCH", f"/api/incidents/{incident_id}/", data=fields)
 
-    def update_status(self, incident_id: str, status: str) -> dict[str, Any]:
+    def update_status(self, incident_id: str, status: str | IncidentStatus) -> dict[str, Any]:
         """Update incident status."""
         return self.update_incident(incident_id, status=status)
 
-    def update_severity(self, incident_id: str, severity: str) -> dict[str, Any]:
+    def update_severity(self, incident_id: str, severity: str | IncidentSeverity) -> dict[str, Any]:
         """Update incident severity."""
         return self.update_incident(incident_id, severity=severity)
 

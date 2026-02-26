@@ -4,6 +4,7 @@ import pytest
 import requests
 
 from firetower_sdk.client import FiretowerClient
+from firetower_sdk.enums import IncidentSeverity, IncidentStatus, ServiceTier
 from firetower_sdk.exceptions import FiretowerError
 
 
@@ -84,7 +85,7 @@ class TestCreateIncident:
 
             result = client.create_incident(
                 title="Test Incident",
-                severity="P1",
+                severity=IncidentSeverity.P1,
                 captain_email="captain@example.com",
                 reporter_email="reporter@example.com",
             )
@@ -141,7 +142,9 @@ class TestListIncidents:
             mock_response.content = b'{"results": []}'
             mock_request.return_value = mock_response
 
-            client.list_incidents(statuses=["Active", "Mitigated"], page=2)
+            client.list_incidents(
+                statuses=[IncidentStatus.ACTIVE, IncidentStatus.MITIGATED], page=2
+            )
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["params"] == {"page": 2, "status": ["Active", "Mitigated"]}
@@ -172,7 +175,7 @@ class TestListIncidents:
             mock_response.content = b'{"results": []}'
             mock_request.return_value = mock_response
 
-            client.list_incidents(severities=["P0", "P1"], page=2)
+            client.list_incidents(severities=[IncidentSeverity.P0, IncidentSeverity.P1], page=2)
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["params"] == {"page": 2, "severity": ["P0", "P1"]}
@@ -203,7 +206,7 @@ class TestListIncidents:
             mock_response.content = b'{"results": []}'
             mock_request.return_value = mock_response
 
-            client.list_incidents(service_tiers=["T0", "T1"])
+            client.list_incidents(service_tiers=[ServiceTier.T0, ServiceTier.T1])
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["params"] == {
@@ -220,7 +223,7 @@ class TestUpdateMethods:
             mock_response.content = b'{"id": "INC-2000"}'
             mock_request.return_value = mock_response
 
-            client.update_status("INC-2000", "Mitigated")
+            client.update_status("INC-2000", IncidentStatus.MITIGATED)
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["json"] == {"status": "Mitigated"}
@@ -232,7 +235,7 @@ class TestUpdateMethods:
             mock_response.content = b'{"id": "INC-2000"}'
             mock_request.return_value = mock_response
 
-            client.update_severity("INC-2000", "P0")
+            client.update_severity("INC-2000", IncidentSeverity.P0)
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["json"] == {"severity": "P0"}
