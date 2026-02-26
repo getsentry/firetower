@@ -541,6 +541,64 @@ class TestIncidentViews:
         assert response.status_code == 200
         assert response.data["count"] == 2
 
+    def test_list_incidents_filter_by_captain(self):
+        captain1 = User.objects.create_user(
+            username="captain1@example.com",
+            email="captain1@example.com",
+        )
+        captain2 = User.objects.create_user(
+            username="captain2@example.com",
+            email="captain2@example.com",
+        )
+        Incident.objects.create(
+            title="Captain1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=captain1,
+        )
+        Incident.objects.create(
+            title="Captain2 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=captain2,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?captain=captain1@example.com")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Captain1 Incident"
+
+    def test_list_incidents_filter_by_reporter(self):
+        reporter1 = User.objects.create_user(
+            username="reporter1@example.com",
+            email="reporter1@example.com",
+        )
+        reporter2 = User.objects.create_user(
+            username="reporter2@example.com",
+            email="reporter2@example.com",
+        )
+        Incident.objects.create(
+            title="Reporter1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            reporter=reporter1,
+        )
+        Incident.objects.create(
+            title="Reporter2 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            reporter=reporter2,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?reporter=reporter1@example.com")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Reporter1 Incident"
+
     def test_retrieve_incident(self):
         """Test GET /api/ui/incidents/INC-2000/ returns full incident details"""
         captain = User.objects.create_user(
@@ -1190,6 +1248,48 @@ class TestIncidentAPIViews:
         assert response.status_code == 200
         assert response.data["count"] == 1
         assert response.data["results"][0]["title"] == "T0 Incident"
+
+    def test_list_api_incidents_filter_by_captain(self):
+        Incident.objects.create(
+            title="Captain Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+        )
+        Incident.objects.create(
+            title="Other Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.reporter,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/?captain=captain@example.com")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Captain Incident"
+
+    def test_list_api_incidents_filter_by_reporter(self):
+        Incident.objects.create(
+            title="Reporter Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            reporter=self.reporter,
+        )
+        Incident.objects.create(
+            title="Other Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            reporter=self.captain,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/?reporter=reporter@example.com")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Reporter Incident"
 
     def test_retrieve_api_incident(self):
         """Test GET /api/incidents/INC-{id}/ returns incident with proper format"""

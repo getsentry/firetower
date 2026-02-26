@@ -161,6 +161,24 @@ def filter_by_tags(
     return queryset
 
 
+def filter_by_captain(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    captain_emails = request.GET.getlist("captain")
+    if captain_emails:
+        queryset = queryset.filter(captain__email__in=captain_emails)
+    return queryset
+
+
+def filter_by_reporter(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    reporter_emails = request.GET.getlist("reporter")
+    if reporter_emails:
+        queryset = queryset.filter(reporter__email__in=reporter_emails)
+    return queryset
+
+
 class IncidentListUIView(generics.ListAPIView):
     """
     List all incidents from database.
@@ -187,6 +205,8 @@ class IncidentListUIView(generics.ListAPIView):
         queryset = filter_by_service_tier(queryset, self.request)
         queryset = filter_by_date_range(queryset, self.request)
         queryset = filter_by_tags(queryset, self.request)
+        queryset = filter_by_captain(queryset, self.request)
+        queryset = filter_by_reporter(queryset, self.request)
         return queryset
 
 
@@ -290,6 +310,8 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
         queryset = filter_by_service_tier(queryset, self.request)
         queryset = filter_by_date_range(queryset, self.request)
         queryset = filter_by_tags(queryset, self.request)
+        queryset = filter_by_captain(queryset, self.request)
+        queryset = filter_by_reporter(queryset, self.request)
         return queryset
 
 
