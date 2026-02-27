@@ -8,6 +8,7 @@ import {Spinner} from 'components/Spinner';
 import {arraysEqual} from 'utils/arrays';
 import {z} from 'zod';
 
+import {AdvancedFilters} from './components/AdvancedFilters';
 import {IncidentCard} from './components/IncidentCard';
 import {IncidentListSkeleton} from './components/IncidentListSkeleton';
 import {StatusFilter} from './components/StatusFilter';
@@ -41,6 +42,7 @@ function IncidentsLayout({children}: {children: React.ReactNode}) {
   return (
     <div className="flex flex-col">
       <StatusFilter />
+      <AdvancedFilters />
       <hr className="mb-space-xl mt-space-lg border-secondary" />
       {children}
     </div>
