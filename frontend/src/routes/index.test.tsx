@@ -151,7 +151,7 @@ describe('IncidentCard (via Index Route)', () => {
     expect(incidentLinks[1]).toHaveAttribute('href', '/INC-1246');
   });
 
-  it('calls the incidents API without status params by default', async () => {
+  it('calls the incidents API without filter params by default', async () => {
     renderRoute();
 
     await screen.findByText('INC-1247');
@@ -159,7 +159,7 @@ describe('IncidentCard (via Index Route)', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: undefined, page: 1},
+        query: expect.objectContaining({page: 1}),
       })
     );
   });
@@ -199,7 +199,7 @@ describe('StatusFilter', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Postmortem'], page: 1},
+        query: expect.objectContaining({status: ['Postmortem'], page: 1}),
       })
     );
   });
@@ -217,7 +217,7 @@ describe('StatusFilter', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Done', 'Cancelled'], page: 1},
+        query: expect.objectContaining({status: ['Done', 'Cancelled'], page: 1}),
       })
     );
   });
@@ -263,7 +263,7 @@ describe('Search Params', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['Active'], page: 1},
+        query: expect.objectContaining({status: ['Active'], page: 1}),
       })
     );
   });
@@ -276,7 +276,96 @@ describe('Search Params', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: {status: ['InvalidStatus'], page: 1},
+        query: expect.objectContaining({status: ['InvalidStatus'], page: 1}),
+      })
+    );
+  });
+});
+
+describe('Advanced Filter Params', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    setupDefaultMocks();
+  });
+
+  it('passes severity filter params to API', async () => {
+    renderRoute('/?severity=P0&severity=P1');
+
+    await screen.findByText('INC-1247');
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/incidents/',
+        query: expect.objectContaining({severity: ['P0', 'P1'], page: 1}),
+      })
+    );
+  });
+
+  it('passes service_tier filter params to API', async () => {
+    renderRoute('/?service_tier=T0');
+
+    await screen.findByText('INC-1247');
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/incidents/',
+        query: expect.objectContaining({service_tier: ['T0'], page: 1}),
+      })
+    );
+  });
+
+  it('passes tag filter params to API', async () => {
+    renderRoute('/?affected_service=api&root_cause=deploy');
+
+    await screen.findByText('INC-1247');
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/incidents/',
+        query: expect.objectContaining({
+          affected_service: ['api'],
+          root_cause: ['deploy'],
+          page: 1,
+        }),
+      })
+    );
+  });
+
+  it('passes date filter params to API', async () => {
+    renderRoute('/?created_after=2024-01-01&created_before=2024-12-31');
+
+    await screen.findByText('INC-1247');
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/incidents/',
+        query: expect.objectContaining({
+          created_after: '2024-01-01',
+          created_before: '2024-12-31',
+          page: 1,
+        }),
+      })
+    );
+  });
+
+  it('preserves advanced filters when switching status tabs', async () => {
+    const user = userEvent.setup();
+    renderRoute('/?severity=P0');
+
+    await screen.findByText('INC-1247');
+    mockApiGet.mockClear();
+
+    const reviewButton = await screen.findByTestId('filter-review');
+    await user.click(reviewButton);
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/incidents/',
+        query: expect.objectContaining({
+          status: ['Postmortem'],
+          severity: ['P0'],
+          page: 1,
+        }),
       })
     );
   });

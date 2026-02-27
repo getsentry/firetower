@@ -3,7 +3,7 @@ import {Link, useRouterState} from '@tanstack/react-router';
 import {Avatar} from 'components/Avatar';
 
 import {currentUserQueryOptions} from '../queries/currentUserQueryOptions';
-import type {IncidentStatus} from '../queries/incidentsQueryOptions';
+import type {IncidentStatus} from '../types';
 
 const STORAGE_KEY = 'firetower_list_search';
 
