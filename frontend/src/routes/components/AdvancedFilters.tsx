@@ -5,11 +5,9 @@ import {Button} from 'components/Button';
 import {Pill} from 'components/Pill';
 import {Tag} from 'components/Tag';
 import {SlidersHorizontalIcon, XIcon} from 'lucide-react';
-import {
-  tagsQueryOptions,
-  type TagType,
-} from 'routes/$incidentId/queries/tagsQueryOptions';
-import {ServiceTierSchema, SeveritySchema} from 'routes/queries/incidentsQueryOptions';
+
+import {tagsQueryOptions, type TagType} from '../$incidentId/queries/tagsQueryOptions';
+import {ServiceTierSchema, SeveritySchema} from '../types';
 
 import {DateFilter} from './DateFilter';
 import {MultiSelectFilter} from './MultiSelectFilter';
