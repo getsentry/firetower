@@ -2,7 +2,6 @@ import logging
 import re
 from collections import defaultdict
 from dataclasses import asdict
-from datetime import datetime
 
 from django.conf import settings
 from django.db.models import Count, QuerySet
@@ -15,11 +14,19 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .filters import (
+    filter_by_captain,
+    filter_by_date_range,
+    filter_by_reporter,
+    filter_by_service_tier,
+    filter_by_severity,
+    filter_by_status,
+    filter_by_tags,
+)
 from .models import (
     INCIDENT_ID_START,
     Incident,
     IncidentOrRedirect,
-    IncidentSeverity,
     Tag,
     TagType,
     filter_visible_to_user,
@@ -45,72 +52,6 @@ from .services import ParticipantsSyncStats, sync_incident_participants_from_sla
 logger = logging.getLogger(__name__)
 
 
-def parse_date_param(value: str) -> datetime | None:
-    """Parse a date string from query params. Accepts ISO 8601 formats."""
-    if not value:
-        return None
-    dt = parse_datetime(value)
-    if dt:
-        return dt
-    # Try parsing as date-only (YYYY-MM-DD)
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
-
-
-def filter_by_date_range(
-    queryset: QuerySet[Incident], request: Request
-) -> QuerySet[Incident]:
-    """Apply created_after and created_before filters to queryset."""
-    created_after = request.GET.get("created_after")
-    created_before = request.GET.get("created_before")
-
-    if created_after:
-        dt = parse_date_param(created_after)
-        if dt is None:
-            raise ValidationError(
-                {
-                    "created_after": "Invalid date format. Use ISO 8601 (e.g., 2024-01-15 or 2024-01-15T10:30:00Z)"
-                }
-            )
-        queryset = queryset.filter(created_at__gte=dt)
-
-    if created_before:
-        dt = parse_date_param(created_before)
-        if dt is None:
-            raise ValidationError(
-                {
-                    "created_before": "Invalid date format. Use ISO 8601 (e.g., 2024-01-15 or 2024-01-15T10:30:00Z)"
-                }
-            )
-        queryset = queryset.filter(created_at__lte=dt)
-
-    return queryset
-
-
-def filter_by_severity(
-    queryset: QuerySet[Incident], request: Request
-) -> QuerySet[Incident]:
-    """Apply severity filter to queryset. Expects severity param in GET (can be repeated for multiple values)."""
-    severity_filters = request.GET.getlist("severity")
-
-    if severity_filters:
-        valid_severities = set(IncidentSeverity.__members__.values())
-        invalid_severities = set(severity_filters) - valid_severities
-
-        if invalid_severities:
-            raise ValidationError(
-                {
-                    "severity": f"Invalid severity value(s): {', '.join(invalid_severities)}"
-                }
-            )
-
-        queryset = queryset.filter(severity__in=severity_filters)
-
-    return queryset
-
-
 class IncidentListUIView(generics.ListAPIView):
     """
     List all incidents from database.
@@ -128,22 +69,17 @@ class IncidentListUIView(generics.ListAPIView):
     serializer_class = IncidentListUISerializer
 
     def get_queryset(self) -> QuerySet[Incident]:
-        """Filter incidents by visibility, status, severity, and date range"""
         queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
-
-        # Filter by status (defaults to Active and Mitigated if not specified)
-        status_filters = self.request.GET.getlist("status")
-        if not status_filters:
-            status_filters = ["Active", "Mitigated"]
-        queryset = queryset.filter(status__in=status_filters)
-
-        # Filter by severity
+        queryset = filter_by_status(
+            queryset, self.request, default=["Active", "Mitigated"]
+        )
         queryset = filter_by_severity(queryset, self.request)
-
-        # Filter by date range
+        queryset = filter_by_service_tier(queryset, self.request)
         queryset = filter_by_date_range(queryset, self.request)
-
+        queryset = filter_by_tags(queryset, self.request)
+        queryset = filter_by_captain(queryset, self.request)
+        queryset = filter_by_reporter(queryset, self.request)
         return queryset
 
 
@@ -240,11 +176,15 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
         return IncidentReadSerializer
 
     def get_queryset(self) -> QuerySet[Incident]:
-        """Filter incidents by visibility, severity, and date range"""
         queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
+        queryset = filter_by_status(queryset, self.request)
         queryset = filter_by_severity(queryset, self.request)
+        queryset = filter_by_service_tier(queryset, self.request)
         queryset = filter_by_date_range(queryset, self.request)
+        queryset = filter_by_tags(queryset, self.request)
+        queryset = filter_by_captain(queryset, self.request)
+        queryset = filter_by_reporter(queryset, self.request)
         return queryset
 
 

@@ -4,6 +4,7 @@ import pytest
 import requests
 
 from firetower_sdk.client import FiretowerClient
+from firetower_sdk.enums import IncidentSeverity, IncidentStatus, ServiceTier
 from firetower_sdk.exceptions import FiretowerError
 
 
@@ -84,7 +85,7 @@ class TestCreateIncident:
 
             result = client.create_incident(
                 title="Test Incident",
-                severity="P1",
+                severity=IncidentSeverity.P1,
                 captain_email="captain@example.com",
                 reporter_email="reporter@example.com",
             )
@@ -141,7 +142,9 @@ class TestListIncidents:
             mock_response.content = b'{"results": []}'
             mock_request.return_value = mock_response
 
-            client.list_incidents(statuses=["Active", "Mitigated"], page=2)
+            client.list_incidents(
+                statuses=[IncidentStatus.ACTIVE, IncidentStatus.MITIGATED], page=2
+            )
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["params"] == {"page": 2, "status": ["Active", "Mitigated"]}
@@ -172,10 +175,74 @@ class TestListIncidents:
             mock_response.content = b'{"results": []}'
             mock_request.return_value = mock_response
 
-            client.list_incidents(severities=["P0", "P1"], page=2)
+            client.list_incidents(severities=[IncidentSeverity.P0, IncidentSeverity.P1], page=2)
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["params"] == {"page": 2, "severity": ["P0", "P1"]}
+
+    def test_with_tag_filters(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"results": [], "count": 0}
+            mock_response.content = b'{"results": []}'
+            mock_request.return_value = mock_response
+
+            client.list_incidents(
+                affected_service=["API", "Database"],
+                root_cause=["OOM"],
+            )
+
+            call_kwargs = mock_request.call_args[1]
+            assert call_kwargs["params"] == {
+                "page": 1,
+                "affected_service": ["API", "Database"],
+                "root_cause": ["OOM"],
+            }
+
+    def test_with_service_tier_filter(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"results": [], "count": 0}
+            mock_response.content = b'{"results": []}'
+            mock_request.return_value = mock_response
+
+            client.list_incidents(service_tiers=[ServiceTier.T0, ServiceTier.T1])
+
+            call_kwargs = mock_request.call_args[1]
+            assert call_kwargs["params"] == {
+                "page": 1,
+                "service_tier": ["T0", "T1"],
+            }
+
+    def test_with_captain_filter(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"results": [], "count": 0}
+            mock_response.content = b'{"results": []}'
+            mock_request.return_value = mock_response
+
+            client.list_incidents(captain=["captain@example.com"])
+
+            call_kwargs = mock_request.call_args[1]
+            assert call_kwargs["params"] == {
+                "page": 1,
+                "captain": ["captain@example.com"],
+            }
+
+    def test_with_reporter_filter(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"results": [], "count": 0}
+            mock_response.content = b'{"results": []}'
+            mock_request.return_value = mock_response
+
+            client.list_incidents(reporter=["reporter@example.com", "other@example.com"])
+
+            call_kwargs = mock_request.call_args[1]
+            assert call_kwargs["params"] == {
+                "page": 1,
+                "reporter": ["reporter@example.com", "other@example.com"],
+            }
 
 
 class TestUpdateMethods:
@@ -186,7 +253,7 @@ class TestUpdateMethods:
             mock_response.content = b'{"id": "INC-2000"}'
             mock_request.return_value = mock_response
 
-            client.update_status("INC-2000", "Mitigated")
+            client.update_status("INC-2000", IncidentStatus.MITIGATED)
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["json"] == {"status": "Mitigated"}
@@ -198,7 +265,7 @@ class TestUpdateMethods:
             mock_response.content = b'{"id": "INC-2000"}'
             mock_request.return_value = mock_response
 
-            client.update_severity("INC-2000", "P0")
+            client.update_severity("INC-2000", IncidentSeverity.P0)
 
             call_kwargs = mock_request.call_args[1]
             assert call_kwargs["json"] == {"severity": "P0"}

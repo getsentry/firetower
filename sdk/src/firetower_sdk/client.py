@@ -4,6 +4,7 @@ from typing import Any
 import requests
 
 from firetower_sdk.auth import JWTInterface, JwtAuth
+from firetower_sdk.enums import IncidentSeverity, IncidentStatus, ServiceTier
 from firetower_sdk.exceptions import FiretowerError
 from firetower_sdk.utils import get_base_url
 
@@ -57,12 +58,12 @@ class FiretowerClient:
     def create_incident(
         self,
         title: str,
-        severity: str,
+        severity: IncidentSeverity,
         captain_email: str,
         reporter_email: str,
         description: str | None = None,
         impact_summary: str | None = None,
-        status: str = "Active",
+        status: IncidentStatus = IncidentStatus.ACTIVE,
         is_private: bool = False,
     ) -> str:
         """
@@ -95,10 +96,17 @@ class FiretowerClient:
 
     def list_incidents(
         self,
-        statuses: list[str] | None = None,
-        severities: list[str] | None = None,
+        statuses: list[IncidentStatus] | None = None,
+        severities: list[IncidentSeverity] | None = None,
         created_after: str | None = None,
         created_before: str | None = None,
+        service_tiers: list[ServiceTier] | None = None,
+        affected_service: list[str] | None = None,
+        root_cause: list[str] | None = None,
+        impact_type: list[str] | None = None,
+        affected_region: list[str] | None = None,
+        captain: list[str] | None = None,
+        reporter: list[str] | None = None,
         page: int = 1,
     ) -> dict[str, Any]:
         """List incidents with optional filtering.
@@ -108,6 +116,17 @@ class FiretowerClient:
             severities: Filter by severity (e.g., ["P0", "P1"])
             created_after: Filter incidents created after this date (ISO 8601 format)
             created_before: Filter incidents created before this date (ISO 8601 format)
+            service_tiers: Filter by service tier (e.g., ["T0", "T1"])
+            affected_service: Filter by affected service tags (OR within type).
+                Each tag name must be a separate list element, not comma-separated.
+            root_cause: Filter by root cause tags (OR within type).
+                Each tag name must be a separate list element, not comma-separated.
+            impact_type: Filter by impact type tags (OR within type).
+                Each tag name must be a separate list element, not comma-separated.
+            affected_region: Filter by affected region tags (OR within type).
+                Each tag name must be a separate list element, not comma-separated.
+            captain: Filter by captain email addresses.
+            reporter: Filter by reporter email addresses.
             page: Page number for pagination
         """
         params: dict[str, Any] = {"page": page}
@@ -119,17 +138,31 @@ class FiretowerClient:
             params["created_after"] = created_after
         if created_before:
             params["created_before"] = created_before
+        if service_tiers:
+            params["service_tier"] = service_tiers
+        if affected_service:
+            params["affected_service"] = affected_service
+        if root_cause:
+            params["root_cause"] = root_cause
+        if impact_type:
+            params["impact_type"] = impact_type
+        if affected_region:
+            params["affected_region"] = affected_region
+        if captain:
+            params["captain"] = captain
+        if reporter:
+            params["reporter"] = reporter
         return self._request("GET", "/api/incidents/", params=params)
 
     def update_incident(self, incident_id: str, **fields: Any) -> dict[str, Any]:
         """Update an incident with arbitrary fields."""
         return self._request("PATCH", f"/api/incidents/{incident_id}/", data=fields)
 
-    def update_status(self, incident_id: str, status: str) -> dict[str, Any]:
+    def update_status(self, incident_id: str, status: IncidentStatus) -> dict[str, Any]:
         """Update incident status."""
         return self.update_incident(incident_id, status=status)
 
-    def update_severity(self, incident_id: str, severity: str) -> dict[str, Any]:
+    def update_severity(self, incident_id: str, severity: IncidentSeverity) -> dict[str, Any]:
         """Update incident severity."""
         return self.update_incident(incident_id, severity=severity)
 
