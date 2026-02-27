@@ -2,23 +2,13 @@ import {infiniteQueryOptions} from '@tanstack/react-query';
 import {Api} from 'api';
 import {z} from 'zod';
 
-export const IncidentStatusSchema = z.enum([
-  'Active',
-  'Mitigated',
-  'Postmortem',
-  'Done',
-  'Cancelled',
-]);
-
-export const SeveritySchema = z.enum(['P0', 'P1', 'P2', 'P3', 'P4']);
-
-export const ServiceTierSchema = z.enum(['T0', 'T1', 'T2', 'T3', 'T4']);
+import {ServiceTierSchema, SeveritySchema, StatusSchema} from '../types';
 
 const IncidentListItemSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string(),
-  status: IncidentStatusSchema,
+  status: StatusSchema,
   severity: SeveritySchema,
   service_tier: ServiceTierSchema.nullable(),
   created_at: z.string(),
@@ -32,7 +22,6 @@ const PaginatedIncidentsSchema = z.object({
   results: z.array(IncidentListItemSchema),
 });
 
-export type IncidentStatus = z.infer<typeof IncidentStatusSchema>;
 export type IncidentListItem = z.infer<typeof IncidentListItemSchema>;
 export type PaginatedIncidents = z.infer<typeof PaginatedIncidentsSchema>;
 
