@@ -10,13 +10,17 @@ export const IncidentStatusSchema = z.enum([
   'Cancelled',
 ]);
 
+export const SeveritySchema = z.enum(['P0', 'P1', 'P2', 'P3', 'P4']);
+
+export const ServiceTierSchema = z.enum(['T0', 'T1', 'T2', 'T3', 'T4']);
+
 const IncidentListItemSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string(),
   status: IncidentStatusSchema,
-  severity: z.enum(['P0', 'P1', 'P2', 'P3', 'P4']),
-  service_tier: z.enum(['T0', 'T1', 'T2', 'T3', 'T4']).nullable(),
+  severity: SeveritySchema,
+  service_tier: ServiceTierSchema.nullable(),
   created_at: z.string(),
   is_private: z.boolean(),
 });
@@ -34,15 +38,25 @@ export type PaginatedIncidents = z.infer<typeof PaginatedIncidentsSchema>;
 
 interface IncidentsQueryArgs {
   status?: string[];
+  severity?: string[];
+  service_tier?: string[];
+  affected_service?: string[];
+  root_cause?: string[];
+  impact_type?: string[];
+  affected_region?: string[];
+  captain?: string[];
+  reporter?: string[];
+  created_after?: string;
+  created_before?: string;
 }
 
-export function incidentsQueryOptions({status}: IncidentsQueryArgs) {
+export function incidentsQueryOptions(args: IncidentsQueryArgs) {
   return infiniteQueryOptions({
-    queryKey: ['Incidents', status],
+    queryKey: ['Incidents', args],
     queryFn: ({signal, pageParam}) =>
       Api.get({
         path: '/ui/incidents/',
-        query: {status, page: pageParam},
+        query: {...args, page: pageParam},
         signal,
         responseSchema: PaginatedIncidentsSchema,
       }),

@@ -16,7 +16,7 @@ function FilterLink({statuses, label, isActive, testId}: FilterLinkProps) {
   return (
     <Link
       to="/"
-      search={{status: statuses}}
+      search={prev => ({...prev, status: statuses})}
       preload="intent"
       data-testid={testId}
       aria-selected={isActive}
