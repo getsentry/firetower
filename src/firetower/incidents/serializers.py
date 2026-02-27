@@ -151,6 +151,7 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
             "time_analyzed",
             "time_mitigated",
             "time_recovered",
+            "total_downtime",
         ]
         read_only_fields = [
             "id",
@@ -261,6 +262,7 @@ class IncidentReadSerializer(serializers.ModelSerializer):
             "time_analyzed",
             "time_mitigated",
             "time_recovered",
+            "total_downtime",
         ]
 
     def get_captain(self, obj: Incident) -> str | None:
@@ -365,11 +367,17 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             "time_analyzed",
             "time_mitigated",
             "time_recovered",
+            "total_downtime",
         ]
         extra_kwargs = {
             "is_private": {"required": False},
             "service_tier": {"required": False},
         }
+
+    def validate_total_downtime(self, value: int) -> int:
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Downtime cannot be negative.")
+        return value
 
     def validate_status(self, value: str) -> str:
         status_map = {s.lower(): s for s in IncidentStatus.values}

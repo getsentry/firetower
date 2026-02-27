@@ -8,6 +8,8 @@ import {Pencil} from 'lucide-react';
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
+import {DowntimeField} from './DowntimeField';
+
 interface MilestonesCardProps {
   incident: IncidentDetail;
 }
@@ -71,6 +73,9 @@ function combineDateAndTime(date: Date, time: string): Date {
 
 export function MilestonesCard({incident}: MilestonesCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [draftDowntime, setDraftDowntime] = useState<number | null>(
+    incident.total_downtime
+  );
   const [draftValues, setDraftValues] = useState<DraftValues>(() => ({
     time_started: parseIncidentDateTime(incident.time_started),
     time_detected: parseIncidentDateTime(incident.time_detected),
@@ -98,6 +103,7 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
   };
 
   const startEditing = () => {
+    setDraftDowntime(incident.total_downtime);
     const drafts: DraftValues = {
       time_started: parseIncidentDateTime(incident.time_started),
       time_detected: parseIncidentDateTime(incident.time_detected),
@@ -147,6 +153,14 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
           });
         }
       }
+      if (draftDowntime !== incident.total_downtime) {
+        await updateIncidentField.mutateAsync({
+          incidentId: incident.id,
+          field: 'total_downtime',
+          value: draftDowntime,
+        });
+      }
+
       setIsEditing(false);
     } finally {
       setIsSaving(false);
@@ -198,6 +212,12 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
             </div>
           </div>
         ))}
+        <DowntimeField
+          isEditing={isEditing}
+          value={incident.total_downtime}
+          draftValue={draftDowntime}
+          onChange={setDraftDowntime}
+        />
       </div>
       {isEditing && (
         <div className="mt-space-lg flex items-center justify-end gap-space-xs">
