@@ -60,6 +60,9 @@ function setupDefaultMocks() {
     if (args.path === '/ui/users/me/') {
       return Promise.resolve(mockCurrentUser);
     }
+    if (args.path === '/tags/') {
+      return Promise.resolve(['tag-1', 'tag-2']);
+    }
     return Promise.reject(new Error('Not found'));
   });
 }
@@ -386,6 +389,69 @@ describe('Advanced Filter Params', () => {
         }),
       })
     );
+  });
+});
+
+describe('Advanced Filters UI', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    setupDefaultMocks();
+  });
+
+  it('shows filters toggle button', async () => {
+    renderRoute();
+
+    expect(await screen.findByTestId('advanced-filters-toggle')).toBeInTheDocument();
+  });
+
+  it('does not show filter controls by default', async () => {
+    renderRoute();
+
+    await screen.findByText('INC-1247');
+
+    expect(screen.queryByText('Severity')).not.toBeInTheDocument();
+  });
+
+  it('shows filter controls when toggle is clicked', async () => {
+    const user = userEvent.setup();
+    renderRoute();
+
+    await screen.findByText('INC-1247');
+
+    const toggle = screen.getByTestId('advanced-filters-toggle');
+    await user.click(toggle);
+
+    expect(screen.getByText('Severity')).toBeInTheDocument();
+    expect(screen.getByText('Service Tier')).toBeInTheDocument();
+    expect(screen.getByText('Captain')).toBeInTheDocument();
+    expect(screen.getByText('Reporter')).toBeInTheDocument();
+    expect(screen.getByText('Created After')).toBeInTheDocument();
+    expect(screen.getByText('Created Before')).toBeInTheDocument();
+  });
+
+  it('auto-opens when URL has advanced filters', async () => {
+    renderRoute('/?severity=P0');
+
+    await screen.findByText('INC-1247');
+
+    expect(screen.getByText('Severity')).toBeInTheDocument();
+  });
+
+  it('shows active filter tags', async () => {
+    renderRoute('/?severity=P0&service_tier=T0');
+
+    await screen.findByText('INC-1247');
+
+    expect(screen.getByText('Severity: P0')).toBeInTheDocument();
+    expect(screen.getByText('Service Tier: T0')).toBeInTheDocument();
+  });
+
+  it('shows clear all button when filters are active', async () => {
+    renderRoute('/?severity=P0');
+
+    await screen.findByText('INC-1247');
+
+    expect(screen.getByTestId('clear-all-filters')).toBeInTheDocument();
   });
 });
 
