@@ -2,8 +2,7 @@ import {Link, useSearch} from '@tanstack/react-router';
 import {arraysEqual} from 'utils/arrays';
 import {cn} from 'utils/cn';
 
-import {type IncidentStatus} from '../queries/incidentsQueryOptions';
-import {STATUS_FILTER_GROUPS} from '../types';
+import {STATUS_FILTER_GROUPS, type IncidentStatus} from '../types';
 
 interface FilterLinkProps {
   statuses?: IncidentStatus[];
@@ -16,7 +15,7 @@ function FilterLink({statuses, label, isActive, testId}: FilterLinkProps) {
   return (
     <Link
       to="/"
-      search={{status: statuses}}
+      search={prev => ({...prev, status: statuses})}
       preload="intent"
       data-testid={testId}
       aria-selected={isActive}

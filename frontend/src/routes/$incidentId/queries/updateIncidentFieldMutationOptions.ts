@@ -2,12 +2,9 @@ import {mutationOptions, type QueryClient} from '@tanstack/react-query';
 import {Api} from 'api';
 import {z} from 'zod';
 
+import {ServiceTierSchema, SeveritySchema, StatusSchema} from '../../types';
+
 import type {IncidentDetail} from './incidentDetailQueryOptions';
-import {
-  SERVICE_TIER_OPTIONS,
-  SEVERITY_OPTIONS,
-  STATUS_OPTIONS,
-} from './incidentDetailQueryOptions';
 
 export type UpdateIncidentFieldArgs =
   | {
@@ -49,9 +46,9 @@ const PatchResponseSchema = z.object({
   title: z.string(),
   description: z.string(),
   impact_summary: z.string(),
-  status: z.enum(STATUS_OPTIONS),
-  severity: z.enum(SEVERITY_OPTIONS),
-  service_tier: z.enum(SERVICE_TIER_OPTIONS).nullable(),
+  status: StatusSchema,
+  severity: SeveritySchema,
+  service_tier: ServiceTierSchema.nullable(),
   is_private: z.boolean(),
   affected_service_tags: z.array(z.string()),
   affected_region_tags: z.array(z.string()),

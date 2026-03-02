@@ -5,13 +5,9 @@ import {EditableTags} from 'components/EditableTags';
 import {EditableTextField} from 'components/EditableTextField';
 import {Pill} from 'components/Pill';
 
+import {ServiceTierSchema, SeveritySchema, StatusSchema} from '../../types';
 import {createTagMutationOptions} from '../queries/createTagMutationOptions';
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
-import {
-  SERVICE_TIER_OPTIONS,
-  SEVERITY_OPTIONS,
-  STATUS_OPTIONS,
-} from '../queries/incidentDetailQueryOptions';
 import {tagsQueryOptions} from '../queries/tagsQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
@@ -99,17 +95,17 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
       <div className="gap-space-lg mb-space-xl flex">
         <EditablePill
           value={incident.severity}
-          options={SEVERITY_OPTIONS}
+          options={SeveritySchema.options}
           onSave={handleFieldChange('severity')}
         />
         <EditablePill
           value={incident.status}
-          options={STATUS_OPTIONS}
+          options={StatusSchema.options}
           onSave={handleFieldChange('status')}
         />
         <EditablePill
           value={incident.service_tier}
-          options={SERVICE_TIER_OPTIONS}
+          options={ServiceTierSchema.options}
           onSave={handleFieldChange('service_tier')}
           placeholder="Service tier"
         />

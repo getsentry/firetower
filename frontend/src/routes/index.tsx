@@ -14,16 +14,27 @@ import {StatusFilter} from './components/StatusFilter';
 import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
 import {STATUS_FILTER_GROUPS} from './types';
 
-// Zod schema for search params - coerce single values to arrays, accept any strings
+const stringArrayPreprocess = z
+  .preprocess(val => {
+    if (val === undefined) return undefined;
+    if (Array.isArray(val) && val.every(v => typeof v === 'string')) return val;
+    if (typeof val === 'string') return [val];
+    return [String(val)];
+  }, z.array(z.string()).optional())
+  .optional();
+
 const incidentListSearchSchema = z.object({
-  status: z
-    .preprocess(val => {
-      if (val === undefined) return undefined;
-      if (Array.isArray(val) && val.every(v => typeof v === 'string')) return val;
-      if (typeof val === 'string') return [val];
-      return [String(val)]; // Convert weird formats to string
-    }, z.array(z.string()).optional())
-    .optional(),
+  status: stringArrayPreprocess,
+  severity: stringArrayPreprocess,
+  service_tier: stringArrayPreprocess,
+  affected_service: stringArrayPreprocess,
+  root_cause: stringArrayPreprocess,
+  impact_type: stringArrayPreprocess,
+  affected_region: stringArrayPreprocess,
+  captain: stringArrayPreprocess,
+  reporter: stringArrayPreprocess,
+  created_after: z.string().optional(),
+  created_before: z.string().optional(),
 });
 
 function IncidentsLayout({children}: {children: React.ReactNode}) {
@@ -42,7 +53,7 @@ export const Route = createFileRoute('/')({
   // Validate search params with zod schema
   validateSearch: zodValidator(incidentListSearchSchema),
   // Extract search params needed for loader
-  loaderDeps: ({search: {status}}) => ({status}),
+  loaderDeps: ({search}) => search,
   // Define loader with loaderDeps and context (context has queryClient)
   loader: async ({deps, context}) => {
     const options = incidentsQueryOptions(deps);
