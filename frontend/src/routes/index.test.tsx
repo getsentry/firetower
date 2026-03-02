@@ -348,6 +348,24 @@ describe('Advanced Filter Params', () => {
     );
   });
 
+  it('passes multiple filter types combined to API', async () => {
+    renderRoute('/?severity=P0&service_tier=T0&affected_service=api');
+
+    await screen.findByText('INC-1247');
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/incidents/',
+        query: expect.objectContaining({
+          severity: ['P0'],
+          service_tier: ['T0'],
+          affected_service: ['api'],
+          page: 1,
+        }),
+      })
+    );
+  });
+
   it('preserves advanced filters when switching status tabs', async () => {
     const user = userEvent.setup();
     renderRoute('/?severity=P0');
