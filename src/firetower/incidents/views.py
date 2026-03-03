@@ -58,7 +58,7 @@ class IncidentListUIView(generics.ListAPIView):
     serializer_class = IncidentListUISerializer
 
     def get_queryset(self) -> QuerySet[Incident]:
-        queryset = Incident.objects.all()
+        queryset = Incident.objects.select_related("captain")
         queryset = filter_visible_to_user(queryset, self.request.user)
         queryset = filter_by_status(
             queryset, self.request, default=["Active", "Mitigated"]

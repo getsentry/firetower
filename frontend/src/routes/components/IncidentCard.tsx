@@ -43,6 +43,7 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
                 timeZoneName: 'short',
               })}
             </p>
+            {incident.captain && <p>Captain: {incident.captain}</p>}
           </div>
           <h3 className="text-size-xl text-content-headings w-full font-semibold md:w-auto md:flex-1">
             {incident.title}
