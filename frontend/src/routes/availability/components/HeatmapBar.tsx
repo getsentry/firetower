@@ -67,7 +67,7 @@ export function HeatmapBar({blocks, showEndLabels}: HeatmapBarProps) {
               created_after: block.periodStart,
               created_before: block.periodEnd,
               service_tier: ['T0'],
-              status: ['Active', 'Mitigated', 'Postmortem', 'Done'],
+              status: ['Any'],
             }}
           >
             {inner}

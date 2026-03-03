@@ -69,6 +69,29 @@ class TestUIIncidentFilters:
         assert response.data["count"] == 2
         assert len(response.data["results"]) == 2
 
+    def test_filter_by_status_any(self):
+        Incident.objects.create(
+            title="Active",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="Done",
+            status=IncidentStatus.DONE,
+            severity=IncidentSeverity.P2,
+        )
+        Incident.objects.create(
+            title="Cancelled",
+            status=IncidentStatus.CANCELLED,
+            severity=IncidentSeverity.P3,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?status=Any")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 3
+
     def test_filter_by_created_after(self):
         inc1 = Incident.objects.create(
             title="Old Incident",
