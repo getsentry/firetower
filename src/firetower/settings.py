@@ -58,6 +58,7 @@ if not env_is_dev():
 
 # Global project settings
 PROJECT_KEY = config.project_key
+PINNED_REGIONS = config.pinned_regions
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
