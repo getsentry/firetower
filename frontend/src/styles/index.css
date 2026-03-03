@@ -92,6 +92,15 @@ body {
   .bg-background-transparent-warning-muted {
     background-color: var(--tokens-color-background-transparent-warning-muted);
   }
+  .bg-graphics-success-moderate {
+    background-color: var(--tokens-color-graphics-success-moderate);
+  }
+  .bg-graphics-warning-moderate {
+    background-color: var(--tokens-color-graphics-warning-moderate);
+  }
+  .bg-graphics-danger-moderate {
+    background-color: var(--tokens-color-graphics-danger-moderate);
+  }
   .bg-background-transparent-promotion-muted {
     background-color: var(--tokens-color-background-transparent-promotion-muted);
   }
@@ -206,6 +215,15 @@ body {
     }
     .bg-background-transparent-warning-muted {
       background-color: var(--base-color-yellow-dark-transparent-600);
+    }
+    .bg-graphics-success-moderate {
+      background-color: var(--base-color-green-dark-opaque-600);
+    }
+    .bg-graphics-warning-moderate {
+      background-color: var(--base-color-yellow-dark-opaque-600);
+    }
+    .bg-graphics-danger-moderate {
+      background-color: var(--base-color-red-dark-opaque-600);
     }
     .bg-background-transparent-promotion-muted {
       background-color: var(--base-color-pink-dark-transparent-600);
