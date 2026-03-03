@@ -47,6 +47,7 @@ from .serializers import (
     TagSerializer,
 )
 from .services import ParticipantsSyncStats, sync_incident_participants_from_slack
+from .utils import sort_tags_with_overrides
 
 logger = logging.getLogger(__name__)
 
@@ -385,13 +386,27 @@ class TagListCreateAPIView(generics.ListCreateAPIView):
             .order_by("-usage_count", "name")
         )
 
+    def list(self, request: Request, *args: object, **kwargs: object) -> Response:
+        queryset = self.get_queryset()
+        tag_type = request.GET.get("type")
+
+        if tag_type == "AFFECTED_REGION":
+            tags = sort_tags_with_overrides(list(queryset), settings.PINNED_REGIONS)
+            serializer = self.get_serializer(tags, many=True)
+            return Response(serializer.data)
+
+        return super().list(request, *args, **kwargs)
+
 
 class AvailabilityView(APIView):
     """GET /api/ui/availability/ — Returns availability by region for month/quarter/year."""
 
     def get(self, request: Request) -> Response:
         now = timezone.now()
-        tags = list(Tag.objects.filter(type=TagType.AFFECTED_REGION).order_by("name"))
+        tags = sort_tags_with_overrides(
+            list(Tag.objects.filter(type=TagType.AFFECTED_REGION).order_by("name")),
+            settings.PINNED_REGIONS,
+        )
 
         month_periods = get_month_periods(now)
         quarter_periods = get_quarter_periods(now)

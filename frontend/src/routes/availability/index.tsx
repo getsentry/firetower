@@ -1,23 +1,22 @@
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
-import {Card} from 'components/Card';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {z} from 'zod';
 
-import {PeriodTab} from './components/PeriodTab';
-import {RegionTable} from './components/RegionTable';
-import {availabilityQueryOptions, PeriodSchema} from './queries/availabilityQueryOptions';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import {PeriodTabs} from './components/PeriodTabs';
+import {RegionCard} from './components/RegionCard';
+import {
+  availabilityQueryOptions,
+  PeriodSchema,
+  type Period,
+  type PeriodData,
+} from './queries/availabilityQueryOptions';
 
 const availabilitySearchSchema = z.object({
   period: PeriodSchema.optional(),
-  subperiod: z.number().int().min(0).optional(),
 });
-
-// ─── Route ────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute('/availability/')({
   component: AvailabilityPage,
@@ -38,46 +37,59 @@ export const Route = createFileRoute('/availability/')({
   ),
 });
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function getPeriodsForGranularity(
+  data: {months: PeriodData[]; quarters: PeriodData[]; years: PeriodData[]},
+  period: Period
+): PeriodData[] {
+  switch (period) {
+    case 'month':
+      return data.months;
+    case 'quarter':
+      return data.quarters;
+    case 'year':
+      return data.years;
+  }
+}
 
-const {month, quarter, year} = PeriodSchema.enum;
+function getDateRangeLabel(periods: PeriodData[]): string {
+  if (periods.length === 0) return '';
+  const newest = periods[0];
+  const oldest = periods[periods.length - 1];
+  return `${oldest.label} – ${newest.label}`;
+}
 
 function AvailabilityPage() {
-  const {period = month, subperiod = 0} = Route.useSearch();
+  const {period: periodParam} = Route.useSearch();
+  const activePeriod: Period = periodParam ?? 'month';
   const {data} = useSuspenseQuery(availabilityQueryOptions());
 
-  const periodsKey =
-    period === month ? 'months' : period === quarter ? 'quarters' : 'years';
-  const periods = data[periodsKey];
-  const selectedIndex = Math.min(subperiod, periods.length - 1);
-
-  const oldestLabel = periods.length > 1 ? periods[periods.length - 1].label : null;
-  const newestLabel = periods[0]?.label ?? '';
-  const rangeLabel = oldestLabel ? `${oldestLabel} – ${newestLabel}` : newestLabel;
+  const periods = getPeriodsForGranularity(data, activePeriod);
+  const currentPeriod = periods[0];
+  const regionNames = currentPeriod?.regions.map(r => r.name) ?? [];
 
   return (
-    <div className="flex flex-col gap-space-xl">
-      <div>
-        <h1 className="mb-space-xs text-2xl font-semibold text-content-headings">
-          Availability by Region
-        </h1>
-        <p className="text-content-secondary text-size-sm">{rangeLabel}</p>
+    <div className="flex flex-col">
+      <div className="mb-space-xl flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-content-headings text-size-2xl font-semibold">
+            Availability by Region
+          </h1>
+          <p className="text-content-secondary mt-space-xs text-size-sm">
+            {getDateRangeLabel(periods)}
+          </p>
+        </div>
+        <PeriodTabs activePeriod={activePeriod} />
       </div>
-
-      <div className="flex gap-space-2xs">
-        <PeriodTab period={month} label="Month" isActive={period === month} />
-        <PeriodTab period={quarter} label="Quarter" isActive={period === quarter} />
-        <PeriodTab period={year} label="Year" isActive={period === year} />
+      <div className="flex flex-col gap-space-md">
+        {regionNames.map((name, i) => (
+          <RegionCard
+            key={name}
+            regionName={name}
+            periods={periods}
+            showPeriodLabels={i === 0}
+          />
+        ))}
       </div>
-
-      <Card>
-        <RegionTable
-          periods={periods}
-          selectedIndex={selectedIndex}
-          activePeriod={period}
-          key={period}
-        />
-      </Card>
     </div>
   );
 }
