@@ -32,6 +32,22 @@
     url('/fonts/rubik-medium.woff') format('woff');
 }
 
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/roboto-mono-regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/roboto-mono-medium.woff2') format('woff2');
+}
+
 /* Global styles */
 body {
   font-family: 'Rubik', sans-serif;
