@@ -129,6 +129,8 @@ def compute_regions(
         tag_incidents = [
             inc
             for inc in incidents_by_tag.get(tag.id, [])
+            # NOTE: Incidents are binned by created_at, so downtime spanning
+            # period boundaries is fully attributed to the creation period.
             if period_start <= inc.created_at <= effective_end
         ]
         tag_incidents.sort(key=lambda inc: inc.created_at, reverse=True)
