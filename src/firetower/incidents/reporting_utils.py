@@ -122,6 +122,8 @@ def compute_regions(
 ) -> list[dict]:
     effective_end = min(period_end, now)
     total_period_seconds = (effective_end - period_start).total_seconds()
+    if total_period_seconds <= 0:
+        return []
     regions = []
     for tag in tags:
         tag_incidents = [
