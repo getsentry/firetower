@@ -26,6 +26,10 @@ export function HeatmapBar({blocks, showEndLabels}: HeatmapBarProps) {
   return (
     <div className="flex gap-px overflow-visible">
       {blocks.map((block, i) => {
+        const isFullUptime = block.availability >= 100;
+        const displayPct = isFullUptime
+          ? '100.00'
+          : Math.min(99.99, block.availability).toFixed(2);
         const inner = (
           <>
             <div
@@ -37,7 +41,7 @@ export function HeatmapBar({blocks, showEndLabels}: HeatmapBarProps) {
               )}
             >
               <span className="font-mono text-size-sm font-medium text-white drop-shadow-md">
-                {block.availability.toFixed(2)}%
+                {displayPct}%
               </span>
             </div>
             <div
@@ -53,7 +57,7 @@ export function HeatmapBar({blocks, showEndLabels}: HeatmapBarProps) {
           </>
         );
 
-        return block.availability >= 100 ? (
+        return isFullUptime ? (
           <div key={i} className="group relative min-w-0 flex-1">
             {inner}
           </div>
