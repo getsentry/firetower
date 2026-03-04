@@ -23,9 +23,10 @@ export function DowntimeField({
               type="number"
               min="0"
               value={draftValue ?? ''}
-              onChange={e =>
-                onChange(e.target.value === '' ? null : e.target.valueAsNumber)
-              }
+              onChange={e => {
+                const num = e.target.valueAsNumber;
+                onChange(e.target.value === '' ? null : Number.isNaN(num) ? null : num);
+              }}
               placeholder="—"
               className="w-20 rounded-radius-sm border border-secondary bg-background-primary px-space-sm py-space-xs text-right text-sm focus:outline-none focus:ring-1"
             />

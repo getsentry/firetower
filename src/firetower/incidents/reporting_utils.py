@@ -121,7 +121,7 @@ def compute_regions(
     incidents_by_tag: dict[int, list[Incident]],
 ) -> list[dict]:
     effective_end = min(period_end, now)
-    total_period_seconds = (period_end - period_start).total_seconds()
+    total_period_seconds = (effective_end - period_start).total_seconds()
     regions = []
     for tag in tags:
         tag_incidents = [
