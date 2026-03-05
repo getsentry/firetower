@@ -53,6 +53,16 @@ body {
   font-family: 'Rubik', sans-serif;
 }
 
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
 /* Custom utilities using design tokens */
 @layer utilities {
   /* Background colors */
