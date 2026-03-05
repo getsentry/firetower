@@ -39,7 +39,8 @@ export type UpdateIncidentFieldArgs =
         | 'time_mitigated'
         | 'time_recovered';
       value: string | null;
-    };
+    }
+  | {incidentId: string; field: 'total_downtime'; value: number | null};
 
 const PatchResponseSchema = z.object({
   id: z.string(),
@@ -59,6 +60,7 @@ const PatchResponseSchema = z.object({
   time_analyzed: z.string().nullable(),
   time_mitigated: z.string().nullable(),
   time_recovered: z.string().nullable(),
+  total_downtime: z.number().int().nullable(),
 });
 
 export function updateIncidentFieldMutationOptions(queryClient: QueryClient) {

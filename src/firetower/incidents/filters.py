@@ -80,6 +80,8 @@ def filter_by_status(
     default: list[str] | None = None,
 ) -> QuerySet[Incident]:
     status_filters = request.GET.getlist("status")
+    if "Any" in status_filters:
+        return queryset
     if not status_filters and default is not None:
         status_filters = default
     if status_filters:

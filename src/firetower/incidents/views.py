@@ -1,14 +1,17 @@
 import logging
 import re
+from collections import defaultdict
 from dataclasses import asdict
 
 from django.conf import settings
 from django.db.models import Count, QuerySet
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .filters import (
     filter_by_captain,
@@ -28,6 +31,13 @@ from .models import (
     filter_visible_to_user,
 )
 from .permissions import IncidentPermission
+from .reporting_utils import (
+    build_incidents_by_tag,
+    compute_regions,
+    get_month_periods,
+    get_quarter_periods,
+    get_year_periods,
+)
 from .serializers import (
     IncidentListUISerializer,
     IncidentOrRedirectReadSerializer,
@@ -37,6 +47,7 @@ from .serializers import (
     TagSerializer,
 )
 from .services import ParticipantsSyncStats, sync_incident_participants_from_slack
+from .utils import sort_tags_with_overrides
 
 logger = logging.getLogger(__name__)
 
@@ -373,4 +384,70 @@ class TagListCreateAPIView(generics.ListCreateAPIView):
             Tag.objects.filter(type=tag_type)
             .annotate(usage_count=Count(related_name))
             .order_by("-usage_count", "name")
+        )
+
+    def list(self, request: Request, *args: object, **kwargs: object) -> Response:
+        queryset = self.get_queryset()
+        tag_type = request.GET.get("type")
+
+        if tag_type == "AFFECTED_REGION":
+            tags = sort_tags_with_overrides(list(queryset), settings.PINNED_REGIONS)
+            serializer = self.get_serializer(tags, many=True)
+            return Response(serializer.data)
+
+        return super().list(request, *args, **kwargs)
+
+
+class AvailabilityView(APIView):
+    """GET /api/ui/availability/ — Returns availability by region for month/quarter/year."""
+
+    def get(self, request: Request) -> Response:
+        now = timezone.now()
+        tags = sort_tags_with_overrides(
+            list(Tag.objects.filter(type=TagType.AFFECTED_REGION).order_by("name")),
+            settings.PINNED_REGIONS,
+        )
+
+        month_periods = get_month_periods(now)
+        quarter_periods = get_quarter_periods(now)
+        year_periods = get_year_periods(now)
+        all_periods = month_periods + quarter_periods + year_periods
+
+        # Fetch all relevant incidents in 2 queries (fetch + prefetch),
+        # then filter per period×tag in Python to avoid 46×N DB queries.
+        incidents_by_tag: dict[int, list[Incident]] = defaultdict(list)
+        if all_periods and tags:
+            earliest_start = min(p["start"] for p in all_periods)
+            incidents = list(
+                filter_visible_to_user(
+                    Incident.objects.filter(
+                        created_at__gte=earliest_start,
+                        created_at__lte=now,
+                        total_downtime__isnull=False,
+                        service_tier="T0",
+                    ),
+                    request.user,
+                ).prefetch_related("affected_region_tags")
+            )
+            incidents_by_tag = build_incidents_by_tag(incidents)
+
+        def build_periods(raw_periods: list[dict]) -> list[dict]:
+            return [
+                {
+                    "label": p["label"],
+                    "start": p["start"].isoformat(),
+                    "end": p["end"].isoformat(),
+                    "regions": compute_regions(
+                        tags, p["start"], p["end"], now, incidents_by_tag
+                    ),
+                }
+                for p in raw_periods
+            ]
+
+        return Response(
+            {
+                "months": build_periods(month_periods),
+                "quarters": build_periods(quarter_periods),
+                "years": build_periods(year_periods),
+            }
         )
