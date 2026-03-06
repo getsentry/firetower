@@ -1,6 +1,6 @@
-import {useEffect, useRef} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {useSuspenseInfiniteQuery} from '@tanstack/react-query';
-import {createFileRoute} from '@tanstack/react-router';
+import {createFileRoute, useSearch} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
@@ -8,7 +8,7 @@ import {Spinner} from 'components/Spinner';
 import {arraysEqual} from 'utils/arrays';
 import {z} from 'zod';
 
-import {AdvancedFilters} from './components/AdvancedFilters';
+import {FilterPanel, FilterTrigger} from './components/AdvancedFilters';
 import {IncidentCard} from './components/IncidentCard';
 import {IncidentListSkeleton} from './components/IncidentListSkeleton';
 import {StatusFilter} from './components/StatusFilter';
@@ -39,10 +39,32 @@ const incidentListSearchSchema = z.object({
 });
 
 function IncidentsLayout({children}: {children: React.ReactNode}) {
+  const search = useSearch({from: '/'});
+  const [open, setOpen] = useState(() => {
+    const keys = [
+      'severity',
+      'service_tier',
+      'affected_service',
+      'root_cause',
+      'impact_type',
+      'affected_region',
+      'captain',
+      'reporter',
+    ] as const;
+    for (const key of keys) {
+      const val = search[key];
+      if (Array.isArray(val) && val.length > 0) return true;
+    }
+    return !!(search.created_after || search.created_before);
+  });
+
   return (
-    <div className="flex flex-col">
-      <StatusFilter />
-      <AdvancedFilters />
+    <div className="flex flex-col gap-space-md">
+      <div className="flex items-center justify-between">
+        <StatusFilter />
+        <FilterTrigger open={open} onToggle={() => setOpen(prev => !prev)} />
+      </div>
+      {open && <FilterPanel />}
       <hr className="mb-space-xl mt-space-lg border-secondary" />
       {children}
     </div>
