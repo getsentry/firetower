@@ -49,12 +49,17 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
           </h3>
         </div>
 
-        <div className="mb-space-lg">
+        <div className="mb-space-lg flex items-center justify-between">
           <div className="gap-space-md flex">
             <Pill variant={incident.severity}>{incident.severity}</Pill>
             <Pill variant={incident.status}>{incident.status}</Pill>
             {incident.is_private && <Pill variant="private">Private</Pill>}
           </div>
+          {incident.captain && (
+            <p className="text-content-secondary text-size-sm">
+              Captain: {incident.captain}
+            </p>
+          )}
         </div>
 
         <p className="text-content-secondary text-size-sm leading-comfortable">

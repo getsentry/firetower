@@ -19,6 +19,7 @@ const IncidentListItemSchema = z.object({
   service_tier: z.enum(['T0', 'T1', 'T2', 'T3', 'T4']).nullable(),
   created_at: z.string(),
   is_private: z.boolean(),
+  captain: z.string().nullable(),
 });
 
 const PaginatedIncidentsSchema = z.object({
