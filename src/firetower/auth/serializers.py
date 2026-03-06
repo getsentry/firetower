@@ -27,3 +27,8 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.userprofile.avatar_url or None
         except AttributeError:
             return None
+
+
+class UserListSerializer(UserSerializer):
+    class Meta(UserSerializer.Meta):
+        fields = ["email", "name", "avatar_url"]
