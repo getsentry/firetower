@@ -4,6 +4,7 @@ Configuration file loader for Firetower.
 Loads configuration values from a TOML file and validates that all required keys are present.
 """
 
+from dataclasses import field
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +62,7 @@ class ConfigFile:
     project_key: str
     django_secret_key: str
     sentry_dsn: str
+    pinned_regions: list[str] = field(default_factory=list)
 
     @classmethod
     def from_file(cls, file_path: str | Path) -> "ConfigFile":
@@ -122,3 +124,4 @@ class DummyConfigFile(ConfigFile):
         self.project_key = ""
         self.django_secret_key = ""
         self.sentry_dsn = ""
+        self.pinned_regions: list[str] = []
