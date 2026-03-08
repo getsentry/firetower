@@ -23,7 +23,6 @@ from .filters import (
     filter_by_tags,
 )
 from .models import (
-    INCIDENT_ID_START,
     Incident,
     IncidentOrRedirect,
     Tag,
@@ -129,10 +128,6 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
             )
 
         numeric_id = int(match.group(1))
-        if numeric_id < INCIDENT_ID_START:
-            return IncidentOrRedirect(
-                redirect=f"{settings.JIRA['DOMAIN']}/browse/{project_key}-{numeric_id}"
-            )
 
         # Get incident by numeric ID
         queryset = self.get_queryset()
