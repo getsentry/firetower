@@ -49,17 +49,33 @@ STATUSPAGE_BASE_URL = "https://status.sentry.io/incidents/"
 
 # Custom field IDs from opsbot Config(Environment.PROD)
 # Jira field name          -> customfield ID       -> Firetower field
-FIELD_SEVERITY = "customfield_10941"        # Severity             -> Incident.severity (P0–P4)
-FIELD_TYPE = "customfield_11008"            # Incident Type        -> (not stored directly)
-FIELD_IMPACT = "customfield_11031"          # Impact               -> Incident.impact_type_tags + downtime check
-FIELD_SERVICE_TIER = "customfield_11033"    # Service Tier         -> Incident.service_tier (T0–T4)
-FIELD_POSTMORTEM = "customfield_10943"      # Postmortem URL       -> ExternalLink(NOTION)
-FIELD_TIME_STARTED = "customfield_11032"    # Time Started         -> Incident.time_started
-FIELD_TIME_DETECTED = "customfield_11026"   # Time Detected        -> Incident.time_detected
-FIELD_TIME_ANALYZED = "customfield_11718"   # Time Clue (opsbot)   -> Incident.time_analyzed
-FIELD_TIME_MITIGATED = "customfield_11027"  # Time Mitigated       -> Incident.time_mitigated
-FIELD_TIME_RECOVERED = "customfield_11719"  # Time Recovery (opsbot) -> Incident.time_recovered
-FIELD_STATUSPAGE_ID = "customfield_11017"   # Statuspage ID        -> ExternalLink(STATUSPAGE)
+FIELD_SEVERITY = (
+    "customfield_10941"  # Severity             -> Incident.severity (P0–P4)
+)
+FIELD_TYPE = "customfield_11008"  # Incident Type        -> (not stored directly)
+FIELD_IMPACT = "customfield_11031"  # Impact               -> Incident.impact_type_tags + downtime check
+FIELD_SERVICE_TIER = (
+    "customfield_11033"  # Service Tier         -> Incident.service_tier (T0–T4)
+)
+FIELD_POSTMORTEM = "customfield_10943"  # Postmortem URL       -> ExternalLink(NOTION)
+FIELD_TIME_STARTED = (
+    "customfield_11032"  # Time Started         -> Incident.time_started
+)
+FIELD_TIME_DETECTED = (
+    "customfield_11026"  # Time Detected        -> Incident.time_detected
+)
+FIELD_TIME_ANALYZED = (
+    "customfield_11718"  # Time Clue (opsbot)   -> Incident.time_analyzed
+)
+FIELD_TIME_MITIGATED = (
+    "customfield_11027"  # Time Mitigated       -> Incident.time_mitigated
+)
+FIELD_TIME_RECOVERED = (
+    "customfield_11719"  # Time Recovery (opsbot) -> Incident.time_recovered
+)
+FIELD_STATUSPAGE_ID = (
+    "customfield_11017"  # Statuspage ID        -> ExternalLink(STATUSPAGE)
+)
 
 # Jira status -> Firetower IncidentStatus
 JIRA_TO_FIRETOWER_STATUS: dict[str, str] = {
@@ -153,7 +169,11 @@ def fetch_all_issues(client: JIRA, batch_size: int) -> list[dict]:
 
             service_tier_field = getattr(fields, FIELD_SERVICE_TIER, None)
             service_tier_raw = getattr(service_tier_field, "value", None)
-            service_tier = JIRA_SERVICE_TIER_MAP.get(service_tier_raw) if service_tier_raw else None
+            service_tier = (
+                JIRA_SERVICE_TIER_MAP.get(service_tier_raw)
+                if service_tier_raw
+                else None
+            )
 
             statuspage_id = get_field(FIELD_STATUSPAGE_ID)
             statuspage_url = (
@@ -216,7 +236,11 @@ def resolve_region_tags(labels: list[str]) -> list[Tag]:
             if tag:
                 tags.append(tag)
             else:
-                logger.warning("  Label %r mapped to %r but no matching region tag found", label, region_name)
+                logger.warning(
+                    "  Label %r mapped to %r but no matching region tag found",
+                    label,
+                    region_name,
+                )
     return tags
 
 
@@ -226,7 +250,10 @@ def resolve_service_tags(labels: list[str], title: str) -> list[Tag]:
     - Labels: exact case-insensitive match against tag names.
     - Title: word-boundary case-insensitive search for each tag name.
     """
-    all_service_tags = {tag.name.lower(): tag for tag in Tag.objects.filter(type=TagType.AFFECTED_SERVICE)}
+    all_service_tags = {
+        tag.name.lower(): tag
+        for tag in Tag.objects.filter(type=TagType.AFFECTED_SERVICE)
+    }
 
     matched: dict[int, Tag] = {}
 
@@ -256,7 +283,9 @@ def compute_downtime_minutes(issue: dict) -> int | None:
     Result: floor((time_mitigated - time_started).total_seconds() / 60)
     """
     started = parse_datetime(issue["time_started"]) if issue["time_started"] else None
-    mitigated = parse_datetime(issue["time_mitigated"]) if issue["time_mitigated"] else None
+    mitigated = (
+        parse_datetime(issue["time_mitigated"]) if issue["time_mitigated"] else None
+    )
 
     if (
         issue["impact"] == "Availability"
@@ -277,7 +306,9 @@ def import_incident(issue: dict, jira_domain: str, dry_run: bool) -> str:
 
     jira_id = int(jira_key.split("-")[1])
     if Incident.objects.filter(pk=jira_id).exists():
-        logger.error("  %s: incident with id %d already exists, skipping", jira_key, jira_id)
+        logger.error(
+            "  %s: incident with id %d already exists, skipping", jira_key, jira_id
+        )
         return "skipped"
 
     severity = issue["severity"]
@@ -297,7 +328,9 @@ def import_incident(issue: dict, jira_domain: str, dry_run: bool) -> str:
     reporter = (
         get_or_create_user(issue["reporter_email"]) if issue["reporter_email"] else None
     )
-    captain = get_or_create_user(issue["assignee_email"]) if issue["assignee_email"] else None
+    captain = (
+        get_or_create_user(issue["assignee_email"]) if issue["assignee_email"] else None
+    )
 
     total_downtime = compute_downtime_minutes(issue)
     mapped_regions = [
@@ -308,15 +341,22 @@ def import_incident(issue: dict, jira_domain: str, dry_run: bool) -> str:
     service_tags = resolve_service_tags(issue["labels"], issue["title"])
 
     if dry_run:
+
         def fmt_dt(val: str | None) -> str:
             return parse_datetime(val).strftime("%Y-%m-%d %H:%M") if val else "—"
 
         downtime_str = "—"
         if total_downtime is not None:
             hours, mins = divmod(total_downtime, 60)
-            downtime_str = f"{hours}h {mins}m ({total_downtime} min)" if hours else f"{mins}m ({total_downtime} min)"
+            downtime_str = (
+                f"{hours}h {mins}m ({total_downtime} min)"
+                if hours
+                else f"{mins}m ({total_downtime} min)"
+            )
 
-        service_names = ", ".join(sorted(t.name for t in service_tags)) if service_tags else "—"
+        service_names = (
+            ", ".join(sorted(t.name for t in service_tags)) if service_tags else "—"
+        )
         logger.info(
             "  %s | status=%-10s severity=%s tier=%-3s type=%-14s impact=%-14s captain=%-30s reporter=%-30s "
             "started=%-16s detected=%-16s analyzed=%-16s mitigated=%-16s recovered=%-16s "
@@ -353,11 +393,21 @@ def import_incident(issue: dict, jira_domain: str, dry_run: bool) -> str:
             captain=captain,
             total_downtime=total_downtime,
             service_tier=issue["service_tier"],
-            time_started=parse_datetime(issue["time_started"]) if issue["time_started"] else None,
-            time_detected=parse_datetime(issue["time_detected"]) if issue["time_detected"] else None,
-            time_analyzed=parse_datetime(issue["time_analyzed"]) if issue["time_analyzed"] else None,
-            time_mitigated=parse_datetime(issue["time_mitigated"]) if issue["time_mitigated"] else None,
-            time_recovered=parse_datetime(issue["time_recovered"]) if issue["time_recovered"] else None,
+            time_started=parse_datetime(issue["time_started"])
+            if issue["time_started"]
+            else None,
+            time_detected=parse_datetime(issue["time_detected"])
+            if issue["time_detected"]
+            else None,
+            time_analyzed=parse_datetime(issue["time_analyzed"])
+            if issue["time_analyzed"]
+            else None,
+            time_mitigated=parse_datetime(issue["time_mitigated"])
+            if issue["time_mitigated"]
+            else None,
+            time_recovered=parse_datetime(issue["time_recovered"])
+            if issue["time_recovered"]
+            else None,
         )
         incident.save()
 
@@ -410,7 +460,9 @@ def import_incident(issue: dict, jira_domain: str, dry_run: bool) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Import Jira INC incidents into Firetower")
+    parser = argparse.ArgumentParser(
+        description="Import Jira INC incidents into Firetower"
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -451,7 +503,6 @@ def main() -> None:
     logger.info(
         "\nDone. Imported: %d  Skipped: %d  Failed: %d", imported, skipped, failed
     )
-
 
 
 if __name__ == "__main__":
