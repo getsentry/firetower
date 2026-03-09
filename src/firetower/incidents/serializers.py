@@ -39,6 +39,7 @@ class IncidentListUISerializer(serializers.ModelSerializer):
 
     # Use incident_number as "id" field for frontend
     id = serializers.CharField(source="incident_number", read_only=True)
+    captain = serializers.SerializerMethodField()
 
     class Meta:
         model = Incident
@@ -53,8 +54,14 @@ class IncidentListUISerializer(serializers.ModelSerializer):
             "is_private",
             "created_at",
             "updated_at",
+            "captain",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_captain(self, obj: Incident) -> str | None:
+        if obj.captain:
+            return obj.captain.get_full_name() or obj.captain.username
+        return None
 
 
 class ParticipantSerializer(serializers.Serializer):
