@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
-from django.db.models import Q, QuerySet
+from django.db.models import Q, QuerySet, Value
+from django.db.models.functions import Concat
 from rest_framework import generics
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
@@ -26,11 +27,9 @@ class UserListView(generics.ListAPIView):
         queryset = User.objects.select_related("userprofile").order_by("email")
         search = self.request.query_params.get("search")
         if search:
-            queryset = queryset.filter(
-                Q(first_name__icontains=search)
-                | Q(last_name__icontains=search)
-                | Q(email__icontains=search)
-            )
+            queryset = queryset.annotate(
+                full_name=Concat("first_name", Value(" "), "last_name")
+            ).filter(Q(full_name__icontains=search) | Q(email__icontains=search))
         return queryset
 
 

@@ -149,6 +149,20 @@ class TestUserListView:
         assert len(response.data["results"]) == 1
         assert response.data["results"][0]["email"] == "alice@special.com"
 
+    def test_search_filters_by_full_name(self):
+        User.objects.create_user(
+            username="alice@example.com",
+            email="alice@example.com",
+            first_name="Alice",
+            last_name="Smith",
+        )
+
+        response = self.client.get("/api/users/?search=Alice Smith")
+
+        assert response.status_code == 200
+        assert len(response.data["results"]) == 1
+        assert response.data["results"][0]["name"] == "Alice Smith"
+
     @override_settings(IAP_ENABLED=True)
     def test_requires_authentication(self):
         client = APIClient()
