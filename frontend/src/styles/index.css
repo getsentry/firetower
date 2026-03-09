@@ -415,6 +415,56 @@ input[type='number'] {
     padding-right: var(--tokens-size-space-xl);
   }
 
+  .pt-space-xs {
+    padding-top: var(--tokens-size-space-xs);
+  }
+  .pt-space-sm {
+    padding-top: var(--tokens-size-space-sm);
+  }
+  .pt-space-md {
+    padding-top: var(--tokens-size-space-md);
+  }
+  .pt-space-lg {
+    padding-top: var(--tokens-size-space-lg);
+  }
+  .pt-space-xl {
+    padding-top: var(--tokens-size-space-xl);
+  }
+  .pt-space-2xl {
+    padding-top: var(--tokens-size-space-2xl);
+  }
+  .pt-space-3xl {
+    padding-top: var(--tokens-size-space-3xl);
+  }
+  .pt-space-4xl {
+    padding-top: var(--tokens-size-space-4xl);
+  }
+
+  .pb-space-xs {
+    padding-bottom: var(--tokens-size-space-xs);
+  }
+  .pb-space-sm {
+    padding-bottom: var(--tokens-size-space-sm);
+  }
+  .pb-space-md {
+    padding-bottom: var(--tokens-size-space-md);
+  }
+  .pb-space-lg {
+    padding-bottom: var(--tokens-size-space-lg);
+  }
+  .pb-space-xl {
+    padding-bottom: var(--tokens-size-space-xl);
+  }
+  .pb-space-2xl {
+    padding-bottom: var(--tokens-size-space-2xl);
+  }
+  .pb-space-3xl {
+    padding-bottom: var(--tokens-size-space-3xl);
+  }
+  .pb-space-4xl {
+    padding-bottom: var(--tokens-size-space-4xl);
+  }
+
   .py-space-xs {
     padding-top: var(--tokens-size-space-xs);
     padding-bottom: var(--tokens-size-space-xs);
