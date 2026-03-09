@@ -24,17 +24,15 @@ import django
 
 django.setup()
 
-from jira import JIRA  # noqa: E402
-
 from django.contrib.auth.models import User  # noqa: E402
-from django.db import models, transaction  # noqa: E402
+from django.db import transaction  # noqa: E402
 from django.utils.dateparse import parse_datetime  # noqa: E402
+from jira import JIRA  # noqa: E402
 
 from firetower.incidents.models import (  # noqa: E402
     ExternalLink,
     ExternalLinkType,
     Incident,
-    IncidentCounter,
     IncidentSeverity,
     IncidentStatus,
     Tag,
@@ -277,7 +275,9 @@ def import_incident(issue: dict, jira_domain: str, dry_run: bool) -> str:
     jira_key = issue["key"]
     jira_url = f"{jira_domain}/browse/{jira_key}"
 
-    if ExternalLink.objects.filter(type=ExternalLinkType.JIRA, url=jira_url).exists():
+    jira_id = int(jira_key.split("-")[1])
+    if Incident.objects.filter(pk=jira_id).exists():
+        logger.error("  %s: incident with id %d already exists, skipping", jira_key, jira_id)
         return "skipped"
 
     severity = issue["severity"]
@@ -341,8 +341,6 @@ def import_incident(issue: dict, jira_domain: str, dry_run: bool) -> str:
             service_names,
         )
         return "created"
-
-    jira_id = int(jira_key.split("-")[1])
 
     with transaction.atomic():
         incident = Incident(
@@ -454,13 +452,6 @@ def main() -> None:
         "\nDone. Imported: %d  Skipped: %d  Failed: %d", imported, skipped, failed
     )
 
-    if not args.dry_run and imported > 0:
-        max_id = Incident.objects.aggregate(max_id=models.Max("id"))["max_id"]
-        if max_id:
-            counter, _ = IncidentCounter.objects.get_or_create(pk=1)
-            counter.next_id = max_id + 1
-            counter.save()
-            logger.info("IncidentCounter updated to %d", counter.next_id)
 
 
 if __name__ == "__main__":
