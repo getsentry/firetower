@@ -23,7 +23,7 @@ class UserListView(generics.ListAPIView):
     serializer_class = UserListSerializer
 
     def get_queryset(self) -> QuerySet[User]:
-        queryset = User.objects.all().order_by("email")
+        queryset = User.objects.select_related("userprofile").order_by("email")
         search = self.request.query_params.get("search")
         if search:
             queryset = queryset.filter(
