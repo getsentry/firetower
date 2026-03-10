@@ -1,12 +1,14 @@
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
+import {Card} from 'components/Card';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {z} from 'zod';
 
+import {PeriodLabels} from './components/PeriodLabels';
 import {PeriodTabs} from './components/PeriodTabs';
-import {RegionCard} from './components/RegionCard';
+import {RegionRow} from './components/RegionRow';
 import {
   availabilityQueryOptions,
   PeriodSchema,
@@ -80,16 +82,12 @@ function AvailabilityPage() {
         </div>
         <PeriodTabs activePeriod={activePeriod} />
       </div>
-      <div className="flex flex-col gap-space-md">
-        {regionNames.map((name, i) => (
-          <RegionCard
-            key={name}
-            regionName={name}
-            periods={periods}
-            showPeriodLabels={i === 0}
-          />
+      <Card className="flex flex-col gap-space-md px-space-xl pt-space-sm pb-space-lg">
+        <PeriodLabels periods={periods} />
+        {regionNames.map(name => (
+          <RegionRow key={name} regionName={name} periods={periods} />
         ))}
-      </div>
+      </Card>
     </div>
   );
 }

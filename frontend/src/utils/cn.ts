@@ -92,6 +92,28 @@ const twMerge = extendTailwindMerge({
       ],
       // Padding X
       px: ['px-space-xs', 'px-space-sm', 'px-space-md', 'px-space-lg', 'px-space-xl'],
+      // Padding top
+      pt: [
+        'pt-space-xs',
+        'pt-space-sm',
+        'pt-space-md',
+        'pt-space-lg',
+        'pt-space-xl',
+        'pt-space-2xl',
+        'pt-space-3xl',
+        'pt-space-4xl',
+      ],
+      // Padding bottom
+      pb: [
+        'pb-space-xs',
+        'pb-space-sm',
+        'pb-space-md',
+        'pb-space-lg',
+        'pb-space-xl',
+        'pb-space-2xl',
+        'pb-space-3xl',
+        'pb-space-4xl',
+      ],
       // Padding Y
       py: ['py-space-xs', 'py-space-sm', 'py-space-md', 'py-space-lg', 'py-space-xl'],
       // Margin

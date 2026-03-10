@@ -10,7 +10,6 @@ const AVAILABILITY_BG: Record<AvailabilityLevel, string> = {
 };
 
 interface HeatmapBlock {
-  label: string;
   availability: number;
   periodStart: string;
   periodEnd: string;
@@ -19,40 +18,31 @@ interface HeatmapBlock {
 
 interface HeatmapBarProps {
   blocks: HeatmapBlock[];
-  showEndLabels?: boolean;
 }
 
-export function HeatmapBar({blocks, showEndLabels}: HeatmapBarProps) {
+export function HeatmapBar({blocks}: HeatmapBarProps) {
   return (
-    <div className="flex gap-px overflow-visible">
+    <div className="flex min-w-0 flex-1 gap-px overflow-visible">
       {blocks.map((block, i) => {
         const isFullUptime = block.availability >= 100;
         const displayPct = isFullUptime
           ? '100.00'
           : Math.min(99.99, block.availability).toFixed(2);
+        const isLast = i === blocks.length - 1;
         const inner = (
           <>
             <div
               className={cn(
-                'flex h-8 items-center justify-center sm:transition-opacity sm:group-hover:opacity-80',
+                'flex h-8 items-center justify-center',
+                !isFullUptime && 'sm:transition-opacity sm:group-hover:opacity-80',
                 AVAILABILITY_BG[getAvailabilityLevel(block.availability)],
                 i === 0 && 'rounded-l-md',
-                i === blocks.length - 1 && 'rounded-r-md'
+                isLast && 'rounded-r-md'
               )}
             >
-              <span className="font-mono text-size-sm font-medium text-white drop-shadow-md">
+              <span className="text-size-sm font-mono font-medium text-white drop-shadow-md select-none">
                 {displayPct}%
               </span>
-            </div>
-            <div
-              className={cn(
-                'pointer-events-none absolute top-full left-1/2 z-10 mt-0.5 -translate-x-1/2 whitespace-nowrap sm:block',
-                showEndLabels && i === blocks.length - 1
-                  ? 'opacity-100'
-                  : 'hidden opacity-0 transition-opacity group-hover:opacity-100'
-              )}
-            >
-              <span className="text-size-xs text-content-secondary">{block.label}</span>
             </div>
           </>
         );
