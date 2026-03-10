@@ -10,7 +10,6 @@ const AVAILABILITY_BG: Record<AvailabilityLevel, string> = {
 };
 
 interface HeatmapBlock {
-  label: string;
   availability: number;
   periodStart: string;
   periodEnd: string;

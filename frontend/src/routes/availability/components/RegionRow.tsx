@@ -11,7 +11,6 @@ export function RegionRow({regionName, periods}: RegionRowProps) {
   const heatmapBlocks = [...periods].reverse().map(p => {
     const region = p.regions.find(r => r.name === regionName);
     return {
-      label: p.label,
       availability: region?.availability_percentage ?? 100,
       periodStart: p.start,
       periodEnd: p.end,
