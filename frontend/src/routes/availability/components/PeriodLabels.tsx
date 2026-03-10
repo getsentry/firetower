@@ -12,15 +12,17 @@ function abbreviateLabel(label: string): string {
 }
 
 export function PeriodLabels({periods}: PeriodLabelsProps) {
-  const labels = [...periods].reverse().map(p => abbreviateLabel(p.label));
+  const labels = [...periods].reverse();
 
   return (
     <div className="gap-space-lg flex items-center">
       <div className="w-32 shrink-0" />
       <div className="flex min-w-0 flex-1 gap-px">
-        {labels.map(label => (
-          <div key={label} className="min-w-0 flex-1 text-center">
-            <span className="text-content-secondary text-size-xs">{label}</span>
+        {labels.map(p => (
+          <div key={p.start} className="min-w-0 flex-1 text-center">
+            <span className="text-content-secondary text-size-xs">
+              {abbreviateLabel(p.label)}
+            </span>
           </div>
         ))}
       </div>

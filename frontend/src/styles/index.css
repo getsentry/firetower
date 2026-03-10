@@ -415,6 +415,39 @@ input[type='number'] {
     padding-right: var(--tokens-size-space-xl);
   }
 
+  .py-space-xs {
+    padding-top: var(--tokens-size-space-xs);
+    padding-bottom: var(--tokens-size-space-xs);
+  }
+  .py-space-sm {
+    padding-top: var(--tokens-size-space-sm);
+    padding-bottom: var(--tokens-size-space-sm);
+  }
+  .py-space-md {
+    padding-top: var(--tokens-size-space-md);
+    padding-bottom: var(--tokens-size-space-md);
+  }
+  .py-space-lg {
+    padding-top: var(--tokens-size-space-lg);
+    padding-bottom: var(--tokens-size-space-lg);
+  }
+  .py-space-xl {
+    padding-top: var(--tokens-size-space-xl);
+    padding-bottom: var(--tokens-size-space-xl);
+  }
+  .py-space-2xl {
+    padding-top: var(--tokens-size-space-2xl);
+    padding-bottom: var(--tokens-size-space-2xl);
+  }
+  .py-space-3xl {
+    padding-top: var(--tokens-size-space-3xl);
+    padding-bottom: var(--tokens-size-space-3xl);
+  }
+  .py-space-4xl {
+    padding-top: var(--tokens-size-space-4xl);
+    padding-bottom: var(--tokens-size-space-4xl);
+  }
+
   .pt-space-xs {
     padding-top: var(--tokens-size-space-xs);
   }
@@ -462,39 +495,6 @@ input[type='number'] {
     padding-bottom: var(--tokens-size-space-3xl);
   }
   .pb-space-4xl {
-    padding-bottom: var(--tokens-size-space-4xl);
-  }
-
-  .py-space-xs {
-    padding-top: var(--tokens-size-space-xs);
-    padding-bottom: var(--tokens-size-space-xs);
-  }
-  .py-space-sm {
-    padding-top: var(--tokens-size-space-sm);
-    padding-bottom: var(--tokens-size-space-sm);
-  }
-  .py-space-md {
-    padding-top: var(--tokens-size-space-md);
-    padding-bottom: var(--tokens-size-space-md);
-  }
-  .py-space-lg {
-    padding-top: var(--tokens-size-space-lg);
-    padding-bottom: var(--tokens-size-space-lg);
-  }
-  .py-space-xl {
-    padding-top: var(--tokens-size-space-xl);
-    padding-bottom: var(--tokens-size-space-xl);
-  }
-  .py-space-2xl {
-    padding-top: var(--tokens-size-space-2xl);
-    padding-bottom: var(--tokens-size-space-2xl);
-  }
-  .py-space-3xl {
-    padding-top: var(--tokens-size-space-3xl);
-    padding-bottom: var(--tokens-size-space-3xl);
-  }
-  .py-space-4xl {
-    padding-top: var(--tokens-size-space-4xl);
     padding-bottom: var(--tokens-size-space-4xl);
   }
 
