@@ -92,14 +92,13 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
         }
         break;
       case 'Enter':
-      case ' ':
         if (focusedIndex >= 0 && focusedIndex < available.length) {
           e.preventDefault();
           toggle(available[focusedIndex]);
           setInputValue('');
           setFocusedIndex(0);
           inputRef.current?.focus();
-        } else if (e.key === 'Enter' && !inputValue.trim()) {
+        } else if (!inputValue.trim()) {
           close();
         }
         break;

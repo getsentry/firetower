@@ -124,14 +124,13 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
         }
         break;
       case 'Enter':
-      case ' ':
         if (focusedIndex >= 0 && focusedIndex < available.length) {
           e.preventDefault();
           toggle(available[focusedIndex].email);
           setInputValue('');
           setFocusedIndex(0);
           inputRef.current?.focus();
-        } else if (e.key === 'Enter' && !inputValue.trim()) {
+        } else if (!inputValue.trim()) {
           close();
         }
         break;
