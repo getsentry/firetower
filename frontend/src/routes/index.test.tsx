@@ -54,6 +54,16 @@ const mockCurrentUser: CurrentUser = {
   avatar_url: null,
 };
 
+const mockPaginatedUsers = {
+  count: 2,
+  next: null,
+  previous: null,
+  results: [
+    {email: 'alice@example.com', name: 'Alice Smith', avatar_url: null},
+    {email: 'bob@example.com', name: 'Bob Jones', avatar_url: null},
+  ],
+};
+
 function setupDefaultMocks() {
   mockApiGet.mockImplementation((args: {path: string}) => {
     if (args.path === '/ui/incidents/') {
@@ -64,6 +74,9 @@ function setupDefaultMocks() {
     }
     if (args.path === '/tags/') {
       return Promise.resolve(['tag-1', 'tag-2']);
+    }
+    if (args.path === '/users/') {
+      return Promise.resolve(mockPaginatedUsers);
     }
     return Promise.reject(new Error('Not found'));
   });
@@ -509,6 +522,71 @@ describe('Route States', () => {
     expect(screen.getByTestId('filter-active')).toBeInTheDocument();
     expect(screen.getByTestId('filter-review')).toBeInTheDocument();
     expect(screen.getByTestId('filter-closed')).toBeInTheDocument();
+  });
+});
+
+describe('Filter Interactions', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    setupDefaultMocks();
+  });
+
+  async function openFilters() {
+    const user = userEvent.setup();
+    renderRoute();
+    await screen.findByText('INC-1247');
+    const toggle = screen.getByTestId('advanced-filters-toggle');
+    await user.click(toggle);
+    return user;
+  }
+
+  it('PillFilter: selecting a severity option adds it to the filter', async () => {
+    const user = await openFilters();
+
+    const editButton = screen.getByLabelText('Edit Severity');
+    await user.click(editButton);
+
+    const option = await screen.findByRole('button', {name: 'P0'});
+    await user.click(option);
+
+    expect(screen.getByText('P0')).toBeInTheDocument();
+  });
+
+  it('TagFilter: selecting a tag option adds it to the filter', async () => {
+    const user = await openFilters();
+
+    const editButton = screen.getByLabelText('Edit Impact Type');
+    await user.click(editButton);
+
+    const option = await screen.findByRole('button', {name: 'tag-1'});
+    await user.click(option);
+
+    expect(screen.getByText('tag-1')).toBeInTheDocument();
+  });
+
+  it('UserFilter: selecting a user adds their email to the filter', async () => {
+    const user = await openFilters();
+
+    const editButton = screen.getByLabelText('Edit Captain');
+    await user.click(editButton);
+
+    const option = await screen.findByRole('button', {name: /Alice Smith/});
+    await user.click(option);
+
+    expect(screen.getByText('alice@example.com')).toBeInTheDocument();
+  });
+
+  it('DateRangeFilter: selecting a date shows clear button', async () => {
+    renderRoute('/?created_after=2024-06-15');
+
+    await screen.findByText('INC-1247');
+
+    const user = userEvent.setup();
+    const toggle = screen.getByTestId('advanced-filters-toggle');
+    await user.click(toggle);
+
+    expect(screen.getByText('Jun 15, 2024')).toBeInTheDocument();
+    expect(screen.getByLabelText('Clear start date')).toBeInTheDocument();
   });
 });
 
