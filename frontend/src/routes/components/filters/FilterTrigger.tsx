@@ -17,20 +17,7 @@ export function FilterTrigger({open, onToggle}: {open: boolean; onToggle: () => 
           onClick={() => {
             navigate({
               to: '/',
-              search: prev => ({
-                ...prev,
-                severity: undefined,
-                service_tier: undefined,
-                affected_service: undefined,
-                root_cause: undefined,
-                impact_type: undefined,
-                affected_region: undefined,
-                captain: undefined,
-                reporter: undefined,
-                created_after: undefined,
-                created_before: undefined,
-                status: undefined,
-              }),
+              search: {},
               replace: true,
             });
           }}
