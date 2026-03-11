@@ -32,6 +32,7 @@ const mockIncidents: PaginatedIncidents = {
       service_tier: null,
       created_at: '2024-08-27T18:14:00Z',
       is_private: false,
+      captain: null,
     },
     {
       id: 'INC-1246',
@@ -43,6 +44,7 @@ const mockIncidents: PaginatedIncidents = {
       service_tier: null,
       created_at: '2024-08-27T15:32:00Z',
       is_private: true,
+      captain: null,
     },
   ],
 };
