@@ -1,188 +1,495 @@
-import {useNavigate, useSearch} from '@tanstack/react-router';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
+import {useNavigate} from '@tanstack/react-router';
 import {Button} from 'components/Button';
+import {Card} from 'components/Card';
+import {Pill, type PillProps} from 'components/Pill';
 import {Tag} from 'components/Tag';
-import {SlidersHorizontalIcon, XIcon} from 'lucide-react';
+import {Pencil, SlidersHorizontalIcon, XIcon} from 'lucide-react';
+import {cn} from 'utils/cn';
 
-type ArrayFilterKey =
-  | 'severity'
-  | 'service_tier'
-  | 'affected_service'
-  | 'root_cause'
-  | 'impact_type'
-  | 'affected_region'
-  | 'captain'
-  | 'reporter';
+import {tagsQueryOptions, type TagType} from '../$incidentId/queries/tagsQueryOptions';
+import {ServiceTierSchema, SeveritySchema} from '../types';
 
-type DateFilterKey = 'created_after' | 'created_before';
-
-const FILTER_LABELS: Record<ArrayFilterKey | DateFilterKey, string> = {
-  severity: 'Severity',
-  service_tier: 'Service Tier',
-  affected_service: 'Affected Service',
-  root_cause: 'Root Cause',
-  impact_type: 'Impact Type',
-  affected_region: 'Affected Region',
-  captain: 'Captain',
-  reporter: 'Reporter',
-  created_after: 'Created After',
-  created_before: 'Created Before',
-};
-
-const ARRAY_FILTER_KEYS: ArrayFilterKey[] = [
-  'severity',
-  'service_tier',
-  'affected_service',
-  'root_cause',
-  'impact_type',
-  'affected_region',
-  'captain',
-  'reporter',
-];
-
-function useActiveFilters() {
-  const search = useSearch({from: '/'});
-
-  const activeFilters: {key: ArrayFilterKey; value: string; label: string}[] = [];
-  for (const key of ARRAY_FILTER_KEYS) {
-    const values = (search[key] as string[] | undefined) ?? [];
-    for (const value of values) {
-      activeFilters.push({key, value, label: FILTER_LABELS[key]});
-    }
-  }
-
-  const activeCount =
-    activeFilters.length +
-    (search.created_after ? 1 : 0) +
-    (search.created_before ? 1 : 0);
-
-  return {search, activeFilters, activeCount};
-}
+import {useActiveFilters, type ArrayFilterKey} from './useActiveFilters';
 
 export function FilterTrigger({open, onToggle}: {open: boolean; onToggle: () => void}) {
+  const navigate = useNavigate();
   const {activeCount} = useActiveFilters();
 
   return (
-    <Button
-      variant="secondary"
-      size="sm"
-      onClick={onToggle}
-      aria-expanded={open}
-      data-testid="advanced-filters-toggle"
-    >
-      <SlidersHorizontalIcon className="h-3.5 w-3.5" />
-      Filter
+    <div className="flex items-center gap-space-md">
       {activeCount > 0 && (
-        <span className="bg-background-accent-vibrant text-content-on-vibrant-light ml-space-2xs inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-xs leading-none">
-          {activeCount}
-        </span>
+        <button
+          type="button"
+          className="text-content-accent text-size-sm cursor-pointer hover:underline"
+          onClick={() => {
+            navigate({
+              to: '/',
+              search: prev => ({
+                ...prev,
+                severity: undefined,
+                service_tier: undefined,
+                affected_service: undefined,
+                root_cause: undefined,
+                impact_type: undefined,
+                affected_region: undefined,
+                captain: undefined,
+                reporter: undefined,
+                created_after: undefined,
+                created_before: undefined,
+              }),
+              replace: true,
+            });
+          }}
+          data-testid="clear-all-filters"
+        >
+          Clear all filters
+        </button>
       )}
-    </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onToggle}
+        aria-expanded={open}
+        data-testid="advanced-filters-toggle"
+      >
+        <SlidersHorizontalIcon className="h-3.5 w-3.5" />
+        {open ? 'Hide filters' : 'Show filters'}
+        {activeCount > 0 && (
+          <span className="bg-background-accent-vibrant text-content-on-vibrant-light ml-space-2xs inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-xs leading-none">
+            {activeCount}
+          </span>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+type PillVariant = NonNullable<PillProps['variant']>;
+
+interface PillFilterProps<T extends PillVariant> {
+  label: string;
+  filterKey: ArrayFilterKey;
+  options: readonly T[];
+}
+
+function PillFilter<T extends PillVariant>({
+  label,
+  filterKey,
+  options,
+}: PillFilterProps<T>) {
+  const navigate = useNavigate();
+  const {search} = useActiveFilters();
+  const selected = ((search[filterKey] as string[] | undefined) ?? []) as string[];
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const available = options.filter(
+    o => !selected.includes(o) && o.toLowerCase().includes(inputValue.toLowerCase())
+  );
+
+  const toggle = useCallback(
+    (value: string) => {
+      const current = ((search[filterKey] as string[] | undefined) ?? []) as string[];
+      const next = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value];
+      navigate({
+        to: '/',
+        search: prev => ({...prev, [filterKey]: next.length > 0 ? next : undefined}),
+        replace: true,
+      });
+    },
+    [search, filterKey, navigate]
+  );
+
+  const close = useCallback(() => {
+    setIsEditing(false);
+    setInputValue('');
+    setFocusedIndex(0);
+  }, []);
+
+  const open = () => {
+    setIsEditing(true);
+    setInputValue('');
+    setFocusedIndex(0);
+  };
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isEditing, close]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (available.length > 0) {
+          setFocusedIndex(prev => (prev + 1) % available.length);
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (available.length > 0) {
+          setFocusedIndex(prev => (prev - 1 + available.length) % available.length);
+        }
+        break;
+      case 'Enter':
+      case ' ':
+        if (focusedIndex >= 0 && focusedIndex < available.length) {
+          e.preventDefault();
+          toggle(available[focusedIndex]);
+          setInputValue('');
+          setFocusedIndex(0);
+          inputRef.current?.focus();
+        } else if (e.key === 'Enter' && !inputValue.trim()) {
+          close();
+        }
+        break;
+      case 'Backspace':
+        if (inputValue === '' && selected.length > 0) {
+          toggle(selected[selected.length - 1]);
+        }
+        break;
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-space-md gap-space-xs flex items-center">
+        <h3 className="text-size-md text-content-secondary font-semibold">{label}</h3>
+        <Button
+          variant="icon"
+          onClick={open}
+          aria-label={`Edit ${label}`}
+          className={cn(isEditing && 'invisible')}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className={cn('relative', isEditing && 'z-50')}>
+        {isEditing ? (
+          <div className="gap-space-sm flex flex-wrap items-center">
+            {selected.map(v => (
+              <Tag
+                key={v}
+                action={
+                  <Button
+                    variant="close"
+                    size={null}
+                    onClick={() => toggle(v)}
+                    aria-label={`Remove ${v}`}
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              >
+                <Pill variant={v as T}>{v}</Pill>
+              </Tag>
+            ))}
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={e => {
+                setInputValue(e.target.value);
+                setFocusedIndex(0);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Add..."
+              className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
+            />
+          </div>
+        ) : selected.length > 0 ? (
+          <div className="gap-space-sm flex flex-wrap">
+            {selected.map(v => (
+              <Tag key={v}>
+                <Pill variant={v as T}>{v}</Pill>
+              </Tag>
+            ))}
+          </div>
+        ) : (
+          <p className="text-size-sm text-content-disabled italic">Any</p>
+        )}
+
+        {isEditing && available.length > 0 && (
+          <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
+            <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {available.map((option, index) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    toggle(option);
+                    setInputValue('');
+                    setFocusedIndex(0);
+                    inputRef.current?.focus();
+                  }}
+                  className={cn(
+                    'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
+                    index === focusedIndex
+                      ? 'bg-background-secondary'
+                      : 'hover:bg-background-transparent-neutral-muted'
+                  )}
+                >
+                  <Pill variant={option}>{option}</Pill>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {isEditing && (
+        <div
+          className="fixed inset-0 z-40 bg-transparent"
+          aria-hidden="true"
+          onClick={close}
+        />
+      )}
+    </div>
+  );
+}
+
+interface TagFilterProps {
+  label: string;
+  filterKey: ArrayFilterKey;
+  tagType: TagType;
+}
+
+function TagFilter({label, filterKey, tagType}: TagFilterProps) {
+  const navigate = useNavigate();
+  const {search} = useActiveFilters();
+  const selected = ((search[filterKey] as string[] | undefined) ?? []) as string[];
+  const {data: suggestions = []} = useQuery(tagsQueryOptions(tagType));
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const available = suggestions.filter(
+    s => !selected.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
+  );
+
+  const toggle = useCallback(
+    (value: string) => {
+      const current = ((search[filterKey] as string[] | undefined) ?? []) as string[];
+      const next = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value];
+      navigate({
+        to: '/',
+        search: prev => ({...prev, [filterKey]: next.length > 0 ? next : undefined}),
+        replace: true,
+      });
+    },
+    [search, filterKey, navigate]
+  );
+
+  const close = useCallback(() => {
+    setIsEditing(false);
+    setInputValue('');
+    setFocusedIndex(0);
+  }, []);
+
+  const open = () => {
+    setIsEditing(true);
+    setInputValue('');
+    setFocusedIndex(0);
+  };
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isEditing, close]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (available.length > 0) {
+          setFocusedIndex(prev => (prev + 1) % available.length);
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (available.length > 0) {
+          setFocusedIndex(prev => (prev - 1 + available.length) % available.length);
+        }
+        break;
+      case 'Enter':
+      case ' ':
+        if (focusedIndex >= 0 && focusedIndex < available.length) {
+          e.preventDefault();
+          toggle(available[focusedIndex]);
+          setInputValue('');
+          setFocusedIndex(0);
+          inputRef.current?.focus();
+        } else if (e.key === 'Enter' && !inputValue.trim()) {
+          close();
+        }
+        break;
+      case 'Backspace':
+        if (inputValue === '' && selected.length > 0) {
+          toggle(selected[selected.length - 1]);
+        }
+        break;
+    }
+  };
+
+  return (
+    <div>
+      <div className="mb-space-md gap-space-xs flex items-center">
+        <h3 className="text-size-md text-content-secondary font-semibold">{label}</h3>
+        <Button
+          variant="icon"
+          onClick={open}
+          aria-label={`Edit ${label}`}
+          className={cn(isEditing && 'invisible')}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className={cn('relative', isEditing && 'z-50')}>
+        {isEditing ? (
+          <div className="gap-space-sm flex flex-wrap items-center">
+            {selected.map(v => (
+              <Tag
+                key={v}
+                action={
+                  <Button
+                    variant="close"
+                    size={null}
+                    onClick={() => toggle(v)}
+                    aria-label={`Remove ${v}`}
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              >
+                {v}
+              </Tag>
+            ))}
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={e => {
+                setInputValue(e.target.value);
+                setFocusedIndex(0);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Add..."
+              className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
+            />
+          </div>
+        ) : selected.length > 0 ? (
+          <div className="gap-space-sm flex flex-wrap">
+            {selected.map(v => (
+              <Tag key={v}>{v}</Tag>
+            ))}
+          </div>
+        ) : (
+          <p className="text-size-sm text-content-disabled italic">Any</p>
+        )}
+
+        {isEditing && available.length > 0 && (
+          <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
+            <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {available.map((option, index) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    toggle(option);
+                    setInputValue('');
+                    setFocusedIndex(0);
+                    inputRef.current?.focus();
+                  }}
+                  className={cn(
+                    'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
+                    index === focusedIndex
+                      ? 'bg-background-secondary'
+                      : 'hover:bg-background-transparent-neutral-muted'
+                  )}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {isEditing && (
+        <div
+          className="fixed inset-0 z-40 bg-transparent"
+          aria-hidden="true"
+          onClick={close}
+        />
+      )}
+    </div>
   );
 }
 
 export function FilterPanel() {
-  const navigate = useNavigate();
-  const {search, activeFilters, activeCount} = useActiveFilters();
-
-  function removeArrayFilterValue(key: ArrayFilterKey, value: string) {
-    const current = (search[key] as string[] | undefined) ?? [];
-    const next = current.filter(v => v !== value);
-    navigate({
-      to: '/',
-      search: prev => ({...prev, [key]: next.length > 0 ? next : undefined}),
-    });
-  }
-
-  function updateDateFilter(key: DateFilterKey, value: string | undefined) {
-    navigate({
-      to: '/',
-      search: prev => ({...prev, [key]: value}),
-    });
-  }
-
-  function clearAll() {
-    navigate({
-      to: '/',
-      search: prev => {
-        const next = {...prev};
-        for (const key of ARRAY_FILTER_KEYS) {
-          delete next[key];
-        }
-        delete next.created_after;
-        delete next.created_before;
-        return next;
-      },
-    });
-  }
-
   return (
-    <div
-      className="bg-background-secondary flex flex-col gap-space-md rounded-md p-space-md"
-      data-testid="advanced-filters"
-    >
-      <div className="grid grid-cols-2 gap-space-md">
-        <div>Column 1</div>
-        <div>Column 2</div>
+    <Card className="flex flex-col gap-space-md" data-testid="advanced-filters">
+      <div className="grid grid-cols-3 gap-space-md">
+        <PillFilter
+          label="Severity"
+          filterKey="severity"
+          options={SeveritySchema.options}
+        />
+        <PillFilter
+          label="Service Tier"
+          filterKey="service_tier"
+          options={ServiceTierSchema.options}
+        />
+        <TagFilter label="Impact Type" filterKey="impact_type" tagType="IMPACT_TYPE" />
+        <TagFilter
+          label="Affected Service"
+          filterKey="affected_service"
+          tagType="AFFECTED_SERVICE"
+        />
+        <TagFilter
+          label="Affected Region"
+          filterKey="affected_region"
+          tagType="AFFECTED_REGION"
+        />
+        <TagFilter label="Root Cause" filterKey="root_cause" tagType="ROOT_CAUSE" />
       </div>
-
-      {activeCount > 0 && (
-        <div className="flex flex-wrap items-center gap-space-xs">
-          {activeFilters.map(({key, value, label}) => (
-            <Tag
-              key={`${key}-${value}`}
-              action={
-                <button
-                  type="button"
-                  onClick={() => removeArrayFilterValue(key, value)}
-                  className="text-content-secondary hover:text-content-primary cursor-pointer"
-                >
-                  <XIcon className="h-3 w-3" />
-                </button>
-              }
-            >
-              {label}: {value}
-            </Tag>
-          ))}
-          {search.created_after && (
-            <Tag
-              action={
-                <button
-                  type="button"
-                  onClick={() => updateDateFilter('created_after', undefined)}
-                  className="text-content-secondary hover:text-content-primary cursor-pointer"
-                >
-                  <XIcon className="h-3 w-3" />
-                </button>
-              }
-            >
-              After: {search.created_after}
-            </Tag>
-          )}
-          {search.created_before && (
-            <Tag
-              action={
-                <button
-                  type="button"
-                  onClick={() => updateDateFilter('created_before', undefined)}
-                  className="text-content-secondary hover:text-content-primary cursor-pointer"
-                >
-                  <XIcon className="h-3 w-3" />
-                </button>
-              }
-            >
-              Before: {search.created_before}
-            </Tag>
-          )}
-          <button
-            type="button"
-            onClick={clearAll}
-            className="text-content-accent text-size-sm cursor-pointer hover:underline"
-            data-testid="clear-all-filters"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
-    </div>
+    </Card>
   );
 }
