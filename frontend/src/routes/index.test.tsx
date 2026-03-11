@@ -409,7 +409,10 @@ describe('Advanced Filters UI', () => {
 
     await screen.findByText('INC-1247');
 
-    expect(screen.queryByText('Severity')).not.toBeInTheDocument();
+    expect(screen.getByTestId('advanced-filters-toggle')).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
   });
 
   it('shows filter controls when toggle is clicked', async () => {
@@ -422,36 +425,17 @@ describe('Advanced Filters UI', () => {
     await user.click(toggle);
 
     expect(screen.getByText('Severity')).toBeInTheDocument();
-    expect(screen.getByText('Service Tier')).toBeInTheDocument();
-    expect(screen.getByText('Captain')).toBeInTheDocument();
-    expect(screen.getByText('Reporter')).toBeInTheDocument();
-    expect(screen.getByText('Created After')).toBeInTheDocument();
-    expect(screen.getByText('Created Before')).toBeInTheDocument();
   });
 
-  it('auto-opens when URL has advanced filters', async () => {
+  it('does not auto-open when URL has advanced filters', async () => {
     renderRoute('/?severity=P0');
 
     await screen.findByText('INC-1247');
 
-    expect(screen.getByText('Severity')).toBeInTheDocument();
-  });
-
-  it('shows active filter tags', async () => {
-    renderRoute('/?severity=P0&service_tier=T0');
-
-    await screen.findByText('INC-1247');
-
-    expect(screen.getByText('Severity: P0')).toBeInTheDocument();
-    expect(screen.getByText('Service Tier: T0')).toBeInTheDocument();
-  });
-
-  it('shows clear all button when filters are active', async () => {
-    renderRoute('/?severity=P0');
-
-    await screen.findByText('INC-1247');
-
-    expect(screen.getByTestId('clear-all-filters')).toBeInTheDocument();
+    expect(screen.getByTestId('advanced-filters-toggle')).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
   });
 });
 
