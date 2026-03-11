@@ -174,12 +174,13 @@ describe('StatusFilter', () => {
     setupDefaultMocks();
   });
 
-  it('renders all three filter buttons', async () => {
+  it('renders all four filter buttons', async () => {
     renderRoute();
 
     expect(await screen.findByTestId('filter-active')).toBeInTheDocument();
     expect(await screen.findByTestId('filter-review')).toBeInTheDocument();
     expect(await screen.findByTestId('filter-closed')).toBeInTheDocument();
+    expect(await screen.findByTestId('filter-all')).toBeInTheDocument();
   });
 
   it('shows Active filter as active by default', async () => {
@@ -245,10 +246,12 @@ describe('StatusFilter', () => {
     const activeButton = screen.getByTestId('filter-active');
     const reviewButton = screen.getByTestId('filter-review');
     const closedButton = screen.getByTestId('filter-closed');
+    const allButton = screen.getByTestId('filter-all');
 
     expect(activeButton).toHaveAttribute('aria-selected', 'false');
     expect(reviewButton).toHaveAttribute('aria-selected', 'false');
     expect(closedButton).toHaveAttribute('aria-selected', 'false');
+    expect(allButton).toHaveAttribute('aria-selected', 'false');
   });
 });
 

@@ -18,4 +18,5 @@ export const STATUS_FILTER_GROUPS = {
   active: ['Active', 'Mitigated'] as IncidentStatus[],
   review: ['Postmortem'] as IncidentStatus[],
   closed: ['Done', 'Cancelled'] as IncidentStatus[],
+  all: ['Any'] as string[],
 };
