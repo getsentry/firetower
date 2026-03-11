@@ -81,38 +81,41 @@ function PillFilter<T extends PillVariant>({
 }: PillFilterProps<T>) {
   const navigate = useNavigate();
   const {search} = useActiveFilters();
-  const selected = ((search[filterKey] as string[] | undefined) ?? []) as string[];
+  const committed = ((search[filterKey] as string[] | undefined) ?? []) as string[];
   const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = isEditing ? draft : committed;
 
   const available = options.filter(
     o => !selected.includes(o) && o.toLowerCase().includes(inputValue.toLowerCase())
   );
 
-  const toggle = useCallback(
-    (value: string) => {
-      const current = ((search[filterKey] as string[] | undefined) ?? []) as string[];
-      const next = current.includes(value)
-        ? current.filter(v => v !== value)
-        : [...current, value];
-      navigate({
-        to: '/',
-        search: prev => ({...prev, [filterKey]: next.length > 0 ? next : undefined}),
-        replace: true,
-      });
-    },
-    [search, filterKey, navigate]
-  );
+  const toggle = useCallback((value: string) => {
+    setDraft(prev =>
+      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+    );
+  }, []);
 
   const close = useCallback(() => {
     setIsEditing(false);
     setInputValue('');
     setFocusedIndex(0);
-  }, []);
+    setDraft(prev => {
+      navigate({
+        to: '/',
+        search: s => ({...s, [filterKey]: prev.length > 0 ? prev : undefined}),
+        replace: true,
+      });
+      return prev;
+    });
+  }, [navigate, filterKey]);
 
   const open = () => {
+    setDraft(committed);
     setIsEditing(true);
     setInputValue('');
     setFocusedIndex(0);
@@ -277,39 +280,42 @@ interface TagFilterProps {
 function TagFilter({label, filterKey, tagType}: TagFilterProps) {
   const navigate = useNavigate();
   const {search} = useActiveFilters();
-  const selected = ((search[filterKey] as string[] | undefined) ?? []) as string[];
+  const committed = ((search[filterKey] as string[] | undefined) ?? []) as string[];
   const {data: suggestions = []} = useQuery(tagsQueryOptions(tagType));
   const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = isEditing ? draft : committed;
 
   const available = suggestions.filter(
     s => !selected.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
   );
 
-  const toggle = useCallback(
-    (value: string) => {
-      const current = ((search[filterKey] as string[] | undefined) ?? []) as string[];
-      const next = current.includes(value)
-        ? current.filter(v => v !== value)
-        : [...current, value];
-      navigate({
-        to: '/',
-        search: prev => ({...prev, [filterKey]: next.length > 0 ? next : undefined}),
-        replace: true,
-      });
-    },
-    [search, filterKey, navigate]
-  );
+  const toggle = useCallback((value: string) => {
+    setDraft(prev =>
+      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+    );
+  }, []);
 
   const close = useCallback(() => {
     setIsEditing(false);
     setInputValue('');
     setFocusedIndex(0);
-  }, []);
+    setDraft(prev => {
+      navigate({
+        to: '/',
+        search: s => ({...s, [filterKey]: prev.length > 0 ? prev : undefined}),
+        replace: true,
+      });
+      return prev;
+    });
+  }, [navigate, filterKey]);
 
   const open = () => {
+    setDraft(committed);
     setIsEditing(true);
     setInputValue('');
     setFocusedIndex(0);
