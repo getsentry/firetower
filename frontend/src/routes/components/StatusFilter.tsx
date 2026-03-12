@@ -58,6 +58,12 @@ export function StatusFilter() {
         isActive={arraysEqual(status ?? [], STATUS_FILTER_GROUPS.closed)}
         testId="filter-closed"
       />
+      <FilterLink
+        statuses={STATUS_FILTER_GROUPS.all}
+        label="All"
+        isActive={arraysEqual(status ?? [], STATUS_FILTER_GROUPS.all)}
+        testId="filter-all"
+      />
     </div>
   );
 }
