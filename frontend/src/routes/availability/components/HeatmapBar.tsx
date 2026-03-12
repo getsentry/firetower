@@ -61,6 +61,7 @@ export function HeatmapBar({blocks}: HeatmapBarProps) {
               created_after: block.periodStart,
               created_before: block.periodEnd,
               service_tier: ['T0'],
+              impact_type: ['Availability'],
               status: ['Any'],
             }}
           >
