@@ -423,7 +423,7 @@ class AvailabilityView(APIView):
                     Incident.objects.filter(
                         created_at__gte=earliest_start,
                         created_at__lte=now,
-                        total_downtime__isnull=False,
+                        impact_type_tags__name="Availability",
                         service_tier="T0",
                     ),
                     request.user,
