@@ -1,43 +1,28 @@
 import logging
 import re
-from collections import defaultdict
 from dataclasses import asdict
+from datetime import datetime
 
 from django.conf import settings
 from django.db.models import Count, QuerySet
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
+from django.utils import timezone as django_timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework import generics, serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
-from .filters import (
-    filter_by_captain,
-    filter_by_date_range,
-    filter_by_reporter,
-    filter_by_service_tier,
-    filter_by_severity,
-    filter_by_status,
-    filter_by_tags,
-)
 from .models import (
     INCIDENT_ID_START,
     Incident,
     IncidentOrRedirect,
+    IncidentSeverity,
     Tag,
     TagType,
     filter_visible_to_user,
 )
 from .permissions import IncidentPermission
-from .reporting_utils import (
-    build_incidents_by_tag,
-    compute_regions,
-    get_month_periods,
-    get_quarter_periods,
-    get_year_periods,
-)
 from .serializers import (
     IncidentListUISerializer,
     IncidentOrRedirectReadSerializer,
@@ -47,9 +32,76 @@ from .serializers import (
     TagSerializer,
 )
 from .services import ParticipantsSyncStats, sync_incident_participants_from_slack
-from .utils import sort_tags_with_overrides
 
 logger = logging.getLogger(__name__)
+
+
+def parse_date_param(value: str) -> datetime | None:
+    """Parse a date string from query params. Accepts ISO 8601 formats."""
+    if not value:
+        return None
+    dt = parse_datetime(value)
+    if dt is None:
+        # Try parsing as date-only (YYYY-MM-DD)
+        try:
+            dt = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    if django_timezone.is_naive(dt):
+        dt = django_timezone.make_aware(dt)
+    return dt
+
+
+def filter_by_date_range(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    """Apply created_after and created_before filters to queryset."""
+    created_after = request.GET.get("created_after")
+    created_before = request.GET.get("created_before")
+
+    if created_after:
+        dt = parse_date_param(created_after)
+        if dt is None:
+            raise ValidationError(
+                {
+                    "created_after": "Invalid date format. Use ISO 8601 (e.g., 2024-01-15 or 2024-01-15T10:30:00Z)"
+                }
+            )
+        queryset = queryset.filter(created_at__gte=dt)
+
+    if created_before:
+        dt = parse_date_param(created_before)
+        if dt is None:
+            raise ValidationError(
+                {
+                    "created_before": "Invalid date format. Use ISO 8601 (e.g., 2024-01-15 or 2024-01-15T10:30:00Z)"
+                }
+            )
+        queryset = queryset.filter(created_at__lte=dt)
+
+    return queryset
+
+
+def filter_by_severity(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    """Apply severity filter to queryset. Expects severity param in GET (can be repeated for multiple values)."""
+    severity_filters = request.GET.getlist("severity")
+
+    if severity_filters:
+        valid_severities = set(IncidentSeverity.__members__.values())
+        invalid_severities = set(severity_filters) - valid_severities
+
+        if invalid_severities:
+            raise ValidationError(
+                {
+                    "severity": f"Invalid severity value(s): {', '.join(invalid_severities)}"
+                }
+            )
+
+        queryset = queryset.filter(severity__in=severity_filters)
+
+    return queryset
 
 
 class IncidentListUIView(generics.ListAPIView):
@@ -69,17 +121,22 @@ class IncidentListUIView(generics.ListAPIView):
     serializer_class = IncidentListUISerializer
 
     def get_queryset(self) -> QuerySet[Incident]:
-        queryset = Incident.objects.select_related("captain")
+        """Filter incidents by visibility, status, severity, and date range"""
+        queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
-        queryset = filter_by_status(
-            queryset, self.request, default=["Active", "Mitigated"]
-        )
+
+        # Filter by status (defaults to Active and Mitigated if not specified)
+        status_filters = self.request.GET.getlist("status")
+        if not status_filters:
+            status_filters = ["Active", "Mitigated"]
+        queryset = queryset.filter(status__in=status_filters)
+
+        # Filter by severity
         queryset = filter_by_severity(queryset, self.request)
-        queryset = filter_by_service_tier(queryset, self.request)
+
+        # Filter by date range
         queryset = filter_by_date_range(queryset, self.request)
-        queryset = filter_by_tags(queryset, self.request)
-        queryset = filter_by_captain(queryset, self.request)
-        queryset = filter_by_reporter(queryset, self.request)
+
         return queryset
 
 
@@ -176,15 +233,11 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
         return IncidentReadSerializer
 
     def get_queryset(self) -> QuerySet[Incident]:
+        """Filter incidents by visibility, severity, and date range"""
         queryset = Incident.objects.all()
         queryset = filter_visible_to_user(queryset, self.request.user)
-        queryset = filter_by_status(queryset, self.request)
         queryset = filter_by_severity(queryset, self.request)
-        queryset = filter_by_service_tier(queryset, self.request)
         queryset = filter_by_date_range(queryset, self.request)
-        queryset = filter_by_tags(queryset, self.request)
-        queryset = filter_by_captain(queryset, self.request)
-        queryset = filter_by_reporter(queryset, self.request)
         return queryset
 
 
@@ -384,70 +437,4 @@ class TagListCreateAPIView(generics.ListCreateAPIView):
             Tag.objects.filter(type=tag_type)
             .annotate(usage_count=Count(related_name))
             .order_by("-usage_count", "name")
-        )
-
-    def list(self, request: Request, *args: object, **kwargs: object) -> Response:
-        queryset = self.get_queryset()
-        tag_type = request.GET.get("type")
-
-        if tag_type == "AFFECTED_REGION":
-            tags = sort_tags_with_overrides(list(queryset), settings.PINNED_REGIONS)
-            serializer = self.get_serializer(tags, many=True)
-            return Response(serializer.data)
-
-        return super().list(request, *args, **kwargs)
-
-
-class AvailabilityView(APIView):
-    """GET /api/ui/availability/ — Returns availability by region for month/quarter/year."""
-
-    def get(self, request: Request) -> Response:
-        now = timezone.now()
-        tags = sort_tags_with_overrides(
-            list(Tag.objects.filter(type=TagType.AFFECTED_REGION).order_by("name")),
-            settings.PINNED_REGIONS,
-        )
-
-        month_periods = get_month_periods(now)
-        quarter_periods = get_quarter_periods(now)
-        year_periods = get_year_periods(now)
-        all_periods = month_periods + quarter_periods + year_periods
-
-        # Fetch all relevant incidents in 2 queries (fetch + prefetch),
-        # then filter per period×tag in Python to avoid 46×N DB queries.
-        incidents_by_tag: dict[int, list[Incident]] = defaultdict(list)
-        if all_periods and tags:
-            earliest_start = min(p["start"] for p in all_periods)
-            incidents = list(
-                filter_visible_to_user(
-                    Incident.objects.filter(
-                        created_at__gte=earliest_start,
-                        created_at__lte=now,
-                        total_downtime__isnull=False,
-                        service_tier="T0",
-                    ),
-                    request.user,
-                ).prefetch_related("affected_region_tags")
-            )
-            incidents_by_tag = build_incidents_by_tag(incidents)
-
-        def build_periods(raw_periods: list[dict]) -> list[dict]:
-            return [
-                {
-                    "label": p["label"],
-                    "start": p["start"].isoformat(),
-                    "end": p["end"].isoformat(),
-                    "regions": compute_regions(
-                        tags, p["start"], p["end"], now, incidents_by_tag
-                    ),
-                }
-                for p in raw_periods
-            ]
-
-        return Response(
-            {
-                "months": build_periods(month_periods),
-                "quarters": build_periods(quarter_periods),
-                "years": build_periods(year_periods),
-            }
         )
