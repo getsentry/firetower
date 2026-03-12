@@ -26,6 +26,7 @@ from .models import (
     INCIDENT_ID_START,
     Incident,
     IncidentOrRedirect,
+    ServiceTier,
     Tag,
     TagType,
     filter_visible_to_user,
@@ -424,7 +425,7 @@ class AvailabilityView(APIView):
                         created_at__gte=earliest_start,
                         created_at__lte=now,
                         impact_type_tags__name="Availability",
-                        service_tier="T0",
+                        service_tier=ServiceTier.T0,
                     ),
                     request.user,
                 ).prefetch_related("affected_region_tags")
