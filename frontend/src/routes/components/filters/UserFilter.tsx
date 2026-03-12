@@ -1,13 +1,14 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {useInfiniteQuery} from '@tanstack/react-query';
-import {useNavigate} from '@tanstack/react-router';
 import {Button} from 'components/Button';
 import {Tag} from 'components/Tag';
 import {Pencil, XIcon} from 'lucide-react';
 import {cn} from 'utils/cn';
 
 import {usersInfiniteQueryOptions} from '../../queries/usersQueryOptions';
-import {useActiveFilters, type ArrayFilterKey} from '../useActiveFilters';
+import {type ArrayFilterKey} from '../useActiveFilters';
+
+import {useFilterEditor} from './useFilterEditor';
 
 interface UserFilterProps {
   label: string;
@@ -15,18 +16,26 @@ interface UserFilterProps {
 }
 
 export function UserFilter({label, filterKey}: UserFilterProps) {
-  const navigate = useNavigate();
-  const {search} = useActiveFilters();
-  const committed = ((search[filterKey] as string[] | undefined) ?? []) as string[];
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState<string[]>([]);
-  const [inputValue, setInputValue] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [focusedIndex, setFocusedIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const scrollSentinelRef = useRef<HTMLDivElement>(null);
 
-  const selected = isEditing ? draft : committed;
+  const {
+    isEditing,
+    selected,
+    inputValue,
+    focusedIndex,
+    inputRef,
+    setInputValue,
+    setFocusedIndex,
+    toggle,
+    open,
+    close,
+    handleKeyDown,
+  } = useFilterEditor({
+    filterKey,
+    onClose: () => setDebouncedSearch(''),
+    onOpen: () => setDebouncedSearch(''),
+  });
 
   const {
     data: users = [],
@@ -61,86 +70,6 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
     observer.observe(target);
     return () => observer.disconnect();
   }, [isEditing, fetchNextPage, hasNextPage, isFetchingNextPage]);
-
-  const toggle = useCallback((value: string) => {
-    setDraft(prev =>
-      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
-    );
-  }, []);
-
-  const close = useCallback(() => {
-    setIsEditing(false);
-    setInputValue('');
-    setDebouncedSearch('');
-    setFocusedIndex(0);
-    setDraft(prev => {
-      navigate({
-        to: '/',
-        search: s => ({...s, [filterKey]: prev.length > 0 ? prev : undefined}),
-        replace: true,
-      });
-      return prev;
-    });
-  }, [navigate, filterKey]);
-
-  const open = () => {
-    setDraft(committed);
-    setIsEditing(true);
-    setInputValue('');
-    setDebouncedSearch('');
-    setFocusedIndex(0);
-  };
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isEditing]);
-
-  useEffect(() => {
-    if (!isEditing) return;
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        close();
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isEditing, close]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        if (available.length > 0) {
-          setFocusedIndex(prev => (prev + 1) % available.length);
-        }
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        if (available.length > 0) {
-          setFocusedIndex(prev => (prev - 1 + available.length) % available.length);
-        }
-        break;
-      case 'Enter':
-        if (focusedIndex >= 0 && focusedIndex < available.length) {
-          e.preventDefault();
-          toggle(available[focusedIndex].email);
-          setInputValue('');
-          setFocusedIndex(0);
-          inputRef.current?.focus();
-        } else if (!inputValue.trim()) {
-          close();
-        }
-        break;
-      case 'Backspace':
-        if (inputValue === '' && selected.length > 0) {
-          toggle(selected[selected.length - 1]);
-        }
-        break;
-    }
-  };
 
   return (
     <div>
@@ -184,7 +113,7 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
                 setInputValue(e.target.value);
                 setFocusedIndex(0);
               }}
-              onKeyDown={handleKeyDown}
+              onKeyDown={handleKeyDown(available.map(u => u.email))}
               placeholder="Search users..."
               className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
             />
