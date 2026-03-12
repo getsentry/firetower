@@ -1,13 +1,13 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
-import {useNavigate} from '@tanstack/react-router';
 import {Button} from 'components/Button';
 import {Tag} from 'components/Tag';
 import {Pencil, XIcon} from 'lucide-react';
 import {cn} from 'utils/cn';
 
 import {tagsQueryOptions, type TagType} from '../../$incidentId/queries/tagsQueryOptions';
-import {useActiveFilters, type ArrayFilterKey} from '../useActiveFilters';
+import {type ArrayFilterKey} from '../useActiveFilters';
+
+import {useFilterEditor} from './useFilterEditor';
 
 interface TagFilterProps {
   label: string;
@@ -16,99 +16,25 @@ interface TagFilterProps {
 }
 
 export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
-  const navigate = useNavigate();
-  const {search} = useActiveFilters();
-  const committed = ((search[filterKey] as string[] | undefined) ?? []) as string[];
+  const {
+    isEditing,
+    selected,
+    inputValue,
+    focusedIndex,
+    inputRef,
+    setInputValue,
+    setFocusedIndex,
+    toggle,
+    open,
+    close,
+    handleKeyDown,
+  } = useFilterEditor({filterKey});
   const {data: suggestions = []} = useQuery(tagsQueryOptions(tagType));
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState<string[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [focusedIndex, setFocusedIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const selected = isEditing ? draft : committed;
 
   const available = suggestions.filter(
-    s => !selected.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
+    (s: string) =>
+      !selected.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
   );
-
-  const toggle = useCallback((value: string) => {
-    setDraft(prev =>
-      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
-    );
-  }, []);
-
-  const close = useCallback(() => {
-    setIsEditing(false);
-    setInputValue('');
-    setFocusedIndex(0);
-    setDraft(prev => {
-      navigate({
-        to: '/',
-        search: s => ({...s, [filterKey]: prev.length > 0 ? prev : undefined}),
-        replace: true,
-      });
-      return prev;
-    });
-  }, [navigate, filterKey]);
-
-  const open = () => {
-    setDraft(committed);
-    setIsEditing(true);
-    setInputValue('');
-    setFocusedIndex(0);
-  };
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isEditing]);
-
-  useEffect(() => {
-    if (!isEditing) return;
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        close();
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isEditing, close]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        if (available.length > 0) {
-          setFocusedIndex(prev => (prev + 1) % available.length);
-        }
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        if (available.length > 0) {
-          setFocusedIndex(prev => (prev - 1 + available.length) % available.length);
-        }
-        break;
-      case 'Enter':
-        if (focusedIndex >= 0 && focusedIndex < available.length) {
-          e.preventDefault();
-          toggle(available[focusedIndex]);
-          setInputValue('');
-          setFocusedIndex(0);
-          inputRef.current?.focus();
-        } else if (!inputValue.trim()) {
-          close();
-        }
-        break;
-      case 'Backspace':
-        if (inputValue === '' && selected.length > 0) {
-          toggle(selected[selected.length - 1]);
-        }
-        break;
-    }
-  };
 
   return (
     <div>
@@ -152,7 +78,7 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
                 setInputValue(e.target.value);
                 setFocusedIndex(0);
               }}
-              onKeyDown={handleKeyDown}
+              onKeyDown={handleKeyDown(available)}
               placeholder="Add..."
               className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
             />
@@ -170,7 +96,7 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
         {isEditing && available.length > 0 && (
           <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
             <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {available.map((option, index) => (
+              {available.map((option: string, index: number) => (
                 <button
                   key={option}
                   type="button"
