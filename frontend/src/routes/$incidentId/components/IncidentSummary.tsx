@@ -102,6 +102,15 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           value={incident.status}
           options={StatusSchema.options}
           onSave={handleFieldChange('status')}
+          disabledOptions={{
+            Postmortem: (
+              <>
+                If you need a postmortem doc, use <code>/inc fixed</code> in the incident
+                channel. This is a temporary thing due to INC Bot owning the PM generation
+                and will be fixed in a future version of Firetower.
+              </>
+            ),
+          }}
         />
         <EditablePill
           value={incident.service_tier}
