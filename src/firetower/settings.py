@@ -210,7 +210,6 @@ JIRA = {
 SLACK = {
     "BOT_TOKEN": config.slack.bot_token,
     "TEAM_ID": config.slack.team_id,
-    "SIGNING_SECRET": config.slack.signing_secret,
     "APP_TOKEN": config.slack.app_token,
 }
 
