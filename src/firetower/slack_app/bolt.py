@@ -16,8 +16,8 @@ slack_config = settings.SLACK
 bolt_app = App(token=slack_config["BOT_TOKEN"])
 
 
-@bolt_app.command("/inc")
-@bolt_app.command("/testinc")
+@bolt_app.command("/ft")
+@bolt_app.command("/ft-test")
 def handle_inc(ack: Any, body: dict, command: dict, respond: Any) -> None:
     subcommand = (body.get("text") or "").strip().lower()
     tags = [f"subcommand:{subcommand or 'help'}"]
@@ -28,12 +28,12 @@ def handle_inc(ack: Any, body: dict, command: dict, respond: Any) -> None:
             handle_help_command(ack, command, respond)
         else:
             ack()
-            cmd = command.get("command", "/inc")
+            cmd = command.get("command", "/ft")
             respond(f"Unknown command: `{cmd} {subcommand}`. Try `{cmd} help`.")
         statsd.increment(f"{METRICS_PREFIX}.completed", tags=tags)
     except Exception:
         logger.exception(
-            "Slash command failed: %s %s", command.get("command", "/inc"), subcommand
+            "Slash command failed: %s %s", command.get("command", "/ft"), subcommand
         )
         statsd.increment(f"{METRICS_PREFIX}.failed", tags=tags)
         raise

@@ -6,10 +6,10 @@ from firetower.slack_app.bolt import handle_inc
 
 
 class TestHandleInc:
-    def _make_body(self, text="", command="/inc"):
+    def _make_body(self, text="", command="/ft"):
         return {"text": text, "command": command}
 
-    def _make_command(self, command="/inc", text=""):
+    def _make_command(self, command="/ft", text=""):
         return {"command": command, "text": text}
 
     @patch("firetower.slack_app.bolt.statsd")
@@ -25,7 +25,7 @@ class TestHandleInc:
         respond.assert_called_once()
         response_text = respond.call_args[0][0]
         assert "Firetower Slack App" in response_text
-        assert "/inc help" in response_text
+        assert "/ft help" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
     def test_empty_text_returns_help(self, mock_statsd):
@@ -54,20 +54,20 @@ class TestHandleInc:
         respond.assert_called_once()
         response_text = respond.call_args[0][0]
         assert "Unknown command" in response_text
-        assert "/inc unknown" in response_text
+        assert "/ft unknown" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
     def test_help_uses_testinc_command(self, mock_statsd):
         ack = MagicMock()
         respond = MagicMock()
-        body = self._make_body(text="help", command="/testinc")
-        command = self._make_command(command="/testinc")
+        body = self._make_body(text="help", command="/ft-test")
+        command = self._make_command(command="/ft-test")
 
         handle_inc(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
         response_text = respond.call_args[0][0]
-        assert "/testinc help" in response_text
+        assert "/ft-test help" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
     def test_emits_submitted_and_completed_metrics(self, mock_statsd):
