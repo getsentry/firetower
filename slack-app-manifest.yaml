@@ -1,17 +1,16 @@
 display_information:
-  name: Firetower # test: "Firetower Test"
-  description: Sentry incident management bot
-
+  name: "Firetower" # test: "Firetower Test"
+  description: "Sentry incident management bot"
+  background_color: "#000000"
 features:
   bot_user:
-    display_name: firetower # test: firetower-test
+    display_name: "Firetower" # test: "Firetower Test"
     always_online: true
   slash_commands:
     - command: /ft # test: /ft-test
-      description: "Manage incidents — use /ft help for usage"
+      description: Manage incidents - use /ft help for usage # test: /ft-test
       usage_hint: "[command] [args...]"
       should_escape: false
-
 oauth_config:
   scopes:
     bot:
@@ -26,7 +25,7 @@ oauth_config:
       - groups:write
       - users:read
       - users:read.email
-
+  pkce_enabled: false
 settings:
   interactivity:
     is_enabled: true
