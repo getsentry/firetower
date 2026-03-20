@@ -104,10 +104,10 @@ class TestUIIncidentFilters:
             severity=IncidentSeverity.P1,
         )
         Incident.objects.filter(pk=inc1.pk).update(
-            created_at=datetime(2024, 1, 1, 0, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 1, 1, 0, 0, 0))
         )
         Incident.objects.filter(pk=inc2.pk).update(
-            created_at=datetime(2024, 6, 15, 12, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 6, 15, 12, 0, 0))
         )
 
         self.client.force_authenticate(user=self.user)
@@ -129,10 +129,10 @@ class TestUIIncidentFilters:
             severity=IncidentSeverity.P1,
         )
         Incident.objects.filter(pk=inc1.pk).update(
-            created_at=datetime(2024, 1, 1, 0, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 1, 1, 0, 0, 0))
         )
         Incident.objects.filter(pk=inc2.pk).update(
-            created_at=datetime(2024, 6, 15, 12, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 6, 15, 12, 0, 0))
         )
 
         self.client.force_authenticate(user=self.user)
@@ -159,13 +159,13 @@ class TestUIIncidentFilters:
             severity=IncidentSeverity.P1,
         )
         Incident.objects.filter(pk=inc1.pk).update(
-            created_at=datetime(2024, 1, 1, 0, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 1, 1, 0, 0, 0))
         )
         Incident.objects.filter(pk=inc2.pk).update(
-            created_at=datetime(2024, 6, 15, 12, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 6, 15, 12, 0, 0))
         )
         Incident.objects.filter(pk=inc3.pk).update(
-            created_at=datetime(2024, 12, 1, 0, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 12, 1, 0, 0, 0))
         )
 
         self.client.force_authenticate(user=self.user)
@@ -184,7 +184,7 @@ class TestUIIncidentFilters:
             severity=IncidentSeverity.P1,
         )
         Incident.objects.filter(pk=inc.pk).update(
-            created_at=datetime(2024, 6, 15, 14, 30, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 6, 15, 14, 30, 0))
         )
 
         self.client.force_authenticate(user=self.user)
@@ -537,10 +537,10 @@ class TestServiceAPIIncidentFilters:
             severity=IncidentSeverity.P1,
         )
         Incident.objects.filter(pk=inc1.pk).update(
-            created_at=datetime(2024, 1, 1, 0, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 1, 1, 0, 0, 0))
         )
         Incident.objects.filter(pk=inc2.pk).update(
-            created_at=datetime(2024, 6, 15, 12, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 6, 15, 12, 0, 0))
         )
 
         self.client.force_authenticate(user=self.user)
@@ -636,13 +636,13 @@ class TestServiceAPIIncidentFilters:
             severity=IncidentSeverity.P2,
         )
         Incident.objects.filter(pk=Incident.objects.get(title="P1 Old").pk).update(
-            created_at=datetime(2024, 1, 1, 0, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 1, 1, 0, 0, 0))
         )
         Incident.objects.filter(pk=Incident.objects.get(title="P2 Old").pk).update(
-            created_at=datetime(2024, 1, 1, 0, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 1, 1, 0, 0, 0))
         )
         Incident.objects.filter(pk=Incident.objects.get(title="P1 New").pk).update(
-            created_at=datetime(2024, 6, 15, 12, 0, 0)
+            created_at=django_timezone.make_aware(datetime(2024, 6, 15, 12, 0, 0))
         )
 
         self.client.force_authenticate(user=self.user)
