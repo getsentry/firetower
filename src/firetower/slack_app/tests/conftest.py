@@ -13,3 +13,7 @@ mock_auth = patch.object(
     },
 )
 mock_auth.start()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    mock_auth.stop()

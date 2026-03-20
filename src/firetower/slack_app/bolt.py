@@ -20,7 +20,8 @@ bolt_app = App(token=slack_config["BOT_TOKEN"])
 @bolt_app.command("/ft-test")
 def handle_inc(ack: Any, body: dict, command: dict, respond: Any) -> None:
     subcommand = (body.get("text") or "").strip().lower()
-    tags = [f"subcommand:{subcommand or 'help'}"]
+    metric_subcommand = "help" if subcommand in ("", "help") else "unknown"
+    tags = [f"subcommand:{metric_subcommand}"]
     statsd.increment(f"{METRICS_PREFIX}.submitted", tags=tags)
 
     try:
