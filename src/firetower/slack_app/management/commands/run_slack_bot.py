@@ -8,7 +8,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-from firetower.slack_app.bolt import bolt_app
+from firetower.slack_app.bolt import get_bolt_app
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,6 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         _start_health_server()
         app_token = settings.SLACK["APP_TOKEN"]
-        handler = SocketModeHandler(app=bolt_app, app_token=app_token)
+        handler = SocketModeHandler(app=get_bolt_app(), app_token=app_token)
         logger.info("Starting Slack bot in Socket Mode")
         handler.start()

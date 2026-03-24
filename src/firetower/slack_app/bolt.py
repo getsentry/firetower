@@ -11,14 +11,20 @@ logger = logging.getLogger(__name__)
 
 METRICS_PREFIX = "slack_app.commands"
 
-slack_config = settings.SLACK
-
-bolt_app = App(token=slack_config["BOT_TOKEN"])
+_bolt_app: App | None = None
 
 
-@bolt_app.command("/ft")
-@bolt_app.command("/ft-test")
-def handle_inc(ack: Any, body: dict, command: dict, respond: Any) -> None:
+def get_bolt_app() -> App:
+    """Lazy-init to avoid an auth_test API call at import time."""
+    global _bolt_app  # noqa: PLW0603
+    if _bolt_app is None:
+        _bolt_app = App(token=settings.SLACK["BOT_TOKEN"])
+        _bolt_app.command("/ft")(handle_command)
+        _bolt_app.command("/ft-test")(handle_command)
+    return _bolt_app
+
+
+def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
     subcommand = (body.get("text") or "").strip().lower()
     metric_subcommand = "help" if subcommand in ("", "help") else "unknown"
     tags = [f"subcommand:{metric_subcommand}"]
