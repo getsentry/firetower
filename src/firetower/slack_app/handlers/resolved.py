@@ -144,25 +144,42 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
         return
 
     captain_user = get_or_create_user_from_slack_id(captain_slack_id)
+    if not captain_user:
+        logger.error(
+            "Could not resolve Slack user %s to a Firetower user", captain_slack_id
+        )
+        client.chat_postMessage(
+            channel=channel_id,
+            text="Failed to resolve the selected captain to a Firetower user.",
+        )
+        return
 
     if severity in ("P0", "P1", "P2"):
         target_status = "Postmortem"
     else:
         target_status = "Done"
 
-    data: dict[str, Any] = {"status": target_status, "severity": severity}
-    if captain_user:
-        data["captain"] = captain_user.email
+    data: dict[str, Any] = {
+        "status": target_status,
+        "severity": severity,
+        "captain": captain_user.email,
+    }
 
     serializer = IncidentWriteSerializer(instance=incident, data=data, partial=True)
-    if serializer.is_valid():
-        serializer.save()
+    if not serializer.is_valid():
+        logger.error("Resolved update failed: %s", serializer.errors)
+        client.chat_postMessage(
+            channel=channel_id,
+            text=f"Failed to resolve incident: {serializer.errors}",
+        )
+        return
+    serializer.save()
 
     client.chat_postMessage(
         channel=channel_id,
         text=(
             f"*{incident.incident_number} marked as {target_status}*\n"
-            f"Severity: {severity} | Captain: {captain_user.get_full_name() if captain_user else 'Unknown'}"
+            f"Severity: {severity} | Captain: {captain_user.get_full_name()}"
         ),
     )
 
