@@ -6,13 +6,13 @@ const IncidentSummarySchema = z.object({
   id: z.number(),
   title: z.string(),
   created_at: z.string(),
-  total_downtime_minutes: z.number(),
+  total_downtime_minutes: z.number().nullable(),
   total_downtime_display: z.string().nullable(),
 });
 
 const RegionAvailabilitySchema = z.object({
   name: z.string(),
-  total_downtime_minutes: z.number(),
+  total_downtime_minutes: z.number().nullable(),
   total_downtime_display: z.string().nullable(),
   availability_percentage: z.number(),
   incident_count: z.number(),

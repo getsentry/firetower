@@ -28,6 +28,10 @@ const router = createRouter({
   Wrap: ({children}) => {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   },
+  defaultOnCatch: error => {
+    console.error(error);
+    Sentry.captureException(error);
+  },
   defaultErrorComponent: () => <p>Error</p>,
   defaultPendingComponent: () => <p>Loading</p>,
 });
