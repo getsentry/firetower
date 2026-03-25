@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 from slack_sdk.errors import SlackApiError
 
-from .services.slack import SlackService
+from firetower.integrations.services.slack import SlackService
 
 # Set up Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "firetower.settings")
