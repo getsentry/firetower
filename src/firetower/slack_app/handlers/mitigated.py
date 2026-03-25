@@ -95,15 +95,24 @@ def handle_mitigated_submission(ack: Any, body: dict, view: dict, client: Any) -
     serializer = IncidentWriteSerializer(
         instance=incident, data={"status": "Mitigated"}, partial=True
     )
-    if serializer.is_valid():
-        serializer.save()
+    if not serializer.is_valid():
+        logger.error("Mitigated status update failed: %s", serializer.errors)
+        client.chat_postMessage(
+            channel=channel_id,
+            text=f"Failed to update incident status: {serializer.errors}",
+        )
+        return
+    serializer.save()
 
+    incident.refresh_from_db()
     mitigation_notes = f"\n\n---\n**Mitigation notes:**\n**Impact:** {impact}\n**Action items:** {todo}"
     new_description = (incident.description or "") + mitigation_notes
     desc_serializer = IncidentWriteSerializer(
         instance=incident, data={"description": new_description}, partial=True
     )
-    if desc_serializer.is_valid():
+    if not desc_serializer.is_valid():
+        logger.error("Mitigated description update failed: %s", desc_serializer.errors)
+    else:
         desc_serializer.save()
 
     client.chat_postMessage(
