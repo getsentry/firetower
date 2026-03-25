@@ -27,6 +27,18 @@ class DatadogConfig:
 
 
 @deserialize
+class EscalationPolicy:
+    id: str
+    integration_key: str | None = None
+
+
+@deserialize
+class PagerDutyConfig:
+    api_token: str
+    escalation_policies: dict[str, EscalationPolicy]
+
+
+@deserialize
 class SlackConfig:
     bot_token: str
     team_id: str
@@ -53,6 +65,7 @@ class ConfigFile:
     datadog: DatadogConfig | None
     slack: SlackConfig
     auth: AuthConfig
+    pagerduty: PagerDutyConfig | None
 
     project_key: str
     django_secret_key: str
@@ -118,6 +131,7 @@ class DummyConfigFile(ConfigFile):
             iap_audience="",
         )
         self.datadog = None
+        self.pagerduty = None
         self.project_key = ""
         self.django_secret_key = ""
         self.sentry_dsn = ""

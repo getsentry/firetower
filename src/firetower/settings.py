@@ -239,6 +239,22 @@ PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_s
 FIRETOWER_BASE_URL = config.firetower_base_url
 HOOKS_ENABLED = config.hooks_enabled
 
+# PagerDuty Integration Configuration
+PAGERDUTY = (
+    {
+        "API_TOKEN": config.pagerduty.api_token,
+        "ESCALATION_POLICIES": {
+            name: {
+                "id": policy.id,
+                "integration_key": policy.integration_key,
+            }
+            for name, policy in config.pagerduty.escalation_policies.items()
+        },
+    }
+    if config.pagerduty
+    else None
+)
+
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     # Pagination

@@ -23,6 +23,16 @@ incident_guide_message = "This is the message posted whenever a new incident sla
 iap_enabled = false
 iap_audience = ""
 
+[pagerduty]
+api_token = ""
+
+[pagerduty.escalation_policies.IMOC]
+id = ""
+integration_key = ""
+
+[pagerduty.escalation_policies.ExampleTeam]
+id = ""
+
 [datadog]
 api_key = ""
 app_key = ""
