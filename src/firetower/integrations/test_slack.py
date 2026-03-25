@@ -139,3 +139,62 @@ class TestSlackService:
             profile = service.get_user_profile_by_email("test@example.com")
 
             assert profile is None
+
+    def test_get_user_info_returns_none_for_deactivated_user(self):
+        mock_slack_config = {
+            "BOT_TOKEN": "xoxb-test-token",
+            "TEAM_ID": "sentry",
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            with patch("firetower.integrations.services.slack.WebClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+
+                mock_client.users_info.return_value = {
+                    "user": {
+                        "id": "U_DEACTIVATED",
+                        "deleted": True,
+                        "real_name": "Former Employee",
+                        "profile": {
+                            "email": "",
+                            "image_512": "",
+                        },
+                    }
+                }
+
+                service = SlackService()
+                result = service.get_user_info("U_DEACTIVATED")
+
+                assert result is None
+
+    def test_get_user_info_returns_data_for_active_user(self):
+        mock_slack_config = {
+            "BOT_TOKEN": "xoxb-test-token",
+            "TEAM_ID": "sentry",
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            with patch("firetower.integrations.services.slack.WebClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+
+                mock_client.users_info.return_value = {
+                    "user": {
+                        "id": "U12345",
+                        "deleted": False,
+                        "real_name": "John Doe",
+                        "profile": {
+                            "email": "john@example.com",
+                            "image_512": "https://example.com/avatar.jpg",
+                        },
+                    }
+                }
+
+                service = SlackService()
+                result = service.get_user_info("U12345")
+
+                assert result is not None
+                assert result["email"] == "john@example.com"
+                assert result["first_name"] == "John"
+                assert result["last_name"] == "Doe"

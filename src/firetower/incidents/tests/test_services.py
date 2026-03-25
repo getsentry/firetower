@@ -244,7 +244,7 @@ class TestSyncIncidentParticipantsFromSlack:
                 assert len(stats.errors) == 1
                 assert "Failed to fetch channel members" in stats.errors[0]
 
-    def test_handles_user_creation_failure(self):
+    def test_skips_unresolvable_users(self):
         incident = Incident.objects.create(
             title="Test Incident",
             status=IncidentStatus.ACTIVE,
@@ -274,8 +274,7 @@ class TestSyncIncidentParticipantsFromSlack:
                     stats = sync_incident_participants_from_slack(incident)
 
                     assert stats.added == 0
-                    assert len(stats.errors) == 1
-                    assert "Could not get/create user" in stats.errors[0]
+                    assert stats.errors == []
 
     def test_counts_already_existed_participants(self):
         incident = Incident.objects.create(
