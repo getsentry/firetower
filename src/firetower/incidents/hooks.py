@@ -24,11 +24,12 @@ def _build_channel_topic(incident: Incident) -> str:
         captain_name = incident.captain.get_full_name() or incident.captain.username
     prefix = f"[{incident.severity}] {incident.incident_number} "
     suffix = f" | IC: @{captain_name}"
-    max_title_len = SLACK_TOPIC_MAX_LENGTH - len(prefix) - len(suffix)
+    max_title_len = max(SLACK_TOPIC_MAX_LENGTH - len(prefix) - len(suffix), 0)
     title = incident.title
     if len(title) > max_title_len:
-        title = title[: max_title_len - 1] + "\u2026"
-    return f"{prefix}{title}{suffix}"
+        title = title[: max_title_len - 1] + "\u2026" if max_title_len > 0 else ""
+    topic = f"{prefix}{title}{suffix}"
+    return topic[:SLACK_TOPIC_MAX_LENGTH]
 
 
 def _get_channel_id(incident: Incident) -> str | None:
