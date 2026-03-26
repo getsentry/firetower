@@ -217,7 +217,7 @@ class TestGetOrCreateUserFromSlackId:
             assert user is None
             assert User.objects.count() == 0
 
-    def test_returns_none_if_no_email_in_slack(self):
+    def test_creates_inactive_user_if_no_email_in_slack(self):
         mock_user_info = {
             "email": "",
             "first_name": "NoEmail",
@@ -232,8 +232,9 @@ class TestGetOrCreateUserFromSlackId:
 
             user = get_or_create_user_from_slack_id("U_NO_EMAIL")
 
-            assert user is None
-            assert User.objects.count() == 0
+            assert user is not None
+            assert user.is_active is False
+            assert user.username == "slack:U_NO_EMAIL"
 
     def test_returns_none_if_empty_slack_id(self):
         user = get_or_create_user_from_slack_id("")
@@ -276,7 +277,7 @@ class TestGetOrCreateUserFromSlackId:
             assert user is not None
             assert user.userprofile.avatar_url == ""
 
-    def test_returns_none_for_deactivated_user(self):
+    def test_creates_inactive_user_for_deactivated_slack_user(self):
         mock_user_info = {
             "email": "",
             "first_name": "Former",
@@ -292,9 +293,11 @@ class TestGetOrCreateUserFromSlackId:
 
             user = get_or_create_user_from_slack_id("U_DEACTIVATED")
 
-            assert user is None
+            assert user is not None
+            assert user.is_active is False
+            assert user.username == "slack:U_DEACTIVATED"
 
-    def test_returns_none_for_bot_user(self):
+    def test_creates_inactive_user_for_bot(self):
         mock_user_info = {
             "email": "",
             "first_name": "SomeBot",
@@ -311,7 +314,30 @@ class TestGetOrCreateUserFromSlackId:
 
             user = get_or_create_user_from_slack_id("U_BOT")
 
-            assert user is None
+            assert user is not None
+            assert user.is_active is False
+            assert user.username == "slack:U_BOT"
+
+    def test_skips_api_call_for_known_inactive_user(self):
+        existing_user = User.objects.create(
+            username="slack:U_BOT",
+            is_active=False,
+        )
+        existing_user.set_unusable_password()
+        existing_user.save()
+        ExternalProfile.objects.create(
+            user=existing_user,
+            type=ExternalProfileType.SLACK,
+            external_id="U_BOT",
+        )
+
+        with patch(
+            "firetower.auth.services._slack_service.get_user_info"
+        ) as mock_get_info:
+            user = get_or_create_user_from_slack_id("U_BOT")
+
+            mock_get_info.assert_not_called()
+            assert user == existing_user
 
 
 @pytest.mark.django_db

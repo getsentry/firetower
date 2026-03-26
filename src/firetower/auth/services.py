@@ -12,6 +12,39 @@ logger = logging.getLogger(__name__)
 _slack_service = SlackService()
 
 
+def _get_or_create_inactive_slack_user(
+    slack_user_id: str, slack_user_info: dict
+) -> User:
+    first_name = slack_user_info.get("first_name", "")
+    last_name = slack_user_info.get("last_name", "")
+
+    try:
+        user = User.objects.create(
+            username=f"slack:{slack_user_id}",
+            first_name=first_name[:150] if first_name else "",
+            last_name=last_name[:150] if last_name else "",
+            is_active=False,
+        )
+        user.set_unusable_password()
+        user.save()
+    except IntegrityError:
+        existing = User.objects.filter(username=f"slack:{slack_user_id}").first()
+        if existing is None:
+            raise RuntimeError(
+                f"Failed to get or create inactive user for Slack ID: {slack_user_id}"
+            )
+        user = existing
+
+    ExternalProfile.objects.get_or_create(
+        user=user,
+        type=ExternalProfileType.SLACK,
+        defaults={"external_id": slack_user_id},
+    )
+
+    logger.info(f"Created inactive Slack user for: {slack_user_id}")
+    return user
+
+
 def _get_or_create_user_by_email(
     email: str,
     first_name: str = "",
@@ -217,17 +250,12 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
     last_name = slack_user_info.get("last_name", "")
     avatar_url = slack_user_info.get("avatar_url", "")
 
-    if slack_user_info.get("deleted", False):
-        logger.info(f"Skipping deactivated Slack user: {slack_user_id}")
-        return None
-
-    if slack_user_info.get("is_bot", False):
-        logger.info(f"Skipping bot Slack user: {slack_user_id}")
-        return None
-
-    if not email:
-        logger.info(f"Skipping Slack user {slack_user_id} - no email")
-        return None
+    if (
+        slack_user_info.get("deleted", False)
+        or slack_user_info.get("is_bot", False)
+        or not email
+    ):
+        return _get_or_create_inactive_slack_user(slack_user_id, slack_user_info)
 
     user = _get_or_create_user_by_email(email, first_name, last_name)
 
