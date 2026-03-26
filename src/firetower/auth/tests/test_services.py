@@ -276,7 +276,7 @@ class TestGetOrCreateUserFromSlackId:
             assert user is not None
             assert user.userprofile.avatar_url == ""
 
-    def test_creates_inactive_stub_for_deactivated_user(self):
+    def test_returns_none_for_deactivated_user(self):
         mock_user_info = {
             "email": "",
             "first_name": "Former",
@@ -292,38 +292,26 @@ class TestGetOrCreateUserFromSlackId:
 
             user = get_or_create_user_from_slack_id("U_DEACTIVATED")
 
-            assert user is not None
-            assert user.is_active is False
-            assert user.username == "slack:U_DEACTIVATED"
-            assert user.first_name == "Former"
-            assert user.last_name == "Employee"
+            assert user is None
 
-            external_profile = ExternalProfile.objects.get(
-                user=user, type=ExternalProfileType.SLACK
-            )
-            assert external_profile.external_id == "U_DEACTIVATED"
-
-    def test_returns_existing_stub_for_deactivated_user(self):
-        """Second sync for same deactivated user should hit ExternalProfile lookup."""
-        existing_user = User.objects.create(
-            username="slack:U_DEACTIVATED",
-            is_active=False,
-        )
-        existing_user.set_unusable_password()
-        existing_user.save()
-        ExternalProfile.objects.create(
-            user=existing_user,
-            type=ExternalProfileType.SLACK,
-            external_id="U_DEACTIVATED",
-        )
+    def test_returns_none_for_bot_user(self):
+        mock_user_info = {
+            "email": "",
+            "first_name": "SomeBot",
+            "last_name": "",
+            "avatar_url": "",
+            "deleted": False,
+            "is_bot": True,
+        }
 
         with patch(
             "firetower.auth.services._slack_service.get_user_info"
         ) as mock_get_info:
-            user = get_or_create_user_from_slack_id("U_DEACTIVATED")
+            mock_get_info.return_value = mock_user_info
 
-            mock_get_info.assert_not_called()
-            assert user == existing_user
+            user = get_or_create_user_from_slack_id("U_BOT")
+
+            assert user is None
 
 
 @pytest.mark.django_db
