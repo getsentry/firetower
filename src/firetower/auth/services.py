@@ -26,7 +26,12 @@ def _create_deactivated_slack_user(slack_user_id: str, slack_user_info: dict) ->
         user.set_unusable_password()
         user.save()
     except IntegrityError:
-        user = User.objects.get(username=f"slack:{slack_user_id}")
+        existing = User.objects.filter(username=f"slack:{slack_user_id}").first()
+        if existing is None:
+            raise RuntimeError(
+                f"Failed to get or create deactivated user for Slack ID: {slack_user_id}"
+            )
+        user = existing
 
     ExternalProfile.objects.get_or_create(
         user=user,
