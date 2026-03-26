@@ -8,7 +8,7 @@ def delete_jira_links(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0013_add_tag_approved_field"),
+        ("incidents", "0014_add_total_downtime"),
     ]
 
     operations = [
