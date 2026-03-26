@@ -218,9 +218,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Jira Integration Configuration
 JIRA = {
     "DOMAIN": config.jira.domain,
-    "ACCOUNT": config.jira.account,
-    "API_KEY": config.jira.api_key,
-    "SEVERITY_FIELD": config.jira.severity_field,
 }
 
 

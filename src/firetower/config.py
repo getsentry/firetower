@@ -29,9 +29,6 @@ class DatadogConfig:
 @deserialize
 class JIRAConfig:
     domain: str
-    account: str
-    api_key: str
-    severity_field: str
 
 
 @deserialize
@@ -115,9 +112,6 @@ class DummyConfigFile(ConfigFile):
         )
         self.jira = JIRAConfig(
             domain="",
-            account="",
-            api_key="",
-            severity_field="",
         )
         self.slack = SlackConfig(
             bot_token="",
