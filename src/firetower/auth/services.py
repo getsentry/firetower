@@ -12,6 +12,32 @@ logger = logging.getLogger(__name__)
 _slack_service = SlackService()
 
 
+def _create_deactivated_slack_user(slack_user_id: str, slack_user_info: dict) -> User:
+    first_name = slack_user_info.get("first_name", "")
+    last_name = slack_user_info.get("last_name", "")
+
+    try:
+        user = User.objects.create(
+            username=f"slack:{slack_user_id}",
+            first_name=first_name[:150] if first_name else "",
+            last_name=last_name[:150] if last_name else "",
+            is_active=False,
+        )
+        user.set_unusable_password()
+        user.save()
+    except IntegrityError:
+        user = User.objects.get(username=f"slack:{slack_user_id}")
+
+    ExternalProfile.objects.get_or_create(
+        user=user,
+        type=ExternalProfileType.SLACK,
+        defaults={"external_id": slack_user_id},
+    )
+
+    logger.info(f"Created deactivated stub user for Slack ID: {slack_user_id}")
+    return user
+
+
 def _get_or_create_user_by_email(
     email: str,
     first_name: str = "",
@@ -211,6 +237,10 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
     if not slack_user_info:
         logger.warning(f"Could not fetch user info from Slack for ID: {slack_user_id}")
         return None
+
+    if slack_user_info.get("deleted", False):
+        user = _create_deactivated_slack_user(slack_user_id, slack_user_info)
+        return user
 
     email = slack_user_info.get("email", "")
     first_name = slack_user_info.get("first_name", "")

@@ -169,11 +169,7 @@ class SlackService:
             response = self.client.users_info(user=slack_user_id)
 
             user: dict[str, Any] = response.get("user", {})
-
-            if user.get("deleted", False):
-                logger.info(f"Skipping deactivated Slack user: {slack_user_id}")
-                return None
-
+            deleted = user.get("deleted", False)
             profile = user.get("profile", {})
 
             email = profile.get("email", "")
@@ -194,6 +190,7 @@ class SlackService:
                 "first_name": first_name,
                 "last_name": last_name,
                 "avatar_url": avatar_url,
+                "deleted": deleted,
             }
 
         except SlackApiError as e:

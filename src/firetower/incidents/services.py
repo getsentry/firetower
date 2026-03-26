@@ -93,6 +93,9 @@ def sync_incident_participants_from_slack(
             )
             continue
 
+        if not user.is_active:
+            continue
+
         if user.id in existing_participant_ids:
             stats.already_existed += 1
         else:
