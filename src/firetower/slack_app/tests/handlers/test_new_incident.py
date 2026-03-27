@@ -12,6 +12,7 @@ from firetower.slack_app.handlers.new_incident import (
 )
 
 
+@pytest.mark.django_db
 class TestNewSubcommandRouting:
     def _make_body(self, text="", command="/ft"):
         return {"text": text, "command": command}
@@ -19,7 +20,7 @@ class TestNewSubcommandRouting:
     def _make_command(self, command="/ft", text=""):
         return {"command": command, "text": text}
 
-    @patch("firetower.slack_app.handlers.new_incident.get_bolt_app")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
     @patch("firetower.slack_app.bolt.statsd")
     def test_new_subcommand_routes_correctly(self, mock_statsd, mock_get_bolt_app):
         ack = MagicMock()
@@ -36,7 +37,7 @@ class TestNewSubcommandRouting:
 
 @pytest.mark.django_db
 class TestNewIncidentModal:
-    @patch("firetower.slack_app.handlers.new_incident.get_bolt_app")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
     def test_new_opens_modal(self, mock_get_bolt_app):
         ack = MagicMock()
         body = {"trigger_id": "T12345"}
