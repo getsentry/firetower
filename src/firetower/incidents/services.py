@@ -88,9 +88,12 @@ def sync_incident_participants_from_slack(
         user = get_or_create_user_from_slack_id(slack_user_id)
 
         if not user:
-            error_msg = f"Could not get/create user for Slack ID: {slack_user_id}"
-            logger.warning(error_msg)
-            stats.errors.append(error_msg)
+            logger.info(
+                f"Skipping Slack user {slack_user_id} - could not resolve to a Firetower user"
+            )
+            continue
+
+        if not user.is_active:
             continue
 
         if user.id in existing_participant_ids:

@@ -169,6 +169,8 @@ class SlackService:
             response = self.client.users_info(user=slack_user_id)
 
             user: dict[str, Any] = response.get("user", {})
+            deleted = user.get("deleted", False)
+            is_bot = user.get("is_bot", False)
             profile = user.get("profile", {})
 
             email = profile.get("email", "")
@@ -189,6 +191,8 @@ class SlackService:
                 "first_name": first_name,
                 "last_name": last_name,
                 "avatar_url": avatar_url,
+                "deleted": deleted,
+                "is_bot": is_bot,
             }
 
         except SlackApiError as e:

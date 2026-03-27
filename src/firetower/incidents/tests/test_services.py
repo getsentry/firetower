@@ -244,7 +244,7 @@ class TestSyncIncidentParticipantsFromSlack:
                 assert len(stats.errors) == 1
                 assert "Failed to fetch channel members" in stats.errors[0]
 
-    def test_handles_user_creation_failure(self):
+    def test_skips_unresolvable_users(self):
         incident = Incident.objects.create(
             title="Test Incident",
             status=IncidentStatus.ACTIVE,
@@ -274,8 +274,7 @@ class TestSyncIncidentParticipantsFromSlack:
                     stats = sync_incident_participants_from_slack(incident)
 
                     assert stats.added == 0
-                    assert len(stats.errors) == 1
-                    assert "Could not get/create user" in stats.errors[0]
+                    assert stats.errors == []
 
     def test_counts_already_existed_participants(self):
         incident = Incident.objects.create(
@@ -359,3 +358,52 @@ class TestSyncIncidentParticipantsFromSlack:
                     mock_get_user.assert_called_once_with("U11111")
                     assert stats.added == 1
                     assert stats.errors == []
+
+    def test_skips_inactive_users(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://workspace.slack.com/archives/C12345",
+        )
+
+        active_user = User.objects.create_user(
+            username="active@example.com",
+            email="active@example.com",
+        )
+        ExternalProfile.objects.create(
+            user=active_user,
+            type=ExternalProfileType.SLACK,
+            external_id="U_ACTIVE",
+        )
+
+        inactive_user = User.objects.create(
+            username="slack:U_BOT",
+            is_active=False,
+        )
+        ExternalProfile.objects.create(
+            user=inactive_user,
+            type=ExternalProfileType.SLACK,
+            external_id="U_BOT",
+        )
+
+        with patch(
+            "firetower.incidents.services._slack_service.parse_channel_id_from_url"
+        ) as mock_parse:
+            mock_parse.return_value = "C12345"
+
+            with patch(
+                "firetower.incidents.services._slack_service.get_channel_members"
+            ) as mock_get_members:
+                mock_get_members.return_value = ["U_ACTIVE", "U_BOT"]
+
+                stats = sync_incident_participants_from_slack(incident)
+
+                assert stats.added == 1
+                assert incident.participants.count() == 1
+                assert active_user in incident.participants.all()
+                assert inactive_user not in incident.participants.all()
