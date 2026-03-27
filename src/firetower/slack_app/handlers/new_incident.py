@@ -41,7 +41,9 @@ def _build_new_incident_modal() -> dict:
                 "action_id": "severity",
                 "placeholder": {"type": "plain_text", "text": "Select severity"},
                 "options": severity_options,
-                "initial_option": severity_options[2],  # P2
+                "initial_option": {sev["value"]: sev for sev in severity_options}.get(
+                    "P2", severity_options[0]
+                ),
             },
             "label": {"type": "plain_text", "text": "Severity"},
         },
@@ -165,9 +167,11 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
         respond("Could not open modal — missing trigger_id.")
         return
 
-    from firetower.slack_app.bolt import bolt_app  # noqa: PLC0415
+    from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
-    bolt_app.client.views_open(trigger_id=trigger_id, view=_build_new_incident_modal())
+    get_bolt_app().client.views_open(
+        trigger_id=trigger_id, view=_build_new_incident_modal()
+    )
 
 
 def handle_new_incident_submission(
