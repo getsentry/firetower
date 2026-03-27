@@ -19,18 +19,16 @@ def _build_new_incident_modal() -> dict:
         for sev in IncidentSeverity
     ]
 
-    impact_type_options = [
-        {"text": {"type": "plain_text", "text": t.name}, "value": t.name}
-        for t in Tag.objects.filter(type=TagType.IMPACT_TYPE).order_by("name")
-    ]
-    affected_service_options = [
-        {"text": {"type": "plain_text", "text": t.name}, "value": t.name}
-        for t in Tag.objects.filter(type=TagType.AFFECTED_SERVICE).order_by("name")
-    ]
-    affected_region_options = [
-        {"text": {"type": "plain_text", "text": t.name}, "value": t.name}
-        for t in Tag.objects.filter(type=TagType.AFFECTED_REGION).order_by("name")
-    ]
+    tag_types = [TagType.IMPACT_TYPE, TagType.AFFECTED_SERVICE, TagType.AFFECTED_REGION]
+    all_tags = Tag.objects.filter(type__in=tag_types).order_by("name")
+    tags_by_type: dict[str, list] = {t: [] for t in tag_types}
+    for tag in all_tags:
+        tags_by_type[tag.type].append(
+            {"text": {"type": "plain_text", "text": tag.name}, "value": tag.name}
+        )
+    impact_type_options = tags_by_type[TagType.IMPACT_TYPE]
+    affected_service_options = tags_by_type[TagType.AFFECTED_SERVICE]
+    affected_region_options = tags_by_type[TagType.AFFECTED_REGION]
 
     blocks = [
         {
