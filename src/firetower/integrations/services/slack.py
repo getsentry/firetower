@@ -150,6 +150,119 @@ class SlackService:
             )
             return None
 
+    def create_channel(self, name: str) -> str | None:
+        if not self.client:
+            logger.warning("Cannot create channel - Slack client not initialized")
+            return None
+
+        try:
+            logger.info(f"Creating Slack channel: {name}")
+            response = self.client.conversations_create(name=name)
+            channel_id: str = response["channel"]["id"]
+            logger.info(f"Created Slack channel {name} with ID {channel_id}")
+            return channel_id
+        except SlackApiError as e:
+            logger.error(
+                f"Error creating Slack channel: {e}",
+                extra={"channel_name": name},
+            )
+            return None
+
+    def set_channel_topic(self, channel_id: str, topic: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot set topic - Slack client not initialized")
+            return False
+
+        try:
+            logger.info(f"Setting topic for channel {channel_id}")
+            self.client.conversations_setTopic(channel=channel_id, topic=topic)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error setting channel topic: {e}",
+                extra={"channel_id": channel_id},
+            )
+            return False
+
+    def invite_to_channel(self, channel_id: str, user_ids: list[str]) -> bool:
+        if not self.client:
+            logger.warning("Cannot invite to channel - Slack client not initialized")
+            return False
+
+        try:
+            logger.info(f"Inviting {len(user_ids)} users to channel {channel_id}")
+            self.client.conversations_invite(
+                channel=channel_id, users=",".join(user_ids)
+            )
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error inviting to channel: {e}",
+                extra={"channel_id": channel_id},
+            )
+            return False
+
+    def post_message(
+        self, channel_id: str, text: str, blocks: list[dict] | None = None
+    ) -> bool:
+        if not self.client:
+            logger.warning("Cannot post message - Slack client not initialized")
+            return False
+
+        try:
+            logger.info(f"Posting message to channel {channel_id}")
+            self.client.chat_postMessage(channel=channel_id, text=text, blocks=blocks)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error posting message: {e}", extra={"channel_id": channel_id}
+            )
+            return False
+
+    def add_bookmark(self, channel_id: str, title: str, link: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot add bookmark - Slack client not initialized")
+            return False
+
+        try:
+            logger.info(f"Adding bookmark to channel {channel_id}")
+            self.client.bookmarks_add(
+                channel_id=channel_id, title=title, type="link", link=link
+            )
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error adding bookmark: {e}", extra={"channel_id": channel_id}
+            )
+            return False
+
+    def get_channel_history(
+        self, channel_id: str, limit: int = 1000
+    ) -> list[dict] | None:
+        if not self.client:
+            logger.warning(
+                "Cannot fetch channel history - Slack client not initialized"
+            )
+            return None
+
+        try:
+            logger.info(f"Fetching history for channel {channel_id}")
+            response = self.client.conversations_history(
+                channel=channel_id, limit=limit
+            )
+            messages: list[dict] = response.get("messages", [])
+            logger.info(f"Found {len(messages)} messages in channel {channel_id}")
+            return messages
+        except SlackApiError as e:
+            logger.error(
+                f"Error fetching channel history: {e}",
+                extra={"channel_id": channel_id},
+            )
+            return None
+
+    def build_channel_url(self, channel_id: str) -> str:
+        return f"https://slack.com/archives/{channel_id}"
+
     def get_user_info(self, slack_user_id: str) -> dict | None:
         """
         Get user information from Slack by user ID.
