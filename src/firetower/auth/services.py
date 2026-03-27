@@ -250,11 +250,7 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
     last_name = slack_user_info.get("last_name", "")
     avatar_url = slack_user_info.get("avatar_url", "")
 
-    if (
-        slack_user_info.get("deleted", False)
-        or slack_user_info.get("is_bot", False)
-        or not email
-    ):
+    if not email:
         return _get_or_create_inactive_slack_user(slack_user_id, slack_user_info)
 
     user = _get_or_create_user_by_email(email, first_name, last_name)
