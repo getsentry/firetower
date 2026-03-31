@@ -305,7 +305,7 @@ def handle_new_incident_submission(
     incident_url = f"{base_url}/{incident.incident_number}"
     slack_link = incident.external_links_dict.get("slack", "")
 
-    message = f"*{incident.incident_number}: {incident.title}* created!\n<{incident_url}|View in Firetower>"
+    message = f"*{incident.incident_number}: {incident.title}* created\n<{incident_url}|View in Firetower>"
     if slack_link:
         message += f"\n<{slack_link}|Slack channel>"
 
