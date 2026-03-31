@@ -51,6 +51,10 @@ def _build_channel_topic(incident: Incident) -> str:
     return topic[:SLACK_TOPIC_MAX_LENGTH]
 
 
+def _build_incident_url(incident: Incident) -> str:
+    return f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
+
+
 def _get_channel_id(incident: Incident) -> str | None:
     slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
     if not slack_link:
@@ -96,8 +100,7 @@ def on_incident_created(incident: Incident) -> None:
 
         _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
 
-        base_url = settings.FIRETOWER_BASE_URL
-        incident_url = f"{base_url}/{incident.incident_number}"
+        incident_url = _build_incident_url(incident)
         _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
 
         _slack_service.post_message(
@@ -120,9 +123,10 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
         if not channel_id:
             return
 
+        incident_url = _build_incident_url(incident)
         _slack_service.post_message(
             channel_id,
-            f"Status changed: {old_status} -> {incident.status}",
+            f"Status changed: {old_status} -> {incident.status}\n<{incident_url}|View in Firetower>",
         )
     except Exception:
         logger.exception(f"Error in on_status_changed for incident {incident.id}")
@@ -134,9 +138,10 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         if not channel_id:
             return
 
+        incident_url = _build_incident_url(incident)
         _slack_service.post_message(
             channel_id,
-            f"Severity changed: {old_severity} -> {incident.severity}",
+            f"Severity changed: {old_severity} -> {incident.severity}\n<{incident_url}|View in Firetower>",
         )
         _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
     except Exception:
@@ -161,9 +166,11 @@ def on_visibility_changed(incident: Incident) -> None:
             return
 
         visibility = "private" if incident.is_private else "public"
+        incident_url = _build_incident_url(incident)
         message = (
             f"This incident has been marked as *{visibility}* in Firetower. "
-            f"If you want to make this channel {visibility}, you will need a Slack admin to make the change."
+            f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
+            f"<{incident_url}|View in Firetower>"
         )
         _slack_service.post_message(channel_id, message)
     except Exception:
@@ -178,6 +185,7 @@ def on_captain_changed(incident: Incident) -> None:
 
         _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
 
+        incident_url = _build_incident_url(incident)
         if incident.captain:
             slack_id = _get_slack_user_id(incident.captain)
             if slack_id:
@@ -188,7 +196,7 @@ def on_captain_changed(incident: Incident) -> None:
                 )
             _slack_service.post_message(
                 channel_id,
-                f"Incident captain changed to {captain_ref}",
+                f"Incident captain changed to {captain_ref}\n<{incident_url}|View in Firetower>",
             )
 
         if incident.captain:
