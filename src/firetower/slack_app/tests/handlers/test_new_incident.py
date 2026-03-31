@@ -254,7 +254,7 @@ class TestNewIncidentSubmission:
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Something went wrong" in msg
-        assert "#team-sre" in msg
+        assert "Slack channel manually" in msg
 
 
 @pytest.mark.django_db

@@ -296,8 +296,8 @@ def handle_new_incident_submission(
             channel=slack_user_id,
             text=(
                 "Something went wrong creating your incident. "
-                "Please create it manually in Firetower and create a Slack channel, "
-                "then let #team-sre know."
+                "Please create a Slack channel manually for incident coordination "
+                "and let #team-sre know."
             ),
         )
         return
