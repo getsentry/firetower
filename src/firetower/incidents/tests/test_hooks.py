@@ -12,6 +12,7 @@ from firetower.incidents.hooks import (
     on_severity_changed,
     on_status_changed,
     on_title_changed,
+    on_visibility_changed,
 )
 from firetower.incidents.models import (
     ExternalLink,
@@ -286,6 +287,62 @@ class TestOnTitleChanged:
         on_title_changed(incident)
 
         mock_slack.set_channel_topic.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestOnVisibilityChanged:
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_private_message(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_visibility_changed(incident)
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "private" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_public_message(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_visibility_changed(incident)
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "public" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_noop_without_slack_link(self, mock_slack):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_visibility_changed(incident)
+
+        mock_slack.post_message.assert_not_called()
 
 
 @pytest.mark.django_db

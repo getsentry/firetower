@@ -14,6 +14,7 @@ from .hooks import (
     on_severity_changed,
     on_status_changed,
     on_title_changed,
+    on_visibility_changed,
 )
 from .models import (
     USER_ADDABLE_TAG_TYPES,
@@ -536,6 +537,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         old_status = instance.status
         old_severity = instance.severity
         old_captain_id = instance.captain_id
+        old_is_private = instance.is_private
 
         # Update basic fields
         instance = super().update(instance, validated_data)
@@ -598,6 +600,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             on_severity_changed(instance, old_severity)
         if instance.captain_id != old_captain_id:
             on_captain_changed(instance)
+        if instance.is_private != old_is_private:
+            on_visibility_changed(instance)
 
         return instance
 

@@ -154,6 +154,22 @@ def on_title_changed(incident: Incident) -> None:
         logger.exception(f"Error in on_title_changed for incident {incident.id}")
 
 
+def on_visibility_changed(incident: Incident) -> None:
+    try:
+        channel_id = _get_channel_id(incident)
+        if not channel_id:
+            return
+
+        visibility = "private" if incident.is_private else "public"
+        message = (
+            f"This incident has been marked as *{visibility}* in Firetower. "
+            f"If you want to make this channel {visibility}, you will need a Slack admin to make the change."
+        )
+        _slack_service.post_message(channel_id, message)
+    except Exception:
+        logger.exception(f"Error in on_visibility_changed for incident {incident.id}")
+
+
 def on_captain_changed(incident: Incident) -> None:
     try:
         channel_id = _get_channel_id(incident)
