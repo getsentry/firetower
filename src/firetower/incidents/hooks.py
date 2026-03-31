@@ -106,7 +106,7 @@ def on_incident_created(incident: Incident) -> None:
 
         _slack_service.post_message(
             channel_id,
-            f"*{incident.incident_number}: {incident.title}*\n"
+            f"*{incident.incident_number}: {escape_slack_text(incident.title)}*\n"
             f"Severity: {incident.severity} | Status: {incident.status}",
         )
 
