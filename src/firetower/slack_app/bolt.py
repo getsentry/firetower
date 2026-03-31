@@ -9,6 +9,7 @@ from firetower.slack_app.handlers.help import handle_help_command
 from firetower.slack_app.handlers.new_incident import (
     handle_new_command,
     handle_new_incident_submission,
+    handle_tag_options,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,3 +59,9 @@ def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
 def _register_views(app: App) -> None:
     """Register view handlers (modals, etc.) on the Bolt app."""
     app.view("new_incident_modal")(handle_new_incident_submission)
+    for action_id in (
+        "impact_type_tags",
+        "affected_service_tags",
+        "affected_region_tags",
+    ):
+        app.options(action_id)(handle_tag_options)

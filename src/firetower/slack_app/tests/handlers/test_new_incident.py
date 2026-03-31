@@ -4,11 +4,12 @@ import pytest
 from django.contrib.auth.models import User
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
-from firetower.incidents.models import Incident, IncidentSeverity
+from firetower.incidents.models import Incident, IncidentSeverity, Tag, TagType
 from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.new_incident import (
     handle_new_command,
     handle_new_incident_submission,
+    handle_tag_options,
 )
 
 
@@ -188,3 +189,51 @@ class TestNewIncidentSubmission:
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Something went wrong" in msg
         assert "#team-sre" in msg
+
+
+@pytest.mark.django_db
+class TestTagOptions:
+    def test_returns_matching_tags(self):
+        Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
+        Tag.objects.create(name="us-west-2", type=TagType.AFFECTED_REGION)
+        Tag.objects.create(name="eu-west-1", type=TagType.AFFECTED_REGION)
+
+        ack = MagicMock()
+        payload = {"action_id": "affected_region_tags", "value": "us"}
+        handle_tag_options(ack, payload)
+
+        ack.assert_called_once()
+        options = ack.call_args[1]["options"]
+        assert len(options) == 2
+        names = {o["text"]["text"] for o in options}
+        assert names == {"us-east-1", "us-west-2"}
+
+    def test_empty_query_returns_all(self):
+        Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
+        Tag.objects.create(name="eu-west-1", type=TagType.AFFECTED_REGION)
+
+        ack = MagicMock()
+        payload = {"action_id": "affected_region_tags", "value": ""}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert len(options) == 2
+
+    def test_unknown_action_id_returns_empty(self):
+        ack = MagicMock()
+        payload = {"action_id": "unknown_action", "value": ""}
+        handle_tag_options(ack, payload)
+
+        ack.assert_called_once_with(options=[])
+
+    def test_filters_by_tag_type(self):
+        Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
+        Tag.objects.create(name="api", type=TagType.AFFECTED_SERVICE)
+
+        ack = MagicMock()
+        payload = {"action_id": "affected_region_tags", "value": ""}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert len(options) == 1
+        assert options[0]["text"]["text"] == "us-east-1"

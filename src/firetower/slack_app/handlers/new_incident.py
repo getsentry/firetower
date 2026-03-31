@@ -19,17 +19,6 @@ def _build_new_incident_modal() -> dict:
         for sev in IncidentSeverity
     ]
 
-    tag_types = [TagType.IMPACT_TYPE, TagType.AFFECTED_SERVICE, TagType.AFFECTED_REGION]
-    all_tags = Tag.objects.filter(type__in=tag_types).order_by("name")
-    tags_by_type: dict[str, list] = {t: [] for t in tag_types}
-    for tag in all_tags:
-        tags_by_type[tag.type].append(
-            {"text": {"type": "plain_text", "text": tag.name}, "value": tag.name}
-        )
-    impact_type_options = tags_by_type[TagType.IMPACT_TYPE]
-    affected_service_options = tags_by_type[TagType.AFFECTED_SERVICE]
-    affected_region_options = tags_by_type[TagType.AFFECTED_REGION]
-
     blocks = [
         {
             "type": "input",
@@ -70,64 +59,52 @@ def _build_new_incident_modal() -> dict:
             },
             "label": {"type": "plain_text", "text": "Description"},
         },
+        {
+            "type": "input",
+            "block_id": "impact_type_block",
+            "optional": True,
+            "element": {
+                "type": "multi_external_select",
+                "action_id": "impact_type_tags",
+                "min_query_length": 0,
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "Select impact types",
+                },
+            },
+            "label": {"type": "plain_text", "text": "Impact Type"},
+        },
+        {
+            "type": "input",
+            "block_id": "affected_service_block",
+            "optional": True,
+            "element": {
+                "type": "multi_external_select",
+                "action_id": "affected_service_tags",
+                "min_query_length": 0,
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "Select affected services",
+                },
+            },
+            "label": {"type": "plain_text", "text": "Affected Service"},
+        },
+        {
+            "type": "input",
+            "block_id": "affected_region_block",
+            "optional": True,
+            "element": {
+                "type": "multi_external_select",
+                "action_id": "affected_region_tags",
+                "min_query_length": 0,
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "Select affected regions",
+                },
+            },
+            "label": {"type": "plain_text", "text": "Affected Region"},
+        },
     ]
-
-    if impact_type_options:
-        blocks.append(
-            {
-                "type": "input",
-                "block_id": "impact_type_block",
-                "optional": True,
-                "element": {
-                    "type": "multi_static_select",
-                    "action_id": "impact_type_tags",
-                    "placeholder": {
-                        "type": "plain_text",
-                        "text": "Select impact types",
-                    },
-                    "options": impact_type_options,
-                },
-                "label": {"type": "plain_text", "text": "Impact Type"},
-            }
-        )
-
-    if affected_service_options:
-        blocks.append(
-            {
-                "type": "input",
-                "block_id": "affected_service_block",
-                "optional": True,
-                "element": {
-                    "type": "multi_static_select",
-                    "action_id": "affected_service_tags",
-                    "placeholder": {
-                        "type": "plain_text",
-                        "text": "Select affected services",
-                    },
-                    "options": affected_service_options,
-                },
-                "label": {"type": "plain_text", "text": "Affected Service"},
-            }
-        )
-
-    if affected_region_options:
-        blocks.append(
-            {
-                "type": "input",
-                "block_id": "affected_region_block",
-                "optional": True,
-                "element": {
-                    "type": "multi_static_select",
-                    "action_id": "affected_region_tags",
-                    "placeholder": {
-                        "type": "plain_text",
-                        "text": "Select affected regions",
-                    },
-                    "options": affected_region_options,
-                },
-                "label": {"type": "plain_text", "text": "Affected Region"},
-            }
-        )
 
     blocks.append(
         {
@@ -156,6 +133,33 @@ def _build_new_incident_modal() -> dict:
         "close": {"type": "plain_text", "text": "Cancel"},
         "blocks": blocks,
     }
+
+
+ACTION_ID_TO_TAG_TYPE = {
+    "impact_type_tags": TagType.IMPACT_TYPE,
+    "affected_service_tags": TagType.AFFECTED_SERVICE,
+    "affected_region_tags": TagType.AFFECTED_REGION,
+}
+
+
+def handle_tag_options(ack: Any, payload: dict) -> None:
+    action_id = payload.get("action_id", "")
+    keyword = payload.get("value", "")
+
+    tag_type = ACTION_ID_TO_TAG_TYPE.get(action_id)
+    if not tag_type:
+        ack(options=[])
+        return
+
+    qs = Tag.objects.filter(type=tag_type)
+    if keyword:
+        qs = qs.filter(name__icontains=keyword)
+
+    options = [
+        {"text": {"type": "plain_text", "text": tag.name}, "value": tag.name}
+        for tag in qs.order_by("name")[:100]
+    ]
+    ack(options=options)
 
 
 def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
