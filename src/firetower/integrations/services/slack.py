@@ -208,6 +208,21 @@ class SlackService:
             )
             return False
 
+    def join_channel(self, channel_id: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot join channel - Slack client not initialized")
+            return False
+
+        try:
+            logger.info(f"Joining channel {channel_id}")
+            self.client.conversations_join(channel=channel_id)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error joining channel: {e}", extra={"channel_id": channel_id}
+            )
+            return False
+
     def post_message(
         self, channel_id: str, text: str, blocks: list[dict] | None = None
     ) -> bool:

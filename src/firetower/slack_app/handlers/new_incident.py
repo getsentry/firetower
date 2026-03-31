@@ -6,6 +6,7 @@ from django.conf import settings
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import IncidentSeverity, Tag, TagType
 from firetower.incidents.serializers import IncidentWriteSerializer
+from firetower.integrations.services import SlackService
 
 logger = logging.getLogger(__name__)
 
@@ -312,4 +313,5 @@ def handle_new_incident_submission(
 
     invoking_channel = view.get("private_metadata", "")
     if invoking_channel:
+        SlackService().join_channel(invoking_channel)
         client.chat_postMessage(channel=invoking_channel, text=message)
