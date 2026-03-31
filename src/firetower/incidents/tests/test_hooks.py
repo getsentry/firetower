@@ -207,7 +207,7 @@ class TestOnStatusChanged:
         mock_slack.post_message.assert_called_once()
         assert "Active" in mock_slack.post_message.call_args[0][1]
         assert "Mitigated" in mock_slack.post_message.call_args[0][1]
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_channel_topic.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):

@@ -122,7 +122,6 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
             channel_id,
             f"Status changed: {old_status} -> {incident.status}",
         )
-        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
     except Exception:
         logger.exception(f"Error in on_status_changed for incident {incident.id}")
 
