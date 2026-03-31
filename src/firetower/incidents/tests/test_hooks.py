@@ -33,12 +33,17 @@ class TestBuildChannelName:
 
 @pytest.mark.django_db
 class TestBuildChannelTopic:
-    def test_format_with_captain(self):
+    def test_format_with_captain_slack_profile(self):
         captain = User.objects.create_user(
             username="captain@example.com",
             email="captain@example.com",
             first_name="Jane",
             last_name="Doe",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAPTAIN",
         )
         incident = Incident.objects.create(
             title="Database connection pool exhausted",
@@ -46,10 +51,26 @@ class TestBuildChannelTopic:
             captain=captain,
         )
         topic = _build_channel_topic(incident)
-        assert topic == (
-            f"[P1] {incident.incident_number} Database connection pool exhausted"
-            " | IC: @Jane Doe"
+        assert topic.startswith("[P1] ")
+        assert (
+            f"|{incident.incident_number} Database connection pool exhausted>" in topic
         )
+        assert "| IC: <@U_CAPTAIN>" in topic
+
+    def test_format_with_captain_no_slack_profile(self):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            captain=captain,
+        )
+        topic = _build_channel_topic(incident)
+        assert "| IC: Jane Doe" in topic
 
     def test_format_without_captain(self):
         incident = Incident.objects.create(
@@ -57,7 +78,9 @@ class TestBuildChannelTopic:
             severity=IncidentSeverity.P2,
         )
         topic = _build_channel_topic(incident)
-        assert topic == (f"[P2] {incident.incident_number} Test Incident | IC: @")
+        assert topic.startswith("[P2] ")
+        assert f"|{incident.incident_number} Test Incident>" in topic
+        assert "IC:" not in topic
 
     def test_long_title_is_truncated(self):
         long_title = "A" * 300
@@ -67,7 +90,6 @@ class TestBuildChannelTopic:
         )
         topic = _build_channel_topic(incident)
         assert len(topic) <= 250
-        assert topic.endswith("| IC: @")
         assert "\u2026" in topic
 
 
@@ -266,7 +288,7 @@ class TestOnCaptainChanged:
 
         mock_slack.set_channel_topic.assert_called_once()
         mock_slack.post_message.assert_called_once()
-        assert "New Captain" in mock_slack.post_message.call_args[0][1]
+        assert "<@U_NEW>" in mock_slack.post_message.call_args[0][1]
         mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_NEW"])
 
     @patch("firetower.incidents.hooks._slack_service")

@@ -18,17 +18,36 @@ def _build_channel_name(incident: Incident) -> str:
 SLACK_TOPIC_MAX_LENGTH = 250
 
 
+def _get_slack_user_id(user: User) -> str | None:
+    profile = user.external_profiles.filter(type=ExternalProfileType.SLACK).first()
+    return profile.external_id if profile else None
+
+
 def _build_channel_topic(incident: Incident) -> str:
-    captain_name = ""
+    base_url = settings.FIRETOWER_BASE_URL
+    incident_url = f"{base_url}/{incident.incident_number}"
+
+    ic_part = ""
     if incident.captain:
-        captain_name = incident.captain.get_full_name() or incident.captain.username
-    prefix = f"[{incident.severity}] {incident.incident_number} "
-    suffix = f" | IC: @{captain_name}"
-    max_title_len = max(SLACK_TOPIC_MAX_LENGTH - len(prefix) - len(suffix), 0)
+        slack_id = _get_slack_user_id(incident.captain)
+        if slack_id:
+            ic_part = f" | IC: <@{slack_id}>"
+        else:
+            captain_name = incident.captain.get_full_name() or incident.captain.username
+            ic_part = f" | IC: {captain_name}"
+
+    prefix = f"[{incident.severity}] "
+    suffix = ic_part
+    # Link text: "INC-2000 title"
+    link_label_prefix = f"{incident.incident_number} "
+    link_overhead = len(f"<{incident_url}|{link_label_prefix}>")
+    max_title_len = max(
+        SLACK_TOPIC_MAX_LENGTH - len(prefix) - len(suffix) - link_overhead, 0
+    )
     title = incident.title
     if len(title) > max_title_len:
         title = (title[: max_title_len - 1] + "\u2026") if max_title_len > 0 else ""
-    topic = f"{prefix}{title}{suffix}"
+    topic = f"{prefix}<{incident_url}|{link_label_prefix}{title}>{suffix}"
     return topic[:SLACK_TOPIC_MAX_LENGTH]
 
 
@@ -76,7 +95,7 @@ def on_incident_created(incident: Incident) -> None:
         _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
 
         base_url = settings.FIRETOWER_BASE_URL
-        incident_url = f"{base_url}/incidents/{incident.incident_number}"
+        incident_url = f"{base_url}/{incident.incident_number}"
         _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
 
         _slack_service.post_message(
@@ -131,13 +150,18 @@ def on_captain_changed(incident: Incident) -> None:
 
         _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
 
-        captain_name = ""
         if incident.captain:
-            captain_name = incident.captain.get_full_name() or incident.captain.username
-        _slack_service.post_message(
-            channel_id,
-            f"Incident captain changed to @{captain_name}",
-        )
+            slack_id = _get_slack_user_id(incident.captain)
+            if slack_id:
+                captain_ref = f"<@{slack_id}>"
+            else:
+                captain_ref = (
+                    incident.captain.get_full_name() or incident.captain.username
+                )
+            _slack_service.post_message(
+                channel_id,
+                f"Incident captain changed to {captain_ref}",
+            )
 
         if incident.captain:
             _invite_user_to_channel(channel_id, incident.captain)

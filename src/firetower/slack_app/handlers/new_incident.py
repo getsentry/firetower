@@ -10,7 +10,7 @@ from firetower.incidents.serializers import IncidentWriteSerializer
 logger = logging.getLogger(__name__)
 
 
-def _build_new_incident_modal() -> dict:
+def _build_new_incident_modal(channel_id: str = "") -> dict:
     severity_options = [
         {
             "text": {"type": "plain_text", "text": sev.label},
@@ -29,7 +29,7 @@ def _build_new_incident_modal() -> dict:
                 "placeholder": {"type": "plain_text", "text": "Select severity"},
                 "options": severity_options,
                 "initial_option": {sev["value"]: sev for sev in severity_options}.get(
-                    "P2", severity_options[0]
+                    "P3", severity_options[0]
                 ),
             },
             "label": {"type": "plain_text", "text": "Severity"},
@@ -58,6 +58,21 @@ def _build_new_incident_modal() -> dict:
                 },
             },
             "label": {"type": "plain_text", "text": "Description"},
+        },
+        {
+            "type": "input",
+            "block_id": "impact_summary_block",
+            "optional": True,
+            "element": {
+                "type": "plain_text_input",
+                "action_id": "impact_summary",
+                "multiline": True,
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "What is the user/business impact?",
+                },
+            },
+            "label": {"type": "plain_text", "text": "Impact Summary"},
         },
         {
             "type": "input",
@@ -125,7 +140,7 @@ def _build_new_incident_modal() -> dict:
         }
     )
 
-    return {
+    modal = {
         "type": "modal",
         "callback_id": "new_incident_modal",
         "title": {"type": "plain_text", "text": "New Incident"},
@@ -133,6 +148,9 @@ def _build_new_incident_modal() -> dict:
         "close": {"type": "plain_text", "text": "Cancel"},
         "blocks": blocks,
     }
+    if channel_id:
+        modal["private_metadata"] = channel_id
+    return modal
 
 
 ACTION_ID_TO_TAG_TYPE = {
@@ -169,10 +187,12 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
         respond("Could not open modal — missing trigger_id.")
         return
 
+    channel_id = body.get("channel_id", "")
+
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
     get_bolt_app().client.views_open(
-        trigger_id=trigger_id, view=_build_new_incident_modal()
+        trigger_id=trigger_id, view=_build_new_incident_modal(channel_id=channel_id)
     )
 
 
@@ -190,6 +210,10 @@ def handle_new_incident_submission(
     )
     description = (
         values.get("description_block", {}).get("description", {}).get("value") or ""
+    )
+    impact_summary = (
+        values.get("impact_summary_block", {}).get("impact_summary", {}).get("value")
+        or ""
     )
 
     impact_type_selections = (
@@ -235,6 +259,7 @@ def handle_new_incident_submission(
         "title": title,
         "severity": severity,
         "description": description,
+        "impact_summary": impact_summary,
         "captain": user.email,
         "reporter": user.email,
         "is_private": is_private,
@@ -276,7 +301,7 @@ def handle_new_incident_submission(
         return
 
     base_url = settings.FIRETOWER_BASE_URL
-    incident_url = f"{base_url}/incidents/{incident.incident_number}"
+    incident_url = f"{base_url}/{incident.incident_number}"
     slack_link = incident.external_links_dict.get("slack", "")
 
     message = f"*{incident.incident_number}: {incident.title}* created!\n<{incident_url}|View in Firetower>"
@@ -284,3 +309,7 @@ def handle_new_incident_submission(
         message += f"\n<{slack_link}|Slack channel>"
 
     client.chat_postMessage(channel=slack_user_id, text=message)
+
+    invoking_channel = view.get("private_metadata", "")
+    if invoking_channel:
+        client.chat_postMessage(channel=invoking_channel, text=message)
