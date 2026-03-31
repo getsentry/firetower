@@ -80,7 +80,9 @@ def on_incident_created(incident: Incident) -> None:
             )
             return
 
-        channel_id = _slack_service.create_channel(_build_channel_name(incident))
+        channel_id = _slack_service.create_channel(
+            _build_channel_name(incident), is_private=incident.is_private
+        )
         if not channel_id:
             logger.warning(f"Failed to create Slack channel for incident {incident.id}")
             return

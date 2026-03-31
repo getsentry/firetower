@@ -218,7 +218,9 @@ class TestSlackService:
         mock_client.conversations_create.return_value = {"channel": {"id": "C12345"}}
         result = service.create_channel("inc-2014")
         assert result == "C12345"
-        mock_client.conversations_create.assert_called_once_with(name="inc-2014")
+        mock_client.conversations_create.assert_called_once_with(
+            name="inc-2014", is_private=False
+        )
 
     def test_create_channel_no_client(self):
         mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}

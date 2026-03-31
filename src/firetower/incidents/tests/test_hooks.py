@@ -123,7 +123,7 @@ class TestOnIncidentCreated:
         on_incident_created(incident)
 
         mock_slack.create_channel.assert_called_once_with(
-            incident.incident_number.lower()
+            incident.incident_number.lower(), is_private=False
         )
         link = ExternalLink.objects.get(incident=incident, type=ExternalLinkType.SLACK)
         assert link.url == "https://slack.com/archives/C99999"

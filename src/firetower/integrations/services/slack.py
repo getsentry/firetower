@@ -150,14 +150,16 @@ class SlackService:
             )
             return None
 
-    def create_channel(self, name: str) -> str | None:
+    def create_channel(self, name: str, is_private: bool = False) -> str | None:
         if not self.client:
             logger.warning("Cannot create channel - Slack client not initialized")
             return None
 
         try:
-            logger.info(f"Creating Slack channel: {name}")
-            response = self.client.conversations_create(name=name)
+            logger.info(f"Creating Slack channel: {name} (private={is_private})")
+            response = self.client.conversations_create(
+                name=name, is_private=is_private
+            )
             channel = response.get("channel")
             channel_id = channel.get("id") if channel else None
             if not channel_id:

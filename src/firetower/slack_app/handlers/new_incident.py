@@ -312,6 +312,6 @@ def handle_new_incident_submission(
     client.chat_postMessage(channel=slack_user_id, text=message)
 
     invoking_channel = view.get("private_metadata", "")
-    if invoking_channel:
+    if invoking_channel and not is_private:
         SlackService().join_channel(invoking_channel)
         client.chat_postMessage(channel=invoking_channel, text=message)
