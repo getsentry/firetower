@@ -11,6 +11,7 @@ from firetower.incidents.hooks import (
     on_incident_created,
     on_severity_changed,
     on_status_changed,
+    on_title_changed,
 )
 from firetower.incidents.models import (
     ExternalLink,
@@ -253,6 +254,38 @@ class TestOnSeverityChanged:
         on_severity_changed(incident, IncidentSeverity.P2)
 
         mock_slack.post_message.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestOnTitleChanged:
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_updates_topic(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = Incident.objects.create(
+            title="Updated Title",
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_title_changed(incident)
+
+        mock_slack.set_channel_topic.assert_called_once()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_noop_without_slack_link(self, mock_slack):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_title_changed(incident)
+
+        mock_slack.set_channel_topic.assert_not_called()
 
 
 @pytest.mark.django_db

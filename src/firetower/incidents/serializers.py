@@ -13,6 +13,7 @@ from .hooks import (
     on_incident_created,
     on_severity_changed,
     on_status_changed,
+    on_title_changed,
 )
 from .models import (
     USER_ADDABLE_TAG_TYPES,
@@ -531,6 +532,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
         impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
 
+        old_title = instance.title
         old_status = instance.status
         old_severity = instance.severity
         old_captain_id = instance.captain_id
@@ -588,6 +590,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             )
             instance.impact_type_tags.set(tags)
 
+        if instance.title != old_title:
+            on_title_changed(instance)
         if instance.status != old_status:
             on_status_changed(instance, old_status)
         if instance.severity != old_severity:
