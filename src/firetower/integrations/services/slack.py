@@ -15,6 +15,10 @@ from slack_sdk.errors import SlackApiError
 logger = logging.getLogger(__name__)
 
 
+def escape_slack_text(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 class SlackService:
     """
     Service class for interacting with Slack API.

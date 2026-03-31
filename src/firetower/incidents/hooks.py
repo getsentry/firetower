@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from firetower.auth.models import ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
 from firetower.integrations.services import SlackService
+from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
@@ -16,10 +17,6 @@ def _build_channel_name(incident: Incident) -> str:
 
 
 SLACK_TOPIC_MAX_LENGTH = 250
-
-
-def _escape_slack_text(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _get_slack_user_id(user: User) -> str | None:
@@ -48,7 +45,7 @@ def _build_channel_topic(incident: Incident) -> str:
     max_title_len = max(
         SLACK_TOPIC_MAX_LENGTH - len(prefix) - len(suffix) - link_overhead, 0
     )
-    title = _escape_slack_text(incident.title)
+    title = escape_slack_text(incident.title)
     if len(title) > max_title_len:
         title = (title[: max_title_len - 1] + "\u2026") if max_title_len > 0 else ""
     topic = f"{prefix}<{incident_url}|{link_label_prefix}{title}>{suffix}"

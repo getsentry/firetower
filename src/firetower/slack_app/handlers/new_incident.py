@@ -7,6 +7,7 @@ from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import IncidentSeverity, Tag, TagType
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.integrations.services import SlackService
+from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
 
@@ -313,7 +314,7 @@ def handle_new_incident_submission(
 
         message = (
             f"A {incident.severity} incident has been created.\n"
-            f"<{incident_url}|{incident.incident_number} {incident.title}>"
+            f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
         )
         if channel_id:
             message += f"\n\nFor those involved, please join <#{channel_id}>"
