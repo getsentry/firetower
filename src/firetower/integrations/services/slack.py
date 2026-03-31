@@ -199,6 +199,9 @@ class SlackService:
             )
             return True
         except SlackApiError as e:
+            if e.response.get("error") == "already_in_channel":
+                logger.info(f"Users already in channel {channel_id}")
+                return True
             logger.error(
                 f"Error inviting to channel: {e}",
                 extra={"channel_id": channel_id},
