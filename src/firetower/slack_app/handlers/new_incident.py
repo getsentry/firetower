@@ -248,12 +248,21 @@ def handle_new_incident_submission(
     )
     is_private = any(opt.get("value") == "private" for opt in private_selections)
 
+    if not title:
+        ack(
+            response_action="errors",
+            errors={"title_block": "This field is required."},
+        )
+        return
+
+    ack()
+
     slack_user_id = body.get("user", {}).get("id", "")
     user = get_or_create_user_from_slack_id(slack_user_id)
     if not user:
-        ack(
-            response_action="errors",
-            errors={"title_block": "Could not identify your Firetower account."},
+        client.chat_postMessage(
+            channel=slack_user_id,
+            text="Could not identify your Firetower account. Please try again or create the incident manually.",
         )
         return
 
@@ -275,18 +284,12 @@ def handle_new_incident_submission(
 
     serializer = IncidentWriteSerializer(data=data)
     if not serializer.is_valid():
-        errors = {}
-        if "title" in serializer.errors:
-            errors["title_block"] = str(serializer.errors["title"][0])
-        if "severity" in serializer.errors:
-            errors["severity_block"] = str(serializer.errors["severity"][0])
-        if not errors:
-            first_key = next(iter(serializer.errors))
-            errors["title_block"] = str(serializer.errors[first_key][0])
-        ack(response_action="errors", errors=errors)
+        logger.error("Incident validation failed: %s", serializer.errors)
+        client.chat_postMessage(
+            channel=slack_user_id,
+            text="Something went wrong validating your incident. Please try again.",
+        )
         return
-
-    ack()
 
     try:
         incident = serializer.save()

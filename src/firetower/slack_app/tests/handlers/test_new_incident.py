@@ -167,10 +167,7 @@ class TestNewIncidentSubmission:
         client.chat_postMessage.assert_called_once()
         assert client.chat_postMessage.call_args[1]["channel"] == "U_TEST"
 
-    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
-    def test_validation_error(self, mock_get_user):
-        mock_get_user.return_value = self.user
-
+    def test_empty_title_returns_modal_error(self):
         ack = MagicMock()
         client = MagicMock()
         body = {"user": {"id": "U_TEST"}}
@@ -197,7 +194,7 @@ class TestNewIncidentSubmission:
         client.chat_postMessage.assert_not_called()
 
     @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
-    def test_unknown_user_returns_error(self, mock_get_user):
+    def test_unknown_user_sends_dm(self, mock_get_user):
         mock_get_user.return_value = None
 
         ack = MagicMock()
@@ -218,9 +215,10 @@ class TestNewIncidentSubmission:
 
         handle_new_incident_submission(ack, body, view, client)
 
-        ack.assert_called_once()
-        call_kwargs = ack.call_args[1]
-        assert call_kwargs["response_action"] == "errors"
+        ack.assert_called_once_with()
+        client.chat_postMessage.assert_called_once()
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "Could not identify" in msg
 
     @patch(
         "firetower.incidents.serializers.on_incident_created",
