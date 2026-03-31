@@ -301,25 +301,28 @@ def handle_new_incident_submission(
         )
         return
 
-    base_url = settings.FIRETOWER_BASE_URL
-    incident_url = f"{base_url}/{incident.incident_number}"
-    slack_link = incident.external_links_dict.get("slack", "")
+    try:
+        base_url = settings.FIRETOWER_BASE_URL
+        incident_url = f"{base_url}/{incident.incident_number}"
+        slack_link = incident.external_links_dict.get("slack", "")
 
-    slack_service = SlackService()
-    channel_id = (
-        slack_service.parse_channel_id_from_url(slack_link) if slack_link else None
-    )
+        slack_service = SlackService()
+        channel_id = (
+            slack_service.parse_channel_id_from_url(slack_link) if slack_link else None
+        )
 
-    message = (
-        f"A {incident.severity} incident has been created.\n"
-        f"<{incident_url}|{incident.incident_number} {incident.title}>"
-    )
-    if channel_id:
-        message += f"\n\nFor those involved, please join <#{channel_id}>"
+        message = (
+            f"A {incident.severity} incident has been created.\n"
+            f"<{incident_url}|{incident.incident_number} {incident.title}>"
+        )
+        if channel_id:
+            message += f"\n\nFor those involved, please join <#{channel_id}>"
 
-    client.chat_postMessage(channel=slack_user_id, text=message)
+        client.chat_postMessage(channel=slack_user_id, text=message)
 
-    invoking_channel = view.get("private_metadata", "")
-    if invoking_channel and not is_private:
-        slack_service.join_channel(invoking_channel)
-        client.chat_postMessage(channel=invoking_channel, text=message)
+        invoking_channel = view.get("private_metadata", "")
+        if invoking_channel and not is_private and invoking_channel != slack_user_id:
+            slack_service.join_channel(invoking_channel)
+            client.chat_postMessage(channel=invoking_channel, text=message)
+    except Exception:
+        logger.exception("Failed to send incident creation notifications")

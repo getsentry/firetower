@@ -101,6 +101,72 @@ class TestNewIncidentSubmission:
         assert incident.reporter == self.user
         client.chat_postMessage.assert_called_once()
 
+    @patch("firetower.slack_app.handlers.new_incident.SlackService")
+    @patch("firetower.incidents.serializers.on_incident_created")
+    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
+    def test_posts_to_invoking_channel(self, mock_get_user, mock_hook, mock_slack_svc):
+        mock_get_user.return_value = self.user
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "private_metadata": "C_INVOKE",
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "Test Incident"}},
+                    "severity_block": {
+                        "severity": {
+                            "selected_option": {"value": "P1"},
+                        }
+                    },
+                    "description_block": {"description": {"value": "Description"}},
+                    "private_block": {"is_private": {"selected_options": []}},
+                }
+            },
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        assert client.chat_postMessage.call_count == 2
+        channels = [c[1]["channel"] for c in client.chat_postMessage.call_args_list]
+        assert "C_INVOKE" in channels
+        mock_slack_svc.return_value.join_channel.assert_called_once_with("C_INVOKE")
+
+    @patch("firetower.slack_app.handlers.new_incident.SlackService")
+    @patch("firetower.incidents.serializers.on_incident_created")
+    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
+    def test_private_incident_skips_invoking_channel(
+        self, mock_get_user, mock_hook, mock_slack_svc
+    ):
+        mock_get_user.return_value = self.user
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "private_metadata": "C_INVOKE",
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "Test Incident"}},
+                    "severity_block": {
+                        "severity": {
+                            "selected_option": {"value": "P1"},
+                        }
+                    },
+                    "description_block": {"description": {"value": "Description"}},
+                    "private_block": {
+                        "is_private": {"selected_options": [{"value": "private"}]}
+                    },
+                }
+            },
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        client.chat_postMessage.assert_called_once()
+        assert client.chat_postMessage.call_args[1]["channel"] == "U_TEST"
+
     @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
     def test_validation_error(self, mock_get_user):
         mock_get_user.return_value = self.user

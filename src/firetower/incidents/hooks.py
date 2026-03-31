@@ -18,6 +18,10 @@ def _build_channel_name(incident: Incident) -> str:
 SLACK_TOPIC_MAX_LENGTH = 250
 
 
+def _escape_slack_text(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _get_slack_user_id(user: User) -> str | None:
     profile = user.external_profiles.filter(type=ExternalProfileType.SLACK).first()
     return profile.external_id if profile else None
@@ -44,7 +48,7 @@ def _build_channel_topic(incident: Incident) -> str:
     max_title_len = max(
         SLACK_TOPIC_MAX_LENGTH - len(prefix) - len(suffix) - link_overhead, 0
     )
-    title = incident.title
+    title = _escape_slack_text(incident.title)
     if len(title) > max_title_len:
         title = (title[: max_title_len - 1] + "\u2026") if max_title_len > 0 else ""
     topic = f"{prefix}<{incident_url}|{link_label_prefix}{title}>{suffix}"
@@ -198,8 +202,6 @@ def on_captain_changed(incident: Incident) -> None:
                 channel_id,
                 f"Incident captain updated to {captain_ref}\n<{incident_url}|View in Firetower>",
             )
-
-        if incident.captain:
             _invite_user_to_channel(channel_id, incident.captain)
     except Exception:
         logger.exception(f"Error in on_captain_changed for incident {incident.id}")
