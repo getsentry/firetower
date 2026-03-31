@@ -126,7 +126,7 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
         incident_url = _build_incident_url(incident)
         _slack_service.post_message(
             channel_id,
-            f"Status changed: {old_status} -> {incident.status}\n<{incident_url}|View in Firetower>",
+            f"Incident status updated: {old_status} -> {incident.status}\n<{incident_url}|View in Firetower>",
         )
     except Exception:
         logger.exception(f"Error in on_status_changed for incident {incident.id}")
@@ -138,12 +138,12 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         if not channel_id:
             return
 
+        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
         incident_url = _build_incident_url(incident)
         _slack_service.post_message(
             channel_id,
-            f"Severity changed: {old_severity} -> {incident.severity}\n<{incident_url}|View in Firetower>",
+            f"Incident severity updated: {old_severity} -> {incident.severity}\n<{incident_url}|View in Firetower>",
         )
-        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
     except Exception:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
 
@@ -196,7 +196,7 @@ def on_captain_changed(incident: Incident) -> None:
                 )
             _slack_service.post_message(
                 channel_id,
-                f"Incident captain changed to {captain_ref}\n<{incident_url}|View in Firetower>",
+                f"Incident captain updated to {captain_ref}\n<{incident_url}|View in Firetower>",
             )
 
         if incident.captain:
