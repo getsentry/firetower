@@ -305,13 +305,21 @@ def handle_new_incident_submission(
     incident_url = f"{base_url}/{incident.incident_number}"
     slack_link = incident.external_links_dict.get("slack", "")
 
-    message = f"*{incident.incident_number}: {incident.title}* created\n<{incident_url}|View in Firetower>"
-    if slack_link:
-        message += f"\n<{slack_link}|Slack channel>"
+    slack_service = SlackService()
+    channel_id = (
+        slack_service.parse_channel_id_from_url(slack_link) if slack_link else None
+    )
+
+    message = (
+        f"A {incident.severity} incident has been created.\n"
+        f"<{incident_url}|{incident.incident_number} {incident.title}>"
+    )
+    if channel_id:
+        message += f"\n\nFor those involved, please join <#{channel_id}>"
 
     client.chat_postMessage(channel=slack_user_id, text=message)
 
     invoking_channel = view.get("private_metadata", "")
     if invoking_channel and not is_private:
-        SlackService().join_channel(invoking_channel)
+        slack_service.join_channel(invoking_channel)
         client.chat_postMessage(channel=invoking_channel, text=message)
