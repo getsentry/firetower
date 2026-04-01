@@ -40,6 +40,7 @@ from .reporting_utils import (
     get_year_periods,
 )
 from .serializers import (
+    ActionItemSerializer,
     IncidentListUISerializer,
     IncidentOrRedirectReadSerializer,
     IncidentReadSerializer,
@@ -47,10 +48,28 @@ from .serializers import (
     TagCreateSerializer,
     TagSerializer,
 )
-from .services import ParticipantsSyncStats, sync_incident_participants_from_slack
+from .services import (
+    ActionItemsSyncStats,
+    ParticipantsSyncStats,
+    sync_action_items_from_linear,
+    sync_incident_participants_from_slack,
+)
 from .utils import sort_tags_with_overrides
 
 logger = logging.getLogger(__name__)
+
+
+def parse_incident_id(incident_id: str) -> int:
+    project_key = settings.PROJECT_KEY
+    incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
+    match = re.match(incident_pattern, incident_id, re.IGNORECASE)
+
+    if not match:
+        raise ValidationError(
+            f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
+        )
+
+    return int(match.group(1))
 
 
 class IncidentListUIView(generics.ListAPIView):
@@ -118,21 +137,11 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
         Returns incident if found and user has access, otherwise 404.
         """
         incident_id = self.kwargs["incident_id"]
-        project_key = settings.PROJECT_KEY
+        numeric_id = parse_incident_id(incident_id)
 
-        # Extract numeric ID from incident number (INC-2000 -> 2000), case-insensitive
-        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
-        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
-
-        if not match:
-            raise ValidationError(
-                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
-            )
-
-        numeric_id = int(match.group(1))
         if numeric_id < INCIDENT_ID_START:
             return IncidentOrRedirect(
-                redirect=f"{settings.JIRA['DOMAIN']}/browse/{project_key}-{numeric_id}"
+                redirect=f"{settings.JIRA['DOMAIN']}/browse/{settings.PROJECT_KEY}-{numeric_id}"
             )
 
         # Get incident by numeric ID
@@ -231,19 +240,7 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
         Filters by visibility before lookup to avoid leaking incident existence.
         """
         incident_id = self.kwargs["incident_id"]
-        project_key = settings.PROJECT_KEY
-
-        # Extract numeric ID from incident number (INC-2000 -> 2000), case-insensitive
-        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
-        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
-
-        if not match:
-            raise ValidationError(
-                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
-            )
-
-        # Get incident by numeric ID, filtered by visibility
-        numeric_id = int(match.group(1))
+        numeric_id = parse_incident_id(incident_id)
         queryset = self.get_queryset()
 
         # Filter by visibility before lookup (404 if not visible)
@@ -291,24 +288,10 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
         Returns incident if found and user has access, otherwise 404.
         """
         incident_id = self.kwargs["incident_id"]
-        project_key = settings.PROJECT_KEY
-
-        # Case-insensitive match for incident ID format
-        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
-        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
-
-        if not match:
-            raise ValidationError(
-                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
-            )
-
-        numeric_id = int(match.group(1))
-        queryset = self.get_queryset()
-        queryset = filter_visible_to_user(queryset, self.request.user)
+        numeric_id = parse_incident_id(incident_id)
+        queryset = filter_visible_to_user(self.get_queryset(), self.request.user)
 
         obj = get_object_or_404(queryset, id=numeric_id)
-
-        # Check object permissions
         self.check_object_permissions(self.request, obj)
 
         return obj
@@ -339,6 +322,70 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
 
 # View alias for sync endpoint
 sync_incident_participants = SyncIncidentParticipantsView.as_view()
+
+
+class ActionItemListView(generics.ListAPIView):
+    serializer_class = ActionItemSerializer
+    pagination_class = None
+
+    def get_queryset(self) -> QuerySet:
+        incident = self._get_incident()
+        return incident.action_items.select_related("assignee__userprofile")
+
+    def _get_incident(self) -> Incident:
+        numeric_id = parse_incident_id(self.kwargs["incident_id"])
+        queryset = filter_visible_to_user(Incident.objects.all(), self.request.user)
+        return get_object_or_404(queryset, id=numeric_id)
+
+    def list(self, request: Request, *args: object, **kwargs: object) -> Response:
+        incident = self._get_incident()
+
+        try:
+            sync_action_items_from_linear(incident)
+        except Exception as e:
+            logger.error(
+                f"Failed to sync action items for incident {incident.id}: {e}",
+                exc_info=True,
+            )
+
+        return super().list(request, *args, **kwargs)
+
+
+class SyncActionItemsView(generics.GenericAPIView):
+    def get_queryset(self) -> QuerySet[Incident]:
+        return Incident.objects.all()
+
+    def _get_incident(self) -> Incident:
+        numeric_id = parse_incident_id(self.kwargs["incident_id"])
+        queryset = filter_visible_to_user(self.get_queryset(), self.request.user)
+        return get_object_or_404(queryset, id=numeric_id)
+
+    def post(self, request: Request, incident_id: str) -> Response:
+        incident = self._get_incident()
+
+        try:
+            stats = sync_action_items_from_linear(incident, force=True)
+            return Response({"success": True, "stats": asdict(stats)})
+        except Exception as e:
+            logger.error(
+                f"Failed to force sync action items for incident {incident.id}: {e}",
+                exc_info=True,
+            )
+            error_stats = ActionItemsSyncStats(
+                errors=["Failed to sync action items from Linear"]
+            )
+            return Response(
+                {
+                    "success": False,
+                    "error": "Failed to sync action items from Linear",
+                    "stats": asdict(error_stats),
+                },
+                status=500,
+            )
+
+
+action_item_list = ActionItemListView.as_view()
+sync_action_items = SyncActionItemsView.as_view()
 
 
 class TagListCreateAPIView(generics.ListCreateAPIView):

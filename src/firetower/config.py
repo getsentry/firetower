@@ -43,6 +43,12 @@ class SlackConfig:
 
 
 @deserialize
+class LinearConfig:
+    api_key: str
+    action_item_sync_throttle_seconds: int
+
+
+@deserialize
 class AuthConfig:
     iap_enabled: bool
     iap_audience: str | None
@@ -58,9 +64,11 @@ class ConfigFile:
     datadog: DatadogConfig | None
     jira: JIRAConfig
     slack: SlackConfig
+    linear: LinearConfig | None
     auth: AuthConfig
 
     project_key: str
+    firetower_base_url: str
     django_secret_key: str
     sentry_dsn: str
     pinned_regions: list[str] = field(default_factory=list)
@@ -122,8 +130,10 @@ class DummyConfigFile(ConfigFile):
             iap_enabled=False,
             iap_audience="",
         )
+        self.linear = None
         self.datadog = None
         self.project_key = ""
+        self.firetower_base_url = ""
         self.django_secret_key = ""
         self.sentry_dsn = ""
         self.pinned_regions: list[str] = []
