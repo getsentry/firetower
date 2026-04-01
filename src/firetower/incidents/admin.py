@@ -5,7 +5,10 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 
 from .models import ExternalLink, Incident, Tag
-from .services import sync_incident_participants_from_slack
+from .services import (
+    sync_action_items_from_linear,
+    sync_incident_participants_from_slack,
+)
 
 
 class ExternalLinkInline(admin.TabularInline):
@@ -36,7 +39,11 @@ class IncidentAdmin(admin.ModelAdmin):
         "impact_type_tags",
     ]
 
-    actions = ["sync_participants_from_slack", "clear_milestones"]
+    actions = [
+        "sync_participants_from_slack",
+        "sync_action_items_from_linear",
+        "clear_milestones",
+    ]
 
     inlines = [ExternalLinkInline]
 
@@ -111,6 +118,36 @@ class IncidentAdmin(admin.ModelAdmin):
             message_parts.append(f"{error_count} failed")
 
         self.message_user(request, f"Participant sync: {', '.join(message_parts)}")
+
+    @admin.action(description="Sync action items from Linear")
+    def sync_action_items_from_linear(
+        self, request: HttpRequest, queryset: QuerySet[Incident]
+    ) -> None:
+        success_count = 0
+        skipped_count = 0
+        error_count = 0
+
+        for incident in queryset:
+            try:
+                stats = sync_action_items_from_linear(incident, force=True)
+                if stats.errors:
+                    error_count += 1
+                elif stats.skipped:
+                    skipped_count += 1
+                else:
+                    success_count += 1
+            except Exception:
+                error_count += 1
+
+        message_parts = []
+        if success_count:
+            message_parts.append(f"{success_count} synced successfully")
+        if skipped_count:
+            message_parts.append(f"{skipped_count} skipped")
+        if error_count:
+            message_parts.append(f"{error_count} failed")
+
+        self.message_user(request, f"Action item sync: {', '.join(message_parts)}")
 
     @admin.action(description="Clear all milestones")
     def clear_milestones(
