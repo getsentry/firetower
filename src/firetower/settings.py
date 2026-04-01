@@ -69,6 +69,8 @@ def _coerce_region_grouping(raw: list[Any]) -> list[list[str]]:
 # Global project settings
 PROJECT_KEY = config.project_key
 REGION_GROUPING = _coerce_region_grouping(config.region_grouping)
+FIRETOWER_BASE_URL = config.firetower_base_url
+PINNED_REGIONS = config.pinned_regions
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -246,6 +248,19 @@ PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_s
 
 FIRETOWER_BASE_URL = config.firetower_base_url
 HOOKS_ENABLED = config.hooks_enabled
+
+# Linear Integration Configuration
+LINEAR = (
+    {
+        "API_KEY": config.linear.api_key,
+    }
+    if config.linear
+    else {}
+)
+
+ACTION_ITEM_SYNC_THROTTLE_SECONDS = (
+    int(config.linear.action_item_sync_throttle_seconds) if config.linear else 300
+)
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {

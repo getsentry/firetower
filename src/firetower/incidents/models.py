@@ -184,6 +184,7 @@ class Incident(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     participants_last_synced_at = models.DateTimeField(null=True, blank=True)
+    action_items_last_synced_at = models.DateTimeField(null=True, blank=True)
 
     # Milestone timestamps (for postmortem)
     total_downtime = models.IntegerField(
@@ -324,6 +325,41 @@ class Incident(models.Model):
 
     def __str__(self) -> str:
         return f"{self.incident_number}: {self.title}"
+
+
+class ActionItemStatus(models.TextChoices):
+    TODO = "Todo", "Todo"
+    IN_PROGRESS = "In Progress", "In Progress"
+    DONE = "Done", "Done"
+    CANCELLED = "Cancelled", "Cancelled"
+
+
+class ActionItem(models.Model):
+    incident = models.ForeignKey(
+        "Incident", on_delete=models.CASCADE, related_name="action_items"
+    )
+    linear_issue_id = models.CharField(max_length=255, unique=True)
+    linear_identifier = models.CharField(max_length=25)
+    title = models.CharField(max_length=500)
+    status = models.CharField(
+        max_length=20, choices=ActionItemStatus.choices, default=ActionItemStatus.TODO
+    )
+    assignee = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="action_items",
+    )
+    url = models.URLField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.linear_identifier}: {self.title}"
 
 
 class ExternalLink(models.Model):
