@@ -41,6 +41,8 @@ class SlackConfig:
     participant_sync_throttle_seconds: int
     app_token: str
     incident_feed_channel_id: str
+    always_invited_ids: list[str] = field(default_factory=list)
+    incident_guide_message: str = ""
 
 
 @deserialize
@@ -120,6 +122,8 @@ class DummyConfigFile(ConfigFile):
             participant_sync_throttle_seconds=0,
             app_token="",
             incident_feed_channel_id="",
+            always_invited_ids=[],
+            incident_guide_message="",
         )
         self.auth = AuthConfig(
             iap_enabled=False,

@@ -104,16 +104,36 @@ def on_incident_created(incident: Incident) -> None:
         incident_url = _build_incident_url(incident)
         _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
 
+        guide_message = settings.SLACK.get("INCIDENT_GUIDE_MESSAGE", "")
+        if guide_message:
+            _slack_service.post_message(channel_id, guide_message)
+
+        ic_mention = ""
+        if incident.captain:
+            slack_id = _get_slack_user_id(incident.captain)
+            ic_mention = f"\nIncident Captain: <@{slack_id}>" if slack_id else ""
+
         _slack_service.post_message(
             channel_id,
             f"*{incident.incident_number}: {escape_slack_text(incident.title)}*\n"
-            f"Severity: {incident.severity} | Status: {incident.status}",
+            f"Severity: {incident.severity} | Status: {incident.status}"
+            f"{ic_mention}",
         )
+
+        if incident.description:
+            _slack_service.post_message(
+                channel_id,
+                f"*Incident Description:*\n{escape_slack_text(incident.description)}",
+            )
 
         if incident.captain:
             _invite_user_to_channel(channel_id, incident.captain)
 
-        feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID")
+        always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
+        if always_invited:
+            _slack_service.invite_to_channel(channel_id, always_invited)
+
+        feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
         if feed_channel_id and not incident.is_private:
             incident_url = _build_incident_url(incident)
             feed_message = (

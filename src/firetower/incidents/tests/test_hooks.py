@@ -130,7 +130,7 @@ class TestOnIncidentCreated:
         assert link.url == "https://slack.com/archives/C99999"
         mock_slack.set_channel_topic.assert_called_once()
         mock_slack.add_bookmark.assert_called_once()
-        mock_slack.post_message.assert_called_once()
+        mock_slack.post_message.assert_called()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_skips_if_slack_link_exists(self, mock_slack):
@@ -199,10 +199,11 @@ class TestOnIncidentCreated:
 
         on_incident_created(incident)
 
-        assert mock_slack.post_message.call_count == 2
-        feed_call = mock_slack.post_message.call_args_list[1]
-        assert feed_call[0][0] == "C_FEED"
-        assert "P1" in feed_call[0][1]
+        feed_calls = [
+            c for c in mock_slack.post_message.call_args_list if c[0][0] == "C_FEED"
+        ]
+        assert len(feed_calls) == 1
+        assert "P1" in feed_calls[0][0][1]
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_private_incident_skips_feed_channel(self, mock_slack, settings):
@@ -218,8 +219,92 @@ class TestOnIncidentCreated:
 
         on_incident_created(incident)
 
-        mock_slack.post_message.assert_called_once()
-        assert mock_slack.post_message.call_args[0][0] == "C99999"
+        feed_calls = [
+            c for c in mock_slack.post_message.call_args_list if c[0][0] == "C_FEED"
+        ]
+        assert len(feed_calls) == 0
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_invites_always_invited_ids(self, mock_slack, settings):
+        settings.SLACK["ALWAYS_INVITED_IDS"] = ["U_SRE1", "U_SRE2"]
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        mock_slack.invite_to_channel.assert_called_once_with(
+            "C99999", ["U_SRE1", "U_SRE2"]
+        )
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_guide_message(self, mock_slack, settings):
+        settings.SLACK["INCIDENT_GUIDE_MESSAGE"] = "Here is the guide."
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        first_message = mock_slack.post_message.call_args_list[0]
+        assert first_message[0][0] == "C99999"
+        assert first_message[0][1] == "Here is the guide."
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_description_when_present(self, mock_slack):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            description="Something is broken",
+        )
+
+        on_incident_created(incident)
+
+        desc_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "Incident Description" in c[0][1]
+        ]
+        assert len(desc_calls) == 1
+        assert "Something is broken" in desc_calls[0][0][1]
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_ic_in_channel_message(self, mock_slack):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        ExternalProfile.objects.create(
+            user=self.captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAPTAIN",
+        )
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+        )
+
+        on_incident_created(incident)
+
+        info_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if c[0][0] == "C99999" and "Severity:" in c[0][1]
+        ]
+        assert len(info_calls) == 1
+        assert "Incident Captain: <@U_CAPTAIN>" in info_calls[0][0][1]
 
 
 @pytest.mark.django_db

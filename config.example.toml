@@ -21,6 +21,8 @@ team_id = "<slack-team-id>"
 participant_sync_throttle_seconds = 300
 app_token = ""
 incident_feed_channel_id = ""
+always_invited_ids = []
+incident_guide_message = "This is the message posted whenever a new incident slack channel is created."
 
 [auth]
 iap_enabled = false
