@@ -113,6 +113,16 @@ def on_incident_created(incident: Incident) -> None:
         if incident.captain:
             _invite_user_to_channel(channel_id, incident.captain)
 
+        feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID")
+        if feed_channel_id and not incident.is_private:
+            incident_url = _build_incident_url(incident)
+            feed_message = (
+                f"A {incident.severity} incident has been created.\n"
+                f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
+                f"\n\nFor those involved, please join <#{channel_id}>"
+            )
+            _slack_service.post_message(feed_channel_id, feed_message)
+
         # TODO: Datadog notebook creation step will be added in RELENG-467
     except Exception:
         logger.exception(f"Error in on_incident_created for incident {incident.id}")

@@ -185,6 +185,42 @@ class TestOnIncidentCreated:
 
         mock_slack.invite_to_channel.assert_called_once_with("C99999", ["U_CAPTAIN"])
 
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_to_feed_channel(self, mock_slack, settings):
+        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+        )
+
+        on_incident_created(incident)
+
+        assert mock_slack.post_message.call_count == 2
+        feed_call = mock_slack.post_message.call_args_list[1]
+        assert feed_call[0][0] == "C_FEED"
+        assert "P1" in feed_call[0][1]
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_private_incident_skips_feed_channel(self, mock_slack, settings):
+        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Secret Incident",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        on_incident_created(incident)
+
+        mock_slack.post_message.assert_called_once()
+        assert mock_slack.post_message.call_args[0][0] == "C99999"
+
 
 @pytest.mark.django_db
 class TestOnStatusChanged:

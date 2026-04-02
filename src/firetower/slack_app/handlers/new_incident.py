@@ -315,18 +315,24 @@ def handle_new_incident_submission(
             slack_service.parse_channel_id_from_url(slack_link) if slack_link else None
         )
 
-        message = (
-            f"A {incident.severity} incident has been created.\n"
-            f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
-        )
+        dm_message = "The incident has been created, details below.\n\n"
+        dm_message += f"Incident: {incident_url}\n"
         if channel_id:
-            message += f"\n\nFor those involved, please join <#{channel_id}>"
+            dm_message += f"Slack channel: <#{channel_id}>"
 
-        client.chat_postMessage(channel=slack_user_id, text=message)
+        client.chat_postMessage(channel=slack_user_id, text=dm_message)
 
         invoking_channel = view.get("private_metadata", "")
         if invoking_channel and not is_private and invoking_channel != slack_user_id:
+            channel_message = (
+                f"A {incident.severity} incident has been created.\n"
+                f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
+            )
+            if channel_id:
+                channel_message += (
+                    f"\n\nFor those involved, please join <#{channel_id}>"
+                )
             slack_service.join_channel(invoking_channel)
-            client.chat_postMessage(channel=invoking_channel, text=message)
+            client.chat_postMessage(channel=invoking_channel, text=channel_message)
     except Exception:
         logger.exception("Failed to send incident creation notifications")

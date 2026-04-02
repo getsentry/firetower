@@ -211,6 +211,7 @@ SLACK = {
     "BOT_TOKEN": config.slack.bot_token,
     "TEAM_ID": config.slack.team_id,
     "APP_TOKEN": config.slack.app_token,
+    "INCIDENT_FEED_CHANNEL_ID": config.slack.incident_feed_channel_id,
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)

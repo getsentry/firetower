@@ -21,6 +21,7 @@ bot_token = "test-bot-token"
 team_id = "test-bot-id"
 participant_sync_throttle_seconds = 300
 app_token = "xapp-test-token"
+incident_feed_channel_id = ""
 
 [auth]
 iap_enabled = false

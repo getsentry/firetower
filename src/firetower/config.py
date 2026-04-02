@@ -40,6 +40,7 @@ class SlackConfig:
     team_id: str
     participant_sync_throttle_seconds: int
     app_token: str
+    incident_feed_channel_id: str
 
 
 @deserialize
@@ -118,6 +119,7 @@ class DummyConfigFile(ConfigFile):
             team_id="",
             participant_sync_throttle_seconds=0,
             app_token="",
+            incident_feed_channel_id="",
         )
         self.auth = AuthConfig(
             iap_enabled=False,
