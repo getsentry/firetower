@@ -111,7 +111,13 @@ def on_incident_created(incident: Incident) -> None:
         ic_mention = ""
         if incident.captain:
             slack_id = _get_slack_user_id(incident.captain)
-            ic_mention = f"\nIncident Captain: <@{slack_id}>" if slack_id else ""
+            if slack_id:
+                ic_mention = f"\nIncident Captain: <@{slack_id}>"
+            else:
+                captain_name = escape_slack_text(
+                    incident.captain.get_full_name() or incident.captain.username
+                )
+                ic_mention = f"\nIncident Captain: {captain_name}"
 
         _slack_service.post_message(
             channel_id,

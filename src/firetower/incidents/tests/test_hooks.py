@@ -503,6 +503,54 @@ class TestOnCaptainChanged:
         mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_NEW"])
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_updates_topic_and_posts_name_when_no_slack_profile(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="newcaptain@example.com",
+            email="newcaptain@example.com",
+            first_name="New",
+            last_name="Captain",
+        )
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=captain,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_captain_changed(incident)
+
+        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.post_message.assert_called_once()
+        assert "New Captain" in mock_slack.post_message.call_args[0][1]
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_updates_topic_only_when_captain_cleared(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=None,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_captain_changed(incident)
+
+        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
         incident = Incident.objects.create(
             title="Test",
