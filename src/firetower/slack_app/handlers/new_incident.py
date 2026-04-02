@@ -208,7 +208,7 @@ def handle_new_incident_submission(
 ) -> None:
     values = view.get("state", {}).get("values", {})
 
-    title = values.get("title_block", {}).get("title", {}).get("value", "")
+    title = values.get("title_block", {}).get("title", {}).get("value", "").strip()
     severity = (
         values.get("severity_block", {})
         .get("severity", {})
