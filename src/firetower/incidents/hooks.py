@@ -137,7 +137,6 @@ def on_incident_created(incident: Incident) -> None:
 
         feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
         if feed_channel_id and not incident.is_private:
-            incident_url = _build_incident_url(incident)
             feed_message = (
                 f"A {incident.severity} incident has been created.\n"
                 f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
