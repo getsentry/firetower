@@ -10,6 +10,9 @@ from firetower.integrations.services import SlackService
 from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
+_slack_service = SlackService()
+
+_DEFAULT_SEVERITY = IncidentSeverity.P3
 
 
 def _build_new_incident_modal(channel_id: str = "") -> dict:
@@ -20,6 +23,10 @@ def _build_new_incident_modal(channel_id: str = "") -> dict:
         }
         for sev in IncidentSeverity
     ]
+    default_option = {
+        "text": {"type": "plain_text", "text": _DEFAULT_SEVERITY.label},
+        "value": _DEFAULT_SEVERITY.value,
+    }
 
     blocks = [
         {
@@ -30,9 +37,7 @@ def _build_new_incident_modal(channel_id: str = "") -> dict:
                 "action_id": "severity",
                 "placeholder": {"type": "plain_text", "text": "Select severity"},
                 "options": severity_options,
-                "initial_option": {sev["value"]: sev for sev in severity_options}.get(
-                    "P3", severity_options[0]
-                ),
+                "initial_option": default_option,
             },
             "label": {"type": "plain_text", "text": "Severity"},
         },
@@ -310,9 +315,8 @@ def handle_new_incident_submission(
         incident_url = f"{base_url}/{incident.incident_number}"
         slack_link = incident.external_links_dict.get("slack", "")
 
-        slack_service = SlackService()
         channel_id = (
-            slack_service.parse_channel_id_from_url(slack_link) if slack_link else None
+            _slack_service.parse_channel_id_from_url(slack_link) if slack_link else None
         )
 
         dm_message = "The incident has been created, details below.\n\n"
@@ -332,7 +336,7 @@ def handle_new_incident_submission(
                 channel_message += (
                     f"\n\nFor those involved, please join <#{channel_id}>"
                 )
-            slack_service.join_channel(invoking_channel)
+            _slack_service.join_channel(invoking_channel)
             client.chat_postMessage(channel=invoking_channel, text=channel_message)
     except Exception:
         logger.exception("Failed to send incident creation notifications")

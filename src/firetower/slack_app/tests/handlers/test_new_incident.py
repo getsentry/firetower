@@ -101,7 +101,7 @@ class TestNewIncidentSubmission:
         assert incident.reporter == self.user
         client.chat_postMessage.assert_called_once()
 
-    @patch("firetower.slack_app.handlers.new_incident.SlackService")
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
     @patch("firetower.incidents.serializers.on_incident_created")
     @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
     def test_posts_to_invoking_channel(self, mock_get_user, mock_hook, mock_slack_svc):
@@ -131,9 +131,9 @@ class TestNewIncidentSubmission:
         assert client.chat_postMessage.call_count == 2
         channels = [c[1]["channel"] for c in client.chat_postMessage.call_args_list]
         assert "C_INVOKE" in channels
-        mock_slack_svc.return_value.join_channel.assert_called_once_with("C_INVOKE")
+        mock_slack_svc.join_channel.assert_called_once_with("C_INVOKE")
 
-    @patch("firetower.slack_app.handlers.new_incident.SlackService")
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
     @patch("firetower.incidents.serializers.on_incident_created")
     @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
     def test_private_incident_skips_invoking_channel(
