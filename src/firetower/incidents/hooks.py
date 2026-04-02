@@ -45,12 +45,9 @@ def _build_channel_topic(incident: Incident) -> str:
     max_title_len = max(
         SLACK_TOPIC_MAX_LENGTH - len(prefix) - len(suffix) - link_overhead, 0
     )
-    raw_title = incident.title
-    if len(raw_title) > max_title_len:
-        raw_title = (
-            (raw_title[: max_title_len - 1] + "\u2026") if max_title_len > 0 else ""
-        )
-    title = escape_slack_text(raw_title)
+    title = escape_slack_text(incident.title)
+    if len(title) > max_title_len:
+        title = (title[: max_title_len - 1] + "\u2026") if max_title_len > 0 else ""
     topic = f"{prefix}<{incident_url}|{link_label_prefix}{title}>{suffix}"
     return topic[:SLACK_TOPIC_MAX_LENGTH]
 

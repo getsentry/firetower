@@ -94,6 +94,19 @@ class TestBuildChannelTopic:
         assert len(topic) <= 250
         assert "\u2026" in topic
 
+    def test_special_chars_in_title_do_not_exceed_max_length(self):
+        # A title full of '&' chars: each expands to '&amp;' (5 chars).
+        # Escaping must happen before truncation so the result stays within budget.
+        long_title = "&" * 300
+        incident = Incident.objects.create(
+            title=long_title,
+            severity=IncidentSeverity.P1,
+        )
+        topic = _build_channel_topic(incident)
+        assert len(topic) <= 250
+        # The topic must be a well-formed Slack link — closing '>' must be present.
+        assert ">" in topic
+
 
 @pytest.mark.django_db
 class TestOnIncidentCreated:
