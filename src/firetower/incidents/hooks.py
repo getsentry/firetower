@@ -131,12 +131,23 @@ def on_incident_created(incident: Incident) -> None:
                 f"*Incident Description:*\n{escape_slack_text(incident.description)}",
             )
 
+        captain_slack_id = None
         if incident.captain:
             _invite_user_to_channel(channel_id, incident.captain)
+            captain_slack_id = _get_slack_user_id(incident.captain)
 
         always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
         if always_invited:
-            _slack_service.invite_to_channel(channel_id, always_invited)
+            ids_to_invite = [uid for uid in always_invited if uid != captain_slack_id]
+            if ids_to_invite:
+                try:
+                    _slack_service.invite_to_channel(channel_id, ids_to_invite)
+                except Exception:
+                    logger.warning(
+                        "Failed to invite always_invited users to channel %s for incident %s",
+                        channel_id,
+                        incident.id,
+                    )
 
         feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
         if feed_channel_id and not incident.is_private:
