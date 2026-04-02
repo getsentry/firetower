@@ -35,7 +35,7 @@ def _build_channel_topic(incident: Incident) -> str:
             ic_part = f" | IC: <@{slack_id}>"
         else:
             captain_name = incident.captain.get_full_name() or incident.captain.username
-            ic_part = f" | IC: {captain_name}"
+            ic_part = f" | IC: {escape_slack_text(captain_name)}"
 
     prefix = f"[{incident.severity}] "
     suffix = ic_part
@@ -192,7 +192,7 @@ def on_captain_changed(incident: Incident) -> None:
             if slack_id:
                 captain_ref = f"<@{slack_id}>"
             else:
-                captain_ref = (
+                captain_ref = escape_slack_text(
                     incident.captain.get_full_name() or incident.captain.username
                 )
             _slack_service.post_message(
