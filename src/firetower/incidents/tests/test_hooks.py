@@ -310,7 +310,7 @@ class TestOnIncidentCreated:
 @pytest.mark.django_db
 class TestOnStatusChanged:
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_and_updates_topic(self, mock_slack):
+    def test_posts_status_update_message(self, mock_slack):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = Incident.objects.create(
@@ -346,7 +346,7 @@ class TestOnStatusChanged:
 @pytest.mark.django_db
 class TestOnSeverityChanged:
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_and_updates_topic(self, mock_slack):
+    def test_posts_severity_update_message(self, mock_slack):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = Incident.objects.create(
