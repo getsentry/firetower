@@ -301,7 +301,7 @@ class TestOnIncidentCreated:
         info_calls = [
             c
             for c in mock_slack.post_message.call_args_list
-            if c[0][0] == "C99999" and "Severity:" in c[0][1]
+            if c[0][0] == "C99999" and "Test Incident" in c[0][1]
         ]
         assert len(info_calls) == 1
         assert "Incident Captain: <@U_CAPTAIN>" in info_calls[0][0][1]
