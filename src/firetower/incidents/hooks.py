@@ -143,10 +143,8 @@ def on_incident_created(incident: Incident) -> None:
                 try:
                     _slack_service.invite_to_channel(channel_id, ids_to_invite)
                 except Exception:
-                    logger.warning(
-                        "Failed to invite always_invited users to channel %s for incident %s",
-                        channel_id,
-                        incident.id,
+                    logger.exception(
+                        f"Failed to invite always_invited users to channel {channel_id} for incident {incident.id}"
                     )
 
         feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
