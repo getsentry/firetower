@@ -213,7 +213,7 @@ def handle_new_incident_submission(
         values.get("severity_block", {})
         .get("severity", {})
         .get("selected_option", {})
-        .get("value", "P2")
+        .get("value", _DEFAULT_SEVERITY.value)
     )
     description = (
         values.get("description_block", {}).get("description", {}).get("value") or ""
