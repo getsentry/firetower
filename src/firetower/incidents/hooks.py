@@ -86,10 +86,15 @@ def _invite_user_to_channel(
 
 def on_incident_created(incident: Incident) -> None:
     try:
-        existing_slack_link = incident.external_links.filter(
-            type=ExternalLinkType.SLACK
-        ).exists()
-        if existing_slack_link:
+        # Use get_or_create to atomically claim the ExternalLink row before calling
+        # the Slack API.  If two concurrent requests both reach this point, only one
+        # will get created=True; the other bails out without creating a second channel.
+        slack_link, created = ExternalLink.objects.get_or_create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            defaults={"url": ""},
+        )
+        if not created:
             logger.info(
                 f"Incident {incident.id} already has a Slack link, skipping channel creation"
             )
@@ -99,15 +104,13 @@ def on_incident_created(incident: Incident) -> None:
             _build_channel_name(incident), is_private=incident.is_private
         )
         if not channel_id:
+            slack_link.delete()
             logger.warning(f"Failed to create Slack channel for incident {incident.id}")
             return
 
         channel_url = _slack_service.build_channel_url(channel_id)
-        ExternalLink.objects.create(
-            incident=incident,
-            type=ExternalLinkType.SLACK,
-            url=channel_url,
-        )
+        slack_link.url = channel_url
+        slack_link.save(update_fields=["url"])
 
         captain_slack_id = (
             _get_slack_user_id(incident.captain) if incident.captain else None
