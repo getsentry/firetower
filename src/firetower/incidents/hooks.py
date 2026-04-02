@@ -24,13 +24,19 @@ def _get_slack_user_id(user: User) -> str | None:
     return profile.external_id if profile else None
 
 
-def _build_channel_topic(incident: Incident) -> str:
+def _build_channel_topic(
+    incident: Incident, captain_slack_id: str | None = None
+) -> str:
     base_url = settings.FIRETOWER_BASE_URL
     incident_url = f"{base_url}/{incident.incident_number}"
 
     ic_part = ""
     if incident.captain:
-        slack_id = _get_slack_user_id(incident.captain)
+        slack_id = (
+            captain_slack_id
+            if captain_slack_id is not None
+            else _get_slack_user_id(incident.captain)
+        )
         if slack_id:
             ic_part = f" | IC: <@{slack_id}>"
         else:
@@ -63,13 +69,17 @@ def _get_channel_id(incident: Incident) -> str | None:
     return _slack_service.parse_channel_id_from_url(slack_link.url)
 
 
-def _invite_user_to_channel(channel_id: str, user: User) -> None:
+def _invite_user_to_channel(
+    channel_id: str, user: User, slack_user_id: str | None = None
+) -> None:
     try:
-        slack_profile = user.external_profiles.filter(
-            type=ExternalProfileType.SLACK
-        ).first()
-        if slack_profile:
-            _slack_service.invite_to_channel(channel_id, [slack_profile.external_id])
+        if slack_user_id is None:
+            profile = user.external_profiles.filter(
+                type=ExternalProfileType.SLACK
+            ).first()
+            slack_user_id = profile.external_id if profile else None
+        if slack_user_id:
+            _slack_service.invite_to_channel(channel_id, [slack_user_id])
     except Exception:
         logger.exception(f"Failed to invite user {user.id} to channel {channel_id}")
 
@@ -99,7 +109,13 @@ def on_incident_created(incident: Incident) -> None:
             url=channel_url,
         )
 
-        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+        captain_slack_id = (
+            _get_slack_user_id(incident.captain) if incident.captain else None
+        )
+
+        _slack_service.set_channel_topic(
+            channel_id, _build_channel_topic(incident, captain_slack_id)
+        )
 
         incident_url = _build_incident_url(incident)
         _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
@@ -110,9 +126,8 @@ def on_incident_created(incident: Incident) -> None:
 
         ic_mention = ""
         if incident.captain:
-            slack_id = _get_slack_user_id(incident.captain)
-            if slack_id:
-                ic_mention = f"Incident Captain: <@{slack_id}>"
+            if captain_slack_id:
+                ic_mention = f"Incident Captain: <@{captain_slack_id}>"
             else:
                 captain_name = escape_slack_text(
                     incident.captain.get_full_name() or incident.captain.username
@@ -128,10 +143,8 @@ def on_incident_created(incident: Incident) -> None:
                 f"*Incident Description:*\n{escape_slack_text(incident.description)}",
             )
 
-        captain_slack_id = None
         if incident.captain:
-            _invite_user_to_channel(channel_id, incident.captain)
-            captain_slack_id = _get_slack_user_id(incident.captain)
+            _invite_user_to_channel(channel_id, incident.captain, captain_slack_id)
 
         always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
         if always_invited:
