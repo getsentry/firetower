@@ -609,6 +609,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
 
 class IncidentImportSerializer(IncidentWriteSerializer):
+    """Temporary: used for one-time Jira incident migration."""
+
     id = serializers.IntegerField(required=True)
     created_at = serializers.DateTimeField(required=False)
     updated_at = serializers.DateTimeField(required=False)
