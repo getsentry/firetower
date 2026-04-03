@@ -268,6 +268,8 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
 
 
 class IncidentImportAPIView(generics.CreateAPIView):
+    """Temporary: admin-only endpoint for one-time Jira incident migration."""
+
     serializer_class = IncidentImportSerializer
     permission_classes = [permissions.IsAdminUser]
 
