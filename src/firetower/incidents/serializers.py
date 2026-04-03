@@ -504,7 +504,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             )
             incident.impact_type_tags.set(tags)
 
-    def create(self, validated_data: dict) -> Incident:
+    def create(self, validated_data: dict, skip_hooks: bool = False) -> Incident:
         """Create incident with external links and tags"""
         external_links_data = validated_data.pop("external_links", None)
         affected_service_tag_names = validated_data.pop(
@@ -527,9 +527,10 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             impact_type_tag_names,
         )
 
-        # Runs synchronously — Slack API calls may add latency to the response.
-        # Consider deferring to a background task if this becomes a problem.
-        on_incident_created(incident)
+        if not skip_hooks:
+            # Runs synchronously — Slack API calls may add latency to the response.
+            # Consider deferring to a background task if this becomes a problem.
+            on_incident_created(incident)
 
         return incident
 
@@ -648,31 +649,13 @@ class IncidentImportSerializer(IncidentWriteSerializer):
         return value
 
     @transaction.atomic
-    def create(self, validated_data: dict) -> Incident:
+    def create(self, validated_data: dict, skip_hooks: bool = False) -> Incident:
         created_at = validated_data.pop("created_at", None)
         updated_at = validated_data.pop("updated_at", None)
-        external_links_data = validated_data.pop("external_links", None)
-        affected_service_tag_names = validated_data.pop(
-            "affected_service_tag_names", None
-        )
-        affected_region_tag_names = validated_data.pop(
-            "affected_region_tag_names", None
-        )
-        root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
-        impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
 
-        # Skip on_incident_created — we don't want Slack channel creation or
-        # notifications for historical incidents being imported from Jira.
-        incident = serializers.ModelSerializer.create(self, validated_data)
-
-        self._set_tags_and_links(
-            incident,
-            external_links_data,
-            affected_service_tag_names,
-            affected_region_tag_names,
-            root_cause_tag_names,
-            impact_type_tag_names,
-        )
+        # Always skip hooks — no Slack channel creation or notifications for
+        # historical incidents being imported from Jira.
+        incident = super().create(validated_data, skip_hooks=True)
 
         timestamp_updates = {}
         if created_at is not None:
