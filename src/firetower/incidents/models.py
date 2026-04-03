@@ -81,7 +81,7 @@ USER_ADDABLE_TAG_TYPES = [
 
 class ExternalLinkType(models.TextChoices):
     SLACK = "SLACK", "Slack"
-    JIRA = "JIRA", "Jira"
+    JIRA = "JIRA", "Jira"  # used for incidents imported from Jira
     DATADOG = "DATADOG", "Datadog"
     PAGERDUTY = "PAGERDUTY", "PagerDuty"
     STATUSPAGE = "STATUSPAGE", "Statuspage"
