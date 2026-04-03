@@ -3,6 +3,7 @@ from typing import Any
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models.functions import Lower
 from rest_framework import serializers
 
@@ -17,6 +18,7 @@ from .hooks import (
     on_visibility_changed,
 )
 from .models import (
+    INCIDENT_ID_START,
     USER_ADDABLE_TAG_TYPES,
     ExternalLink,
     ExternalLinkType,
@@ -604,6 +606,46 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             on_visibility_changed(instance)
 
         return instance
+
+
+class IncidentImportSerializer(IncidentWriteSerializer):
+    id = serializers.IntegerField(required=True)
+    created_at = serializers.DateTimeField(required=False)
+    updated_at = serializers.DateTimeField(required=False)
+
+    class Meta(IncidentWriteSerializer.Meta):
+        fields = [*IncidentWriteSerializer.Meta.fields, "created_at", "updated_at"]
+
+    def validate_id(self, value: int) -> int:
+        if value < 1:
+            raise serializers.ValidationError("ID must be >= 1.")
+        if value >= INCIDENT_ID_START:
+            raise serializers.ValidationError(
+                f"ID must be less than {INCIDENT_ID_START}."
+            )
+        if Incident.objects.filter(pk=value).exists():
+            raise serializers.ValidationError(
+                f"Incident with ID {value} already exists."
+            )
+        return value
+
+    @transaction.atomic
+    def create(self, validated_data: dict) -> Incident:
+        created_at = validated_data.pop("created_at", None)
+        updated_at = validated_data.pop("updated_at", None)
+
+        incident = super().create(validated_data)
+
+        timestamp_updates = {}
+        if created_at is not None:
+            timestamp_updates["created_at"] = created_at
+        if updated_at is not None:
+            timestamp_updates["updated_at"] = updated_at
+        if timestamp_updates:
+            Incident.objects.filter(pk=incident.pk).update(**timestamp_updates)
+            incident.refresh_from_db()
+
+        return incident
 
 
 class TagSerializer(serializers.ModelSerializer):
