@@ -458,22 +458,16 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
         return value
 
-    def create(self, validated_data: dict) -> Incident:
-        """Create incident with external links and tags"""
-        external_links_data = validated_data.pop("external_links", None)
-        affected_service_tag_names = validated_data.pop(
-            "affected_service_tag_names", None
-        )
-        affected_region_tag_names = validated_data.pop(
-            "affected_region_tag_names", None
-        )
-        root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
-        impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
-
-        # Create the incident
-        incident = super().create(validated_data)
-
-        # Create external links if provided
+    def _set_tags_and_links(
+        self,
+        incident: Incident,
+        external_links_data: dict[str, str | None] | None,
+        affected_service_tag_names: list[str] | None,
+        affected_region_tag_names: list[str] | None,
+        root_cause_tag_names: list[str] | None,
+        impact_type_tag_names: list[str] | None,
+    ) -> None:
+        """Set external links and tags on a newly created incident."""
         if external_links_data:
             for link_type, url in external_links_data.items():
                 if url is not None:  # Skip null values on create
@@ -483,7 +477,6 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                         url=url,
                     )
 
-        # Set tags if provided
         if affected_service_tag_names:
             tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
                 name_lower__in=[n.lower() for n in affected_service_tag_names],
@@ -511,6 +504,29 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                 type=TagType.IMPACT_TYPE,
             )
             incident.impact_type_tags.set(tags)
+
+    def create(self, validated_data: dict) -> Incident:
+        """Create incident with external links and tags"""
+        external_links_data = validated_data.pop("external_links", None)
+        affected_service_tag_names = validated_data.pop(
+            "affected_service_tag_names", None
+        )
+        affected_region_tag_names = validated_data.pop(
+            "affected_region_tag_names", None
+        )
+        root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
+        impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
+
+        incident = super().create(validated_data)
+
+        self._set_tags_and_links(
+            incident,
+            external_links_data,
+            affected_service_tag_names,
+            affected_region_tag_names,
+            root_cause_tag_names,
+            impact_type_tag_names,
+        )
 
         # Runs synchronously — Slack API calls may add latency to the response.
         # Consider deferring to a background task if this becomes a problem.
@@ -638,8 +654,28 @@ class IncidentImportSerializer(IncidentWriteSerializer):
     def create(self, validated_data: dict) -> Incident:
         created_at = validated_data.pop("created_at", None)
         updated_at = validated_data.pop("updated_at", None)
+        external_links_data = validated_data.pop("external_links", None)
+        affected_service_tag_names = validated_data.pop(
+            "affected_service_tag_names", None
+        )
+        affected_region_tag_names = validated_data.pop(
+            "affected_region_tag_names", None
+        )
+        root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
+        impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
 
-        incident = super().create(validated_data)
+        # Skip on_incident_created — we don't want Slack channel creation or
+        # notifications for historical incidents being imported from Jira.
+        incident = serializers.ModelSerializer.create(self, validated_data)
+
+        self._set_tags_and_links(
+            incident,
+            external_links_data,
+            affected_service_tag_names,
+            affected_region_tag_names,
+            root_cause_tag_names,
+            impact_type_tag_names,
+        )
 
         timestamp_updates = {}
         if created_at is not None:
