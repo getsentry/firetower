@@ -40,6 +40,9 @@ class SlackConfig:
     team_id: str
     participant_sync_throttle_seconds: int
     app_token: str
+    incident_feed_channel_id: str = ""
+    always_invited_ids: list[str] = field(default_factory=list)
+    incident_guide_message: str = ""
 
 
 @deserialize
@@ -63,6 +66,7 @@ class ConfigFile:
     project_key: str
     django_secret_key: str
     sentry_dsn: str
+    firetower_base_url: str
     pinned_regions: list[str] = field(default_factory=list)
 
     @classmethod
@@ -117,6 +121,9 @@ class DummyConfigFile(ConfigFile):
             team_id="",
             participant_sync_throttle_seconds=0,
             app_token="",
+            incident_feed_channel_id="",
+            always_invited_ids=[],
+            incident_guide_message="",
         )
         self.auth = AuthConfig(
             iap_enabled=False,
@@ -127,3 +134,4 @@ class DummyConfigFile(ConfigFile):
         self.django_secret_key = ""
         self.sentry_dsn = ""
         self.pinned_regions: list[str] = []
+        self.firetower_base_url = ""

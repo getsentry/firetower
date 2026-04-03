@@ -16,6 +16,7 @@ oauth_config:
     bot:
       - bookmarks:write
       - channels:history
+      - channels:join
       - channels:manage
       - channels:read
       - chat:write

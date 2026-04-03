@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 from datadog import initialize
 from datadog.dogstatsd.base import statsd
@@ -206,14 +207,28 @@ JIRA = {
     "SEVERITY_FIELD": config.jira.severity_field,
 }
 
-# Slack Integration Configuration
-SLACK = {
+
+class SlackSettings(TypedDict):
+    BOT_TOKEN: str
+    TEAM_ID: str
+    APP_TOKEN: str
+    INCIDENT_FEED_CHANNEL_ID: str
+    ALWAYS_INVITED_IDS: list[str]
+    INCIDENT_GUIDE_MESSAGE: str
+
+
+SLACK: SlackSettings = {
     "BOT_TOKEN": config.slack.bot_token,
     "TEAM_ID": config.slack.team_id,
     "APP_TOKEN": config.slack.app_token,
+    "INCIDENT_FEED_CHANNEL_ID": config.slack.incident_feed_channel_id,
+    "ALWAYS_INVITED_IDS": config.slack.always_invited_ids,
+    "INCIDENT_GUIDE_MESSAGE": config.slack.incident_guide_message,
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
+
+FIRETOWER_BASE_URL = config.firetower_base_url
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {

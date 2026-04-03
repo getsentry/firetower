@@ -6,6 +6,11 @@ from django.conf import settings
 from slack_bolt import App
 
 from firetower.slack_app.handlers.help import handle_help_command
+from firetower.slack_app.handlers.new_incident import (
+    handle_new_command,
+    handle_new_incident_submission,
+    handle_tag_options,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +26,22 @@ def get_bolt_app() -> App:
         _bolt_app = App(token=settings.SLACK["BOT_TOKEN"])
         _bolt_app.command("/ft")(handle_command)
         _bolt_app.command("/ft-test")(handle_command)
+        _register_views(_bolt_app)
     return _bolt_app
 
 
 def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
     subcommand = (body.get("text") or "").strip().lower()
-    metric_subcommand = "help" if subcommand in ("", "help") else "unknown"
+    metric_subcommand = (
+        (subcommand or "help") if subcommand in ("", "help", "new") else "unknown"
+    )
     tags = [f"subcommand:{metric_subcommand}"]
     statsd.increment(f"{METRICS_PREFIX}.submitted", tags=tags)
 
     try:
-        if subcommand in ("help", ""):
+        if subcommand == "new":
+            handle_new_command(ack, body, command, respond)
+        elif subcommand in ("help", ""):
             handle_help_command(ack, command, respond)
         else:
             ack()
@@ -44,3 +54,14 @@ def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
         )
         statsd.increment(f"{METRICS_PREFIX}.failed", tags=tags)
         raise
+
+
+def _register_views(app: App) -> None:
+    """Register view handlers (modals, etc.) on the Bolt app."""
+    app.view("new_incident_modal")(handle_new_incident_submission)
+    for action_id in (
+        "impact_type_tags",
+        "affected_service_tags",
+        "affected_region_tags",
+    ):
+        app.options(action_id)(handle_tag_options)
