@@ -7,7 +7,7 @@ from django.conf import settings
 from django.db.models import Count, QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import generics, serializers
+from rest_framework import generics, permissions, serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -40,6 +40,7 @@ from .reporting_utils import (
     get_year_periods,
 )
 from .serializers import (
+    IncidentImportSerializer,
     IncidentListUISerializer,
     IncidentOrRedirectReadSerializer,
     IncidentReadSerializer,
@@ -264,6 +265,11 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
             )
 
         return obj
+
+
+class IncidentImportAPIView(generics.CreateAPIView):
+    serializer_class = IncidentImportSerializer
+    permission_classes = [permissions.IsAdminUser]
 
 
 class SyncIncidentParticipantsView(generics.GenericAPIView):
