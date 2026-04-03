@@ -1596,3 +1596,12 @@ class TestIncidentImportAPIView:
         response = self.client.post("/api/incidents/import/", data, format="json")
 
         assert response.status_code == 403
+
+    @patch("firetower.incidents.serializers.on_incident_created")
+    def test_does_not_trigger_on_incident_created(self, mock_hook):
+        self.client.force_authenticate(user=self.staff_user)
+        data = self._import_data()
+        response = self.client.post("/api/incidents/import/", data, format="json")
+
+        assert response.status_code == 201
+        mock_hook.assert_not_called()
