@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from firetower.incidents.models import IncidentStatus
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
@@ -15,12 +16,12 @@ def handle_reopen_command(ack: Any, body: dict, command: dict, respond: Any) -> 
         respond("Could not find an incident associated with this channel.")
         return
 
-    if incident.status == "Active":
+    if incident.status == IncidentStatus.ACTIVE:
         respond(f"{incident.incident_number} is already Active.")
         return
 
     serializer = IncidentWriteSerializer(
-        instance=incident, data={"status": "Active"}, partial=True
+        instance=incident, data={"status": IncidentStatus.ACTIVE}, partial=True
     )
     if serializer.is_valid():
         serializer.save()

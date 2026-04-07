@@ -3,7 +3,7 @@ from typing import Any
 
 from firetower.auth.models import ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
-from firetower.incidents.models import IncidentSeverity
+from firetower.incidents.models import IncidentSeverity, IncidentStatus
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
@@ -155,9 +155,9 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
         return
 
     if severity in ("P0", "P1", "P2"):
-        target_status = "Postmortem"
+        target_status = IncidentStatus.POSTMORTEM
     else:
-        target_status = "Done"
+        target_status = IncidentStatus.DONE
 
     data: dict[str, Any] = {
         "status": target_status,
