@@ -18,9 +18,13 @@ class PagerDutyService:
         self.api_token = pd_config["API_TOKEN"]
 
     def trigger_incident(
-        self, summary: str, dedup_key: str, integration_key: str
+        self,
+        summary: str,
+        dedup_key: str,
+        integration_key: str,
+        links: list[dict] | None = None,
     ) -> bool:
-        payload = {
+        payload: dict = {
             "routing_key": integration_key,
             "event_action": "trigger",
             "dedup_key": dedup_key,
@@ -30,6 +34,8 @@ class PagerDutyService:
                 "source": "firetower",
             },
         }
+        if links:
+            payload["links"] = links
 
         try:
             resp = requests.post(EVENTS_API_URL, json=payload, timeout=10)

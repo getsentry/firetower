@@ -55,8 +55,13 @@ def _page_high_sev_if_needed(incident: Incident) -> None:
     dedup_key = f"firetower-{incident.incident_number}"
     summary = f"[{incident.severity}] {incident.incident_number}: {incident.title}"
 
+    links = [{"href": _build_incident_url(incident), "text": "View in Firetower"}]
+    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    if slack_link and slack_link.url:
+        links.append({"href": slack_link.url, "text": "Slack Channel"})
+
     try:
-        pd_service.trigger_incident(summary, dedup_key, integration_key)
+        pd_service.trigger_incident(summary, dedup_key, integration_key, links=links)
     except Exception:
         logger.exception(f"Failed to page HIGH_SEV for incident {incident.id}")
 
