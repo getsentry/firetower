@@ -36,7 +36,7 @@ class LinearService:
                 LINEAR_API_URL,
                 json={"query": query, "variables": variables or {}},
                 headers={
-                    "Authorization": self.api_key,
+                    "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
                 },
                 timeout=30,
