@@ -1,11 +1,11 @@
-import {useQuery} from '@tanstack/react-query';
 import {Avatar} from 'components/Avatar';
+import {buttonVariants} from 'components/Button';
 import {Card} from 'components/Card';
 import {Pill} from 'components/Pill';
+import {Plus} from 'lucide-react';
 import {cn} from 'utils/cn';
 
-import type {ActionItem, ActionItemStatus} from '../queries/actionItemsQueryOptions';
-import {actionItemsQueryOptions} from '../queries/actionItemsQueryOptions';
+import type {ActionItem, ActionItemStatus} from '../queries/incidentDetailQueryOptions';
 
 const STATUS_CONFIG: Record<
   ActionItemStatus,
@@ -56,20 +56,44 @@ function ActionItemCard({item}: {item: ActionItem}) {
   );
 }
 
-interface ActionItemsListProps {
-  incidentId: string;
+function buildLinearNewUrl(incidentId: string, incidentTitle: string): string {
+  const firetowerUrl = `${window.location.origin}/${incidentId}/`;
+  const params = new URLSearchParams({
+    'attachment[url]': firetowerUrl,
+    'attachment[title]': incidentTitle,
+  });
+  return `https://linear.app/new?${params.toString()}`;
 }
 
-export function ActionItemsList({incidentId}: ActionItemsListProps) {
-  const {data: actionItems} = useQuery(actionItemsQueryOptions({incidentId}));
+interface ActionItemsListProps {
+  incidentId: string;
+  incidentTitle: string;
+  actionItems: ActionItem[];
+}
 
-  if (!actionItems || actionItems.length === 0) {
+export function ActionItemsList({
+  incidentId,
+  incidentTitle,
+  actionItems,
+}: ActionItemsListProps) {
+  if (actionItems.length === 0) {
     return null;
   }
 
   return (
     <Card>
-      <Card.Title>Action Items</Card.Title>
+      <div className="mb-space-lg flex items-center justify-between">
+        <h2 className="text-content-headings text-lg font-semibold">Action Items</h2>
+        <a
+          href={buildLinearNewUrl(incidentId, incidentTitle)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(buttonVariants({variant: 'icon'}))}
+          aria-label="Create Linear issue"
+        >
+          <Plus className="h-4 w-4" />
+        </a>
+      </div>
       <div className="gap-space-md flex flex-col">
         {actionItems.map(item => (
           <ActionItemCard key={item.linear_identifier} item={item} />

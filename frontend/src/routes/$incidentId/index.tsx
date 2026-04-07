@@ -64,7 +64,11 @@ function Incident() {
 
       <div className="flex flex-col gap-4 md:flex-row">
         <section className="flex flex-col gap-4 md:flex-[2]">
-          <ActionItemsList incidentId={params.incidentId} />
+          <ActionItemsList
+            incidentId={params.incidentId}
+            incidentTitle={incident.title}
+            actionItems={incident.action_items}
+          />
           <Card>
             <div className="text-content-muted p-12 text-center">
               <p className="mb-2 text-lg">
