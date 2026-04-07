@@ -11,7 +11,7 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
 )
-from firetower.slack_app.bolt import handle_inc
+from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.mitigated import (
     handle_mitigated_command,
     handle_mitigated_submission,
@@ -416,7 +416,7 @@ class TestRouting:
         command = {"command": "/ft"}
 
         with patch("firetower.slack_app.bolt.handle_mitigated_command") as mock_handler:
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
             mock_handler.assert_called_once()
 
     @patch("firetower.slack_app.bolt.statsd")
@@ -427,7 +427,7 @@ class TestRouting:
         command = {"command": "/ft"}
 
         with patch("firetower.slack_app.bolt.handle_mitigated_command") as mock_handler:
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
             mock_handler.assert_called_once()
 
     @patch("firetower.slack_app.bolt.statsd")
@@ -438,7 +438,7 @@ class TestRouting:
         command = {"command": "/ft"}
 
         with patch("firetower.slack_app.bolt.handle_resolved_command") as mock_handler:
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
             mock_handler.assert_called_once()
 
     @patch("firetower.slack_app.bolt.statsd")
@@ -449,7 +449,7 @@ class TestRouting:
         command = {"command": "/ft"}
 
         with patch("firetower.slack_app.bolt.handle_resolved_command") as mock_handler:
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
             mock_handler.assert_called_once()
 
     @patch("firetower.slack_app.bolt.statsd")
@@ -460,7 +460,7 @@ class TestRouting:
         command = {"command": "/ft"}
 
         with patch("firetower.slack_app.bolt.handle_reopen_command") as mock_handler:
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
             mock_handler.assert_called_once()
 
     @patch("firetower.slack_app.bolt.statsd")
@@ -471,7 +471,7 @@ class TestRouting:
         command = {"command": "/ft"}
 
         with patch("firetower.slack_app.bolt.handle_severity_command") as mock_handler:
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
             mock_handler.assert_called_once()
             assert mock_handler.call_args[1]["new_severity"] == "P0"
 
@@ -482,7 +482,7 @@ class TestRouting:
         body = {"text": "severity", "channel_id": CHANNEL_ID}
         command = {"command": "/ft"}
 
-        handle_inc(ack=ack, body=body, command=command, respond=respond)
+        handle_command(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
         assert "Usage" in respond.call_args[0][0]
@@ -495,7 +495,7 @@ class TestRouting:
         command = {"command": "/ft"}
 
         with patch("firetower.slack_app.bolt.handle_severity_command") as mock_handler:
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
             mock_handler.assert_called_once()
 
     @patch("firetower.slack_app.bolt.statsd")
@@ -506,7 +506,7 @@ class TestRouting:
         command = {"command": "/ft"}
 
         with patch("firetower.slack_app.bolt.handle_subject_command") as mock_handler:
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
             mock_handler.assert_called_once()
             assert mock_handler.call_args[1]["new_subject"] == "New Title Here"
 
@@ -517,7 +517,7 @@ class TestRouting:
         body = {"text": "subject", "channel_id": CHANNEL_ID}
         command = {"command": "/ft"}
 
-        handle_inc(ack=ack, body=body, command=command, respond=respond)
+        handle_command(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
         assert "Usage" in respond.call_args[0][0]
@@ -530,7 +530,7 @@ class TestRouting:
         command = {"command": "/ft"}
 
         with patch("firetower.slack_app.bolt.handle_reopen_command"):
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
 
         mock_statsd.increment.assert_any_call(
             "slack_app.commands.submitted", tags=["subcommand:reopen"]

@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import Incident, IncidentSeverity
-from firetower.slack_app.bolt import handle_inc
+from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.new_incident import (
     handle_new_command,
     handle_new_incident_submission,
@@ -27,7 +27,7 @@ class TestHandleInc:
         body = self._make_body(text="help")
         command = self._make_command()
 
-        handle_inc(ack=ack, body=body, command=command, respond=respond)
+        handle_command(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
         respond.assert_called_once()
@@ -42,7 +42,7 @@ class TestHandleInc:
         body = self._make_body(text="")
         command = self._make_command()
 
-        handle_inc(ack=ack, body=body, command=command, respond=respond)
+        handle_command(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
         respond.assert_called_once()
@@ -56,7 +56,7 @@ class TestHandleInc:
         body = self._make_body(text="unknown")
         command = self._make_command()
 
-        handle_inc(ack=ack, body=body, command=command, respond=respond)
+        handle_command(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
         respond.assert_called_once()
@@ -71,7 +71,7 @@ class TestHandleInc:
         body = self._make_body(text="help", command="/ft-test")
         command = self._make_command(command="/ft-test")
 
-        handle_inc(ack=ack, body=body, command=command, respond=respond)
+        handle_command(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
         response_text = respond.call_args[0][0]
@@ -84,7 +84,7 @@ class TestHandleInc:
         body = self._make_body(text="help")
         command = self._make_command()
 
-        handle_inc(ack=ack, body=body, command=command, respond=respond)
+        handle_command(ack=ack, body=body, command=command, respond=respond)
 
         mock_statsd.increment.assert_has_calls(
             [
@@ -101,7 +101,7 @@ class TestHandleInc:
         command = self._make_command()
 
         with pytest.raises(RuntimeError):
-            handle_inc(ack=ack, body=body, command=command, respond=respond)
+            handle_command(ack=ack, body=body, command=command, respond=respond)
 
         mock_statsd.increment.assert_any_call(
             "slack_app.commands.submitted", tags=["subcommand:help"]
@@ -119,7 +119,7 @@ class TestHandleInc:
         body["trigger_id"] = "T12345"
         command = self._make_command()
 
-        handle_inc(ack=ack, body=body, command=command, respond=respond)
+        handle_command(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
         mock_bolt_app.client.views_open.assert_called_once()
