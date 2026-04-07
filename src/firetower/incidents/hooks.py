@@ -29,7 +29,7 @@ def _get_pagerduty_service() -> PagerDutyService | None:
         return None
 
 
-def _page_imoc_if_needed(incident: Incident) -> None:
+def _page_high_sev_if_needed(incident: Incident) -> None:
     if incident.severity not in PAGEABLE_SEVERITIES:
         return
 
@@ -37,14 +37,14 @@ def _page_imoc_if_needed(incident: Incident) -> None:
     if not pd_service:
         return
 
-    imoc_policy = pd_service.escalation_policies.get("IMOC")
-    if not imoc_policy:
-        logger.info("No IMOC escalation policy configured, skipping page")
+    high_sev_policy = pd_service.escalation_policies.get("HIGH_SEV")
+    if not high_sev_policy:
+        logger.info("No HIGH_SEV escalation policy configured, skipping page")
         return
 
-    integration_key = imoc_policy.get("integration_key")
+    integration_key = high_sev_policy.get("integration_key")
     if not integration_key:
-        logger.info("No integration_key for IMOC escalation policy, skipping page")
+        logger.info("No integration_key for HIGH_SEV escalation policy, skipping page")
         return
 
     dedup_key = f"firetower-{incident.incident_number}"
@@ -53,7 +53,7 @@ def _page_imoc_if_needed(incident: Incident) -> None:
     try:
         pd_service.trigger_incident(summary, dedup_key, integration_key)
     except Exception:
-        logger.exception(f"Failed to page IMOC for incident {incident.id}")
+        logger.exception(f"Failed to page HIGH_SEV for incident {incident.id}")
 
 
 def _build_channel_name(incident: Incident) -> str:
@@ -245,7 +245,7 @@ def on_incident_created(incident: Incident) -> None:
                     f"Failed to post feed channel message for incident {incident.id}"
                 )
 
-        _page_imoc_if_needed(incident)
+        _page_high_sev_if_needed(incident)
 
         # TODO: Datadog notebook creation step will be added in RELENG-467
     except Exception:
@@ -284,7 +284,7 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
             old_severity not in PAGEABLE_SEVERITIES
             and incident.severity in PAGEABLE_SEVERITIES
         ):
-            _page_imoc_if_needed(incident)
+            _page_high_sev_if_needed(incident)
     except Exception:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
 

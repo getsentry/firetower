@@ -7,7 +7,7 @@ from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
     _build_channel_name,
     _build_channel_topic,
-    _page_imoc_if_needed,
+    _page_high_sev_if_needed,
     on_captain_changed,
     on_incident_created,
     on_severity_changed,
@@ -579,7 +579,7 @@ class TestOnCaptainChanged:
 MOCK_PD_CONFIG = {
     "API_TOKEN": "test-token",
     "ESCALATION_POLICIES": {
-        "IMOC": {
+        "HIGH_SEV": {
             "id": "P17I207",
             "integration_key": "test-integration-key",
         },
@@ -588,7 +588,7 @@ MOCK_PD_CONFIG = {
 
 
 @pytest.mark.django_db
-class TestPageImocIfNeeded:
+class TestPageHighSevIfNeeded:
     @patch("firetower.incidents.hooks.PagerDutyService")
     def test_pages_for_p0(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
@@ -601,7 +601,7 @@ class TestPageImocIfNeeded:
             severity=IncidentSeverity.P0,
         )
 
-        _page_imoc_if_needed(incident)
+        _page_high_sev_if_needed(incident)
 
         mock_pd.trigger_incident.assert_called_once_with(
             f"[P0] {incident.incident_number}: Major outage",
@@ -621,7 +621,7 @@ class TestPageImocIfNeeded:
             severity=IncidentSeverity.P1,
         )
 
-        _page_imoc_if_needed(incident)
+        _page_high_sev_if_needed(incident)
 
         mock_pd.trigger_incident.assert_called_once()
 
@@ -634,7 +634,7 @@ class TestPageImocIfNeeded:
             severity=IncidentSeverity.P2,
         )
 
-        _page_imoc_if_needed(incident)
+        _page_high_sev_if_needed(incident)
 
         mock_pd_cls.assert_not_called()
 
@@ -647,12 +647,12 @@ class TestPageImocIfNeeded:
             severity=IncidentSeverity.P0,
         )
 
-        _page_imoc_if_needed(incident)
+        _page_high_sev_if_needed(incident)
 
         mock_pd_cls.assert_not_called()
 
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_skips_when_no_imoc_policy(self, mock_pd_cls, settings):
+    def test_skips_when_no_high_sev_policy(self, mock_pd_cls, settings):
         settings.PAGERDUTY = {
             "API_TOKEN": "test-token",
             "ESCALATION_POLICIES": {},
@@ -665,7 +665,7 @@ class TestPageImocIfNeeded:
             severity=IncidentSeverity.P0,
         )
 
-        _page_imoc_if_needed(incident)
+        _page_high_sev_if_needed(incident)
 
         mock_pd.trigger_incident.assert_not_called()
 
@@ -674,12 +674,12 @@ class TestPageImocIfNeeded:
         settings.PAGERDUTY = {
             "API_TOKEN": "test-token",
             "ESCALATION_POLICIES": {
-                "IMOC": {"id": "P17I207", "integration_key": None},
+                "HIGH_SEV": {"id": "P17I207", "integration_key": None},
             },
         }
         mock_pd = mock_pd_cls.return_value
         mock_pd.escalation_policies = {
-            "IMOC": {"id": "P17I207", "integration_key": None}
+            "HIGH_SEV": {"id": "P17I207", "integration_key": None}
         }
 
         incident = Incident.objects.create(
@@ -687,16 +687,16 @@ class TestPageImocIfNeeded:
             severity=IncidentSeverity.P0,
         )
 
-        _page_imoc_if_needed(incident)
+        _page_high_sev_if_needed(incident)
 
         mock_pd.trigger_incident.assert_not_called()
 
 
 @pytest.mark.django_db
 class TestOnIncidentCreatedPagerDuty:
-    @patch("firetower.incidents.hooks._page_imoc_if_needed")
+    @patch("firetower.incidents.hooks._page_high_sev_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_pages_imoc_on_p0_creation(self, mock_slack, mock_page):
+    def test_pages_high_sev_on_p0_creation(self, mock_slack, mock_page):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
 
@@ -709,9 +709,9 @@ class TestOnIncidentCreatedPagerDuty:
 
         mock_page.assert_called_once_with(incident)
 
-    @patch("firetower.incidents.hooks._page_imoc_if_needed")
+    @patch("firetower.incidents.hooks._page_high_sev_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_pages_imoc_on_p3_creation(self, mock_slack, mock_page):
+    def test_pages_high_sev_on_p3_creation(self, mock_slack, mock_page):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
 
@@ -727,9 +727,9 @@ class TestOnIncidentCreatedPagerDuty:
 
 @pytest.mark.django_db
 class TestOnSeverityChangedPagerDuty:
-    @patch("firetower.incidents.hooks._page_imoc_if_needed")
+    @patch("firetower.incidents.hooks._page_high_sev_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_pages_imoc_on_upgrade_to_p0(self, mock_slack, mock_page):
+    def test_pages_high_sev_on_upgrade_to_p0(self, mock_slack, mock_page):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = Incident.objects.create(
@@ -746,9 +746,9 @@ class TestOnSeverityChangedPagerDuty:
 
         mock_page.assert_called_once_with(incident)
 
-    @patch("firetower.incidents.hooks._page_imoc_if_needed")
+    @patch("firetower.incidents.hooks._page_high_sev_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_pages_imoc_on_upgrade_to_p1(self, mock_slack, mock_page):
+    def test_pages_high_sev_on_upgrade_to_p1(self, mock_slack, mock_page):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = Incident.objects.create(
@@ -765,7 +765,7 @@ class TestOnSeverityChangedPagerDuty:
 
         mock_page.assert_called_once_with(incident)
 
-    @patch("firetower.incidents.hooks._page_imoc_if_needed")
+    @patch("firetower.incidents.hooks._page_high_sev_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
     def test_does_not_page_on_p1_to_p0(self, mock_slack, mock_page):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
@@ -784,7 +784,7 @@ class TestOnSeverityChangedPagerDuty:
 
         mock_page.assert_not_called()
 
-    @patch("firetower.incidents.hooks._page_imoc_if_needed")
+    @patch("firetower.incidents.hooks._page_high_sev_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
     def test_does_not_page_on_downgrade(self, mock_slack, mock_page):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
