@@ -76,10 +76,6 @@ export function ActionItemsList({
   incidentTitle,
   actionItems,
 }: ActionItemsListProps) {
-  if (actionItems.length === 0) {
-    return null;
-  }
-
   return (
     <Card>
       <div className="mb-space-lg flex items-center justify-between">
@@ -94,11 +90,15 @@ export function ActionItemsList({
           <Plus className="h-4 w-4" />
         </a>
       </div>
-      <div className="gap-space-md flex flex-col">
-        {actionItems.map(item => (
-          <ActionItemCard key={item.linear_identifier} item={item} />
-        ))}
-      </div>
+      {actionItems.length === 0 ? (
+        <p className="text-content-secondary text-sm">No action items yet</p>
+      ) : (
+        <div className="gap-space-md flex flex-col">
+          {actionItems.map(item => (
+            <ActionItemCard key={item.linear_identifier} item={item} />
+          ))}
+        </div>
+      )}
     </Card>
   );
 }
