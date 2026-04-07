@@ -592,6 +592,7 @@ class TestPageHighSevIfNeeded:
     @patch("firetower.incidents.hooks.PagerDutyService")
     def test_pages_for_p0(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
         mock_pd = mock_pd_cls.return_value
         mock_pd.trigger_incident.return_value = True
 
@@ -607,7 +608,10 @@ class TestPageHighSevIfNeeded:
             f"firetower-{incident.incident_number}",
             "test-integration-key",
             links=[
-                {"href": f"/{incident.incident_number}", "text": "View in Firetower"}
+                {
+                    "href": f"https://firetower.example.com/{incident.incident_number}",
+                    "text": "View in Firetower",
+                }
             ],
         )
 
