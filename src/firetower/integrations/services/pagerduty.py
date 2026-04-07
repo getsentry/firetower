@@ -16,7 +16,6 @@ class PagerDutyService:
             raise ValueError("PagerDuty is not configured")
 
         self.api_token = pd_config["API_TOKEN"]
-        self.escalation_policies = pd_config["ESCALATION_POLICIES"]
 
     def trigger_incident(
         self, summary: str, dedup_key: str, integration_key: str

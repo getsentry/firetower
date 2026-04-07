@@ -38,13 +38,6 @@ class TestPagerDutyServiceInit:
 
     def test_init_stores_config(self, pd_service):
         assert pd_service.api_token == "test-token"
-        assert pd_service.escalation_policies["HIGH_SEV"]["id"] == "P17I207"
-        assert (
-            pd_service.escalation_policies["HIGH_SEV"]["integration_key"]
-            == "test-integration-key"
-        )
-        assert pd_service.escalation_policies["ProdEng"]["id"] == "PABC123"
-        assert pd_service.escalation_policies["ProdEng"]["integration_key"] is None
 
 
 class TestTriggerIncident:
