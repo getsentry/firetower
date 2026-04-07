@@ -139,14 +139,11 @@ def _invite_user_to_channel(
 
 
 def on_incident_created(incident: Incident) -> None:
-    try:
-        _page_high_sev_if_needed(incident)
-    except Exception:
-        logger.exception(f"Failed to page for incident {incident.id}")
-
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
     # will get created=True; the other bails out without creating a second channel.
+    slack_link = None
+    created = False
     try:
         slack_link, created = ExternalLink.objects.get_or_create(
             incident=incident,
@@ -157,13 +154,12 @@ def on_incident_created(incident: Incident) -> None:
         logger.exception(
             f"Failed to get or create Slack ExternalLink for incident {incident.id}"
         )
-        return
     channel_id = None
-    if not created:
+    if not created and slack_link is not None:
         logger.info(
             f"Incident {incident.id} already has a Slack link, skipping channel creation"
         )
-    else:
+    elif created and slack_link is not None:
         try:
             channel_id = _slack_service.create_channel(
                 _build_channel_name(incident), is_private=incident.is_private
@@ -267,6 +263,11 @@ def on_incident_created(incident: Incident) -> None:
                 logger.exception(
                     f"Failed to post feed channel message for incident {incident.id}"
                 )
+
+    try:
+        _page_high_sev_if_needed(incident)
+    except Exception:
+        logger.exception(f"Failed to page for incident {incident.id}")
 
     # TODO: Datadog notebook creation step will be added in RELENG-467
 
