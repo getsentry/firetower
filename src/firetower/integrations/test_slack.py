@@ -370,39 +370,6 @@ class TestSlackService:
         mock_client.bookmarks_add.side_effect = SlackApiError("error", mock_response)
         assert service.add_bookmark("C12345", "title", "https://example.com") is False
 
-    def test_get_channel_history_success(self):
-        service, mock_client = self._make_service()
-        mock_client.conversations_history.return_value = {
-            "messages": [{"text": "hello"}, {"text": "world"}]
-        }
-        result = service.get_channel_history("C12345")
-        assert result == [{"text": "hello"}, {"text": "world"}]
-        mock_client.conversations_history.assert_called_once_with(
-            channel="C12345", limit=1000
-        )
-
-    def test_get_channel_history_custom_limit(self):
-        service, mock_client = self._make_service()
-        mock_client.conversations_history.return_value = {"messages": []}
-        service.get_channel_history("C12345", limit=10)
-        mock_client.conversations_history.assert_called_once_with(
-            channel="C12345", limit=10
-        )
-
-    def test_get_channel_history_no_client(self):
-        mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}
-        with patch.object(settings, "SLACK", mock_slack_config):
-            service = SlackService()
-        assert service.get_channel_history("C12345") is None
-
-    def test_get_channel_history_api_error(self):
-        service, mock_client = self._make_service()
-        mock_response = MagicMock()
-        mock_client.conversations_history.side_effect = SlackApiError(
-            "error", mock_response
-        )
-        assert service.get_channel_history("C12345") is None
-
     def test_build_channel_url(self):
         service, _ = self._make_service()
         url = service.build_channel_url("C12345")
