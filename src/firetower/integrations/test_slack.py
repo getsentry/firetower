@@ -306,6 +306,46 @@ class TestSlackService:
         mock_client.chat_postMessage.side_effect = SlackApiError("error", mock_response)
         assert service.post_message("C12345", "hello") is False
 
+    def test_post_message_not_in_channel_join_and_retry_succeeds(self):
+        service, mock_client = self._make_service()
+        not_in_channel_response = MagicMock()
+        not_in_channel_response.get.return_value = "not_in_channel"
+        mock_client.chat_postMessage.side_effect = [
+            SlackApiError("not_in_channel", not_in_channel_response),
+            MagicMock(),
+        ]
+        assert service.post_message("C12345", "hello") is True
+        mock_client.conversations_join.assert_called_once_with(channel="C12345")
+        assert mock_client.chat_postMessage.call_count == 2
+
+    def test_post_message_not_in_channel_join_fails(self):
+        service, mock_client = self._make_service()
+        not_in_channel_response = MagicMock()
+        not_in_channel_response.get.return_value = "not_in_channel"
+        mock_client.chat_postMessage.side_effect = SlackApiError(
+            "not_in_channel", not_in_channel_response
+        )
+        join_error_response = MagicMock()
+        mock_client.conversations_join.side_effect = SlackApiError(
+            "channel_not_found", join_error_response
+        )
+        assert service.post_message("C12345", "hello") is False
+        mock_client.conversations_join.assert_called_once_with(channel="C12345")
+        assert mock_client.chat_postMessage.call_count == 1
+
+    def test_post_message_not_in_channel_retry_fails(self):
+        service, mock_client = self._make_service()
+        not_in_channel_response = MagicMock()
+        not_in_channel_response.get.return_value = "not_in_channel"
+        retry_error_response = MagicMock()
+        mock_client.chat_postMessage.side_effect = [
+            SlackApiError("not_in_channel", not_in_channel_response),
+            SlackApiError("channel_not_found", retry_error_response),
+        ]
+        assert service.post_message("C12345", "hello") is False
+        mock_client.conversations_join.assert_called_once_with(channel="C12345")
+        assert mock_client.chat_postMessage.call_count == 2
+
     def test_add_bookmark_success(self):
         service, mock_client = self._make_service()
         assert (
