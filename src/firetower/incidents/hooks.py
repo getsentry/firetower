@@ -283,15 +283,13 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
 def on_severity_changed(incident: Incident, old_severity: str) -> None:
     try:
         channel_id = _get_channel_id(incident)
-        if not channel_id:
-            return
-
-        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
-        incident_url = _build_incident_url(incident)
-        _slack_service.post_message(
-            channel_id,
-            f"Incident severity updated: {old_severity} -> {incident.severity}\n<{incident_url}|View in Firetower>",
-        )
+        if channel_id:
+            _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+            incident_url = _build_incident_url(incident)
+            _slack_service.post_message(
+                channel_id,
+                f"Incident severity updated: {old_severity} -> {incident.severity}\n<{incident_url}|View in Firetower>",
+            )
     except Exception:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
 
