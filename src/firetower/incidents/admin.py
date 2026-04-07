@@ -41,7 +41,7 @@ class IncidentAdmin(admin.ModelAdmin):
 
     actions = [
         "sync_participants_from_slack",
-        "sync_action_items_from_linear",
+        "sync_action_items",
         "clear_milestones",
     ]
 
@@ -120,7 +120,7 @@ class IncidentAdmin(admin.ModelAdmin):
         self.message_user(request, f"Participant sync: {', '.join(message_parts)}")
 
     @admin.action(description="Sync action items from Linear")
-    def sync_action_items_from_linear(
+    def sync_action_items(
         self, request: HttpRequest, queryset: QuerySet[Incident]
     ) -> None:
         success_count = 0
