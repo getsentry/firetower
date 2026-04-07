@@ -697,7 +697,9 @@ class TestOnIncidentCreatedPagerDuty:
 
     @patch("firetower.incidents.hooks._page_high_sev_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_pages_high_sev_on_p3_creation(self, mock_slack, mock_page):
+    def test_on_incident_created_calls_page_high_sev_if_needed(
+        self, mock_slack, mock_page
+    ):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
 
