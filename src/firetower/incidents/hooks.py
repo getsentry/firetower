@@ -135,6 +135,8 @@ def _invite_user_to_channel(
 
 def on_incident_created(incident: Incident) -> None:
     try:
+        _page_high_sev_if_needed(incident)
+
         # Use get_or_create to atomically claim the ExternalLink row before calling
         # the Slack API.  If two concurrent requests both reach this point, only one
         # will get created=True; the other bails out without creating a second channel.
@@ -250,8 +252,6 @@ def on_incident_created(incident: Incident) -> None:
                     f"Failed to post feed channel message for incident {incident.id}"
                 )
 
-        _page_high_sev_if_needed(incident)
-
         # TODO: Datadog notebook creation step will be added in RELENG-467
     except Exception:
         logger.exception(f"Error in on_incident_created for incident {incident.id}")
@@ -274,6 +274,12 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
 
 def on_severity_changed(incident: Incident, old_severity: str) -> None:
     try:
+        if (
+            old_severity not in PAGEABLE_SEVERITIES
+            and incident.severity in PAGEABLE_SEVERITIES
+        ):
+            _page_high_sev_if_needed(incident)
+
         channel_id = _get_channel_id(incident)
         if not channel_id:
             return
@@ -284,12 +290,6 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
             channel_id,
             f"Incident severity updated: {old_severity} -> {incident.severity}\n<{incident_url}|View in Firetower>",
         )
-
-        if (
-            old_severity not in PAGEABLE_SEVERITIES
-            and incident.severity in PAGEABLE_SEVERITIES
-        ):
-            _page_high_sev_if_needed(incident)
     except Exception:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
 
