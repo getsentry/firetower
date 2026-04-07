@@ -181,6 +181,12 @@ input[type='number'] {
   .border-danger-vibrant {
     border-color: var(--tokens-color-border-danger-vibrant);
   }
+  .border-success-vibrant {
+    border-color: var(--tokens-color-border-success-vibrant);
+  }
+  .border-warning-vibrant {
+    border-color: var(--tokens-color-border-warning-vibrant);
+  }
 
   @media (prefers-color-scheme: dark) {
     .bg-background-primary {
@@ -307,6 +313,12 @@ input[type='number'] {
     }
     .border-danger-vibrant {
       border-color: var(--base-color-red-dark-opaque-1000);
+    }
+    .border-success-vibrant {
+      border-color: var(--base-color-green-dark-opaque-800);
+    }
+    .border-warning-vibrant {
+      border-color: var(--base-color-yellow-dark-opaque-600);
     }
   }
 

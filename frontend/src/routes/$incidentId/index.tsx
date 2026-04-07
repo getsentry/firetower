@@ -5,6 +5,7 @@ import {Card} from 'components/Card';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 
+import {ActionItemsList} from './components/ActionItemsList';
 import {IncidentDetailSkeleton} from './components/IncidentDetailSkeleton';
 import {IncidentSummary} from './components/IncidentSummary';
 import {LinksList} from './components/LinksList';
@@ -63,6 +64,7 @@ function Incident() {
 
       <div className="flex flex-col gap-4 md:flex-row">
         <section className="flex flex-col gap-4 md:flex-[2]">
+          <ActionItemsList incidentId={params.incidentId} />
           <Card>
             <div className="text-content-muted p-12 text-center">
               <p className="mb-2 text-lg">
