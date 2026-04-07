@@ -91,8 +91,11 @@ class LinearService:
         issues: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
         cursor: str | None = None
+        max_pages = 25
+        page = 0
 
-        while True:
+        while page < max_pages:
+            page += 1
             variables: dict[str, Any] = {"url_contains": url_contains}
             if cursor is not None:
                 variables["after"] = cursor
@@ -131,6 +134,8 @@ class LinearService:
             if not page_info.get("hasNextPage"):
                 break
             cursor = page_info.get("endCursor")
+            if cursor is None:
+                break
 
         logger.info(
             f"Found {len(issues)} Linear issues for URL containing '{url_contains}'"
