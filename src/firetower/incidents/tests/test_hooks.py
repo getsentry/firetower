@@ -606,6 +606,9 @@ class TestPageHighSevIfNeeded:
             f"[P0] {incident.incident_number}: Major outage",
             f"firetower-{incident.incident_number}",
             "test-integration-key",
+            links=[
+                {"href": f"/{incident.incident_number}", "text": "View in Firetower"}
+            ],
         )
 
     @patch("firetower.incidents.hooks.PagerDutyService")
