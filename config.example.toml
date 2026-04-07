@@ -1,5 +1,4 @@
 project_key = "INC"
-firetower_base_url = "https://firetower.getsentry.net"
 django_secret_key = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69"
 sentry_dsn = "https://your-sentry-dsn@o1.ingest.us.sentry.io/project-id"
 firetower_base_url = "http://localhost:5173"

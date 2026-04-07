@@ -146,5 +146,5 @@ class DummyConfigFile(ConfigFile):
         self.django_secret_key = ""
         self.sentry_dsn = ""
         self.region_grouping: list[list[str]] = []
-        self.firetower_base_url = ""
+        self.pinned_regions: list[str] = []
         self.hooks_enabled = False
