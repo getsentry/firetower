@@ -328,6 +328,7 @@ sync_incident_participants = SyncIncidentParticipantsView.as_view()
 
 
 class ActionItemListView(generics.ListAPIView):
+    permission_classes = [IncidentPermission]
     serializer_class = ActionItemSerializer
     pagination_class = None
 
