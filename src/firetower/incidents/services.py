@@ -163,7 +163,7 @@ def sync_action_items_from_linear(
             return stats
 
     firetower_url = (
-        f"{settings.FIRETOWER_BASE_URL}/{settings.PROJECT_KEY}-{incident.id}"
+        f"{settings.FIRETOWER_BASE_URL}/{settings.PROJECT_KEY}-{incident.id}/"
     )
     issues = _linear_service.get_issues_by_attachment_url(firetower_url)
 
