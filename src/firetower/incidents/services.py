@@ -163,7 +163,7 @@ def sync_action_items_from_linear(
             return stats
 
     firetower_url = (
-        f"{settings.FIRETOWER_BASE_URL}/{settings.PROJECT_KEY}-{incident.id}/"
+        f"{settings.FIRETOWER_BASE_URL}/{settings.PROJECT_KEY}-{incident.id}"
     )
     issues = _linear_service.get_issues_by_attachment_url(firetower_url)
 
@@ -185,9 +185,9 @@ def sync_action_items_from_linear(
             assignee = _resolve_assignee_by_email(issue["assignee_email"])
 
         _, created = ActionItem.objects.update_or_create(
-            incident=incident,
             linear_issue_id=issue["id"],
             defaults={
+                "incident": incident,
                 "linear_identifier": issue["identifier"],
                 "title": issue["title"],
                 "status": issue["status"],
