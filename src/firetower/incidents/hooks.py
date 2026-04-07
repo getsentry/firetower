@@ -151,6 +151,7 @@ def on_incident_created(incident: Incident) -> None:
             )
             return
 
+        channel_id = None
         try:
             channel_id = _slack_service.create_channel(
                 _build_channel_name(incident), is_private=incident.is_private
@@ -160,97 +161,106 @@ def on_incident_created(incident: Incident) -> None:
                 logger.warning(
                     f"Failed to create Slack channel for incident {incident.id}"
                 )
-                return
-            channel_url = _slack_service.build_channel_url(channel_id)
-            slack_link.url = channel_url
-            slack_link.save(update_fields=["url"])
+            else:
+                channel_url = _slack_service.build_channel_url(channel_id)
+                slack_link.url = channel_url
+                slack_link.save(update_fields=["url"])
         except Exception:
             slack_link.delete()
-            raise
-
-        captain_slack_id = (
-            _get_slack_user_id(incident.captain) if incident.captain else None
-        )
-
-        try:
-            _slack_service.set_channel_topic(
-                channel_id, _build_channel_topic(incident, captain_slack_id)
+            logger.exception(
+                f"Failed to create Slack channel for incident {incident.id}"
             )
-        except Exception:
-            logger.exception(f"Failed to set channel topic for incident {incident.id}")
 
-        incident_url = _build_incident_url(incident)
+        if channel_id:
+            captain_slack_id = (
+                _get_slack_user_id(incident.captain) if incident.captain else None
+            )
 
-        try:
-            _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
-        except Exception:
-            logger.exception(f"Failed to add bookmark for incident {incident.id}")
-
-        guide_message = settings.SLACK.get("INCIDENT_GUIDE_MESSAGE", "")
-        if guide_message:
             try:
-                _slack_service.post_message(channel_id, guide_message)
-            except Exception:
-                logger.exception(
-                    f"Failed to post guide message for incident {incident.id}"
-                )
-
-        ic_mention = ""
-        if incident.captain:
-            if captain_slack_id:
-                ic_mention = f"Incident Captain: <@{captain_slack_id}>"
-            else:
-                captain_name = escape_slack_text(
-                    incident.captain.get_full_name() or incident.captain.username
-                )
-                ic_mention = f"Incident Captain: {captain_name}"
-
-        if ic_mention:
-            try:
-                _slack_service.post_message(channel_id, ic_mention)
-            except Exception:
-                logger.exception(
-                    f"Failed to post IC mention for incident {incident.id}"
-                )
-
-        if incident.description:
-            try:
-                _slack_service.post_message(
-                    channel_id,
-                    f"*Incident Description:*\n{escape_slack_text(incident.description)}",
+                _slack_service.set_channel_topic(
+                    channel_id, _build_channel_topic(incident, captain_slack_id)
                 )
             except Exception:
                 logger.exception(
-                    f"Failed to post description for incident {incident.id}"
+                    f"Failed to set channel topic for incident {incident.id}"
                 )
 
-        if incident.captain:
-            _invite_user_to_channel(channel_id, incident.captain, captain_slack_id)
+            incident_url = _build_incident_url(incident)
 
-        always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
-        if always_invited:
-            ids_to_invite = [uid for uid in always_invited if uid != captain_slack_id]
-            if ids_to_invite:
+            try:
+                _slack_service.add_bookmark(
+                    channel_id, "Firetower Incident", incident_url
+                )
+            except Exception:
+                logger.exception(f"Failed to add bookmark for incident {incident.id}")
+
+            guide_message = settings.SLACK.get("INCIDENT_GUIDE_MESSAGE", "")
+            if guide_message:
                 try:
-                    _slack_service.invite_to_channel(channel_id, ids_to_invite)
+                    _slack_service.post_message(channel_id, guide_message)
                 except Exception:
                     logger.exception(
-                        f"Failed to invite always_invited users to channel {channel_id} for incident {incident.id}"
+                        f"Failed to post guide message for incident {incident.id}"
                     )
 
-        feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
-        if feed_channel_id and not incident.is_private:
-            feed_message = (
-                f"A {incident.severity} incident has been created.\n"
-                f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
-                f"\n\nFor those involved, please join <#{channel_id}>"
-            )
-            try:
-                _slack_service.post_message(feed_channel_id, feed_message)
-            except Exception:
-                logger.exception(
-                    f"Failed to post feed channel message for incident {incident.id}"
+            ic_mention = ""
+            if incident.captain:
+                if captain_slack_id:
+                    ic_mention = f"Incident Captain: <@{captain_slack_id}>"
+                else:
+                    captain_name = escape_slack_text(
+                        incident.captain.get_full_name() or incident.captain.username
+                    )
+                    ic_mention = f"Incident Captain: {captain_name}"
+
+            if ic_mention:
+                try:
+                    _slack_service.post_message(channel_id, ic_mention)
+                except Exception:
+                    logger.exception(
+                        f"Failed to post IC mention for incident {incident.id}"
+                    )
+
+            if incident.description:
+                try:
+                    _slack_service.post_message(
+                        channel_id,
+                        f"*Incident Description:*\n{escape_slack_text(incident.description)}",
+                    )
+                except Exception:
+                    logger.exception(
+                        f"Failed to post description for incident {incident.id}"
+                    )
+
+            if incident.captain:
+                _invite_user_to_channel(channel_id, incident.captain, captain_slack_id)
+
+            always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
+            if always_invited:
+                ids_to_invite = [
+                    uid for uid in always_invited if uid != captain_slack_id
+                ]
+                if ids_to_invite:
+                    try:
+                        _slack_service.invite_to_channel(channel_id, ids_to_invite)
+                    except Exception:
+                        logger.exception(
+                            f"Failed to invite always_invited users to channel {channel_id} for incident {incident.id}"
+                        )
+
+            feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
+            if feed_channel_id and not incident.is_private:
+                feed_message = (
+                    f"A {incident.severity} incident has been created.\n"
+                    f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
+                    f"\n\nFor those involved, please join <#{channel_id}>"
                 )
+                try:
+                    _slack_service.post_message(feed_channel_id, feed_message)
+                except Exception:
+                    logger.exception(
+                        f"Failed to post feed channel message for incident {incident.id}"
+                    )
 
         # TODO: Datadog notebook creation step will be added in RELENG-467
     except Exception:
