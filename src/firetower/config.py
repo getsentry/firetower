@@ -138,3 +138,4 @@ class DummyConfigFile(ConfigFile):
         self.sentry_dsn = ""
         self.pinned_regions: list[str] = []
         self.firetower_base_url = ""
+        self.hooks_enabled = False
