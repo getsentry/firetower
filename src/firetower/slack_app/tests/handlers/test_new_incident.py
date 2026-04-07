@@ -220,6 +220,11 @@ class TestNewIncidentSubmission:
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Could not identify" in msg
 
+    @pytest.fixture(autouse=False)
+    def _enable_hooks(self, settings):
+        settings.HOOKS_ENABLED = True
+
+    @pytest.mark.usefixtures("_enable_hooks")
     @patch(
         "firetower.incidents.serializers.on_incident_created",
         side_effect=RuntimeError("boom"),
