@@ -110,9 +110,9 @@ class TestHandleInc:
             "slack_app.commands.failed", tags=["subcommand:help"]
         )
 
-    @patch("firetower.slack_app.bolt.bolt_app")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
     @patch("firetower.slack_app.bolt.statsd")
-    def test_new_subcommand_routes_correctly(self, mock_statsd, mock_bolt_app):
+    def test_new_subcommand_routes_correctly(self, mock_statsd, mock_get_bolt_app):
         ack = MagicMock()
         respond = MagicMock()
         body = self._make_body(text="new")
@@ -122,13 +122,13 @@ class TestHandleInc:
         handle_command(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
-        mock_bolt_app.client.views_open.assert_called_once()
+        mock_get_bolt_app.return_value.client.views_open.assert_called_once()
 
 
 @pytest.mark.django_db
 class TestNewIncidentModal:
-    @patch("firetower.slack_app.bolt.bolt_app")
-    def test_new_opens_modal(self, mock_bolt_app):
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    def test_new_opens_modal(self, mock_get_bolt_app):
         ack = MagicMock()
         body = {"trigger_id": "T12345"}
         command = {"text": "new"}
@@ -137,8 +137,8 @@ class TestNewIncidentModal:
         handle_new_command(ack, body, command, respond)
 
         ack.assert_called_once()
-        mock_bolt_app.client.views_open.assert_called_once()
-        view = mock_bolt_app.client.views_open.call_args[1]["view"]
+        mock_get_bolt_app.return_value.client.views_open.assert_called_once()
+        view = mock_get_bolt_app.return_value.client.views_open.call_args[1]["view"]
         assert view["callback_id"] == "new_incident_modal"
         assert view["type"] == "modal"
 

@@ -71,9 +71,9 @@ def handle_mitigated_command(ack: Any, body: dict, command: dict, respond: Any) 
         respond("Could not open modal — missing trigger_id.")
         return
 
-    from firetower.slack_app.bolt import bolt_app  # noqa: PLC0415
+    from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
-    bolt_app.client.views_open(
+    get_bolt_app().client.views_open(
         trigger_id=trigger_id,
         view=_build_mitigated_modal(incident.incident_number, channel_id),
     )

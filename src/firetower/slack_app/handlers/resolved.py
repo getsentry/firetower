@@ -102,9 +102,9 @@ def handle_resolved_command(ack: Any, body: dict, command: dict, respond: Any) -
         if slack_profile:
             captain_slack_id = slack_profile.external_id
 
-    from firetower.slack_app.bolt import bolt_app  # noqa: PLC0415
+    from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
-    bolt_app.client.views_open(
+    get_bolt_app().client.views_open(
         trigger_id=trigger_id,
         view=_build_resolved_modal(
             incident.incident_number,

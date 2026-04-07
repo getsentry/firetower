@@ -79,8 +79,8 @@ class TestGetIncidentFromChannel:
 
 @pytest.mark.django_db
 class TestMitigatedCommand:
-    @patch("firetower.slack_app.bolt.bolt_app")
-    def test_opens_modal(self, mock_bolt_app, incident):
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    def test_opens_modal(self, mock_get_bolt_app, incident):
         ack = MagicMock()
         body = {"channel_id": CHANNEL_ID, "trigger_id": "T12345"}
         command = {"command": "/ft"}
@@ -89,8 +89,8 @@ class TestMitigatedCommand:
         handle_mitigated_command(ack, body, command, respond)
 
         ack.assert_called_once()
-        mock_bolt_app.client.views_open.assert_called_once()
-        view = mock_bolt_app.client.views_open.call_args[1]["view"]
+        mock_get_bolt_app.return_value.client.views_open.assert_called_once()
+        view = mock_get_bolt_app.return_value.client.views_open.call_args[1]["view"]
         assert view["callback_id"] == "mitigated_incident_modal"
         assert view["private_metadata"] == CHANNEL_ID
         assert incident.incident_number in view["title"]["text"]
@@ -161,8 +161,8 @@ class TestMitigatedSubmission:
 
 @pytest.mark.django_db
 class TestResolvedCommand:
-    @patch("firetower.slack_app.bolt.bolt_app")
-    def test_opens_modal(self, mock_bolt_app, incident):
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    def test_opens_modal(self, mock_get_bolt_app, incident):
         ack = MagicMock()
         body = {"channel_id": CHANNEL_ID, "trigger_id": "T12345"}
         command = {"command": "/ft"}
@@ -171,8 +171,8 @@ class TestResolvedCommand:
         handle_resolved_command(ack, body, command, respond)
 
         ack.assert_called_once()
-        mock_bolt_app.client.views_open.assert_called_once()
-        view = mock_bolt_app.client.views_open.call_args[1]["view"]
+        mock_get_bolt_app.return_value.client.views_open.assert_called_once()
+        view = mock_get_bolt_app.return_value.client.views_open.call_args[1]["view"]
         assert view["callback_id"] == "resolved_incident_modal"
 
     def test_no_incident_responds_error(self, db):
