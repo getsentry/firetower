@@ -8,7 +8,7 @@ from firetower.integrations.services.pagerduty import PagerDutyService
 MOCK_PD_CONFIG = {
     "API_TOKEN": "test-token",
     "ESCALATION_POLICIES": {
-        "IMOC": {
+        "HIGH_SEV": {
             "id": "P17I207",
             "integration_key": "test-integration-key",
         },
@@ -38,9 +38,9 @@ class TestPagerDutyServiceInit:
 
     def test_init_stores_config(self, pd_service):
         assert pd_service.api_token == "test-token"
-        assert pd_service.escalation_policies["IMOC"]["id"] == "P17I207"
+        assert pd_service.escalation_policies["HIGH_SEV"]["id"] == "P17I207"
         assert (
-            pd_service.escalation_policies["IMOC"]["integration_key"]
+            pd_service.escalation_policies["HIGH_SEV"]["integration_key"]
             == "test-integration-key"
         )
         assert pd_service.escalation_policies["ProdEng"]["id"] == "PABC123"

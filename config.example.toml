@@ -26,7 +26,7 @@ iap_audience = ""
 [pagerduty]
 api_token = ""
 
-[pagerduty.escalation_policies.IMOC]
+[pagerduty.escalation_policies.HIGH_SEV]
 id = ""
 integration_key = ""
 
