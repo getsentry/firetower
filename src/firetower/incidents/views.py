@@ -329,13 +329,14 @@ class ActionItemListView(generics.ListAPIView):
     pagination_class = None
 
     def get_queryset(self) -> QuerySet:
-        incident = self._get_incident()
-        return incident.action_items.select_related("assignee__userprofile")
+        return self._get_incident().action_items.select_related("assignee__userprofile")
 
     def _get_incident(self) -> Incident:
-        numeric_id = parse_incident_id(self.kwargs["incident_id"])
-        queryset = filter_visible_to_user(Incident.objects.all(), self.request.user)
-        return get_object_or_404(queryset, id=numeric_id)
+        if not hasattr(self, "_incident"):
+            numeric_id = parse_incident_id(self.kwargs["incident_id"])
+            queryset = filter_visible_to_user(Incident.objects.all(), self.request.user)
+            self._incident = get_object_or_404(queryset, id=numeric_id)
+        return self._incident
 
     def list(self, request: Request, *args: object, **kwargs: object) -> Response:
         incident = self._get_incident()
@@ -352,13 +353,17 @@ class ActionItemListView(generics.ListAPIView):
 
 
 class SyncActionItemsView(generics.GenericAPIView):
+    permission_classes = [IncidentPermission]
+
     def get_queryset(self) -> QuerySet[Incident]:
         return Incident.objects.all()
 
     def _get_incident(self) -> Incident:
         numeric_id = parse_incident_id(self.kwargs["incident_id"])
         queryset = filter_visible_to_user(self.get_queryset(), self.request.user)
-        return get_object_or_404(queryset, id=numeric_id)
+        obj = get_object_or_404(queryset, id=numeric_id)
+        self.check_object_permissions(self.request, obj)
+        return obj
 
     def post(self, request: Request, incident_id: str) -> Response:
         incident = self._get_incident()
