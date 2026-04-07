@@ -67,6 +67,9 @@ class ConfigFile:
     django_secret_key: str
     sentry_dsn: str
     firetower_base_url: str
+    hooks_enabled: bool = (
+        False  # TODO: remove after hooks migration is complete and always enable
+    )
     pinned_regions: list[str] = field(default_factory=list)
 
     @classmethod

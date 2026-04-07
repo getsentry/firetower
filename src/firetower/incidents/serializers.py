@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models.functions import Lower
@@ -511,7 +512,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
         # Runs synchronously — Slack API calls may add latency to the response.
         # Consider deferring to a background task if this becomes a problem.
-        on_incident_created(incident)
+        if settings.HOOKS_ENABLED:
+            on_incident_created(incident)
 
         return incident
 
@@ -592,16 +594,17 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             )
             instance.impact_type_tags.set(tags)
 
-        if instance.title != old_title:
-            on_title_changed(instance)
-        if instance.status != old_status:
-            on_status_changed(instance, old_status)
-        if instance.severity != old_severity:
-            on_severity_changed(instance, old_severity)
-        if instance.captain_id != old_captain_id:
-            on_captain_changed(instance)
-        if instance.is_private != old_is_private:
-            on_visibility_changed(instance)
+        if settings.HOOKS_ENABLED:
+            if instance.title != old_title:
+                on_title_changed(instance)
+            if instance.status != old_status:
+                on_status_changed(instance, old_status)
+            if instance.severity != old_severity:
+                on_severity_changed(instance, old_severity)
+            if instance.captain_id != old_captain_id:
+                on_captain_changed(instance)
+            if instance.is_private != old_is_private:
+                on_visibility_changed(instance)
 
         return instance
 
