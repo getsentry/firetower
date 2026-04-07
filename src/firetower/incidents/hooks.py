@@ -142,11 +142,17 @@ def on_incident_created(incident: Incident) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
     # will get created=True; the other bails out without creating a second channel.
-    slack_link, created = ExternalLink.objects.get_or_create(
-        incident=incident,
-        type=ExternalLinkType.SLACK,
-        defaults={"url": ""},
-    )
+    try:
+        slack_link, created = ExternalLink.objects.get_or_create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            defaults={"url": ""},
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to get or create Slack ExternalLink for incident {incident.id}"
+        )
+        return
     channel_id = None
     if not created:
         logger.info(
