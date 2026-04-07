@@ -1,5 +1,6 @@
 import logging
 
+import sentry_sdk
 from django.conf import settings
 from django.contrib.auth.models import User
 
@@ -10,6 +11,11 @@ from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
+
+
+def _handle_exception(e: Exception, msg: str) -> None:
+    sentry_sdk.capture_exception(e)
+    logger.exception(msg)
 
 
 def _build_channel_name(incident: Incident) -> str:
@@ -80,8 +86,8 @@ def _invite_user_to_channel(
             slack_user_id = profile.external_id if profile else None
         if slack_user_id:
             _slack_service.invite_to_channel(channel_id, [slack_user_id])
-    except Exception:
-        logger.exception(f"Failed to invite user {user.id} to channel {channel_id}")
+    except Exception as e:
+        _handle_exception(e, f"Failed to invite user {user.id} to channel {channel_id}")
 
 
 def on_incident_created(incident: Incident) -> None:
@@ -125,23 +131,25 @@ def on_incident_created(incident: Incident) -> None:
             _slack_service.set_channel_topic(
                 channel_id, _build_channel_topic(incident, captain_slack_id)
             )
-        except Exception:
-            logger.exception(f"Failed to set channel topic for incident {incident.id}")
+        except Exception as e:
+            _handle_exception(
+                e, f"Failed to set channel topic for incident {incident.id}"
+            )
 
         incident_url = _build_incident_url(incident)
 
         try:
             _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
-        except Exception:
-            logger.exception(f"Failed to add bookmark for incident {incident.id}")
+        except Exception as e:
+            _handle_exception(e, f"Failed to add bookmark for incident {incident.id}")
 
         guide_message = settings.SLACK.get("INCIDENT_GUIDE_MESSAGE", "")
         if guide_message:
             try:
                 _slack_service.post_message(channel_id, guide_message)
-            except Exception:
-                logger.exception(
-                    f"Failed to post guide message for incident {incident.id}"
+            except Exception as e:
+                _handle_exception(
+                    e, f"Failed to post guide message for incident {incident.id}"
                 )
 
         ic_mention = ""
@@ -157,9 +165,9 @@ def on_incident_created(incident: Incident) -> None:
         if ic_mention:
             try:
                 _slack_service.post_message(channel_id, ic_mention)
-            except Exception:
-                logger.exception(
-                    f"Failed to post IC mention for incident {incident.id}"
+            except Exception as e:
+                _handle_exception(
+                    e, f"Failed to post IC mention for incident {incident.id}"
                 )
 
         if incident.description:
@@ -168,9 +176,9 @@ def on_incident_created(incident: Incident) -> None:
                     channel_id,
                     f"*Incident Description:*\n{escape_slack_text(incident.description)}",
                 )
-            except Exception:
-                logger.exception(
-                    f"Failed to post description for incident {incident.id}"
+            except Exception as e:
+                _handle_exception(
+                    e, f"Failed to post description for incident {incident.id}"
                 )
 
         if incident.captain:
@@ -182,9 +190,10 @@ def on_incident_created(incident: Incident) -> None:
             if ids_to_invite:
                 try:
                     _slack_service.invite_to_channel(channel_id, ids_to_invite)
-                except Exception:
-                    logger.exception(
-                        f"Failed to invite always_invited users to channel {channel_id} for incident {incident.id}"
+                except Exception as e:
+                    _handle_exception(
+                        e,
+                        f"Failed to invite always_invited users to channel {channel_id} for incident {incident.id}",
                     )
 
         feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
@@ -196,14 +205,14 @@ def on_incident_created(incident: Incident) -> None:
             )
             try:
                 _slack_service.post_message(feed_channel_id, feed_message)
-            except Exception:
-                logger.exception(
-                    f"Failed to post feed channel message for incident {incident.id}"
+            except Exception as e:
+                _handle_exception(
+                    e, f"Failed to post feed channel message for incident {incident.id}"
                 )
 
         # TODO: Datadog notebook creation step will be added in RELENG-467
-    except Exception:
-        logger.exception(f"Error in on_incident_created for incident {incident.id}")
+    except Exception as e:
+        _handle_exception(e, f"Error in on_incident_created for incident {incident.id}")
 
 
 def on_status_changed(incident: Incident, old_status: str) -> None:
@@ -217,8 +226,8 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
             channel_id,
             f"Incident status updated: {old_status} -> {incident.status}\n<{incident_url}|View in Firetower>",
         )
-    except Exception:
-        logger.exception(f"Error in on_status_changed for incident {incident.id}")
+    except Exception as e:
+        _handle_exception(e, f"Error in on_status_changed for incident {incident.id}")
 
 
 def on_severity_changed(incident: Incident, old_severity: str) -> None:
@@ -233,8 +242,8 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
             channel_id,
             f"Incident severity updated: {old_severity} -> {incident.severity}\n<{incident_url}|View in Firetower>",
         )
-    except Exception:
-        logger.exception(f"Error in on_severity_changed for incident {incident.id}")
+    except Exception as e:
+        _handle_exception(e, f"Error in on_severity_changed for incident {incident.id}")
 
 
 def on_title_changed(incident: Incident) -> None:
@@ -244,8 +253,8 @@ def on_title_changed(incident: Incident) -> None:
             return
 
         _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
-    except Exception:
-        logger.exception(f"Error in on_title_changed for incident {incident.id}")
+    except Exception as e:
+        _handle_exception(e, f"Error in on_title_changed for incident {incident.id}")
 
 
 def on_visibility_changed(incident: Incident) -> None:
@@ -262,8 +271,10 @@ def on_visibility_changed(incident: Incident) -> None:
             f"<{incident_url}|View in Firetower>"
         )
         _slack_service.post_message(channel_id, message)
-    except Exception:
-        logger.exception(f"Error in on_visibility_changed for incident {incident.id}")
+    except Exception as e:
+        _handle_exception(
+            e, f"Error in on_visibility_changed for incident {incident.id}"
+        )
 
 
 def on_captain_changed(incident: Incident) -> None:
@@ -288,5 +299,5 @@ def on_captain_changed(incident: Incident) -> None:
                 f"Incident captain updated to {captain_ref}\n<{incident_url}|View in Firetower>",
             )
             _invite_user_to_channel(channel_id, incident.captain)
-    except Exception:
-        logger.exception(f"Error in on_captain_changed for incident {incident.id}")
+    except Exception as e:
+        _handle_exception(e, f"Error in on_captain_changed for incident {incident.id}")
