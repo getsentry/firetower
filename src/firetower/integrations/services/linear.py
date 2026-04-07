@@ -60,8 +60,12 @@ class LinearService:
         self, url_contains: str
     ) -> list[dict[str, Any]] | None:
         query = """
-        query($url_contains: String!) {
-            attachments(filter: { url: { contains: $url_contains } }) {
+        query($url_contains: String!, $after: String) {
+            attachments(
+                first: 50,
+                after: $after,
+                filter: { url: { contains: $url_contains } }
+            ) {
                 nodes {
                     issue {
                         id
@@ -76,40 +80,57 @@ class LinearService:
                         }
                     }
                 }
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
             }
         }
         """
 
-        data = self._graphql(query, {"url_contains": url_contains})
-        if data is None:
-            return None
-
         issues: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
+        cursor: str | None = None
 
-        for node in data.get("attachments", {}).get("nodes", []):
-            issue = node.get("issue")
-            if not issue or issue["id"] in seen_ids:
-                continue
-            seen_ids.add(issue["id"])
+        while True:
+            variables: dict[str, Any] = {"url_contains": url_contains}
+            if cursor is not None:
+                variables["after"] = cursor
 
-            state_type = issue.get("state", {}).get("type", "")
-            status = LINEAR_STATE_TYPE_MAP.get(state_type, "Todo")
+            data = self._graphql(query, variables)
+            if data is None:
+                return None
 
-            assignee_email = None
-            if issue.get("assignee"):
-                assignee_email = issue["assignee"].get("email")
+            attachments = data.get("attachments", {})
 
-            issues.append(
-                {
-                    "id": issue["id"],
-                    "identifier": issue["identifier"],
-                    "title": issue["title"],
-                    "url": issue["url"],
-                    "status": status,
-                    "assignee_email": assignee_email,
-                }
-            )
+            for node in attachments.get("nodes", []):
+                issue = node.get("issue")
+                if not issue or issue["id"] in seen_ids:
+                    continue
+                seen_ids.add(issue["id"])
+
+                state_type = issue.get("state", {}).get("type", "")
+                status = LINEAR_STATE_TYPE_MAP.get(state_type, "Todo")
+
+                assignee_email = None
+                if issue.get("assignee"):
+                    assignee_email = issue["assignee"].get("email")
+
+                issues.append(
+                    {
+                        "id": issue["id"],
+                        "identifier": issue["identifier"],
+                        "title": issue["title"],
+                        "url": issue["url"],
+                        "status": status,
+                        "assignee_email": assignee_email,
+                    }
+                )
+
+            page_info = attachments.get("pageInfo", {})
+            if not page_info.get("hasNextPage"):
+                break
+            cursor = page_info.get("endCursor")
 
         logger.info(
             f"Found {len(issues)} Linear issues for URL containing '{url_contains}'"
