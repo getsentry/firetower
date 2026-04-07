@@ -229,7 +229,6 @@ SLACK: SlackSettings = {
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
 
-FIRETOWER_BASE_URL = config.firetower_base_url
 HOOKS_ENABLED = config.hooks_enabled
 
 # Linear Integration Configuration
