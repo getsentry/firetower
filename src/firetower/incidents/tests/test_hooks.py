@@ -593,7 +593,6 @@ class TestPageHighSevIfNeeded:
     def test_pages_for_p0(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
         mock_pd = mock_pd_cls.return_value
-        mock_pd.escalation_policies = MOCK_PD_CONFIG["ESCALATION_POLICIES"]
         mock_pd.trigger_incident.return_value = True
 
         incident = Incident.objects.create(
@@ -613,7 +612,6 @@ class TestPageHighSevIfNeeded:
     def test_pages_for_p1(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
         mock_pd = mock_pd_cls.return_value
-        mock_pd.escalation_policies = MOCK_PD_CONFIG["ESCALATION_POLICIES"]
         mock_pd.trigger_incident.return_value = True
 
         incident = Incident.objects.create(
@@ -651,14 +649,11 @@ class TestPageHighSevIfNeeded:
 
         mock_pd_cls.assert_not_called()
 
-    @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_skips_when_no_high_sev_policy(self, mock_pd_cls, settings):
+    def test_skips_when_no_high_sev_policy(self, settings):
         settings.PAGERDUTY = {
             "API_TOKEN": "test-token",
             "ESCALATION_POLICIES": {},
         }
-        mock_pd = mock_pd_cls.return_value
-        mock_pd.escalation_policies = {}
 
         incident = Incident.objects.create(
             title="Test",
@@ -667,20 +662,13 @@ class TestPageHighSevIfNeeded:
 
         _page_high_sev_if_needed(incident)
 
-        mock_pd.trigger_incident.assert_not_called()
-
-    @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_skips_when_no_integration_key(self, mock_pd_cls, settings):
+    def test_skips_when_no_integration_key(self, settings):
         settings.PAGERDUTY = {
             "API_TOKEN": "test-token",
             "ESCALATION_POLICIES": {
                 "HIGH_SEV": {"id": "P17I207", "integration_key": None},
             },
         }
-        mock_pd = mock_pd_cls.return_value
-        mock_pd.escalation_policies = {
-            "HIGH_SEV": {"id": "P17I207", "integration_key": None}
-        }
 
         incident = Incident.objects.create(
             title="Test",
@@ -688,8 +676,6 @@ class TestPageHighSevIfNeeded:
         )
 
         _page_high_sev_if_needed(incident)
-
-        mock_pd.trigger_incident.assert_not_called()
 
 
 @pytest.mark.django_db

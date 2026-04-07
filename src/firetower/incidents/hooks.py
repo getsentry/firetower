@@ -33,11 +33,12 @@ def _page_high_sev_if_needed(incident: Incident) -> None:
     if incident.severity not in PAGEABLE_SEVERITIES:
         return
 
-    pd_service = _get_pagerduty_service()
-    if not pd_service:
+    pd_config = settings.PAGERDUTY
+    if not pd_config:
         return
 
-    high_sev_policy = pd_service.escalation_policies.get("HIGH_SEV")
+    escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
+    high_sev_policy = escalation_policies.get("HIGH_SEV")
     if not high_sev_policy:
         logger.info("No HIGH_SEV escalation policy configured, skipping page")
         return
@@ -45,6 +46,10 @@ def _page_high_sev_if_needed(incident: Incident) -> None:
     integration_key = high_sev_policy.get("integration_key")
     if not integration_key:
         logger.info("No integration_key for HIGH_SEV escalation policy, skipping page")
+        return
+
+    pd_service = _get_pagerduty_service()
+    if not pd_service:
         return
 
     dedup_key = f"firetower-{incident.incident_number}"
