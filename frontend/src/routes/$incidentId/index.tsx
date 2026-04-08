@@ -1,9 +1,10 @@
-import {useEffect} from 'react';
+import {Suspense, useEffect} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {Card} from 'components/Card';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
+import {Skeleton} from 'components/Skeleton';
 
 import {ActionItemsList} from './components/ActionItemsList';
 import {IncidentDetailSkeleton} from './components/IncidentDetailSkeleton';
@@ -36,6 +37,22 @@ export const Route = createFileRoute('/$incidentId/')({
   ),
 });
 
+function ActionItemsSkeleton() {
+  return (
+    <Card>
+      <div className="mb-space-lg flex items-center justify-between">
+        <Skeleton className="h-7 w-32" />
+        <Skeleton className="h-8 w-8 rounded-full" />
+      </div>
+      <div className="gap-space-md flex flex-col">
+        <Skeleton className="rounded-radius-md h-16 w-full" />
+        <Skeleton className="rounded-radius-md h-16 w-full" />
+        <Skeleton className="rounded-radius-md h-16 w-full" />
+      </div>
+    </Card>
+  );
+}
+
 function Incident() {
   const params = Route.useParams();
   const {data: inc_or_redir} = useSuspenseQuery(incidentDetailQueryOptions(params));
@@ -64,11 +81,12 @@ function Incident() {
 
       <div className="flex flex-col gap-4 md:flex-row">
         <section className="flex flex-col gap-4 md:flex-[2]">
-          <ActionItemsList
-            incidentId={params.incidentId}
-            incidentTitle={incident.title}
-            actionItems={incident.action_items}
-          />
+          <Suspense fallback={<ActionItemsSkeleton />}>
+            <ActionItemsList
+              incidentId={params.incidentId}
+              incidentTitle={incident.title}
+            />
+          </Suspense>
           <Card>
             <div className="text-content-muted p-12 text-center">
               <p className="mb-2 text-lg">

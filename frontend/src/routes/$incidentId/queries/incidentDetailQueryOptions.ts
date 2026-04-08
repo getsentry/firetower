@@ -22,20 +22,6 @@ const ExternalLinksSchema = z.object({
   linear: z.string().optional(),
 });
 
-const ActionItemStatusSchema = z.enum(['Todo', 'In Progress', 'Done', 'Cancelled']);
-
-const ActionItemSchema = z.object({
-  linear_identifier: z.string(),
-  title: z.string(),
-  status: ActionItemStatusSchema,
-  assignee_name: z.string().nullable(),
-  assignee_avatar_url: z.string().nullable(),
-  url: z.string(),
-});
-
-export type ActionItem = z.infer<typeof ActionItemSchema>;
-export type ActionItemStatus = z.infer<typeof ActionItemStatusSchema>;
-
 const IncidentDetailSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -53,7 +39,6 @@ const IncidentDetailSchema = z.object({
   impact_type_tags: z.array(z.string()),
   participants: z.array(ParticipantSchema),
   external_links: ExternalLinksSchema,
-  action_items: z.array(ActionItemSchema),
   time_started: z.string().nullable(),
   time_detected: z.string().nullable(),
   time_analyzed: z.string().nullable(),

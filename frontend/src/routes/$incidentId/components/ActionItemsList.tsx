@@ -1,3 +1,4 @@
+import {useSuspenseQuery} from '@tanstack/react-query';
 import {Avatar} from 'components/Avatar';
 import {buttonVariants} from 'components/Button';
 import {Card} from 'components/Card';
@@ -5,7 +6,8 @@ import {Pill} from 'components/Pill';
 import {Plus} from 'lucide-react';
 import {cn} from 'utils/cn';
 
-import type {ActionItem, ActionItemStatus} from '../queries/incidentDetailQueryOptions';
+import type {ActionItem, ActionItemStatus} from '../queries/actionItemsQueryOptions';
+import {actionItemsQueryOptions} from '../queries/actionItemsQueryOptions';
 
 const STATUS_CONFIG: Record<
   ActionItemStatus,
@@ -68,14 +70,11 @@ function buildLinearNewUrl(incidentId: string, incidentTitle: string): string {
 interface ActionItemsListProps {
   incidentId: string;
   incidentTitle: string;
-  actionItems: ActionItem[];
 }
 
-export function ActionItemsList({
-  incidentId,
-  incidentTitle,
-  actionItems,
-}: ActionItemsListProps) {
+export function ActionItemsList({incidentId, incidentTitle}: ActionItemsListProps) {
+  const {data: actionItems} = useSuspenseQuery(actionItemsQueryOptions({incidentId}));
+
   return (
     <Card>
       <div className="mb-space-lg flex items-center justify-between">
