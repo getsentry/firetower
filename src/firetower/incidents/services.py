@@ -171,6 +171,8 @@ def sync_action_items_from_linear(
         error_msg = f"Failed to fetch Linear issues for incident {incident.id}"
         logger.error(error_msg)
         stats.errors.append(error_msg)
+        incident.action_items_last_synced_at = timezone.now()
+        incident.save(update_fields=["action_items_last_synced_at"])
         return stats
 
     logger.info(f"Syncing {len(issues)} Linear issues to incident {incident.id}")
