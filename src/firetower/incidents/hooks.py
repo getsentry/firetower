@@ -28,7 +28,7 @@ def _build_channel_topic(
     incident: Incident, captain_slack_id: str | None = None
 ) -> str:
     base_url = settings.FIRETOWER_BASE_URL
-    incident_url = f"{base_url}/{incident.incident_number}"
+    incident_url = f"{base_url}/{incident.incident_number}/"
 
     ic_part = ""
     if incident.captain:
@@ -59,7 +59,7 @@ def _build_channel_topic(
 
 
 def _build_incident_url(incident: Incident) -> str:
-    return f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
+    return f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}/"
 
 
 def _get_channel_id(incident: Incident) -> str | None:

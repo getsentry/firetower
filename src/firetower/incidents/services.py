@@ -3,14 +3,20 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.utils import timezone
 
-from firetower.auth.services import get_or_create_user_from_slack_id
-from firetower.incidents.models import ExternalLinkType, Incident
-from firetower.integrations.services import SlackService
+from firetower.auth.models import ExternalProfile, ExternalProfileType
+from firetower.auth.services import (
+    get_or_create_user_from_email,
+    get_or_create_user_from_slack_id,
+)
+from firetower.incidents.models import ActionItem, ExternalLinkType, Incident
+from firetower.integrations.services import LinearService, SlackService
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
+_linear_service = LinearService()
 
 
 @dataclass
@@ -114,6 +120,102 @@ def sync_incident_participants_from_slack(
     logger.info(
         f"Sync complete for incident {incident.id}: {stats.added} added, "
         f"{stats.already_existed} already existed, {len(stats.errors)} errors"
+    )
+
+    return stats
+
+
+@dataclass
+class ActionItemsSyncStats:
+    created: int = 0
+    updated: int = 0
+    deleted: int = 0
+    errors: list[str] = field(default_factory=list)
+    skipped: bool = False
+
+
+def _resolve_assignee_by_email(email: str) -> User | None:
+    user = get_or_create_user_from_email(email)
+    if not user:
+        return None
+    ExternalProfile.objects.get_or_create(
+        user=user,
+        type=ExternalProfileType.LINEAR,
+        defaults={"external_id": email},
+    )
+    return user
+
+
+def sync_action_items_from_linear(
+    incident: Incident, force: bool = False
+) -> ActionItemsSyncStats:
+    stats = ActionItemsSyncStats()
+
+    if not force and incident.action_items_last_synced_at:
+        time_since_sync = timezone.now() - incident.action_items_last_synced_at
+        if time_since_sync < timedelta(
+            seconds=settings.ACTION_ITEM_SYNC_THROTTLE_SECONDS
+        ):
+            logger.info(
+                f"Skipping action item sync for incident {incident.id} - synced {time_since_sync.total_seconds():.0f}s ago"
+            )
+            stats.skipped = True
+            return stats
+
+    firetower_url = (
+        f"{settings.FIRETOWER_BASE_URL}/{settings.PROJECT_KEY}-{incident.id}/"
+    )
+    issues = _linear_service.get_issues_by_attachment_url(firetower_url)
+
+    if issues is None:
+        error_msg = f"Failed to fetch Linear issues for incident {incident.id}"
+        logger.error(error_msg)
+        stats.errors.append(error_msg)
+        incident.action_items_last_synced_at = timezone.now()
+        incident.save(update_fields=["action_items_last_synced_at"])
+        return stats
+
+    logger.info(f"Syncing {len(issues)} Linear issues to incident {incident.id}")
+
+    seen_linear_ids: set[str] = set()
+
+    for issue in issues:
+        seen_linear_ids.add(issue["id"])
+
+        assignee = None
+        if issue.get("assignee_email"):
+            assignee = _resolve_assignee_by_email(issue["assignee_email"])
+
+        _, created = ActionItem.objects.update_or_create(
+            linear_issue_id=issue["id"],
+            defaults={
+                "incident": incident,
+                "linear_identifier": issue["identifier"],
+                "title": issue["title"],
+                "status": issue["status"],
+                "assignee": assignee,
+                "url": issue["url"],
+            },
+        )
+
+        if created:
+            stats.created += 1
+        else:
+            stats.updated += 1
+
+    deleted_count, _ = (
+        ActionItem.objects.filter(incident=incident)
+        .exclude(linear_issue_id__in=seen_linear_ids)
+        .delete()
+    )
+    stats.deleted = deleted_count
+
+    incident.action_items_last_synced_at = timezone.now()
+    incident.save(update_fields=["action_items_last_synced_at"])
+
+    logger.info(
+        f"Action item sync complete for incident {incident.id}: "
+        f"{stats.created} created, {stats.updated} updated, {stats.deleted} deleted"
     )
 
     return stats

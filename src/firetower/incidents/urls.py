@@ -5,8 +5,10 @@ from .views import (
     IncidentListCreateAPIView,
     IncidentRetrieveUpdateAPIView,
     TagListCreateAPIView,
+    action_item_list,
     incident_detail_ui,
     incident_list_ui,
+    sync_action_items,
     sync_incident_participants,
 )
 
@@ -19,6 +21,11 @@ urlpatterns = [
         incident_detail_ui,
         name="incident-detail-ui",
     ),
+    path(
+        "ui/incidents/<str:incident_id>/action-items/",
+        action_item_list,
+        name="action-item-list",
+    ),
     # Service API endpoints
     path(
         "incidents/",
@@ -29,6 +36,11 @@ urlpatterns = [
         "incidents/<str:incident_id>/",
         IncidentRetrieveUpdateAPIView.as_view(),
         name="incident-retrieve-update",
+    ),
+    path(
+        "incidents/<str:incident_id>/sync-action-items/",
+        sync_action_items,
+        name="sync-action-items",
     ),
     path(
         "incidents/<str:incident_id>/sync-participants/",
