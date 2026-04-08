@@ -7,7 +7,7 @@ from django.conf import settings
 from django.db.models import Count, QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import generics, serializers
+from rest_framework import generics, permissions, serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -23,7 +23,6 @@ from .filters import (
     filter_by_tags,
 )
 from .models import (
-    INCIDENT_ID_START,
     Incident,
     IncidentOrRedirect,
     ServiceTier,
@@ -40,6 +39,7 @@ from .reporting_utils import (
     get_year_periods,
 )
 from .serializers import (
+    IncidentImportSerializer,
     IncidentListUISerializer,
     IncidentOrRedirectReadSerializer,
     IncidentReadSerializer,
@@ -130,10 +130,6 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
             )
 
         numeric_id = int(match.group(1))
-        if numeric_id < INCIDENT_ID_START:
-            return IncidentOrRedirect(
-                redirect=f"{settings.JIRA['DOMAIN']}/browse/{project_key}-{numeric_id}"
-            )
 
         # Get incident by numeric ID
         queryset = self.get_queryset()
@@ -264,6 +260,13 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
             )
 
         return obj
+
+
+class IncidentImportAPIView(generics.CreateAPIView):
+    """Temporary: admin-only endpoint for one-time Jira incident migration."""
+
+    serializer_class = IncidentImportSerializer
+    permission_classes = [permissions.IsAdminUser]
 
 
 class SyncIncidentParticipantsView(generics.GenericAPIView):

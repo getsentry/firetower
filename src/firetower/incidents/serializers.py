@@ -4,6 +4,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models.functions import Lower
 from rest_framework import serializers
 
@@ -18,6 +19,7 @@ from .hooks import (
     on_visibility_changed,
 )
 from .models import (
+    INCIDENT_ID_START,
     USER_ADDABLE_TAG_TYPES,
     ExternalLink,
     ExternalLinkType,
@@ -456,22 +458,16 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
         return value
 
-    def create(self, validated_data: dict) -> Incident:
-        """Create incident with external links and tags"""
-        external_links_data = validated_data.pop("external_links", None)
-        affected_service_tag_names = validated_data.pop(
-            "affected_service_tag_names", None
-        )
-        affected_region_tag_names = validated_data.pop(
-            "affected_region_tag_names", None
-        )
-        root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
-        impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
-
-        # Create the incident
-        incident = super().create(validated_data)
-
-        # Create external links if provided
+    def _set_tags_and_links(
+        self,
+        incident: Incident,
+        external_links_data: dict[str, str | None] | None,
+        affected_service_tag_names: list[str] | None,
+        affected_region_tag_names: list[str] | None,
+        root_cause_tag_names: list[str] | None,
+        impact_type_tag_names: list[str] | None,
+    ) -> None:
+        """Set external links and tags on a newly created incident."""
         if external_links_data:
             for link_type, url in external_links_data.items():
                 if url is not None:  # Skip null values on create
@@ -481,7 +477,6 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                         url=url,
                     )
 
-        # Set tags if provided
         if affected_service_tag_names:
             tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
                 name_lower__in=[n.lower() for n in affected_service_tag_names],
@@ -510,9 +505,32 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             )
             incident.impact_type_tags.set(tags)
 
+    def create(self, validated_data: dict, skip_hooks: bool = False) -> Incident:
+        """Create incident with external links and tags"""
+        external_links_data = validated_data.pop("external_links", None)
+        affected_service_tag_names = validated_data.pop(
+            "affected_service_tag_names", None
+        )
+        affected_region_tag_names = validated_data.pop(
+            "affected_region_tag_names", None
+        )
+        root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
+        impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
+
+        incident = super().create(validated_data)
+
+        self._set_tags_and_links(
+            incident,
+            external_links_data,
+            affected_service_tag_names,
+            affected_region_tag_names,
+            root_cause_tag_names,
+            impact_type_tag_names,
+        )
+
         # Runs synchronously — Slack API calls may add latency to the response.
         # Consider deferring to a background task if this becomes a problem.
-        if settings.HOOKS_ENABLED:
+        if settings.HOOKS_ENABLED and not skip_hooks:
             on_incident_created(incident)
 
         return incident
@@ -607,6 +625,50 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                 on_visibility_changed(instance)
 
         return instance
+
+
+class IncidentImportSerializer(IncidentWriteSerializer):
+    """Temporary: used for one-time Jira incident migration."""
+
+    id = serializers.IntegerField(required=True)
+    created_at = serializers.DateTimeField(required=False)
+    updated_at = serializers.DateTimeField(required=False)
+
+    class Meta(IncidentWriteSerializer.Meta):
+        fields = [*IncidentWriteSerializer.Meta.fields, "created_at", "updated_at"]
+
+    def validate_id(self, value: int) -> int:
+        if value < 1:
+            raise serializers.ValidationError("ID must be >= 1.")
+        if value >= INCIDENT_ID_START:
+            raise serializers.ValidationError(
+                f"ID must be less than {INCIDENT_ID_START}."
+            )
+        if Incident.objects.filter(pk=value).exists():
+            raise serializers.ValidationError(
+                f"Incident with ID {value} already exists."
+            )
+        return value
+
+    @transaction.atomic
+    def create(self, validated_data: dict, skip_hooks: bool = False) -> Incident:
+        created_at = validated_data.pop("created_at", None)
+        updated_at = validated_data.pop("updated_at", None)
+
+        # Always skip hooks — no Slack channel creation or notifications for
+        # historical incidents being imported from Jira.
+        incident = super().create(validated_data, skip_hooks=True)
+
+        timestamp_updates = {}
+        if created_at is not None:
+            timestamp_updates["created_at"] = created_at
+        if updated_at is not None:
+            timestamp_updates["updated_at"] = updated_at
+        if timestamp_updates:
+            Incident.objects.filter(pk=incident.pk).update(**timestamp_updates)
+            incident.refresh_from_db()
+
+        return incident
 
 
 class TagSerializer(serializers.ModelSerializer):
