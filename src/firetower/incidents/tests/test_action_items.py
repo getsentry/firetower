@@ -431,7 +431,7 @@ class TestActionItemViews:
             mock_sync.return_value = ActionItemsSyncStats(created=1)
 
             response = self.client.post(
-                f"/api/ui/incidents/{incident.incident_number}/action-items/sync/"
+                f"/api/incidents/{incident.incident_number}/sync-action-items/"
             )
 
         assert response.status_code == 200
