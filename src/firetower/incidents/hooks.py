@@ -175,6 +175,7 @@ def on_incident_created(incident: Incident) -> None:
                 slack_link.save(update_fields=["url"])
         except Exception:
             slack_link.delete()
+            channel_id = None
             logger.exception(
                 f"Failed to create Slack channel for incident {incident.id}"
             )
