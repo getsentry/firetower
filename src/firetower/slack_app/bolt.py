@@ -22,6 +22,10 @@ from firetower.slack_app.handlers.resolved import (
 )
 from firetower.slack_app.handlers.severity import handle_severity_command
 from firetower.slack_app.handlers.subject import handle_subject_command
+from firetower.slack_app.handlers.update_incident import (
+    handle_update_command,
+    handle_update_incident_submission,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,8 @@ KNOWN_SUBCOMMANDS = {
     "sev",
     "setseverity",
     "subject",
+    "update",
+    "edit",
 }
 
 _bolt_app: App | None = None
@@ -87,6 +93,8 @@ def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
                 respond(f"Usage: `{cmd} severity <P0-P4>`")
             else:
                 handle_severity_command(ack, body, command, respond, new_severity=args)
+        elif subcommand in ("update", "edit"):
+            handle_update_command(ack, body, command, respond)
         elif subcommand == "subject":
             if not args:
                 ack()
@@ -110,6 +118,7 @@ def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
 def _register_views(app: App) -> None:
     """Register view handlers (modals, etc.) on the Bolt app."""
     app.view("new_incident_modal")(handle_new_incident_submission)
+    app.view("update_incident_modal")(handle_update_incident_submission)
     app.view("mitigated_incident_modal")(handle_mitigated_submission)
     app.view("resolved_incident_modal")(handle_resolved_submission)
     for action_id in (
