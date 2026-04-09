@@ -30,6 +30,7 @@ export function PillFilter<T extends PillVariant>({
     setInputValue,
     setFocusedIndex,
     toggle,
+    remove,
     open,
     close,
     handleKeyDown,
@@ -55,7 +56,7 @@ export function PillFilter<T extends PillVariant>({
 
       <div className={cn('relative', isEditing && 'z-50')}>
         {isEditing ? (
-          <div className="gap-space-sm flex flex-wrap items-center">
+          <div className="gap-space-sm flex flex-wrap items-center select-none">
             {selected.map(v => (
               <Tag
                 key={v}
@@ -87,15 +88,38 @@ export function PillFilter<T extends PillVariant>({
             />
           </div>
         ) : selected.length > 0 ? (
-          <div className="gap-space-sm flex flex-wrap">
+          <div className="gap-space-sm flex flex-wrap select-none">
             {selected.map(v => (
-              <Tag key={v}>
+              <Tag
+                key={v}
+                className="cursor-pointer"
+                onClick={open}
+                action={
+                  <Button
+                    variant="close"
+                    size={null}
+                    onClick={e => {
+                      e.stopPropagation();
+                      remove(v);
+                    }}
+                    aria-label={`Remove ${v}`}
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              >
                 <Pill variant={v as T}>{v}</Pill>
               </Tag>
             ))}
           </div>
         ) : (
-          <p className="text-size-sm text-content-disabled italic">Any</p>
+          <button
+            type="button"
+            className="text-size-sm text-content-disabled cursor-pointer select-none italic"
+            onClick={open}
+          >
+            Any
+          </button>
         )}
 
         {isEditing && available.length > 0 && (

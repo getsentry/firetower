@@ -33,6 +33,25 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
     );
   }, []);
 
+  const remove = useCallback(
+    (value: string) => {
+      navigate({
+        to: '/',
+        search: (s: Record<string, unknown>) => {
+          const current = ((s[filterKey] as string[] | undefined) ?? []).filter(
+            v => v !== value
+          );
+          return {
+            ...s,
+            [filterKey]: current.length > 0 ? current : undefined,
+          };
+        },
+        replace: true,
+      });
+    },
+    [navigate, filterKey]
+  );
+
   const close = useCallback(() => {
     setIsEditing(false);
     setInputValue('');
@@ -117,6 +136,7 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
     setInputValue,
     setFocusedIndex,
     toggle,
+    remove,
     open,
     close,
     handleKeyDown,
