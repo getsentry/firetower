@@ -2,7 +2,6 @@ from django.urls import path
 
 from .views import (
     AvailabilityView,
-    IncidentImportAPIView,
     IncidentListCreateAPIView,
     IncidentRetrieveUpdateAPIView,
     TagListCreateAPIView,
@@ -21,12 +20,6 @@ urlpatterns = [
         name="incident-detail-ui",
     ),
     # Service API endpoints
-    # Temporary: one-time Jira migration import endpoint
-    path(
-        "incidents/import/",
-        IncidentImportAPIView.as_view(),
-        name="incident-import",
-    ),
     path(
         "incidents/",
         IncidentListCreateAPIView.as_view(),
