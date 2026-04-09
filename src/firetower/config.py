@@ -27,11 +27,6 @@ class DatadogConfig:
 
 
 @deserialize
-class JIRAConfig:
-    domain: str
-
-
-@deserialize
 class SlackConfig:
     bot_token: str
     team_id: str
@@ -56,7 +51,6 @@ class ConfigFile:
 
     postgres: PostgresConfig
     datadog: DatadogConfig | None
-    jira: JIRAConfig
     slack: SlackConfig
     auth: AuthConfig
 
@@ -109,9 +103,6 @@ class DummyConfigFile(ConfigFile):
             host="localhost",
             user="postgres",
             password="dummy_dev_password",
-        )
-        self.jira = JIRAConfig(
-            domain="",
         )
         self.slack = SlackConfig(
             bot_token="",

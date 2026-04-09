@@ -215,11 +215,6 @@ STATIC_ROOT = "static/backend/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Jira Integration Configuration
-JIRA = {
-    "DOMAIN": config.jira.domain,
-}
-
 
 class SlackSettings(TypedDict):
     BOT_TOKEN: str

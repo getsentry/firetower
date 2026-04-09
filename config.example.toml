@@ -10,12 +10,6 @@ host = "localhost"
 user = "postgres"
 password = "dummy_dev_password"
 
-[jira]
-domain = "https://<jira-domain>.atlassian.net"
-account = ""
-api_key = ""
-severity_field = "customfield_11023"
-
 [slack]
 bot_token = ""
 team_id = "<slack-team-id>"
