@@ -10,21 +10,6 @@ export type ArrayFilterKey =
   | 'captain'
   | 'reporter';
 
-type DateFilterKey = 'created_after' | 'created_before';
-
-export const FILTER_LABELS: Record<ArrayFilterKey | DateFilterKey, string> = {
-  severity: 'Severity',
-  service_tier: 'Service Tier',
-  affected_service: 'Affected Service',
-  root_cause: 'Root Cause',
-  impact_type: 'Impact Type',
-  affected_region: 'Affected Region',
-  captain: 'Captain',
-  reporter: 'Reporter',
-  created_after: 'Created After',
-  created_before: 'Created Before',
-};
-
 export const ARRAY_FILTER_KEYS: ArrayFilterKey[] = [
   'severity',
   'service_tier',
@@ -39,18 +24,13 @@ export const ARRAY_FILTER_KEYS: ArrayFilterKey[] = [
 export function useActiveFilters() {
   const search = useSearch({from: '/'});
 
-  const activeFilters: {key: ArrayFilterKey; value: string; label: string}[] = [];
+  let activeCount = 0;
   for (const key of ARRAY_FILTER_KEYS) {
     const values = (search[key] as string[] | undefined) ?? [];
-    for (const value of values) {
-      activeFilters.push({key, value, label: FILTER_LABELS[key]});
-    }
+    activeCount += values.length;
   }
-
-  const activeCount =
-    activeFilters.length +
-    (search.created_after ? 1 : 0) +
-    (search.created_before ? 1 : 0);
+  if (search.created_after) activeCount++;
+  if (search.created_before) activeCount++;
 
   return {search, activeCount};
 }
