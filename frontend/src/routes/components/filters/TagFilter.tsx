@@ -45,7 +45,7 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
           variant="icon"
           onClick={open}
           aria-label={`Edit ${label}`}
-          className={cn(isEditing && 'invisible')}
+          className={cn('transition-none', isEditing && 'invisible')}
         >
           <Pencil className="h-4 w-4" />
         </Button>
