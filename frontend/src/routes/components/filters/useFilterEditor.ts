@@ -17,6 +17,12 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
   const draftRef = useRef<string[]>(draft);
+  const onCloseRef = useRef(onClose);
+  const onOpenRef = useRef(onOpen);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    onOpenRef.current = onOpen;
+  });
   const [inputValue, setInputValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,7 +62,7 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
     setIsEditing(false);
     setInputValue('');
     setFocusedIndex(0);
-    onClose?.();
+    onCloseRef.current?.();
     const current = draftRef.current;
     navigate({
       to: '/',
@@ -66,14 +72,14 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
       }),
       replace: true,
     });
-  }, [navigate, filterKey, onClose]);
+  }, [navigate, filterKey]);
 
   const open = () => {
     setDraft(committed);
     setIsEditing(true);
     setInputValue('');
     setFocusedIndex(0);
-    onOpen?.();
+    onOpenRef.current?.();
   };
 
   useEffect(() => {
