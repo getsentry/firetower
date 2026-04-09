@@ -10,7 +10,7 @@ export type ArrayFilterKey =
   | 'captain'
   | 'reporter';
 
-export type DateFilterKey = 'created_after' | 'created_before';
+type DateFilterKey = 'created_after' | 'created_before';
 
 export const FILTER_LABELS: Record<ArrayFilterKey | DateFilterKey, string> = {
   severity: 'Severity',
@@ -52,5 +52,5 @@ export function useActiveFilters() {
     (search.created_after ? 1 : 0) +
     (search.created_before ? 1 : 0);
 
-  return {search, activeFilters, activeCount};
+  return {search, activeCount};
 }
