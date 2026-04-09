@@ -16,11 +16,16 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
   const committed = ((search[filterKey] as string[] | undefined) ?? []) as string[];
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
+  const draftRef = useRef<string[]>(draft);
   const [inputValue, setInputValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = isEditing ? draft : committed;
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   const toggle = useCallback((value: string) => {
     setDraft(prev =>
@@ -33,16 +38,14 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
     setInputValue('');
     setFocusedIndex(0);
     onClose?.();
-    setDraft(prev => {
-      navigate({
-        to: '/',
-        search: (s: Record<string, unknown>) => ({
-          ...s,
-          [filterKey]: prev.length > 0 ? prev : undefined,
-        }),
-        replace: true,
-      });
-      return prev;
+    const current = draftRef.current;
+    navigate({
+      to: '/',
+      search: (s: Record<string, unknown>) => ({
+        ...s,
+        [filterKey]: current.length > 0 ? current : undefined,
+      }),
+      replace: true,
     });
   }, [navigate, filterKey, onClose]);
 
