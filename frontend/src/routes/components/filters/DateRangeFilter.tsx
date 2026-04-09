@@ -3,6 +3,7 @@ import {useNavigate} from '@tanstack/react-router';
 import {Button} from 'components/Button';
 import {Calendar} from 'components/Calendar';
 import {Popover, PopoverContent, PopoverTrigger} from 'components/Popover';
+import {Tag} from 'components/Tag';
 import {XIcon} from 'lucide-react';
 
 import {useActiveFilters} from '../useActiveFilters';
@@ -58,71 +59,95 @@ export function DateRangeFilter() {
         </h3>
       </div>
       <div className="gap-space-xs flex flex-wrap items-center">
-        <div className="flex items-center gap-space-xs">
-          <Popover
-            open={editing === 'after'}
-            onOpenChange={o => setEditing(o ? 'after' : null)}
-          >
-            <PopoverTrigger asChild>
-              <Button variant="secondary" className="text-size-sm">
-                {after ? formatDateDisplay(after) : 'Any'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={afterDate}
-                defaultMonth={afterDate}
-                captionLayout="dropdown"
-                showOutsideDays={false}
-                onSelect={d => handleDateSelect('created_after', d)}
-              />
-            </PopoverContent>
-          </Popover>
-          {after && (
-            <Button
-              variant="close"
-              onClick={() => update('created_after', undefined)}
-              aria-label="Clear start date"
-              size={null}
-            >
-              <XIcon className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
+        <Popover
+          open={editing === 'after'}
+          onOpenChange={o => setEditing(o ? 'after' : null)}
+        >
+          <PopoverTrigger asChild>
+            {after ? (
+              <Tag
+                className="cursor-pointer select-none"
+                action={
+                  <Button
+                    variant="close"
+                    size={null}
+                    onClick={e => {
+                      e.stopPropagation();
+                      update('created_after', undefined);
+                    }}
+                    aria-label="Clear start date"
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              >
+                {formatDateDisplay(after)}
+              </Tag>
+            ) : (
+              <button
+                type="button"
+                className="text-size-sm text-content-disabled cursor-pointer select-none italic"
+              >
+                Any
+              </button>
+            )}
+          </PopoverTrigger>
+          <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={afterDate}
+              defaultMonth={afterDate}
+              captionLayout="dropdown"
+              showOutsideDays={false}
+              onSelect={d => handleDateSelect('created_after', d)}
+            />
+          </PopoverContent>
+        </Popover>
         <span className="text-content-disabled text-size-sm">to</span>
-        <div className="flex items-center gap-space-xs">
-          <Popover
-            open={editing === 'before'}
-            onOpenChange={o => setEditing(o ? 'before' : null)}
-          >
-            <PopoverTrigger asChild>
-              <Button variant="secondary" className="text-size-sm">
-                {before ? formatDateDisplay(before) : 'Any'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={beforeDate}
-                defaultMonth={beforeDate}
-                captionLayout="dropdown"
-                showOutsideDays={false}
-                onSelect={d => handleDateSelect('created_before', d)}
-              />
-            </PopoverContent>
-          </Popover>
-          {before && (
-            <Button
-              variant="close"
-              onClick={() => update('created_before', undefined)}
-              aria-label="Clear end date"
-              size={null}
-            >
-              <XIcon className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
+        <Popover
+          open={editing === 'before'}
+          onOpenChange={o => setEditing(o ? 'before' : null)}
+        >
+          <PopoverTrigger asChild>
+            {before ? (
+              <Tag
+                className="cursor-pointer select-none"
+                action={
+                  <Button
+                    variant="close"
+                    size={null}
+                    onClick={e => {
+                      e.stopPropagation();
+                      update('created_before', undefined);
+                    }}
+                    aria-label="Clear end date"
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              >
+                {formatDateDisplay(before)}
+              </Tag>
+            ) : (
+              <button
+                type="button"
+                className="text-size-sm text-content-disabled cursor-pointer select-none italic"
+              >
+                Any
+              </button>
+            )}
+          </PopoverTrigger>
+          <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={beforeDate}
+              defaultMonth={beforeDate}
+              captionLayout="dropdown"
+              showOutsideDays={false}
+              onSelect={d => handleDateSelect('created_before', d)}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );
