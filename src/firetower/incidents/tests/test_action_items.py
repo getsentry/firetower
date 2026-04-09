@@ -249,7 +249,7 @@ class TestSyncActionItemsFromLinear:
 
 @pytest.mark.django_db
 class TestLinearService:
-    def test_graphql_returns_none_without_api_key(self):
+    def test_graphql_returns_none_without_credentials(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
             mock_settings.LINEAR = {}
             service = LinearService()
@@ -258,7 +258,7 @@ class TestLinearService:
 
     def test_get_issues_maps_state_types(self):
         mock_response = {
-            "attachments": {
+            "attachmentsForURL": {
                 "nodes": [
                     {
                         "issue": {
@@ -295,7 +295,10 @@ class TestLinearService:
         }
 
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
-            mock_settings.LINEAR = {"API_KEY": "test-key"}
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "test-id",
+                "CLIENT_SECRET": "test-secret",
+            }
             service = LinearService()
 
         with patch.object(service, "_graphql", return_value=mock_response):
@@ -310,7 +313,7 @@ class TestLinearService:
 
     def test_get_issues_deduplicates(self):
         mock_response = {
-            "attachments": {
+            "attachmentsForURL": {
                 "nodes": [
                     {
                         "issue": {
@@ -337,7 +340,10 @@ class TestLinearService:
         }
 
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
-            mock_settings.LINEAR = {"API_KEY": "test-key"}
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "test-id",
+                "CLIENT_SECRET": "test-secret",
+            }
             service = LinearService()
 
         with patch.object(service, "_graphql", return_value=mock_response):
