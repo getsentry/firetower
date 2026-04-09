@@ -2,10 +2,10 @@ import {Link, useSearch} from '@tanstack/react-router';
 import {arraysEqual} from 'utils/arrays';
 import {cn} from 'utils/cn';
 
-import {STATUS_FILTER_GROUPS, type IncidentStatus} from '../types';
+import {STATUS_FILTER_GROUPS, type StatusFilterValue} from '../types';
 
 interface FilterLinkProps {
-  statuses?: IncidentStatus[];
+  statuses?: StatusFilterValue[];
   label: string;
   isActive: boolean;
   testId?: string;
