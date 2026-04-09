@@ -30,7 +30,8 @@ iap_enabled = false
 iap_audience = ""
 
 [linear]
-api_key = ""
+client_id = ""
+client_secret = ""
 action_item_sync_throttle_seconds = 300
 
 [datadog]

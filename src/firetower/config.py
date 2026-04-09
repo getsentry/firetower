@@ -47,7 +47,8 @@ class SlackConfig:
 
 @deserialize
 class LinearConfig:
-    api_key: str
+    client_id: str
+    client_secret: str
     action_item_sync_throttle_seconds: int
 
 

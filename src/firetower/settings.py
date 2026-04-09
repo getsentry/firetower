@@ -251,7 +251,8 @@ HOOKS_ENABLED = config.hooks_enabled
 # Linear Integration Configuration
 LINEAR = (
     {
-        "API_KEY": config.linear.api_key,
+        "CLIENT_ID": config.linear.client_id,
+        "CLIENT_SECRET": config.linear.client_secret,
     }
     if config.linear
     else {}
