@@ -18,9 +18,10 @@ export const Header = () => {
   const {data: currentUser} = useQuery(currentUserQueryOptions());
   const pathname = routerState.location.pathname;
 
-  const isTopLevelRoute = NAV_PAGES.some(
-    page => pathname === page.to || pathname === `${page.to}/`
-  );
+  const isActivePage = (to: string) =>
+    pathname === to || (to !== '/' && pathname === `${to}/`);
+
+  const isTopLevelRoute = NAV_PAGES.some(page => isActivePage(page.to));
 
   const getPreservedSearch = (): {status?: StatusFilterValue[]} | undefined => {
     const stored = sessionStorage.getItem(STORAGE_KEY);
@@ -49,12 +50,9 @@ export const Header = () => {
                   preload="intent"
                   className={cn(
                     'rounded-radius-sm px-space-lg py-space-sm text-size-sm font-medium transition-colors',
-                    {
-                      'bg-background-secondary text-content-headings':
-                        pathname === page.to || pathname === `${page.to}/`,
-                      'text-content-secondary hover:text-content-headings':
-                        pathname !== page.to && pathname !== `${page.to}/`,
-                    }
+                    isActivePage(page.to)
+                      ? 'bg-background-secondary text-content-headings'
+                      : 'text-content-secondary hover:text-content-headings'
                   )}
                 >
                   {page.label}
