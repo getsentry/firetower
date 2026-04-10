@@ -7,7 +7,7 @@ from .models import Incident, Tag, format_downtime_minutes
 
 _HISTORY_MONTHS = 12
 _HISTORY_QUARTERS = 8
-_HISTORY_YEARS = 3
+_HISTORY_YEARS = 4
 
 
 def get_month_periods(now: datetime) -> list[dict]:
@@ -119,6 +119,7 @@ def compute_regions(
     period_end: datetime,
     now: datetime,
     incidents_by_tag: dict[int, list[Incident]],
+    tag_group_by_id: dict[int, int] | None = None,
 ) -> list[dict]:
     effective_end = min(period_end, now)
     total_period_seconds = (effective_end - period_start).total_seconds()
@@ -160,6 +161,9 @@ def compute_regions(
         regions.append(
             {
                 "name": tag.name,
+                "group_index": (
+                    tag_group_by_id.get(tag.id, 0) if tag_group_by_id is not None else 0
+                ),
                 "total_downtime_minutes": total_downtime_minutes,
                 "total_downtime_display": format_downtime_minutes(
                     total_downtime_minutes

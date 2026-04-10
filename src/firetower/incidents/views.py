@@ -47,7 +47,11 @@ from .serializers import (
     TagSerializer,
 )
 from .services import ParticipantsSyncStats, sync_incident_participants_from_slack
-from .utils import sort_tags_with_overrides
+from .utils import (
+    region_names_in_grouping,
+    sort_tags_with_overrides,
+    tag_id_to_group_map,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -387,7 +391,7 @@ class TagListCreateAPIView(generics.ListCreateAPIView):
         tag_type = request.GET.get("type")
 
         if tag_type == "AFFECTED_REGION":
-            tags = sort_tags_with_overrides(list(queryset), settings.PINNED_REGIONS)
+            tags = sort_tags_with_overrides(list(queryset), settings.REGION_GROUPING)
             serializer = self.get_serializer(tags, many=True)
             return Response(serializer.data)
 
@@ -399,10 +403,16 @@ class AvailabilityView(APIView):
 
     def get(self, request: Request) -> Response:
         now = timezone.now()
+        region_qs = Tag.objects.filter(type=TagType.AFFECTED_REGION)
+        groups = settings.REGION_GROUPING
+        if groups:
+            allowed = region_names_in_grouping(groups)
+            region_qs = region_qs.filter(name__in=allowed)
         tags = sort_tags_with_overrides(
-            list(Tag.objects.filter(type=TagType.AFFECTED_REGION).order_by("name")),
-            settings.PINNED_REGIONS,
+            list(region_qs.order_by("name")),
+            groups,
         )
+        tag_group_by_id = tag_id_to_group_map(tags, groups)
 
         month_periods = get_month_periods(now)
         quarter_periods = get_quarter_periods(now)
@@ -434,7 +444,12 @@ class AvailabilityView(APIView):
                     "start": p["start"].isoformat(),
                     "end": p["end"].isoformat(),
                     "regions": compute_regions(
-                        tags, p["start"], p["end"], now, incidents_by_tag
+                        tags,
+                        p["start"],
+                        p["end"],
+                        now,
+                        incidents_by_tag,
+                        tag_group_by_id,
                     ),
                 }
                 for p in raw_periods

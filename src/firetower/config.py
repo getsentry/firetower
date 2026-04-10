@@ -70,7 +70,7 @@ class ConfigFile:
     hooks_enabled: bool = (
         False  # TODO: remove after hooks migration is complete and always enable
     )
-    pinned_regions: list[str] = field(default_factory=list)
+    region_grouping: list[Any] = field(default_factory=list)
 
     @classmethod
     def from_file(cls, file_path: str | Path) -> "ConfigFile":
@@ -136,6 +136,6 @@ class DummyConfigFile(ConfigFile):
         self.project_key = ""
         self.django_secret_key = ""
         self.sentry_dsn = ""
-        self.pinned_regions: list[str] = []
+        self.region_grouping: list[Any] = []
         self.firetower_base_url = ""
         self.hooks_enabled = False
