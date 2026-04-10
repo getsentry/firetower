@@ -7,7 +7,7 @@ from .models import Incident, Tag, format_downtime_minutes
 
 _HISTORY_MONTHS = 12
 _HISTORY_QUARTERS = 8
-_HISTORY_YEARS = 4
+_HISTORY_YEARS = 3
 
 
 def get_month_periods(now: datetime) -> list[dict]:
