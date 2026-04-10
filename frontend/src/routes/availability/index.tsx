@@ -6,6 +6,7 @@ import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {z} from 'zod';
 
+import {AvailabilityTooltip} from './components/AvailabilityTooltip';
 import {PeriodLabels} from './components/PeriodLabels';
 import {PeriodTabs} from './components/PeriodTabs';
 import {RegionRow} from './components/RegionRow';
@@ -73,16 +74,19 @@ function AvailabilityPage() {
     <div className="flex flex-col">
       <div className="mb-space-xl flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-content-headings text-size-2xl font-semibold">
-            Availability by Region
-          </h1>
+          <div className="gap-space-sm flex items-center">
+            <h1 className="text-content-headings text-size-2xl font-semibold">
+              Availability by Region
+            </h1>
+            <AvailabilityTooltip />
+          </div>
           <p className="text-content-secondary mt-space-xs text-size-sm">
             {getDateRangeLabel(periods)}
           </p>
         </div>
         <PeriodTabs activePeriod={activePeriod} />
       </div>
-      <Card className="flex flex-col gap-space-md px-space-xl pt-space-sm pb-space-lg">
+      <Card className="gap-space-md px-space-xl pt-space-sm pb-space-lg flex flex-col">
         <PeriodLabels periods={periods} />
         {regionNames.map(name => (
           <RegionRow key={name} regionName={name} periods={periods} />
