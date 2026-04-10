@@ -35,7 +35,6 @@ function TooltipContent({
           'p-space-md',
           'shadow-lg',
           'outline-none',
-          'animate-in fade-in-0 zoom-in-95',
           className
         )}
         {...props}
