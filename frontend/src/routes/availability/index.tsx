@@ -1,4 +1,4 @@
-import {useCallback, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
@@ -82,6 +82,14 @@ function AvailabilityPage() {
     closeTimeout.current = setTimeout(() => {
       setTooltipOpen(false);
     }, 100);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeout.current) {
+        clearTimeout(closeTimeout.current);
+      }
+    };
   }, []);
 
   const periods = getPeriodsForGranularity(data, activePeriod);
