@@ -127,7 +127,7 @@ function AvailabilityPage() {
                   <strong>availability impact</strong> are included.
                 </p>
                 <p className="text-content-secondary mb-space-md">
-                  Downtime is captured in the month the incident was created.
+                  Downtime is captured in the time period the incident was created.
                 </p>
                 <h4 className="text-content-headings mb-space-xs font-medium">
                   Color thresholds
