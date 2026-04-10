@@ -75,7 +75,7 @@ function AvailabilityPage() {
     <div className="flex flex-col">
       <div className="mb-space-xl flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="gap-space-xs flex items-center">
+          <div className="gap-space-sm flex items-center">
             <h1 className="text-content-headings text-size-2xl font-semibold">
               Availability by Region
             </h1>
@@ -98,9 +98,12 @@ function AvailabilityPage() {
                 <p className="text-content-primary bg-background-secondary mb-space-sm px-space-sm py-space-xs text-size-xs rounded font-mono">
                   (Total Time − Downtime) / Total Time × 100
                 </p>
-                <p className="text-content-secondary mb-space-md">
+                <p className="text-content-secondary mb-space-sm">
                   Only <strong>T0 service tier</strong> incidents with{' '}
                   <strong>availability impact</strong> are included.
+                </p>
+                <p className="text-content-secondary mb-space-md">
+                  Downtime is captured in the month the incident was created.
                 </p>
                 <h4 className="text-content-headings mb-space-xs font-medium">
                   Color thresholds
