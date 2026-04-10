@@ -4,12 +4,66 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from firetower.auth.models import ExternalProfileType
-from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
-from firetower.integrations.services import SlackService
+from firetower.incidents.models import (
+    ExternalLink,
+    ExternalLinkType,
+    Incident,
+    IncidentSeverity,
+)
+from firetower.integrations.services import PagerDutyService, SlackService
 from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
+
+PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
+
+
+def _get_pagerduty_service() -> PagerDutyService | None:
+    if not settings.PAGERDUTY:
+        return None
+    try:
+        return PagerDutyService()
+    except Exception:
+        logger.exception("Failed to initialize PagerDutyService")
+        return None
+
+
+def _page_high_sev_if_needed(incident: Incident) -> None:
+    if incident.severity not in PAGEABLE_SEVERITIES:
+        return
+
+    pd_config = settings.PAGERDUTY
+    if not pd_config:
+        return
+
+    escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
+    high_sev_policy = escalation_policies.get("HIGH_SEV")
+    if not high_sev_policy:
+        logger.info("No HIGH_SEV escalation policy configured, skipping page")
+        return
+
+    integration_key = high_sev_policy.get("integration_key")
+    if not integration_key:
+        logger.info("No integration_key for HIGH_SEV escalation policy, skipping page")
+        return
+
+    pd_service = _get_pagerduty_service()
+    if not pd_service:
+        return
+
+    dedup_key = f"firetower-{incident.incident_number}"
+    summary = f"[{incident.severity}] {incident.incident_number}: {incident.title}"
+
+    links = [{"href": _build_incident_url(incident), "text": "View in Firetower"}]
+    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    if slack_link and slack_link.url:
+        links.append({"href": slack_link.url, "text": "Slack Channel"})
+
+    try:
+        pd_service.trigger_incident(summary, dedup_key, integration_key, links=links)
+    except Exception:
+        logger.exception(f"Failed to page HIGH_SEV for incident {incident.id}")
 
 
 def _build_channel_name(incident: Incident) -> str:
@@ -85,38 +139,47 @@ def _invite_user_to_channel(
 
 
 def on_incident_created(incident: Incident) -> None:
+    # Use get_or_create to atomically claim the ExternalLink row before calling
+    # the Slack API.  If two concurrent requests both reach this point, only one
+    # will get created=True; the other bails out without creating a second channel.
+    slack_link = None
+    created = False
     try:
-        # Use get_or_create to atomically claim the ExternalLink row before calling
-        # the Slack API.  If two concurrent requests both reach this point, only one
-        # will get created=True; the other bails out without creating a second channel.
         slack_link, created = ExternalLink.objects.get_or_create(
             incident=incident,
             type=ExternalLinkType.SLACK,
             defaults={"url": ""},
         )
-        if not created:
-            logger.info(
-                f"Incident {incident.id} already has a Slack link, skipping channel creation"
-            )
-            return
-
+    except Exception:
+        logger.exception(
+            f"Failed to get or create Slack ExternalLink for incident {incident.id}"
+        )
+    channel_id = None
+    if not created and slack_link is not None:
+        logger.info(
+            f"Incident {incident.id} already has a Slack link, skipping channel creation"
+        )
+    elif created and slack_link is not None:
         try:
             channel_id = _slack_service.create_channel(
                 _build_channel_name(incident), is_private=incident.is_private
             )
             if not channel_id:
                 slack_link.delete()
-                logger.warning(
+                logger.error(
                     f"Failed to create Slack channel for incident {incident.id}"
                 )
-                return
-            channel_url = _slack_service.build_channel_url(channel_id)
-            slack_link.url = channel_url
-            slack_link.save(update_fields=["url"])
+            else:
+                channel_url = _slack_service.build_channel_url(channel_id)
+                slack_link.url = channel_url
+                slack_link.save(update_fields=["url"])
         except Exception:
             slack_link.delete()
-            raise
+            logger.exception(
+                f"Failed to create Slack channel for incident {incident.id}"
+            )
 
+    if channel_id:
         captain_slack_id = (
             _get_slack_user_id(incident.captain) if incident.captain else None
         )
@@ -201,9 +264,12 @@ def on_incident_created(incident: Incident) -> None:
                     f"Failed to post feed channel message for incident {incident.id}"
                 )
 
-        # TODO: Datadog notebook creation step will be added in RELENG-467
+    try:
+        _page_high_sev_if_needed(incident)
     except Exception:
-        logger.exception(f"Error in on_incident_created for incident {incident.id}")
+        logger.exception(f"Failed to page for incident {incident.id}")
+
+    # TODO: Datadog notebook creation step will be added in RELENG-467
 
 
 def on_status_changed(incident: Incident, old_status: str) -> None:
@@ -224,17 +290,24 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
 def on_severity_changed(incident: Incident, old_severity: str) -> None:
     try:
         channel_id = _get_channel_id(incident)
-        if not channel_id:
-            return
-
-        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
-        incident_url = _build_incident_url(incident)
-        _slack_service.post_message(
-            channel_id,
-            f"Incident severity updated: {old_severity} -> {incident.severity}\n<{incident_url}|View in Firetower>",
-        )
+        if channel_id:
+            _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+            incident_url = _build_incident_url(incident)
+            _slack_service.post_message(
+                channel_id,
+                f"Incident severity updated: {old_severity} -> {incident.severity}\n<{incident_url}|View in Firetower>",
+            )
     except Exception:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
+
+    if (
+        old_severity not in PAGEABLE_SEVERITIES
+        and incident.severity in PAGEABLE_SEVERITIES
+    ):
+        try:
+            _page_high_sev_if_needed(incident)
+        except Exception:
+            logger.exception(f"Failed to page for incident {incident.id}")
 
 
 def on_title_changed(incident: Incident) -> None:

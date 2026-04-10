@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from .services.jira import JiraService
+from firetower.integrations.services.jira import JiraService
 
 # Set up Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "firetower.settings")
