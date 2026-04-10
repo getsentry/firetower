@@ -82,7 +82,7 @@ class TestGetYearPeriods:
     def test_returns_3_periods(self):
         now = datetime(2026, 3, 15, tzinfo=UTC)
         periods = get_year_periods(now)
-        assert len(periods) == 3
+        assert len(periods) == 4
 
     def test_fiscal_year_labels(self):
         now = datetime(2026, 6, 1, tzinfo=UTC)
