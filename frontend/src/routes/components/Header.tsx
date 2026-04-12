@@ -3,7 +3,7 @@ import {Link, useRouterState} from '@tanstack/react-router';
 import {Avatar} from 'components/Avatar';
 
 import {currentUserQueryOptions} from '../queries/currentUserQueryOptions';
-import type {IncidentStatus} from '../types';
+import type {StatusFilterValue} from '../types';
 
 const STORAGE_KEY = 'firetower_list_search';
 
@@ -13,7 +13,7 @@ export const Header = () => {
 
   const isRootRoute = routerState.location.pathname === '/';
 
-  const getPreservedSearch = (): {status?: IncidentStatus[]} | undefined => {
+  const getPreservedSearch = (): {status?: StatusFilterValue[]} | undefined => {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {

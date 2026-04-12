@@ -1,4 +1,4 @@
-import {useEffect, useRef} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {useSuspenseInfiniteQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
@@ -8,6 +8,7 @@ import {Spinner} from 'components/Spinner';
 import {arraysEqual} from 'utils/arrays';
 import {z} from 'zod';
 
+import {FilterPanel, FilterTrigger} from './components/AdvancedFilters';
 import {IncidentCard} from './components/IncidentCard';
 import {IncidentListSkeleton} from './components/IncidentListSkeleton';
 import {StatusFilter} from './components/StatusFilter';
@@ -38,10 +39,16 @@ const incidentListSearchSchema = z.object({
 });
 
 function IncidentsLayout({children}: {children: React.ReactNode}) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="flex flex-col">
-      <StatusFilter />
-      <hr className="mb-space-xl mt-space-lg border-secondary" />
+    <div className="flex flex-col gap-space-sm">
+      <div className="flex items-center justify-between">
+        <StatusFilter />
+        <FilterTrigger open={open} onToggle={() => setOpen(prev => !prev)} />
+      </div>
+      {open && <FilterPanel />}
+      <hr className="border-secondary" />
       {children}
     </div>
   );
