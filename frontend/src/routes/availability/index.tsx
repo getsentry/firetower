@@ -89,9 +89,7 @@ function AvailabilityPage() {
             i > 0 && region.group_index !== regions[i - 1]!.group_index;
           return (
             <Fragment key={region.name}>
-              {showGroupSpacing ? (
-                <div className="pt-space-md" aria-hidden />
-              ) : null}
+              {showGroupSpacing ? <div className="pt-space-md" aria-hidden /> : null}
               <RegionRow regionName={region.name} periods={periods} />
             </Fragment>
           );
