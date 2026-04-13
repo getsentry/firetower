@@ -75,7 +75,7 @@ class ConfigFile:
     firetower_base_url: str
     django_secret_key: str
     sentry_dsn: str
-    salt_key: str = ""
+    salt_key: str
     hooks_enabled: bool = (
         False  # TODO: remove after hooks migration is complete and always enable
     )
@@ -146,6 +146,7 @@ class DummyConfigFile(ConfigFile):
         self.project_key = ""
         self.firetower_base_url = ""
         self.django_secret_key = ""
+        self.salt_key = ""
         self.sentry_dsn = ""
         self.region_grouping: list[list[str]] = []
         self.pinned_regions: list[str] = []

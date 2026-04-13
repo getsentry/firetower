@@ -149,6 +149,7 @@ class LinearService:
                             type
                         }
                         assignee {
+                            id
                             email
                         }
                     }
@@ -188,9 +189,7 @@ class LinearService:
                 state_type = issue.get("state", {}).get("type", "")
                 status = LINEAR_STATE_TYPE_MAP.get(state_type, "Todo")
 
-                assignee_email = None
-                if issue.get("assignee"):
-                    assignee_email = issue["assignee"].get("email")
+                assignee = issue.get("assignee") or {}
 
                 issues.append(
                     {
@@ -199,7 +198,8 @@ class LinearService:
                         "title": issue["title"],
                         "url": issue["url"],
                         "status": status,
-                        "assignee_email": assignee_email,
+                        "assignee_email": assignee.get("email"),
+                        "assignee_linear_id": assignee.get("id"),
                     }
                 )
 

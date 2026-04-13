@@ -28,6 +28,7 @@ def _make_linear_issue(
     url="https://linear.app/team/issue/ENG-123",
     status="Todo",
     assignee_email=None,
+    assignee_linear_id=None,
 ):
     return {
         "id": id,
@@ -36,6 +37,7 @@ def _make_linear_issue(
         "url": url,
         "status": status,
         "assignee_email": assignee_email,
+        "assignee_linear_id": assignee_linear_id,
     }
 
 
@@ -53,10 +55,8 @@ class TestSyncActionItemsFromLinear:
             _make_linear_issue(id="id-2", identifier="ENG-2", title="Task 2"),
         ]
 
-        with patch(
-            "firetower.incidents.services._linear_service.get_issues_by_attachment_url"
-        ) as mock_fetch:
-            mock_fetch.return_value = issues
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_get.return_value.get_issues_by_attachment_url.return_value = issues
 
             stats = sync_action_items_from_linear(incident, force=True)
 
@@ -91,10 +91,8 @@ class TestSyncActionItemsFromLinear:
             ),
         ]
 
-        with patch(
-            "firetower.incidents.services._linear_service.get_issues_by_attachment_url"
-        ) as mock_fetch:
-            mock_fetch.return_value = issues
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_get.return_value.get_issues_by_attachment_url.return_value = issues
 
             stats = sync_action_items_from_linear(incident, force=True)
 
@@ -123,10 +121,8 @@ class TestSyncActionItemsFromLinear:
             _make_linear_issue(id="id-new", identifier="ENG-1", title="New item"),
         ]
 
-        with patch(
-            "firetower.incidents.services._linear_service.get_issues_by_attachment_url"
-        ) as mock_fetch:
-            mock_fetch.return_value = issues
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_get.return_value.get_issues_by_attachment_url.return_value = issues
 
             stats = sync_action_items_from_linear(incident, force=True)
 
@@ -155,15 +151,13 @@ class TestSyncActionItemsFromLinear:
             action_items_last_synced_at=timezone.now() - timedelta(seconds=30),
         )
 
-        with patch(
-            "firetower.incidents.services._linear_service.get_issues_by_attachment_url"
-        ) as mock_fetch:
-            mock_fetch.return_value = []
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_get.return_value.get_issues_by_attachment_url.return_value = []
 
             stats = sync_action_items_from_linear(incident, force=True)
 
             assert stats.skipped is False
-            mock_fetch.assert_called_once()
+            mock_get.return_value.get_issues_by_attachment_url.assert_called_once()
 
     def test_handles_linear_api_failure(self):
         incident = Incident.objects.create(
@@ -172,10 +166,8 @@ class TestSyncActionItemsFromLinear:
             severity=IncidentSeverity.P1,
         )
 
-        with patch(
-            "firetower.incidents.services._linear_service.get_issues_by_attachment_url"
-        ) as mock_fetch:
-            mock_fetch.return_value = None
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_get.return_value.get_issues_by_attachment_url.return_value = None
 
             stats = sync_action_items_from_linear(incident, force=True)
 
@@ -200,21 +192,21 @@ class TestSyncActionItemsFromLinear:
                 identifier="ENG-1",
                 title="Task 1",
                 assignee_email="dev@example.com",
+                assignee_linear_id="linear-user-123",
             ),
         ]
 
-        with patch(
-            "firetower.incidents.services._linear_service.get_issues_by_attachment_url"
-        ) as mock_fetch:
-            mock_fetch.return_value = issues
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_get.return_value.get_issues_by_attachment_url.return_value = issues
 
             sync_action_items_from_linear(incident, force=True)
 
             item = incident.action_items.get(linear_issue_id="id-1")
             assert item.assignee == user
-            assert ExternalProfile.objects.filter(
+            profile = ExternalProfile.objects.get(
                 user=user, type=ExternalProfileType.LINEAR
-            ).exists()
+            )
+            assert profile.external_id == "linear-user-123"
 
     def test_creates_user_for_unknown_assignee_email(self):
         incident = Incident.objects.create(
@@ -229,22 +221,22 @@ class TestSyncActionItemsFromLinear:
                 identifier="ENG-1",
                 title="Task 1",
                 assignee_email="newdev@example.com",
+                assignee_linear_id="linear-user-456",
             ),
         ]
 
-        with patch(
-            "firetower.incidents.services._linear_service.get_issues_by_attachment_url"
-        ) as mock_fetch:
-            mock_fetch.return_value = issues
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_get.return_value.get_issues_by_attachment_url.return_value = issues
 
             sync_action_items_from_linear(incident, force=True)
 
             item = incident.action_items.get(linear_issue_id="id-1")
             assert item.assignee is not None
             assert item.assignee.email == "newdev@example.com"
-            assert ExternalProfile.objects.filter(
+            profile = ExternalProfile.objects.get(
                 user=item.assignee, type=ExternalProfileType.LINEAR
-            ).exists()
+            )
+            assert profile.external_id == "linear-user-456"
 
 
 @pytest.mark.django_db
@@ -277,7 +269,7 @@ class TestLinearService:
                             "title": "Done task",
                             "url": "https://linear.app/t/ENG-2",
                             "state": {"type": "completed"},
-                            "assignee": {"email": "dev@example.com"},
+                            "assignee": {"id": "user-1", "email": "dev@example.com"},
                         }
                     },
                     {
@@ -309,6 +301,7 @@ class TestLinearService:
             assert issues[0]["status"] == "In Progress"
             assert issues[1]["status"] == "Done"
             assert issues[1]["assignee_email"] == "dev@example.com"
+            assert issues[1]["assignee_linear_id"] == "user-1"
             assert issues[2]["status"] == "Cancelled"
 
     def test_get_issues_deduplicates(self):

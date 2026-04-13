@@ -16,7 +16,14 @@ from firetower.integrations.services import LinearService, SlackService
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
-_linear_service = LinearService()
+_linear_service: LinearService | None = None
+
+
+def _get_linear_service() -> LinearService:
+    global _linear_service  # noqa: PLW0603
+    if _linear_service is None:
+        _linear_service = LinearService()
+    return _linear_service
 
 
 @dataclass
@@ -134,14 +141,14 @@ class ActionItemsSyncStats:
     skipped: bool = False
 
 
-def _resolve_assignee_by_email(email: str) -> User | None:
+def _resolve_assignee(email: str, linear_id: str | None = None) -> User | None:
     user = get_or_create_user_from_email(email)
     if not user:
         return None
-    ExternalProfile.objects.get_or_create(
+    ExternalProfile.objects.update_or_create(
         user=user,
         type=ExternalProfileType.LINEAR,
-        defaults={"external_id": email},
+        defaults={"external_id": linear_id or email},
     )
     return user
 
@@ -163,7 +170,7 @@ def sync_action_items_from_linear(
             return stats
 
     firetower_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}/"
-    issues = _linear_service.get_issues_by_attachment_url(firetower_url)
+    issues = _get_linear_service().get_issues_by_attachment_url(firetower_url)
 
     if issues is None:
         error_msg = f"Failed to fetch Linear issues for incident {incident.id}"
@@ -182,7 +189,9 @@ def sync_action_items_from_linear(
 
         assignee = None
         if issue.get("assignee_email"):
-            assignee = _resolve_assignee_by_email(issue["assignee_email"])
+            assignee = _resolve_assignee(
+                issue["assignee_email"], issue.get("assignee_linear_id")
+            )
 
         _, created = ActionItem.objects.update_or_create(
             linear_issue_id=issue["id"],
