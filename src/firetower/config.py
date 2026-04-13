@@ -75,6 +75,7 @@ class ConfigFile:
     firetower_base_url: str
     django_secret_key: str
     sentry_dsn: str
+    salt_key: str = ""
     hooks_enabled: bool = (
         False  # TODO: remove after hooks migration is complete and always enable
     )

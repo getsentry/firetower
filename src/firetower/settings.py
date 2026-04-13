@@ -77,8 +77,9 @@ PINNED_REGIONS = config.pinned_regions
 
 SECRET_KEY = config.django_secret_key
 
-# django-fernet-encrypted-fields salt
-SALT_KEY = SECRET_KEY
+# Used by django-fernet-encrypted-fields to encrypt sensitive DB fields (e.g. OAuth tokens).
+# In prod, set to a unique value independent of SECRET_KEY.
+SALT_KEY = config.salt_key or SECRET_KEY
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_is_dev()
