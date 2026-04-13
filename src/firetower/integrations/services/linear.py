@@ -53,7 +53,11 @@ class LinearService:
             data = response.json()
             access_token = data["access_token"]
 
-            expires_at = timezone.now() + TOKEN_LIFETIME
+            expires_in = data.get("expires_in")
+            if expires_in:
+                expires_at = timezone.now() + timedelta(seconds=expires_in)
+            else:
+                expires_at = timezone.now() + TOKEN_LIFETIME
 
             with transaction.atomic():
                 LinearOAuthToken.objects.all().delete()
