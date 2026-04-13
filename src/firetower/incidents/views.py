@@ -142,11 +142,6 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
         incident_id = self.kwargs["incident_id"]
         numeric_id = parse_incident_id(incident_id)
 
-        if numeric_id < INCIDENT_ID_START:
-            return IncidentOrRedirect(
-                redirect=f"{settings.JIRA['DOMAIN']}/browse/{settings.PROJECT_KEY}-{numeric_id}"
-            )
-
         # Get incident by numeric ID
         queryset = self.get_queryset()
         queryset = filter_visible_to_user(queryset, self.request.user)
