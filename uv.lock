@@ -440,6 +440,19 @@ wheels = [
 ]
 
 [[package]]
+name = "django-fernet-encrypted-fields"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/aa/529af3888215b8a660fc3897d6d63eaf1de9aa0699c633ca0ec483d4361c/django_fernet_encrypted_fields-0.3.1.tar.gz", hash = "sha256:5ed328c7f9cc7f2d452bb2e125f3ea2bea3563a259fa943e5a1c626175889a71", size = 5265, upload-time = "2025-11-10T08:39:57.398Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/52/7f/4e0b7ed8413fa58e7a77017342e8ab0e977d41cfc376ab9180ae75f216ec/django_fernet_encrypted_fields-0.3.1-py3-none-any.whl", hash = "sha256:3bd2abab02556dc6e15a58a61161ee6c5cdf45a50a8a52d9e035009eb54c6442", size = 5484, upload-time = "2025-11-10T08:39:55.866Z" },
+]
+
+[[package]]
 name = "django-kubernetes"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -519,6 +532,7 @@ dependencies = [
     { name = "ddtrace" },
     { name = "django" },
     { name = "django-cors-headers" },
+    { name = "django-fernet-encrypted-fields" },
     { name = "django-kubernetes" },
     { name = "djangorestframework" },
     { name = "google-auth" },
@@ -554,6 +568,7 @@ requires-dist = [
     { name = "ddtrace", specifier = "==3.18.1" },
     { name = "django", specifier = ">=5.2.9,<6" },
     { name = "django-cors-headers", specifier = ">=4.9.0" },
+    { name = "django-fernet-encrypted-fields", specifier = ">=0.3.1" },
     { name = "django-kubernetes", specifier = ">=1.1.0" },
     { name = "djangorestframework", specifier = ">=3.15.2" },
     { name = "google-auth", specifier = ">=2.37.0" },

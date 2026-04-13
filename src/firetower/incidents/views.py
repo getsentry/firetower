@@ -23,6 +23,7 @@ from .filters import (
     filter_by_tags,
 )
 from .models import (
+    ActionItem,
     Incident,
     IncidentOrRedirect,
     ServiceTier,
@@ -327,7 +328,7 @@ class ActionItemListView(generics.ListAPIView):
     serializer_class = ActionItemSerializer
     pagination_class = None
 
-    def get_queryset(self) -> QuerySet:
+    def get_queryset(self) -> QuerySet[ActionItem]:
         return self._get_incident().action_items.select_related("assignee__userprofile")
 
     def _get_incident(self) -> Incident:

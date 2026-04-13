@@ -145,11 +145,12 @@ def _resolve_assignee(email: str, linear_id: str | None = None) -> User | None:
     user = get_or_create_user_from_email(email)
     if not user:
         return None
-    ExternalProfile.objects.update_or_create(
-        user=user,
-        type=ExternalProfileType.LINEAR,
-        defaults={"external_id": linear_id or email},
-    )
+    if linear_id:
+        ExternalProfile.objects.update_or_create(
+            user=user,
+            type=ExternalProfileType.LINEAR,
+            defaults={"external_id": linear_id},
+        )
     return user
 
 
@@ -157,6 +158,10 @@ def sync_action_items_from_linear(
     incident: Incident, force: bool = False
 ) -> ActionItemsSyncStats:
     stats = ActionItemsSyncStats()
+
+    if not settings.LINEAR.get("CLIENT_ID"):
+        stats.skipped = True
+        return stats
 
     if not force and incident.action_items_last_synced_at:
         time_since_sync = timezone.now() - incident.action_items_last_synced_at

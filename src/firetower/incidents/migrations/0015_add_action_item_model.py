@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
                         max_length=20,
                     ),
                 ),
-                ("url", models.URLField()),
+                ("url", models.URLField(max_length=500)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (
