@@ -141,6 +141,7 @@ class TestComputeRegions:
         assert len(regions) == 1
         assert regions[0]["availability_percentage"] == 100.0
         assert regions[0]["incident_count"] == 0
+        assert regions[0]["group_index"] == 0
 
     def test_availability_with_downtime(self, region_tag, make_incident):
         period_start = datetime(2026, 3, 1, tzinfo=UTC)
@@ -249,3 +250,20 @@ class TestComputeRegions:
         assert regions[1]["name"] == "eu-west-1"
         assert regions[1]["incident_count"] == 0
         assert regions[1]["availability_percentage"] == 100.0
+        assert regions[0]["group_index"] == 0
+        assert regions[1]["group_index"] == 0
+
+    def test_group_index_per_tag(self, user):
+        tag_a = Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
+        tag_b = Tag.objects.create(name="eu-west-1", type=TagType.AFFECTED_REGION)
+
+        period_start = datetime(2026, 3, 1, tzinfo=UTC)
+        period_end = datetime(2026, 3, 31, 23, 59, 59, 999999, tzinfo=UTC)
+        now = datetime(2026, 4, 1, tzinfo=UTC)
+
+        group_by_id = {tag_a.id: 0, tag_b.id: 1}
+        regions = compute_regions(
+            [tag_a, tag_b], period_start, period_end, now, {}, group_by_id
+        )
+        assert regions[0]["group_index"] == 0
+        assert regions[1]["group_index"] == 1

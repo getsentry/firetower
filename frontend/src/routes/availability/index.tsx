@@ -1,7 +1,7 @@
+import {Fragment} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
-import {Card} from 'components/Card';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {z} from 'zod';
@@ -68,7 +68,7 @@ function AvailabilityPage() {
 
   const periods = getPeriodsForGranularity(data, activePeriod);
   const currentPeriod = periods[0];
-  const regionNames = currentPeriod?.regions.map(r => r.name) ?? [];
+  const regions = currentPeriod?.regions ?? [];
 
   return (
     <div className="flex flex-col">
@@ -86,12 +86,19 @@ function AvailabilityPage() {
         </div>
         <PeriodTabs activePeriod={activePeriod} />
       </div>
-      <Card className="gap-space-md px-space-xl pt-space-sm pb-space-lg flex flex-col">
-        <PeriodLabels periods={periods} />
-        {regionNames.map(name => (
-          <RegionRow key={name} regionName={name} periods={periods} />
-        ))}
-      </Card>
+      <PeriodLabels periods={periods} />
+      <div className="bg-background-primary rounded-radius-lg p-space-2xl shadow-sm flex flex-col gap-space-md px-space-xl pt-space-2xl pb-space-2xl">
+        {regions.map((region, i) => {
+          const showGroupSpacing =
+            i > 0 && region.group_index !== regions[i - 1]!.group_index;
+          return (
+            <Fragment key={region.name}>
+              {showGroupSpacing ? <div className="pt-space-md" aria-hidden /> : null}
+              <RegionRow regionName={region.name} periods={periods} />
+            </Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 }

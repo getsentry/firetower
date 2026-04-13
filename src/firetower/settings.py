@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 import sys
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from datadog import initialize
 from datadog.dogstatsd.base import statsd
@@ -57,9 +57,18 @@ if not env_is_dev():
         environment=os.environ.get("DJANGO_ENV", "unknown"),
     )
 
+
+def _coerce_region_grouping(raw: list[Any]) -> list[list[str]]:
+    if not raw:
+        return []
+    if isinstance(raw[0], str):
+        return [list(raw)]
+    return [list(g) for g in raw]
+
+
 # Global project settings
 PROJECT_KEY = config.project_key
-PINNED_REGIONS = config.pinned_regions
+REGION_GROUPING = _coerce_region_grouping(config.region_grouping)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
