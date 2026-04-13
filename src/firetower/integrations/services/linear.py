@@ -54,7 +54,7 @@ class LinearService:
             access_token = data["access_token"]
 
             expires_in = data.get("expires_in")
-            if expires_in:
+            if expires_in is not None:
                 expires_at = timezone.now() + timedelta(seconds=expires_in)
             else:
                 expires_at = timezone.now() + TOKEN_LIFETIME
