@@ -162,9 +162,7 @@ def sync_action_items_from_linear(
             stats.skipped = True
             return stats
 
-    firetower_url = (
-        f"{settings.FIRETOWER_BASE_URL}/{settings.PROJECT_KEY}-{incident.id}/"
-    )
+    firetower_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}/"
     issues = _linear_service.get_issues_by_attachment_url(firetower_url)
 
     if issues is None:

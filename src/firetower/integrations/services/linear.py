@@ -33,9 +33,6 @@ class LinearService:
         self.client_id = linear_config.get("CLIENT_ID")
         self.client_secret = linear_config.get("CLIENT_SECRET")
 
-        if not self.client_id or not self.client_secret:
-            logger.warning("Linear OAuth credentials not configured")
-
     def _request_new_token(self) -> str | None:
         try:
             response = requests.post(

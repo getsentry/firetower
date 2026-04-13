@@ -335,6 +335,7 @@ class ActionItemListView(generics.ListAPIView):
             numeric_id = parse_incident_id(self.kwargs["incident_id"])
             queryset = filter_visible_to_user(Incident.objects.all(), self.request.user)
             self._incident = get_object_or_404(queryset, id=numeric_id)
+            self.check_object_permissions(self.request, self._incident)
         return self._incident
 
     def list(self, request: Request, *args: object, **kwargs: object) -> Response:
