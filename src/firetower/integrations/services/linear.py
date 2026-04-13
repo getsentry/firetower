@@ -85,6 +85,19 @@ class LinearService:
 
         return self._request_new_token()
 
+    def _make_graphql_request(
+        self, query: str, variables: dict | None, access_token: str
+    ) -> requests.Response:
+        return requests.post(
+            LINEAR_API_URL,
+            json={"query": query, "variables": variables or {}},
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+            timeout=30,
+        )
+
     def _graphql(self, query: str, variables: dict | None = None) -> dict | None:
         access_token = self._get_access_token()
         if not access_token:
@@ -94,15 +107,7 @@ class LinearService:
             return None
 
         try:
-            response = requests.post(
-                LINEAR_API_URL,
-                json={"query": query, "variables": variables or {}},
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json",
-                },
-                timeout=30,
-            )
+            response = self._make_graphql_request(query, variables, access_token)
 
             if response.status_code == 401:
                 logger.info("Linear token expired, requesting new token")
@@ -110,15 +115,7 @@ class LinearService:
                 if not access_token:
                     return None
 
-                response = requests.post(
-                    LINEAR_API_URL,
-                    json={"query": query, "variables": variables or {}},
-                    headers={
-                        "Authorization": f"Bearer {access_token}",
-                        "Content-Type": "application/json",
-                    },
-                    timeout=30,
-                )
+                response = self._make_graphql_request(query, variables, access_token)
 
             response.raise_for_status()
             data = response.json()
