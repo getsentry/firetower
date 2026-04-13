@@ -77,6 +77,9 @@ PINNED_REGIONS = config.pinned_regions
 
 SECRET_KEY = config.django_secret_key
 
+# django-fernet-encrypted-fields salt
+SALT_KEY = SECRET_KEY
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_is_dev()
 

@@ -1,8 +1,9 @@
 from django.db import models
+from encrypted_fields.fields import EncryptedTextField
 
 
 class LinearOAuthToken(models.Model):
-    access_token = models.TextField()
+    access_token = EncryptedTextField()
     expires_at = models.DateTimeField()
     last_refreshed = models.DateTimeField(auto_now=True)
 
