@@ -4,6 +4,7 @@ from .models import Tag
 
 
 def region_names_in_grouping(groups: list[list[str]]) -> set[str]:
+    # looking for array of array, i.e. [[us, de], [disney, ly]]
     return {name for group in groups for name in group}
 
 
