@@ -241,10 +241,16 @@ class TestNewIncidentSubmission:
 
         handle_new_incident_submission(ack, body, view, client)
 
-        ack.assert_called_once()
-        call_kwargs = ack.call_args[1]
-        assert call_kwargs["response_action"] == "errors"
+        ack.assert_called_once_with()
+        client.chat_postMessage.assert_called_once()
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "Could not identify" in msg
 
+    @pytest.fixture(autouse=False)
+    def _enable_hooks(self, settings):
+        settings.HOOKS_ENABLED = True
+
+    @pytest.mark.usefixtures("_enable_hooks")
     @patch(
         "firetower.incidents.serializers.on_incident_created",
         side_effect=RuntimeError("boom"),
@@ -277,4 +283,4 @@ class TestNewIncidentSubmission:
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Something went wrong" in msg
-        assert "#team-sre" in msg
+        assert "Slack channel manually" in msg

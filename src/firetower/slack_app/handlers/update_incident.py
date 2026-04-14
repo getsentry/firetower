@@ -16,9 +16,10 @@ def _build_update_incident_modal(incident: Incident, channel_id: str) -> dict:
         }
         for sev in IncidentSeverity
     ]
+    current_severity = IncidentSeverity(incident.severity)
     current_severity_option = {
-        "text": {"type": "plain_text", "text": incident.severity.label},
-        "value": incident.severity.value,
+        "text": {"type": "plain_text", "text": current_severity.label},
+        "value": current_severity.value,
     }
 
     impact_type_initial = [

@@ -154,7 +154,6 @@ class TestIncidentWriteSerializerHooks:
     def enable_hooks(self, settings):
         settings.HOOKS_ENABLED = True
 
-
     def setup_method(self):
         self.captain = User.objects.create_user(
             username="captain@example.com",
