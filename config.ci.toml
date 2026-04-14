@@ -27,6 +27,11 @@ incident_feed_channel_id = ""
 always_invited_ids = []
 incident_guide_message = ""
 
+[linear]
+client_id = "ci-test-client-id"
+client_secret = "ci-test-client-secret"
+action_item_sync_throttle_seconds = 300
+
 [auth]
 iap_enabled = false
 iap_audience = ""
