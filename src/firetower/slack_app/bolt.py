@@ -81,6 +81,9 @@ def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
     )
     tags = [f"subcommand:{metric_subcommand}"]
     statsd.increment(f"{METRICS_PREFIX}.submitted", tags=tags)
+    logger.info(
+        "Slash command raw_text=%r subcommand=%r args=%r", raw_text, subcommand, args
+    )
 
     try:
         if subcommand == "new":
