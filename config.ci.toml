@@ -2,7 +2,7 @@ project_key = "INC"
 django_secret_key = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69"
 sentry_dsn = ""
 firetower_base_url = "http://localhost:5173"
-region_grouping = [["control", "edge"],["us", "de"],["disney", "ly", "geico", "goldman-sachs", "s4s2"]]
+region_grouping = []
 
 # This is the actual essential part. Values match the container set up by GHA
 [postgres]
