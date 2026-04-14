@@ -1,6 +1,8 @@
 import logging
 from typing import Any
 
+from django.conf import settings
+
 from firetower.incidents.models import IncidentStatus
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import get_incident_from_channel
@@ -105,11 +107,14 @@ def handle_mitigated_submission(ack: Any, body: dict, view: dict, client: Any) -
         return
     serializer.save()
 
+    incident_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
     client.chat_postMessage(
         channel=channel_id,
         text=(
-            f"*{incident.incident_number} marked as Mitigated*\n"
-            f"*Impact:* {impact}\n"
-            f"*Action items:* {todo}"
+            f"<{incident_url}|{incident.incident_number}> has been marked Mitigated.\n"
+            f"*Current Impact*:\n"
+            f"```{impact}```\n"
+            f"*Remaining Action Items*:\n"
+            f"```{todo}```"
         ),
     )
