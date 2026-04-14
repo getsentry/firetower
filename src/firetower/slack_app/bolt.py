@@ -5,7 +5,10 @@ from datadog import statsd
 from django.conf import settings
 from slack_bolt import App
 
-from firetower.slack_app.handlers.captain import handle_captain_command
+from firetower.slack_app.handlers.captain import (
+    handle_captain_command,
+    handle_captain_submission,
+)
 from firetower.slack_app.handlers.dumpslack import handle_dumpslack_command
 from firetower.slack_app.handlers.help import handle_help_command
 from firetower.slack_app.handlers.mitigated import (
@@ -113,12 +116,7 @@ def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
             else:
                 handle_subject_command(ack, body, command, respond, new_subject=args)
         elif subcommand in ("captain", "ic"):
-            if not args:
-                ack()
-                cmd = command.get("command", "/ft")
-                respond(f"Usage: `{cmd} captain @user`")
-            else:
-                handle_captain_command(ack, body, command, respond, user_mention=args)
+            handle_captain_command(ack, body, command, respond)
         elif subcommand == "statuspage":
             handle_statuspage_command(ack, command, respond)
         elif subcommand == "dumpslack":
@@ -142,6 +140,7 @@ def _register_views(app: App) -> None:
     app.view("update_incident_modal")(handle_update_incident_submission)
     app.view("mitigated_incident_modal")(handle_mitigated_submission)
     app.view("resolved_incident_modal")(handle_resolved_submission)
+    app.view("captain_incident_modal")(handle_captain_submission)
     for action_id in (
         "impact_type_tags",
         "affected_service_tags",
