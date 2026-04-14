@@ -12,7 +12,7 @@ def handle_help_command(ack: Any, command: dict, respond: Any) -> None:
         f"  `{cmd} new` - Create a new incident\n"
         f"  `{cmd} severity <P0-P4>` - Change incident severity (alias: `{cmd} sev`)\n"
         f"  `{cmd} subject <title>` - Change incident title\n"
-        f"  `{cmd} captain @user` - Set incident captain (alias: `{cmd} ic`)\n"
+        f"  `{cmd} captain` - Set incident captain (alias: `{cmd} ic`)\n"
         f"  `{cmd} update` - Interactively update incident metadata (alias: `{cmd} edit`)\n"
         f"  `{cmd} mitigated` - Mark incident as mitigated (alias: `{cmd} mit`)\n"
         f"  `{cmd} resolved` - Mark incident as resolved (alias: `{cmd} fixed`)\n"
