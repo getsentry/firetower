@@ -5,6 +5,7 @@ from datadog import statsd
 from django.conf import settings
 from slack_bolt import App
 
+from firetower.slack_app.handlers.captain import handle_captain_command
 from firetower.slack_app.handlers.dumpslack import handle_dumpslack_command
 from firetower.slack_app.handlers.help import handle_help_command
 from firetower.slack_app.handlers.mitigated import (
@@ -47,6 +48,8 @@ KNOWN_SUBCOMMANDS = {
     "subject",
     "update",
     "edit",
+    "captain",
+    "ic",
     "statuspage",
     "dumpslack",
 }
@@ -106,6 +109,13 @@ def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
                 respond(f"Usage: `{cmd} subject <new title>`")
             else:
                 handle_subject_command(ack, body, command, respond, new_subject=args)
+        elif subcommand in ("captain", "ic"):
+            if not args:
+                ack()
+                cmd = command.get("command", "/ft")
+                respond(f"Usage: `{cmd} captain @user`")
+            else:
+                handle_captain_command(ack, body, command, respond, user_mention=args)
         elif subcommand == "statuspage":
             handle_statuspage_command(ack, command, respond)
         elif subcommand == "dumpslack":
