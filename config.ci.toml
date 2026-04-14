@@ -1,5 +1,6 @@
 project_key = "INC"
 django_secret_key = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69"
+salt_key = "ci-test-salt-key"
 sentry_dsn = ""
 firetower_base_url = "http://localhost:5173"
 region_grouping = []
@@ -25,6 +26,11 @@ app_token = "xapp-test-token"
 incident_feed_channel_id = ""
 always_invited_ids = []
 incident_guide_message = ""
+
+[linear]
+client_id = "ci-test-client-id"
+client_secret = "ci-test-client-secret"
+action_item_sync_throttle_seconds = 300
 
 [auth]
 iap_enabled = false
