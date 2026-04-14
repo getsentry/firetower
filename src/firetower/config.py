@@ -149,5 +149,4 @@ class DummyConfigFile(ConfigFile):
         self.salt_key = ""
         self.sentry_dsn = ""
         self.region_grouping: list[list[str]] = []
-        self.pinned_regions: list[str] = []
         self.hooks_enabled = False

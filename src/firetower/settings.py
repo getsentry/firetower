@@ -70,7 +70,6 @@ def _coerce_region_grouping(raw: list[Any]) -> list[list[str]]:
 PROJECT_KEY = config.project_key
 REGION_GROUPING = _coerce_region_grouping(config.region_grouping)
 FIRETOWER_BASE_URL = config.firetower_base_url
-PINNED_REGIONS = config.pinned_regions
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
