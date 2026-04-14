@@ -1,6 +1,8 @@
 import logging
 from typing import Any
 
+from firetower.auth.models import ExternalProfileType
+from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import Incident, IncidentSeverity
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import get_incident_from_channel
@@ -98,6 +100,18 @@ def _build_update_incident_modal(incident: Incident, channel_id: str) -> dict:
     if affected_region_initial:
         affected_region_element["initial_options"] = affected_region_initial
 
+    captain_element: dict[str, Any] = {
+        "type": "users_select",
+        "action_id": "captain_select",
+        "placeholder": {"type": "plain_text", "text": "Select incident captain"},
+    }
+    if incident.captain:
+        slack_profile = incident.captain.external_profiles.filter(
+            type=ExternalProfileType.SLACK
+        ).first()
+        if slack_profile:
+            captain_element["initial_user"] = slack_profile.external_id
+
     private_element: dict[str, Any] = {
         "type": "checkboxes",
         "action_id": "is_private",
@@ -163,6 +177,13 @@ def _build_update_incident_modal(incident: Incident, channel_id: str) -> dict:
             "optional": True,
             "element": affected_region_element,
             "label": {"type": "plain_text", "text": "Affected Region"},
+        },
+        {
+            "type": "input",
+            "block_id": "captain_block",
+            "optional": True,
+            "element": captain_element,
+            "label": {"type": "plain_text", "text": "Incident Captain"},
         },
         {
             "type": "input",
@@ -250,6 +271,10 @@ def handle_update_incident_submission(
     )
     affected_region_tags = [opt["value"] for opt in affected_region_selections]
 
+    captain_slack_id = (
+        values.get("captain_block", {}).get("captain_select", {}).get("selected_user")
+    )
+
     private_selections = (
         values.get("private_block", {}).get("is_private", {}).get("selected_options")
         or []
@@ -280,6 +305,11 @@ def handle_update_incident_submission(
         "affected_service_tags": affected_service_tags,
         "affected_region_tags": affected_region_tags,
     }
+
+    if captain_slack_id:
+        captain_user = get_or_create_user_from_slack_id(captain_slack_id)
+        if captain_user:
+            data["captain"] = captain_user.email
 
     serializer = IncidentWriteSerializer(instance=incident, data=data, partial=True)
     if not serializer.is_valid():
