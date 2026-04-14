@@ -228,7 +228,6 @@ class SlackSettings(TypedDict):
     BOT_TOKEN: str
     TEAM_ID: str
     APP_TOKEN: str
-    SIGNING_SECRET: str
     INCIDENT_FEED_CHANNEL_ID: str
     ALWAYS_INVITED_IDS: list[str]
     INCIDENT_GUIDE_MESSAGE: str
@@ -238,7 +237,6 @@ SLACK: SlackSettings = {
     "BOT_TOKEN": config.slack.bot_token,
     "TEAM_ID": config.slack.team_id,
     "APP_TOKEN": config.slack.app_token,
-    "SIGNING_SECRET": config.slack.signing_secret,
     "INCIDENT_FEED_CHANNEL_ID": config.slack.incident_feed_channel_id,
     "ALWAYS_INVITED_IDS": config.slack.always_invited_ids,
     "INCIDENT_GUIDE_MESSAGE": config.slack.incident_guide_message,

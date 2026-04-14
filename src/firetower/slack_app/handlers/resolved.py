@@ -25,7 +25,9 @@ def _build_resolved_modal(
     ]
     initial_severity = next(
         (opt for opt in severity_options if opt["value"] == current_severity),
-        severity_options[2],
+        next(
+            opt for opt in severity_options if opt["value"] == IncidentSeverity.P2.value
+        ),
     )
 
     captain_element: dict = {

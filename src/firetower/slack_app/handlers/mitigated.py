@@ -106,7 +106,7 @@ def handle_mitigated_submission(ack: Any, body: dict, view: dict, client: Any) -
     serializer.save()
 
     incident.refresh_from_db()
-    mitigation_notes = f"\n\n---\n**Mitigation notes:**\n**Impact:** {impact}\n**Action items:** {todo}"
+    mitigation_notes = f"\n\nMitigation notes:\nImpact: {impact}\nAction items: {todo}"
     new_description = (incident.description or "") + mitigation_notes
     desc_serializer = IncidentWriteSerializer(
         instance=incident, data={"description": new_description}, partial=True

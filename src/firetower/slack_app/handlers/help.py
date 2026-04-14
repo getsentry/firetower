@@ -19,5 +19,5 @@ def handle_help_command(ack: Any, command: dict, respond: Any) -> None:
         f"  `{cmd} dumpslack` - Dump slack history (not yet implemented)\n"
         f"  `{cmd} help` - Show this help message\n"
         f"\n"
-        f"Aliases: `mit` = `mitigated`, `fixed` = `resolved`, `sev` = `severity`\n"
+        f"Aliases: `mit` = `mitigated`, `fixed` = `resolved`, `sev`/`setseverity` = `severity`, `edit` = `update`\n"
     )

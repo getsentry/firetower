@@ -40,7 +40,6 @@ class SlackConfig:
     team_id: str
     participant_sync_throttle_seconds: int
     app_token: str
-    signing_secret: str
     incident_feed_channel_id: str = ""
     always_invited_ids: list[str] = field(default_factory=list)
     incident_guide_message: str = ""
@@ -125,7 +124,6 @@ class DummyConfigFile(ConfigFile):
             team_id="",
             participant_sync_throttle_seconds=0,
             app_token="",
-            signing_secret="",
             incident_feed_channel_id="",
             always_invited_ids=[],
             incident_guide_message="",
