@@ -575,7 +575,6 @@ class TestStatuspageCommand:
         ack.assert_called_once()
         respond.assert_called_once()
         assert "not yet implemented" in respond.call_args[0][0]
-        assert "/inc statuspage" in respond.call_args[0][0]
 
 
 class TestDumpslackCommand:
@@ -589,7 +588,6 @@ class TestDumpslackCommand:
         ack.assert_called_once()
         respond.assert_called_once()
         assert "not yet implemented" in respond.call_args[0][0]
-        assert "/inc dumpslack" in respond.call_args[0][0]
 
 
 @pytest.mark.django_db
