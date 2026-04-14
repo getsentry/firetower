@@ -113,8 +113,12 @@ def handle_mitigated_submission(ack: Any, body: dict, view: dict, client: Any) -
     )
     if not desc_serializer.is_valid():
         logger.error("Mitigated description update failed: %s", desc_serializer.errors)
-    else:
-        desc_serializer.save()
+        client.chat_postMessage(
+            channel=channel_id,
+            text=f"Incident marked as Mitigated, but failed to append mitigation notes: {desc_serializer.errors}",
+        )
+        return
+    desc_serializer.save()
 
     client.chat_postMessage(
         channel=channel_id,
