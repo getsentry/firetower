@@ -105,21 +105,6 @@ def handle_mitigated_submission(ack: Any, body: dict, view: dict, client: Any) -
         return
     serializer.save()
 
-    incident.refresh_from_db()
-    mitigation_notes = f"\n\nMitigation notes:\nImpact: {impact}\nAction items: {todo}"
-    new_description = (incident.description or "") + mitigation_notes
-    desc_serializer = IncidentWriteSerializer(
-        instance=incident, data={"description": new_description}, partial=True
-    )
-    if not desc_serializer.is_valid():
-        logger.error("Mitigated description update failed: %s", desc_serializer.errors)
-        client.chat_postMessage(
-            channel=channel_id,
-            text=f"Incident marked as Mitigated, but failed to append mitigation notes: {desc_serializer.errors}",
-        )
-        return
-    desc_serializer.save()
-
     client.chat_postMessage(
         channel=channel_id,
         text=(
