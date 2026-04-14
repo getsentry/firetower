@@ -131,6 +131,23 @@ def _build_new_incident_modal(channel_id: str = "") -> dict:
     blocks.append(
         {
             "type": "input",
+            "block_id": "captain_block",
+            "optional": True,
+            "element": {
+                "type": "users_select",
+                "action_id": "captain_select",
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "Select incident captain",
+                },
+            },
+            "label": {"type": "plain_text", "text": "Incident Captain"},
+        }
+    )
+
+    blocks.append(
+        {
+            "type": "input",
             "block_id": "private_block",
             "optional": True,
             "element": {
@@ -247,6 +264,10 @@ def handle_new_incident_submission(
     )
     affected_region_tags = [opt["value"] for opt in affected_region_selections]
 
+    captain_slack_id = (
+        values.get("captain_block", {}).get("captain_select", {}).get("selected_user")
+    )
+
     private_selections = (
         values.get("private_block", {}).get("is_private", {}).get("selected_options")
         or []
@@ -271,12 +292,18 @@ def handle_new_incident_submission(
         )
         return
 
+    captain_email = user.email
+    if captain_slack_id:
+        captain_user = get_or_create_user_from_slack_id(captain_slack_id)
+        if captain_user:
+            captain_email = captain_user.email
+
     data = {
         "title": title,
         "severity": severity,
         "description": description,
         "impact_summary": impact_summary,
-        "captain": user.email,
+        "captain": captain_email,
         "reporter": user.email,
         "is_private": is_private,
     }
