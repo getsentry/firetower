@@ -12,6 +12,7 @@ from firetower.incidents.models import (
     IncidentStatus,
 )
 from firetower.slack_app.bolt import handle_command
+from firetower.slack_app.handlers.dumpslack import handle_dumpslack_command
 from firetower.slack_app.handlers.mitigated import (
     handle_mitigated_command,
     handle_mitigated_submission,
@@ -22,6 +23,7 @@ from firetower.slack_app.handlers.resolved import (
     handle_resolved_submission,
 )
 from firetower.slack_app.handlers.severity import handle_severity_command
+from firetower.slack_app.handlers.statuspage import handle_statuspage_command
 from firetower.slack_app.handlers.subject import handle_subject_command
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
@@ -535,3 +537,55 @@ class TestRouting:
         mock_statsd.increment.assert_any_call(
             "slack_app.commands.submitted", tags=["subcommand:reopen"]
         )
+
+    @patch("firetower.slack_app.bolt.statsd")
+    def test_statuspage_routes(self, mock_statsd, incident):
+        ack = MagicMock()
+        respond = MagicMock()
+        body = {"text": "statuspage", "channel_id": CHANNEL_ID}
+        command = {"command": "/ft"}
+
+        with patch(
+            "firetower.slack_app.bolt.handle_statuspage_command"
+        ) as mock_handler:
+            handle_command(ack=ack, body=body, command=command, respond=respond)
+            mock_handler.assert_called_once()
+
+    @patch("firetower.slack_app.bolt.statsd")
+    def test_dumpslack_routes(self, mock_statsd, incident):
+        ack = MagicMock()
+        respond = MagicMock()
+        body = {"text": "dumpslack", "channel_id": CHANNEL_ID}
+        command = {"command": "/ft"}
+
+        with patch("firetower.slack_app.bolt.handle_dumpslack_command") as mock_handler:
+            handle_command(ack=ack, body=body, command=command, respond=respond)
+            mock_handler.assert_called_once()
+
+
+class TestStatuspageCommand:
+    def test_returns_not_implemented(self):
+        ack = MagicMock()
+        respond = MagicMock()
+        command = {"command": "/ft"}
+
+        handle_statuspage_command(ack, command, respond)
+
+        ack.assert_called_once()
+        respond.assert_called_once()
+        assert "not yet implemented" in respond.call_args[0][0]
+        assert "/inc statuspage" in respond.call_args[0][0]
+
+
+class TestDumpslackCommand:
+    def test_returns_not_implemented(self):
+        ack = MagicMock()
+        respond = MagicMock()
+        command = {"command": "/ft"}
+
+        handle_dumpslack_command(ack, command, respond)
+
+        ack.assert_called_once()
+        respond.assert_called_once()
+        assert "not yet implemented" in respond.call_args[0][0]
+        assert "/inc dumpslack" in respond.call_args[0][0]
