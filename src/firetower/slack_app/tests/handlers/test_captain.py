@@ -22,12 +22,12 @@ class TestCaptainCommand:
         command = {"command": "/ft"}
         respond = MagicMock()
 
-        with patch("firetower.slack_app.handlers.captain.get_bolt_app") as mock_app:
+        with patch("firetower.slack_app.bolt.get_bolt_app") as mock_app:
             handle_captain_command(ack, body, command, respond)
 
             ack.assert_called_once()
-            mock_app().client.views_open.assert_called_once()
-            view = mock_app().client.views_open.call_args[1]["view"]
+            mock_app.return_value.client.views_open.assert_called_once()
+            view = mock_app.return_value.client.views_open.call_args[1]["view"]
             assert view["callback_id"] == "captain_incident_modal"
 
     def test_prefills_current_captain(self, user, incident):
@@ -39,10 +39,10 @@ class TestCaptainCommand:
         command = {"command": "/ft"}
         respond = MagicMock()
 
-        with patch("firetower.slack_app.handlers.captain.get_bolt_app") as mock_app:
+        with patch("firetower.slack_app.bolt.get_bolt_app") as mock_app:
             handle_captain_command(ack, body, command, respond)
 
-            view = mock_app().client.views_open.call_args[1]["view"]
+            view = mock_app.return_value.client.views_open.call_args[1]["view"]
             captain_element = view["blocks"][0]["element"]
             assert captain_element["initial_user"] == "U_CAPTAIN"
 
@@ -95,7 +95,7 @@ class TestCaptainSubmission:
         ack.assert_called_once()
         incident.refresh_from_db()
         assert incident.captain == user
-        assert "captain updated" in client.chat_postMessage.call_args[1]["text"]
+        client.chat_postMessage.assert_not_called()
 
     @patch("firetower.slack_app.handlers.captain.get_or_create_user_from_slack_id")
     def test_user_not_found(self, mock_get_user, incident):

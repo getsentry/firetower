@@ -67,11 +67,11 @@ class TestMitigatedSubmission:
         ack.assert_called_once()
         incident.refresh_from_db()
         assert incident.status == IncidentStatus.MITIGATED
-        assert "Reduced impact" in incident.description
-        assert "Monitor overnight" in incident.description
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Mitigated" in msg
+        assert "Reduced impact" in msg
+        assert "Monitor overnight" in msg
 
     def test_missing_incident_does_not_crash(self, db):
         ack = MagicMock()

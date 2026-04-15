@@ -115,7 +115,3 @@ def handle_captain_submission(ack: Any, body: dict, view: dict, client: Any) -> 
         return
 
     serializer.save()
-    client.chat_postMessage(
-        channel=channel_id,
-        text=f"{incident.incident_number} captain updated to {captain_user.get_full_name()}.",
-    )
