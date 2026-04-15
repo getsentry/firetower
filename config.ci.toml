@@ -11,12 +11,6 @@ host = "localhost"
 user = "postgres"
 password = "postgres"
 
-[jira]
-domain = ""
-account = ""
-api_key = ""
-severity_field = ""
-
 [slack]
 bot_token = "test-bot-token"
 team_id = "test-bot-id"
