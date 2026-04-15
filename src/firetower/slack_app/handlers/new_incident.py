@@ -15,7 +15,7 @@ _slack_service = SlackService()
 _DEFAULT_SEVERITY = IncidentSeverity.P3
 
 
-def _build_new_incident_modal(channel_id: str = "") -> dict:
+def _build_new_incident_modal(channel_id: str = "", user_id: str = "") -> dict:
     severity_options = [
         {
             "text": {"type": "plain_text", "text": sev.label},
@@ -29,6 +29,21 @@ def _build_new_incident_modal(channel_id: str = "") -> dict:
     }
 
     blocks = [
+        {
+            "type": "input",
+            "block_id": "captain_block",
+            "optional": True,
+            "element": {
+                "type": "users_select",
+                "action_id": "captain_select",
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "Select incident captain",
+                },
+                **({"initial_user": user_id} if user_id else {}),
+            },
+            "label": {"type": "plain_text", "text": "Incident Captain"},
+        },
         {
             "type": "input",
             "block_id": "severity_block",
@@ -195,11 +210,13 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
         return
 
     channel_id = body.get("channel_id", "")
+    user_id = body.get("user_id", "")
 
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
     get_bolt_app().client.views_open(
-        trigger_id=trigger_id, view=_build_new_incident_modal(channel_id=channel_id)
+        trigger_id=trigger_id,
+        view=_build_new_incident_modal(channel_id=channel_id, user_id=user_id),
     )
 
 
@@ -247,6 +264,10 @@ def handle_new_incident_submission(
     )
     affected_region_tags = [opt["value"] for opt in affected_region_selections]
 
+    captain_slack_id = (
+        values.get("captain_block", {}).get("captain_select", {}).get("selected_user")
+    )
+
     private_selections = (
         values.get("private_block", {}).get("is_private", {}).get("selected_options")
         or []
@@ -271,12 +292,18 @@ def handle_new_incident_submission(
         )
         return
 
+    captain_email = user.email
+    if captain_slack_id:
+        captain_user = get_or_create_user_from_slack_id(captain_slack_id)
+        if captain_user:
+            captain_email = captain_user.email
+
     data = {
         "title": title,
         "severity": severity,
         "description": description,
         "impact_summary": impact_summary,
-        "captain": user.email,
+        "captain": captain_email,
         "reporter": user.email,
         "is_private": is_private,
     }
