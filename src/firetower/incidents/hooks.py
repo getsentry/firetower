@@ -19,16 +19,6 @@ _slack_service = SlackService()
 PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 
 
-def _get_pagerduty_service() -> PagerDutyService | None:
-    if not settings.PAGERDUTY:
-        return None
-    try:
-        return PagerDutyService()
-    except Exception:
-        logger.exception("Failed to initialize PagerDutyService")
-        return None
-
-
 def _page_high_sev_if_needed(incident: Incident) -> None:
     if incident.severity not in PAGEABLE_SEVERITIES:
         return
@@ -48,8 +38,10 @@ def _page_high_sev_if_needed(incident: Incident) -> None:
         logger.info("No integration_key for HIGH_SEV escalation policy, skipping page")
         return
 
-    pd_service = _get_pagerduty_service()
-    if not pd_service:
+    try:
+        pd_service = PagerDutyService()
+    except Exception:
+        logger.exception("Failed to initialize PagerDutyService")
         return
 
     dedup_key = f"firetower-{incident.incident_number}"

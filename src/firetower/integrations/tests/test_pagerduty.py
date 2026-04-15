@@ -49,6 +49,7 @@ class TestTriggerIncident:
 
         assert result is True
         mock_post.assert_called_once()
+        mock_post.return_value.raise_for_status.assert_called_once()
         call_kwargs = mock_post.call_args
         assert call_kwargs.kwargs["json"]["routing_key"] == "int-key"
         assert call_kwargs.kwargs["json"]["dedup_key"] == "dedup-123"
