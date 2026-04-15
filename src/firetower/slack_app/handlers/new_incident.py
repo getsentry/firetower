@@ -15,7 +15,7 @@ _slack_service = SlackService()
 _DEFAULT_SEVERITY = IncidentSeverity.P3
 
 
-def _build_new_incident_modal(channel_id: str = "") -> dict:
+def _build_new_incident_modal(channel_id: str = "", user_id: str = "") -> dict:
     severity_options = [
         {
             "text": {"type": "plain_text", "text": sev.label},
@@ -29,6 +29,21 @@ def _build_new_incident_modal(channel_id: str = "") -> dict:
     }
 
     blocks = [
+        {
+            "type": "input",
+            "block_id": "captain_block",
+            "optional": True,
+            "element": {
+                "type": "users_select",
+                "action_id": "captain_select",
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "Select incident captain",
+                },
+                **({"initial_user": user_id} if user_id else {}),
+            },
+            "label": {"type": "plain_text", "text": "Incident Captain"},
+        },
         {
             "type": "input",
             "block_id": "severity_block",
@@ -131,23 +146,6 @@ def _build_new_incident_modal(channel_id: str = "") -> dict:
     blocks.append(
         {
             "type": "input",
-            "block_id": "captain_block",
-            "optional": True,
-            "element": {
-                "type": "users_select",
-                "action_id": "captain_select",
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "Select incident captain",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Incident Captain"},
-        }
-    )
-
-    blocks.append(
-        {
-            "type": "input",
             "block_id": "private_block",
             "optional": True,
             "element": {
@@ -212,11 +210,13 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
         return
 
     channel_id = body.get("channel_id", "")
+    user_id = body.get("user_id", "")
 
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
     get_bolt_app().client.views_open(
-        trigger_id=trigger_id, view=_build_new_incident_modal(channel_id=channel_id)
+        trigger_id=trigger_id,
+        view=_build_new_incident_modal(channel_id=channel_id, user_id=user_id),
     )
 
 

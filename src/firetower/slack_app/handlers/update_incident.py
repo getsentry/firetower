@@ -133,6 +133,13 @@ def _build_update_incident_modal(incident: Incident, channel_id: str) -> dict:
     blocks = [
         {
             "type": "input",
+            "block_id": "captain_block",
+            "optional": True,
+            "element": captain_element,
+            "label": {"type": "plain_text", "text": "Incident Captain"},
+        },
+        {
+            "type": "input",
             "block_id": "severity_block",
             "element": severity_element,
             "label": {"type": "plain_text", "text": "Severity"},
@@ -177,13 +184,6 @@ def _build_update_incident_modal(incident: Incident, channel_id: str) -> dict:
             "optional": True,
             "element": affected_region_element,
             "label": {"type": "plain_text", "text": "Affected Region"},
-        },
-        {
-            "type": "input",
-            "block_id": "captain_block",
-            "optional": True,
-            "element": captain_element,
-            "label": {"type": "plain_text", "text": "Incident Captain"},
         },
         {
             "type": "input",
