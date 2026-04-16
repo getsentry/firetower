@@ -101,13 +101,13 @@ export function DateRangeFilter() {
   };
 
   return (
-    <div className="col-span-1">
-      <div className="mb-space-md">
+    <div>
+      <div className="mb-space-md gap-space-xs flex min-h-[32px] items-center">
         <h3 className="text-size-md text-content-secondary font-semibold">
           Created Date
         </h3>
       </div>
-      <div className="gap-space-xs flex flex-wrap items-center">
+      <div className="gap-space-md flex min-h-[28px] flex-wrap items-center">
         <Popover
           open={editing === 'after'}
           onOpenChange={o => setEditing(o ? 'after' : null)}

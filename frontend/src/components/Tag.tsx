@@ -23,7 +23,7 @@ export function Tag({children, className, action, ref, ...props}: TagProps) {
       )}
       {...props}
     >
-      <span className="mt-[2px] mb-auto">{children}</span>
+      <span>{children}</span>
       {action}
     </span>
   );

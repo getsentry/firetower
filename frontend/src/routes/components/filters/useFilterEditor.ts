@@ -16,6 +16,7 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
   const committed = ((search[filterKey] as string[] | undefined) ?? []) as string[];
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
+  const [displayValues, setDisplayValues] = useState<string[]>(committed);
   const draftRef = useRef<string[]>(draft);
   const onCloseRef = useRef(onClose);
   const onOpenRef = useRef(onOpen);
@@ -27,7 +28,7 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
   const [focusedIndex, setFocusedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const selected = isEditing ? draft : committed;
+  const selected = isEditing ? draft : displayValues;
 
   useEffect(() => {
     draftRef.current = draft;
@@ -41,6 +42,7 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
 
   const remove = useCallback(
     (value: string) => {
+      setDisplayValues(prev => prev.filter(v => v !== value));
       navigate({
         to: '/',
         search: (s: Record<string, unknown>) => {
@@ -59,11 +61,12 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
   );
 
   const close = useCallback(() => {
+    const current = draftRef.current;
+    setDisplayValues(current);
     setIsEditing(false);
     setInputValue('');
     setFocusedIndex(0);
     onCloseRef.current?.();
-    const current = draftRef.current;
     navigate({
       to: '/',
       search: (s: Record<string, unknown>) => ({
@@ -75,6 +78,7 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
   }, [navigate, filterKey]);
 
   const open = () => {
+    setDisplayValues(committed);
     setDraft(committed);
     setIsEditing(true);
     setInputValue('');
