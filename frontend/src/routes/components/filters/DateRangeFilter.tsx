@@ -124,6 +124,7 @@ export function DateRangeFilter() {
               mode="single"
               selected={afterDate}
               defaultMonth={afterDate}
+              disabled={beforeDate ? {after: beforeDate} : undefined}
               captionLayout="dropdown"
               showOutsideDays={false}
               onSelect={d => handleDateSelect('created_after', d)}
@@ -147,6 +148,7 @@ export function DateRangeFilter() {
               mode="single"
               selected={beforeDate}
               defaultMonth={beforeDate}
+              disabled={afterDate ? {before: afterDate} : undefined}
               captionLayout="dropdown"
               showOutsideDays={false}
               onSelect={d => handleDateSelect('created_before', d)}
