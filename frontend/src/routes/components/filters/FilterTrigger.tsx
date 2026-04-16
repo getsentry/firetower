@@ -17,7 +17,7 @@ export function FilterTrigger({open, onToggle}: {open: boolean; onToggle: () => 
           onClick={() => {
             navigate({
               to: '/',
-              search: {},
+              search: prev => ({status: prev.status}),
               replace: true,
             });
           }}
