@@ -115,6 +115,7 @@ export function PillFilter<T extends PillVariant>({
         ) : (
           <button
             type="button"
+            tabIndex={-1}
             className="text-size-sm text-content-disabled cursor-pointer italic select-none"
             onClick={open}
           >

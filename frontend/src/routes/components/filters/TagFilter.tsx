@@ -112,6 +112,7 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
         ) : (
           <button
             type="button"
+            tabIndex={-1}
             className="text-size-sm text-content-disabled cursor-pointer italic select-none"
             onClick={open}
           >
