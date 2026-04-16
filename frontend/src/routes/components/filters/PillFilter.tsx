@@ -115,14 +115,14 @@ export function PillFilter<T extends PillVariant>({
         ) : (
           <button
             type="button"
-            className="text-size-sm text-content-disabled cursor-pointer select-none italic"
+            className="text-size-sm text-content-disabled cursor-pointer italic select-none"
             onClick={open}
           >
             Any
           </button>
         )}
 
-        {isEditing && available.length > 0 && (
+        {isEditing && available.length > 0 ? (
           <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
             <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {available.map((option, index) => (
@@ -147,16 +147,16 @@ export function PillFilter<T extends PillVariant>({
               ))}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {isEditing && (
+      {isEditing ? (
         <div
           className="fixed inset-0 z-40 bg-transparent"
           aria-hidden="true"
           onClick={close}
         />
-      )}
+      ) : null}
     </div>
   );
 }

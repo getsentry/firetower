@@ -11,8 +11,8 @@ export {FilterTrigger} from './filters/FilterTrigger';
 
 export function FilterPanel() {
   return (
-    <Card className="flex flex-col gap-space-md" data-testid="advanced-filters">
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-space-md">
+    <Card className="gap-space-md flex flex-col" data-testid="advanced-filters">
+      <div className="gap-space-md grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         <PillFilter
           label="Severity"
           filterKey="severity"

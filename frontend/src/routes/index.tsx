@@ -42,12 +42,12 @@ function IncidentsLayout({children}: {children: React.ReactNode}) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex flex-col gap-space-sm">
+    <div className="gap-space-sm flex flex-col">
       <div className="flex items-center justify-between">
         <StatusFilter />
         <FilterTrigger open={open} onToggle={() => setOpen(prev => !prev)} />
       </div>
-      {open && <FilterPanel />}
+      {open ? <FilterPanel /> : null}
       <hr className="border-secondary" />
       {children}
     </div>
@@ -163,7 +163,7 @@ function Index() {
 
           {/* Intersection observer target */}
           <div ref={observerTarget} className="py-space-xl flex justify-center">
-            {isFetchingNextPage && <Spinner size="md" />}
+            {isFetchingNextPage ? <Spinner size="md" /> : null}
           </div>
         </>
       )}

@@ -9,8 +9,8 @@ export function FilterTrigger({open, onToggle}: {open: boolean; onToggle: () => 
   const {activeCount} = useActiveFilters();
 
   return (
-    <div className="flex items-center gap-space-md">
-      {activeCount > 0 && (
+    <div className="gap-space-md flex items-center">
+      {activeCount > 0 ? (
         <button
           type="button"
           className="text-content-accent text-size-sm cursor-pointer hover:underline"
@@ -25,7 +25,7 @@ export function FilterTrigger({open, onToggle}: {open: boolean; onToggle: () => 
         >
           Clear all filters
         </button>
-      )}
+      ) : null}
       <Button
         variant="secondary"
         size="sm"
@@ -35,11 +35,11 @@ export function FilterTrigger({open, onToggle}: {open: boolean; onToggle: () => 
       >
         <SlidersHorizontalIcon className="h-3.5 w-3.5" />
         {open ? 'Hide filters' : 'Show filters'}
-        {activeCount > 0 && (
+        {activeCount > 0 ? (
           <span className="bg-background-accent-vibrant text-content-on-vibrant-light ml-space-2xs inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-xs leading-none">
             {activeCount}
           </span>
-        )}
+        ) : null}
       </Button>
     </div>
   );
