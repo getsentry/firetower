@@ -66,7 +66,7 @@ function DateTrigger({
     <button
       ref={ref as React.Ref<HTMLButtonElement>}
       type="button"
-      className="text-size-sm text-content-disabled cursor-pointer select-none italic"
+      className="text-size-sm text-content-disabled cursor-pointer italic select-none"
       {...props}
     >
       Any
@@ -77,8 +77,8 @@ function DateTrigger({
 export function DateRangeFilter() {
   const navigate = useNavigate();
   const {search} = useActiveFilters();
-  const after = search.created_after as string | undefined;
-  const before = search.created_before as string | undefined;
+  const after = search.created_after;
+  const before = search.created_before;
   const [editing, setEditing] = useState<'after' | 'before' | null>(null);
 
   const afterDate = after ? new Date(after + 'T00:00:00') : undefined;
