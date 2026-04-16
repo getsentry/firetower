@@ -11,7 +11,7 @@ interface UseFilterEditorOptions {
 
 // Just a helper hook to prevent duplicate code in the different editor types.
 export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOptions) {
-  const navigate = useNavigate();
+  const navigate = useNavigate({from: '/'});
   const {search} = useActiveFilters();
   const committed = ((search[filterKey] as string[] | undefined) ?? []) as string[];
   const [isEditing, setIsEditing] = useState(false);
@@ -56,7 +56,7 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
       setDisplayValues(prev => prev.filter(v => v !== value));
       navigate({
         to: '/',
-        search: (s: Record<string, unknown>) => {
+        search: s => {
           const current = ((s[filterKey] as string[] | undefined) ?? []).filter(
             v => v !== value
           );
@@ -80,7 +80,7 @@ export function useFilterEditor({filterKey, onClose, onOpen}: UseFilterEditorOpt
     onCloseRef.current?.();
     navigate({
       to: '/',
-      search: (s: Record<string, unknown>) => ({
+      search: s => ({
         ...s,
         [filterKey]: current.length > 0 ? current : undefined,
       }),

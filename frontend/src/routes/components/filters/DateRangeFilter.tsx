@@ -75,7 +75,7 @@ function DateTrigger({
 }
 
 export function DateRangeFilter() {
-  const navigate = useNavigate();
+  const navigate = useNavigate({from: '/'});
   const {search} = useActiveFilters();
   const after = search.created_after;
   const before = search.created_before;

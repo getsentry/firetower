@@ -5,7 +5,7 @@ import {SlidersHorizontalIcon} from 'lucide-react';
 import {useActiveFilters} from '../useActiveFilters';
 
 export function FilterTrigger({open, onToggle}: {open: boolean; onToggle: () => void}) {
-  const navigate = useNavigate();
+  const navigate = useNavigate({from: '/'});
   const {activeCount} = useActiveFilters();
 
   return (
