@@ -92,7 +92,7 @@ export function PillFilter<T extends PillVariant>({
             {selected.map(v => (
               <Tag
                 key={v}
-                className="cursor-pointer"
+                className="cursor-pointer hover:bg-background-transparent-neutral-muted"
                 onClick={open}
                 action={
                   <Button
