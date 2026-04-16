@@ -404,6 +404,15 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         except Exception:
             logger.exception(f"Failed to page for incident {incident.id}")
 
+        channel_id = _get_channel_id(incident)
+        if channel_id:
+            try:
+                _invite_oncall_users(incident, channel_id)
+            except Exception:
+                logger.exception(
+                    f"Failed to invite oncall users for incident {incident.id}"
+                )
+
 
 def on_title_changed(incident: Incident) -> None:
     try:

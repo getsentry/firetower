@@ -797,6 +797,72 @@ class TestOnSeverityChangedPagerDuty:
 
         mock_page.assert_not_called()
 
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_high_sev_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_invites_oncall_users_on_severity_upgrade_to_p0(
+        self, mock_slack, mock_page, mock_invite_oncall
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = Incident.objects.create(
+            title="Escalating issue",
+            severity=IncidentSeverity.P0,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_severity_changed(incident, IncidentSeverity.P2)
+
+        mock_invite_oncall.assert_called_once_with(incident, "C12345")
+
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_high_sev_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_invite_oncall_on_downgrade(
+        self, mock_slack, mock_page, mock_invite_oncall
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = Incident.objects.create(
+            title="Downgraded",
+            severity=IncidentSeverity.P3,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_severity_changed(incident, IncidentSeverity.P1)
+
+        mock_invite_oncall.assert_not_called()
+
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_high_sev_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_invite_oncall_on_p1_to_p0(
+        self, mock_slack, mock_page, mock_invite_oncall
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = Incident.objects.create(
+            title="Already paged",
+            severity=IncidentSeverity.P0,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_severity_changed(incident, IncidentSeverity.P1)
+
+        mock_invite_oncall.assert_not_called()
+
 
 @pytest.mark.django_db
 class TestInviteOncallUsers:
