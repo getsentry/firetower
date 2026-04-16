@@ -89,7 +89,7 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
             {selected.map(v => (
               <Tag
                 key={v}
-                className="cursor-pointer hover:bg-background-transparent-neutral-muted"
+                className="hover:bg-background-transparent-neutral-muted cursor-pointer"
                 onClick={open}
                 action={
                   <Button
