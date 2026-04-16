@@ -41,7 +41,7 @@ function DateTrigger({
     return (
       <Tag
         ref={ref as React.Ref<HTMLSpanElement>}
-        className="cursor-pointer select-none"
+        className="hover:bg-background-transparent-neutral-muted cursor-pointer select-none"
         action={
           <Button
             variant="close"
