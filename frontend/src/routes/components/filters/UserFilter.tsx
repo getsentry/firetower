@@ -15,6 +15,97 @@ interface UserFilterProps {
   filterKey: ArrayFilterKey;
 }
 
+function EditingTags({
+  selected,
+  toggle,
+}: {
+  selected: string[];
+  toggle: (value: string) => void;
+}) {
+  return selected.map(v => (
+    <Tag
+      key={v}
+      action={
+        <Button
+          variant="close"
+          size={null}
+          onClick={() => toggle(v)}
+          aria-label={`Remove ${v}`}
+        >
+          <XIcon className="h-3.5 w-3.5" />
+        </Button>
+      }
+    >
+      {v}
+    </Tag>
+  ));
+}
+
+function ReadOnlyTags({
+  selected,
+  open,
+  remove,
+}: {
+  selected: string[];
+  open: () => void;
+  remove: (value: string) => void;
+}) {
+  return (
+    <div className="gap-space-sm flex flex-wrap select-none">
+      {selected.map(v => (
+        <Tag
+          key={v}
+          className="cursor-pointer"
+          onClick={open}
+          action={
+            <Button
+              variant="close"
+              size={null}
+              onClick={e => {
+                e.stopPropagation();
+                remove(v);
+              }}
+              aria-label={`Remove ${v}`}
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </Button>
+          }
+        >
+          {v}
+        </Tag>
+      ))}
+    </div>
+  );
+}
+
+function EmptyPlaceholder({open}: {open: () => void}) {
+  return (
+    <button
+      type="button"
+      className="text-size-sm text-content-disabled cursor-pointer select-none italic"
+      onClick={open}
+    >
+      Any
+    </button>
+  );
+}
+
+function SelectedValues({
+  selected,
+  open,
+  remove,
+}: {
+  selected: string[];
+  open: () => void;
+  remove: (value: string) => void;
+}) {
+  if (selected.length > 0) {
+    return <ReadOnlyTags selected={selected} open={open} remove={remove} />;
+  }
+
+  return <EmptyPlaceholder open={open} />;
+}
+
 export function UserFilter({label, filterKey}: UserFilterProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const scrollSentinelRef = useRef<HTMLDivElement>(null);
@@ -89,23 +180,7 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
       <div className={cn('relative', isEditing && 'z-50')}>
         {isEditing ? (
           <div className="gap-space-sm flex flex-wrap items-center select-none">
-            {selected.map(v => (
-              <Tag
-                key={v}
-                action={
-                  <Button
-                    variant="close"
-                    size={null}
-                    onClick={() => toggle(v)}
-                    aria-label={`Remove ${v}`}
-                  >
-                    <XIcon className="h-3.5 w-3.5" />
-                  </Button>
-                }
-              >
-                {v}
-              </Tag>
-            ))}
+            <EditingTags selected={selected} toggle={toggle} />
             <input
               ref={inputRef}
               type="text"
@@ -119,39 +194,8 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
               className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
             />
           </div>
-        ) : selected.length > 0 ? (
-          <div className="gap-space-sm flex flex-wrap select-none">
-            {selected.map(v => (
-              <Tag
-                key={v}
-                className="cursor-pointer"
-                onClick={open}
-                action={
-                  <Button
-                    variant="close"
-                    size={null}
-                    onClick={e => {
-                      e.stopPropagation();
-                      remove(v);
-                    }}
-                    aria-label={`Remove ${v}`}
-                  >
-                    <XIcon className="h-3.5 w-3.5" />
-                  </Button>
-                }
-              >
-                {v}
-              </Tag>
-            ))}
-          </div>
         ) : (
-          <button
-            type="button"
-            className="text-size-sm text-content-disabled cursor-pointer select-none italic"
-            onClick={open}
-          >
-            Any
-          </button>
+          <SelectedValues selected={selected} open={open} remove={remove} />
         )}
 
         {isEditing && (
