@@ -130,11 +130,19 @@ def _invite_user_to_channel(
         logger.exception(f"Failed to invite user {user.id} to channel {channel_id}")
 
 
-ONCALL_ROLE_LABELS: dict[int | None, str] = {
+ONCALL_ROLE_LABELS: dict[int, str] = {
     1: "Incident Manager",
     2: "SRE Oncall (Primary)",
     3: "SRE Oncall (Secondary)",
 }
+
+
+def _oncall_role_label(escalation_level: int | None) -> str:
+    if escalation_level is None:
+        return "Oncall"
+    return ONCALL_ROLE_LABELS.get(
+        escalation_level, f"Oncall (Level {escalation_level})"
+    )
 
 
 def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
@@ -171,7 +179,7 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
         logger.exception(f"Failed to fetch oncall users for incident {incident.id}")
         return
 
-    role_lines = []
+    role_entries: list[tuple[bool, int, str]] = []
     for oncall_user in oncall_users:
         email = oncall_user.get("email")
         escalation_level: int | None = oncall_user.get("escalation_level")
@@ -197,14 +205,20 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
                 f"Failed to invite oncall user {email} to channel {channel_id}"
             )
 
-        label = ONCALL_ROLE_LABELS.get(
-            escalation_level, f"Oncall (Level {escalation_level})"
+        label = _oncall_role_label(escalation_level)
+        role_entries.append(
+            (
+                escalation_level is None,
+                escalation_level if escalation_level is not None else 0,
+                f"{label}: <@{slack_user_id}>",
+            )
         )
-        role_lines.append(f"{label}: <@{slack_user_id}>")
 
-    if role_lines:
+    if role_entries:
+        role_entries.sort(key=lambda entry: (entry[0], entry[1]))
+        message = "\n".join(line for _, _, line in role_entries)
         try:
-            _slack_service.post_message(channel_id, "\n".join(role_lines))
+            _slack_service.post_message(channel_id, message)
         except Exception:
             logger.exception(
                 f"Failed to post oncall role message for incident {incident.id}"
