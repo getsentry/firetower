@@ -130,6 +130,87 @@ def _invite_user_to_channel(
         logger.exception(f"Failed to invite user {user.id} to channel {channel_id}")
 
 
+ONCALL_ROLE_LABELS: dict[int | None, str] = {
+    1: "Incident Manager",
+    2: "SRE Oncall (Primary)",
+    3: "SRE Oncall (Secondary)",
+}
+
+
+def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
+    if incident.severity not in PAGEABLE_SEVERITIES:
+        return
+
+    pd_config = settings.PAGERDUTY
+    if not pd_config:
+        return
+
+    api_token = pd_config.get("API_TOKEN")
+    if not api_token:
+        logger.info("No PagerDuty API token configured, skipping oncall invite")
+        return
+
+    escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
+    high_sev_policy = escalation_policies.get("HIGH_SEV")
+    if not high_sev_policy:
+        return
+
+    policy_id = high_sev_policy.get("id")
+    if not policy_id:
+        return
+
+    try:
+        pd_service = PagerDutyService()
+    except Exception:
+        logger.exception("Failed to initialize PagerDutyService for oncall invite")
+        return
+
+    try:
+        oncall_users = pd_service.get_oncall_users(policy_id)
+    except Exception:
+        logger.exception(f"Failed to fetch oncall users for incident {incident.id}")
+        return
+
+    role_lines = []
+    for oncall_user in oncall_users:
+        email = oncall_user.get("email")
+        escalation_level: int | None = oncall_user.get("escalation_level")
+        if not email:
+            continue
+
+        try:
+            slack_profile = _slack_service.get_user_profile_by_email(email)
+        except Exception:
+            logger.exception(f"Failed to look up Slack user for {email}")
+            continue
+
+        if not slack_profile or not slack_profile.get("slack_user_id"):
+            logger.info(f"Could not find Slack user for oncall email {email}")
+            continue
+
+        slack_user_id = slack_profile["slack_user_id"]
+
+        try:
+            _slack_service.invite_to_channel(channel_id, [slack_user_id])
+        except Exception:
+            logger.exception(
+                f"Failed to invite oncall user {email} to channel {channel_id}"
+            )
+
+        label = ONCALL_ROLE_LABELS.get(
+            escalation_level, f"Oncall (Level {escalation_level})"
+        )
+        role_lines.append(f"{label}: <@{slack_user_id}>")
+
+    if role_lines:
+        try:
+            _slack_service.post_message(channel_id, "\n".join(role_lines))
+        except Exception:
+            logger.exception(
+                f"Failed to post oncall role message for incident {incident.id}"
+            )
+
+
 def on_incident_created(incident: Incident) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
@@ -242,6 +323,13 @@ def on_incident_created(incident: Incident) -> None:
                     logger.exception(
                         f"Failed to invite always_invited users to channel {channel_id} for incident {incident.id}"
                     )
+
+        try:
+            _invite_oncall_users(incident, channel_id)
+        except Exception:
+            logger.exception(
+                f"Failed to invite oncall users for incident {incident.id}"
+            )
 
         feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
         if feed_channel_id and not incident.is_private:

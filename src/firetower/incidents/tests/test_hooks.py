@@ -7,6 +7,7 @@ from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
     _build_channel_name,
     _build_channel_topic,
+    _invite_oncall_users,
     _page_high_sev_if_needed,
     on_captain_changed,
     on_incident_created,
@@ -795,3 +796,182 @@ class TestOnSeverityChangedPagerDuty:
         on_severity_changed(incident, IncidentSeverity.P1)
 
         mock_page.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestInviteOncallUsers:
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_invites_multiple_oncall_users_p0(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.return_value = [
+            {"email": "imoc@example.com", "escalation_level": 1},
+            {"email": "primary@example.com", "escalation_level": 2},
+            {"email": "secondary@example.com", "escalation_level": 3},
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            {"slack_user_id": "U_IMOC"},
+            {"slack_user_id": "U_PRIMARY"},
+            {"slack_user_id": "U_SECONDARY"},
+        ]
+
+        incident = Incident.objects.create(
+            title="Major outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        mock_pd.get_oncall_users.assert_called_once_with("P17I207")
+        assert mock_slack.invite_to_channel.call_count == 3
+        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_IMOC"])
+        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_PRIMARY"])
+        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_SECONDARY"])
+
+        mock_slack.post_message.assert_called_once()
+        message = mock_slack.post_message.call_args[0][1]
+        assert "Incident Manager: <@U_IMOC>" in message
+        assert "SRE Oncall (Primary): <@U_PRIMARY>" in message
+        assert "SRE Oncall (Secondary): <@U_SECONDARY>" in message
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_invites_oncall_users_p1(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.return_value = [
+            {"email": "imoc@example.com", "escalation_level": 1},
+        ]
+        mock_slack.get_user_profile_by_email.return_value = {"slack_user_id": "U_IMOC"}
+
+        incident = Incident.objects.create(
+            title="Service degradation",
+            severity=IncidentSeverity.P1,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        mock_pd.get_oncall_users.assert_called_once_with("P17I207")
+        mock_slack.invite_to_channel.assert_called_once_with("C99999", ["U_IMOC"])
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_skips_for_p2(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+
+        incident = Incident.objects.create(
+            title="Minor issue",
+            severity=IncidentSeverity.P2,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        mock_pd_cls.assert_not_called()
+        mock_slack.get_user_profile_by_email.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_skips_when_pd_not_configured(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = None
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        mock_pd_cls.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_skips_when_no_api_token(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = {
+            "API_TOKEN": "",
+            "ESCALATION_POLICIES": {
+                "HIGH_SEV": {"id": "P17I207", "integration_key": "test-key"},
+            },
+        }
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        mock_pd_cls.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_skips_user_not_found_in_slack(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.return_value = [
+            {"email": "ghost@example.com", "escalation_level": 1},
+            {"email": "exists@example.com", "escalation_level": 2},
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            None,
+            {"slack_user_id": "U_EXISTS"},
+        ]
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        mock_slack.invite_to_channel.assert_called_once_with("C99999", ["U_EXISTS"])
+        message = mock_slack.post_message.call_args[0][1]
+        assert "U_EXISTS" in message
+        assert "ghost" not in message
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_invite_failure_does_not_block_others(
+        self, mock_pd_cls, mock_slack, settings
+    ):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.return_value = [
+            {"email": "user1@example.com", "escalation_level": 1},
+            {"email": "user2@example.com", "escalation_level": 2},
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            {"slack_user_id": "U_USER1"},
+            {"slack_user_id": "U_USER2"},
+        ]
+        mock_slack.invite_to_channel.side_effect = [Exception("Slack error"), True]
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        assert mock_slack.invite_to_channel.call_count == 2
+        mock_slack.post_message.assert_called_once()
+        message = mock_slack.post_message.call_args[0][1]
+        assert "U_USER1" in message
+        assert "U_USER2" in message
+
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_on_incident_created_calls_invite_oncall(
+        self, mock_slack, mock_invite_oncall
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Major outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        on_incident_created(incident)
+
+        mock_invite_oncall.assert_called_once_with(incident, "C99999")
