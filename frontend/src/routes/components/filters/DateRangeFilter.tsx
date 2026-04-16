@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import React, {useState} from 'react';
 import {useNavigate} from '@tanstack/react-router';
 import {Button} from 'components/Button';
 import {Calendar} from 'components/Calendar';
@@ -23,6 +23,55 @@ function toDateString(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+function DateTrigger({
+  value,
+  clearLabel,
+  onClear,
+  ref,
+  ...props
+}: {
+  value: string | undefined;
+  clearLabel: string;
+  onClear: () => void;
+  ref?: React.Ref<HTMLElement>;
+} & React.HTMLAttributes<HTMLElement>) {
+  if (value) {
+    return (
+      <Tag
+        ref={ref as React.Ref<HTMLSpanElement>}
+        className="cursor-pointer select-none"
+        action={
+          <Button
+            variant="close"
+            size={null}
+            onClick={e => {
+              e.stopPropagation();
+              onClear();
+            }}
+            aria-label={clearLabel}
+          >
+            <XIcon className="h-3.5 w-3.5" />
+          </Button>
+        }
+        {...props}
+      >
+        {formatDateDisplay(value)}
+      </Tag>
+    );
+  }
+
+  return (
+    <button
+      ref={ref as React.Ref<HTMLButtonElement>}
+      type="button"
+      className="text-size-sm text-content-disabled cursor-pointer select-none italic"
+      {...props}
+    >
+      Any
+    </button>
+  );
 }
 
 export function DateRangeFilter() {
@@ -64,33 +113,11 @@ export function DateRangeFilter() {
           onOpenChange={o => setEditing(o ? 'after' : null)}
         >
           <PopoverTrigger asChild>
-            {after ? (
-              <Tag
-                className="cursor-pointer select-none"
-                action={
-                  <Button
-                    variant="close"
-                    size={null}
-                    onClick={e => {
-                      e.stopPropagation();
-                      update('created_after', undefined);
-                    }}
-                    aria-label="Clear start date"
-                  >
-                    <XIcon className="h-3.5 w-3.5" />
-                  </Button>
-                }
-              >
-                {formatDateDisplay(after)}
-              </Tag>
-            ) : (
-              <button
-                type="button"
-                className="text-size-sm text-content-disabled cursor-pointer select-none italic"
-              >
-                Any
-              </button>
-            )}
+            <DateTrigger
+              value={after}
+              clearLabel="Clear start date"
+              onClear={() => update('created_after', undefined)}
+            />
           </PopoverTrigger>
           <PopoverContent className="w-auto overflow-hidden p-0" align="start">
             <Calendar
@@ -109,33 +136,11 @@ export function DateRangeFilter() {
           onOpenChange={o => setEditing(o ? 'before' : null)}
         >
           <PopoverTrigger asChild>
-            {before ? (
-              <Tag
-                className="cursor-pointer select-none"
-                action={
-                  <Button
-                    variant="close"
-                    size={null}
-                    onClick={e => {
-                      e.stopPropagation();
-                      update('created_before', undefined);
-                    }}
-                    aria-label="Clear end date"
-                  >
-                    <XIcon className="h-3.5 w-3.5" />
-                  </Button>
-                }
-              >
-                {formatDateDisplay(before)}
-              </Tag>
-            ) : (
-              <button
-                type="button"
-                className="text-size-sm text-content-disabled cursor-pointer select-none italic"
-              >
-                Any
-              </button>
-            )}
+            <DateTrigger
+              value={before}
+              clearLabel="Clear end date"
+              onClear={() => update('created_before', undefined)}
+            />
           </PopoverTrigger>
           <PopoverContent className="w-auto overflow-hidden p-0" align="start">
             <Calendar
