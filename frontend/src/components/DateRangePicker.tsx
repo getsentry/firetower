@@ -41,10 +41,6 @@ export function DateRangePicker({
   align = 'start',
   numberOfMonths = 2,
 }: DateRangePickerProps) {
-  const handleSelect = (range: DateRange | undefined) => {
-    onChange(range);
-  };
-
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
@@ -82,7 +78,7 @@ export function DateRangePicker({
         <Calendar
           mode="range"
           selected={value}
-          onSelect={handleSelect}
+          onSelect={onChange}
           numberOfMonths={numberOfMonths}
           defaultMonth={value?.from}
           captionLayout="dropdown"

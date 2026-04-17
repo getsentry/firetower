@@ -445,14 +445,14 @@ describe('Advanced Filters UI', () => {
     expect(screen.getByText('Severity')).toBeInTheDocument();
   });
 
-  it('does not auto-open when URL has advanced filters', async () => {
+  it('auto-opens when URL has advanced filters', async () => {
     renderRoute('/?severity=P0');
 
     await screen.findByText('INC-1247');
 
     expect(screen.getByTestId('advanced-filters-toggle')).toHaveAttribute(
       'aria-expanded',
-      'false'
+      'true'
     );
   });
 });
@@ -581,12 +581,8 @@ describe('Filter Interactions', () => {
 
     await screen.findByText('INC-1247');
 
-    const user = userEvent.setup();
-    const toggle = screen.getByTestId('advanced-filters-toggle');
-    await user.click(toggle);
-
-    expect(screen.getByText('Jun 15, 2024')).toBeInTheDocument();
-    expect(screen.getByLabelText('Clear start date')).toBeInTheDocument();
+    expect(screen.getByText(/Jun 15, 2024/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Clear date range')).toBeInTheDocument();
   });
 });
 
