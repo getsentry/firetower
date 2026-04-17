@@ -32,6 +32,7 @@ const mockIncidents: PaginatedIncidents = {
       service_tier: null,
       created_at: '2024-08-27T18:14:00Z',
       is_private: false,
+      captain: null,
     },
     {
       id: 'INC-1246',
@@ -43,6 +44,7 @@ const mockIncidents: PaginatedIncidents = {
       service_tier: null,
       created_at: '2024-08-27T15:32:00Z',
       is_private: true,
+      captain: null,
     },
   ],
 };
@@ -52,6 +54,16 @@ const mockCurrentUser: CurrentUser = {
   avatar_url: null,
 };
 
+const mockPaginatedUsers = {
+  count: 2,
+  next: null,
+  previous: null,
+  results: [
+    {email: 'alice@example.com', name: 'Alice Smith', avatar_url: null},
+    {email: 'bob@example.com', name: 'Bob Jones', avatar_url: null},
+  ],
+};
+
 function setupDefaultMocks() {
   mockApiGet.mockImplementation((args: {path: string}) => {
     if (args.path === '/ui/incidents/') {
@@ -59,6 +71,12 @@ function setupDefaultMocks() {
     }
     if (args.path === '/ui/users/me/') {
       return Promise.resolve(mockCurrentUser);
+    }
+    if (args.path === '/tags/') {
+      return Promise.resolve(['tag-1', 'tag-2']);
+    }
+    if (args.path === '/users/') {
+      return Promise.resolve(mockPaginatedUsers);
     }
     return Promise.reject(new Error('Not found'));
   });
@@ -171,12 +189,13 @@ describe('StatusFilter', () => {
     setupDefaultMocks();
   });
 
-  it('renders all three filter buttons', async () => {
+  it('renders all four filter buttons', async () => {
     renderRoute();
 
     expect(await screen.findByTestId('filter-active')).toBeInTheDocument();
     expect(await screen.findByTestId('filter-review')).toBeInTheDocument();
     expect(await screen.findByTestId('filter-closed')).toBeInTheDocument();
+    expect(await screen.findByTestId('filter-all')).toBeInTheDocument();
   });
 
   it('shows Active filter as active by default', async () => {
@@ -242,10 +261,12 @@ describe('StatusFilter', () => {
     const activeButton = screen.getByTestId('filter-active');
     const reviewButton = screen.getByTestId('filter-review');
     const closedButton = screen.getByTestId('filter-closed');
+    const allButton = screen.getByTestId('filter-all');
 
     expect(activeButton).toHaveAttribute('aria-selected', 'false');
     expect(reviewButton).toHaveAttribute('aria-selected', 'false');
     expect(closedButton).toHaveAttribute('aria-selected', 'false');
+    expect(allButton).toHaveAttribute('aria-selected', 'false');
   });
 });
 
@@ -389,6 +410,53 @@ describe('Advanced Filter Params', () => {
   });
 });
 
+describe('Advanced Filters UI', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    setupDefaultMocks();
+  });
+
+  it('shows filters toggle button', async () => {
+    renderRoute();
+
+    expect(await screen.findByTestId('advanced-filters-toggle')).toBeInTheDocument();
+  });
+
+  it('does not show filter controls by default', async () => {
+    renderRoute();
+
+    await screen.findByText('INC-1247');
+
+    expect(screen.getByTestId('advanced-filters-toggle')).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  it('shows filter controls when toggle is clicked', async () => {
+    const user = userEvent.setup();
+    renderRoute();
+
+    await screen.findByText('INC-1247');
+
+    const toggle = screen.getByTestId('advanced-filters-toggle');
+    await user.click(toggle);
+
+    expect(screen.getByText('Severity')).toBeInTheDocument();
+  });
+
+  it('auto-opens when URL has advanced filters', async () => {
+    renderRoute('/?severity=P0');
+
+    await screen.findByText('INC-1247');
+
+    expect(screen.getByTestId('advanced-filters-toggle')).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+  });
+});
+
 describe('Route States', () => {
   beforeEach(() => {
     queryClient.clear();
@@ -454,6 +522,67 @@ describe('Route States', () => {
     expect(screen.getByTestId('filter-active')).toBeInTheDocument();
     expect(screen.getByTestId('filter-review')).toBeInTheDocument();
     expect(screen.getByTestId('filter-closed')).toBeInTheDocument();
+  });
+});
+
+describe('Filter Interactions', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    setupDefaultMocks();
+  });
+
+  async function openFilters() {
+    const user = userEvent.setup();
+    renderRoute();
+    await screen.findByText('INC-1247');
+    const toggle = screen.getByTestId('advanced-filters-toggle');
+    await user.click(toggle);
+    return user;
+  }
+
+  it('PillFilter: selecting a severity option adds it to the filter', async () => {
+    const user = await openFilters();
+
+    const editButton = screen.getByLabelText('Edit Severity');
+    await user.click(editButton);
+
+    const option = await screen.findByRole('button', {name: 'P0'});
+    await user.click(option);
+
+    expect(screen.getByText('P0')).toBeInTheDocument();
+  });
+
+  it('TagFilter: selecting a tag option adds it to the filter', async () => {
+    const user = await openFilters();
+
+    const editButton = screen.getByLabelText('Edit Impact Type');
+    await user.click(editButton);
+
+    const option = await screen.findByRole('button', {name: 'tag-1'});
+    await user.click(option);
+
+    expect(screen.getByText('tag-1')).toBeInTheDocument();
+  });
+
+  it('UserFilter: selecting a user adds their email to the filter', async () => {
+    const user = await openFilters();
+
+    const editButton = screen.getByLabelText('Edit Captain');
+    await user.click(editButton);
+
+    const option = await screen.findByRole('button', {name: /Alice Smith/});
+    await user.click(option);
+
+    expect(screen.getByText('alice@example.com')).toBeInTheDocument();
+  });
+
+  it('DateRangeFilter: selecting a date shows clear button', async () => {
+    renderRoute('/?created_after=2024-06-15');
+
+    await screen.findByText('INC-1247');
+
+    expect(screen.getByText(/Jun 15, 2024/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Clear date range')).toBeInTheDocument();
   });
 });
 

@@ -4,11 +4,13 @@ import {cn} from 'utils/cn';
 interface TagProps extends React.HTMLAttributes<HTMLSpanElement> {
   children: React.ReactNode;
   action?: React.ReactNode;
+  ref?: React.Ref<HTMLSpanElement>;
 }
 
-export function Tag({children, className, action, ...props}: TagProps) {
+export function Tag({children, className, action, ref, ...props}: TagProps) {
   return (
     <span
+      ref={ref}
       className={cn(
         'inline-flex items-center gap-space-xs',
         'px-space-md py-space-xs',
@@ -21,7 +23,7 @@ export function Tag({children, className, action, ...props}: TagProps) {
       )}
       {...props}
     >
-      <span className="mt-[2px] mb-auto">{children}</span>
+      <span>{children}</span>
       {action}
     </span>
   );

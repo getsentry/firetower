@@ -14,8 +14,11 @@ export const ServiceTierSchema = z.enum(['T0', 'T1', 'T2', 'T3', 'T4']);
 
 export type IncidentStatus = z.infer<typeof StatusSchema>;
 
+export type StatusFilterValue = IncidentStatus | 'Any';
+
 export const STATUS_FILTER_GROUPS = {
-  active: ['Active', 'Mitigated'] as IncidentStatus[],
-  review: ['Postmortem'] as IncidentStatus[],
-  closed: ['Done', 'Cancelled'] as IncidentStatus[],
+  active: ['Active', 'Mitigated'] as StatusFilterValue[],
+  review: ['Postmortem'] as StatusFilterValue[],
+  closed: ['Done', 'Cancelled'] as StatusFilterValue[],
+  all: ['Any'] as StatusFilterValue[],
 };

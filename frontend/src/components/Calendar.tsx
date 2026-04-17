@@ -97,7 +97,10 @@ function Calendar({
           'rounded-l-md bg-background-secondary',
           defaultClassNames.range_start
         ),
-        range_middle: cn('rounded-none', defaultClassNames.range_middle),
+        range_middle: cn(
+          'rounded-none bg-background-secondary [&_button]:text-content-primary [&_button]:bg-transparent',
+          defaultClassNames.range_middle
+        ),
         range_end: cn(
           'rounded-r-md bg-background-secondary',
           defaultClassNames.range_end
