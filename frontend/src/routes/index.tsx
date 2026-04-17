@@ -12,6 +12,7 @@ import {FilterPanel, FilterTrigger} from './components/AdvancedFilters';
 import {IncidentCard} from './components/IncidentCard';
 import {IncidentListSkeleton} from './components/IncidentListSkeleton';
 import {StatusFilter} from './components/StatusFilter';
+import {useActiveFilters} from './components/useActiveFilters';
 import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
 import {STATUS_FILTER_GROUPS} from './types';
 
@@ -39,7 +40,8 @@ const incidentListSearchSchema = z.object({
 });
 
 function IncidentsLayout({children}: {children: React.ReactNode}) {
-  const [open, setOpen] = useState(false);
+  const {activeCount} = useActiveFilters();
+  const [open, setOpen] = useState(activeCount > 0);
 
   return (
     <div className="gap-space-sm flex flex-col">
