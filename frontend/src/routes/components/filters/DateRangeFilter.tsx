@@ -16,7 +16,9 @@ function toDateString(date: Date): string {
 
 function parseDate(dateStr: string | undefined): Date | undefined {
   if (!dateStr) return undefined;
-  return new Date(dateStr + 'T00:00:00');
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return undefined;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
 }
 
 export function DateRangeFilter() {
