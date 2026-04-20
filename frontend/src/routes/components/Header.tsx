@@ -41,7 +41,7 @@ export const Header = () => {
     <header className="bg-background-primary border-secondary border-b">
       <div className="px-space-md py-space-md md:px-space-xl mx-auto max-w-6xl">
         {isTopLevelRoute ? (
-          <div className="flex items-center justify-between">
+          <div className="relative flex items-center justify-between">
             <nav className="gap-space-2xs flex">
               {NAV_PAGES.map(page => (
                 <Link
@@ -59,7 +59,10 @@ export const Header = () => {
                 </Link>
               ))}
             </nav>
-            <Link to="/" className="gap-space-sm flex items-center no-underline">
+            <Link
+              to="/"
+              className="gap-space-sm absolute left-1/2 flex -translate-x-1/2 items-center no-underline"
+            >
               <img src="/firetower.svg" alt="Firetower" className="h-6 w-6" />
               <span className="text-content-headings text-xl font-semibold">
                 Firetower
