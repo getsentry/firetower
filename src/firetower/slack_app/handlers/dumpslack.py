@@ -1,5 +1,6 @@
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
@@ -44,14 +45,31 @@ def handle_dumpslack_command(
 
     existing_link = incident.external_links.filter(type=ExternalLinkType.NOTION).first()
 
+    respond("Fetching Slack history and generating postmortem doc, this may take a moment...")
+
     if existing_link:
         page_id = _extract_notion_page_id(existing_link.url)
         if not page_id:
             respond("Could not parse existing Notion page ID from stored URL.")
             return
         page_url = existing_link.url
-        is_new = False
+        messages = _get_channel_messages(client, channel_id)
     else:
+        # Fetch template blocks and Slack messages in parallel before creating the page.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            messages_future = pool.submit(_get_channel_messages, client, channel_id)
+            template_future = (
+                pool.submit(notion.get_template_blocks) if notion.template_id else None
+            )
+            messages = messages_future.result()
+            try:
+                template_blocks, template_children = (
+                    template_future.result() if template_future else ([], {})
+                )
+            except Exception:
+                logger.exception("Failed to fetch Notion template blocks")
+                template_blocks, template_children = [], {}
+
         base_url = settings.FIRETOWER_BASE_URL
         incident_url = f"{base_url}/{incident.incident_number}"
         captain_email = incident.captain.email if incident.captain else None
@@ -64,15 +82,18 @@ def handle_dumpslack_command(
                 incident_date=incident.created_at,
                 severity=incident.severity,
                 captain_email=captain_email,
+                template_blocks=template_blocks,
+                template_children=template_children,
             )
         except Exception:
-            logger.exception("Failed to create Notion postmortem page for %s", incident.incident_number)
+            logger.exception(
+                "Failed to create Notion postmortem page for %s", incident.incident_number
+            )
             respond("Failed to create Notion postmortem page. Please try again.")
             return
 
         page_id = page["id"]
         page_url = page["url"]
-        is_new = True
 
         try:
             ExternalLink.objects.update_or_create(
@@ -81,7 +102,9 @@ def handle_dumpslack_command(
                 defaults={"url": page_url},
             )
         except Exception:
-            logger.exception("Failed to store Notion link on incident %s", incident.incident_number)
+            logger.exception(
+                "Failed to store Notion link on incident %s", incident.incident_number
+            )
 
         try:
             client.bookmarks_add(
@@ -93,16 +116,7 @@ def handle_dumpslack_command(
         except Exception:
             logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
 
-    respond("Fetching Slack history and generating postmortem doc, this may take a moment...")
-
-    messages = _get_channel_messages(client, channel_id)
-
-    if is_new and notion.template_id:
-        try:
-            template_blocks, template_children = notion.get_template_blocks()
-            notion.apply_template(page_id, template_blocks, template_children)
-        except Exception:
-            logger.exception("Failed to apply Notion template to page %s", page_id)
+    action = "Created" if not existing_link else "Updated"
 
     try:
         notion.dump_slack_messages(page_id, messages)
@@ -111,7 +125,6 @@ def handle_dumpslack_command(
         respond(f"Postmortem doc created but Slack dump failed. Check: {page_url}")
         return
 
-    action = "Created" if is_new else "Updated"
     respond(f"{action} postmortem doc: {page_url}")
 
 

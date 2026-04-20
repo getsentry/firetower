@@ -1,5 +1,6 @@
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
@@ -8,6 +9,8 @@ from notion_client import Client
 logger = logging.getLogger(__name__)
 
 _BLOCK_CHILD_LIMIT = 85  # Notion enforces 100; stay below for safety
+_NOTION_PAGE_CREATE_LIMIT = 100  # max children in pages.create
+_TEMPLATE_FETCH_WORKERS = 3  # stay comfortably under Notion's 3 req/s rate limit
 
 
 class NotionService:
@@ -42,6 +45,27 @@ class NotionService:
         self._users = users
         return users
 
+    def get_template_blocks(self) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+        """Fetch template blocks one level deep, parallelizing child requests."""
+        if not self.template_id:
+            return [], {}
+
+        response = self.client.blocks.children.list(block_id=self.template_id)
+        blocks: list[dict[str, Any]] = response.get("results", [])
+
+        blocks_with_children = [b for b in blocks if b.get("has_children")]
+        children: dict[str, list[dict[str, Any]]] = {}
+
+        if blocks_with_children:
+            def _fetch_children(block: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+                resp = self.client.blocks.children.list(block_id=block["id"])
+                return block["id"], resp.get("results", [])
+
+            with ThreadPoolExecutor(max_workers=_TEMPLATE_FETCH_WORKERS) as pool:
+                children = dict(pool.map(_fetch_children, blocks_with_children))
+
+        return blocks, children
+
     def create_postmortem_page(
         self,
         incident_number: str,
@@ -50,7 +74,10 @@ class NotionService:
         incident_date: datetime,
         severity: str | None = None,
         captain_email: str | None = None,
+        template_blocks: list[dict[str, Any]] | None = None,
+        template_children: dict[str, list[dict[str, Any]]] | None = None,
     ) -> dict[str, Any]:
+        """Create postmortem page, optionally embedding template blocks in the same API call."""
         properties: dict[str, Any] = {
             "Name": {
                 "title": [
@@ -74,53 +101,23 @@ class NotionService:
                     "people": [{"object": "user", "id": notion_user["id"]}]
                 }
 
-        page: dict[str, Any] = self.client.pages.create(
-            parent={"database_id": self.database_id},
-            properties=properties,
-        )
+        create_kwargs: dict[str, Any] = {
+            "parent": {"database_id": self.database_id},
+            "properties": properties,
+        }
+
+        overflow: list[dict[str, Any]] = []
+        if template_blocks:
+            all_blocks = _build_appendable_blocks(template_blocks, template_children or {})
+            create_kwargs["children"] = all_blocks[:_NOTION_PAGE_CREATE_LIMIT]
+            overflow = all_blocks[_NOTION_PAGE_CREATE_LIMIT:]
+
+        page: dict[str, Any] = self.client.pages.create(**create_kwargs)
+
+        if overflow:
+            self._append_children(page["id"], overflow)
+
         return page
-
-    def get_template_blocks(self) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
-        """Fetch template blocks one level deep. Returns (blocks, children_by_block_id)."""
-        if not self.template_id:
-            return [], {}
-
-        response = self.client.blocks.children.list(block_id=self.template_id)
-        blocks: list[dict[str, Any]] = []
-        children: dict[str, list[dict[str, Any]]] = {}
-
-        for block in response.get("results", []):
-            if block.get("has_children"):
-                child_resp = self.client.blocks.children.list(block_id=block["id"])
-                children[block["id"]] = child_resp.get("results", [])
-            blocks.append(block)
-
-        return blocks, children
-
-    def apply_template(
-        self,
-        page_id: str,
-        template_blocks: list[dict[str, Any]],
-        template_children: dict[str, list[dict[str, Any]]],
-    ) -> None:
-        """Copy template blocks onto the page."""
-        blocks_to_append: list[dict[str, Any]] = []
-
-        for block in template_blocks:
-            block_type = block["type"]
-            if block_type == "table":
-                # The Notion API cannot duplicate tables directly; use a hardcoded postmortem schema.
-                blocks_to_append.append(_standard_postmortem_table())
-            else:
-                stripped = _strip_block(block)
-                if block["id"] in template_children:
-                    stripped[block_type]["children"] = [
-                        _strip_block(c) for c in template_children[block["id"]]
-                    ]
-                blocks_to_append.append(stripped)
-
-        if blocks_to_append:
-            self._append_children(page_id, blocks_to_append)
 
     def dump_slack_messages(
         self,
@@ -195,6 +192,27 @@ class NotionService:
 
         logger.error("Max retries reached appending children to Notion block %s", block_id)
         return None
+
+
+def _build_appendable_blocks(
+    template_blocks: list[dict[str, Any]],
+    template_children: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Convert template blocks into the stripped form required by the Notion append API."""
+    result: list[dict[str, Any]] = []
+    for block in template_blocks:
+        block_type = block["type"]
+        if block_type == "table":
+            # The Notion API cannot duplicate tables directly; use a hardcoded postmortem schema.
+            result.append(_standard_postmortem_table())
+        else:
+            stripped = _strip_block(block)
+            if block["id"] in template_children:
+                stripped[block_type]["children"] = [
+                    _strip_block(c) for c in template_children[block["id"]]
+                ]
+            result.append(stripped)
+    return result
 
 
 def _strip_block(block: dict[str, Any]) -> dict[str, Any]:
