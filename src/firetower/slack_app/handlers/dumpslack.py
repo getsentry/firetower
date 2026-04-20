@@ -134,6 +134,40 @@ def handle_dumpslack_command(
     respond(f"{action} postmortem doc: {page_url}")
 
 
+def _build_user_email_cache(client: Any) -> dict[str, str]:
+    """Batch-fetch all workspace users and return a slack_user_id -> email mapping.
+
+    One users.list call (paginated) instead of one users_info call per unique
+    author avoids N sequential API calls on channels with many participants.
+    """
+    cache: dict[str, str] = {}
+    cursor: str | None = None
+
+    while True:
+        kwargs: dict[str, Any] = {"limit": 200}
+        if cursor:
+            kwargs["cursor"] = cursor
+        try:
+            response = client.users_list(**kwargs)
+        except Exception:
+            logger.exception("Failed to batch-fetch Slack users list")
+            break
+        if not response.get("ok"):
+            logger.error("users_list returned not-ok")
+            break
+        for member in response.get("members", []):
+            if member.get("deleted") or member.get("is_bot"):
+                continue
+            email = member.get("profile", {}).get("email", "")
+            if email:
+                cache[member["id"]] = email
+        cursor = response.get("response_metadata", {}).get("next_cursor", "")
+        if not cursor:
+            break
+
+    return cache
+
+
 def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
     """Fetch up to 1000 channel messages with thread replies, excluding bots and system events."""
     try:
@@ -146,18 +180,19 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
         logger.error("conversations_history returned not-ok for channel %s", channel_id)
         return []
 
-    email_cache: dict[str, str] = {}
+    email_cache = _build_user_email_cache(client)
 
     def resolve_email(slack_user_id: str) -> str:
-        if slack_user_id not in email_cache:
-            try:
-                info = client.users_info(user=slack_user_id)
-                email_cache[slack_user_id] = (
-                    info["user"].get("profile", {}).get("email") or slack_user_id
-                )
-            except Exception:
-                email_cache[slack_user_id] = slack_user_id
-        return email_cache[slack_user_id]
+        if slack_user_id in email_cache:
+            return email_cache[slack_user_id]
+        # User not in the bulk list; fall back to individual lookup.
+        try:
+            info = client.users_info(user=slack_user_id)
+            email = info["user"].get("profile", {}).get("email") or slack_user_id
+            email_cache[slack_user_id] = email
+            return email
+        except Exception:
+            return slack_user_id
 
     content: list[dict[str, Any]] = []
     for msg in response.get("messages", []):

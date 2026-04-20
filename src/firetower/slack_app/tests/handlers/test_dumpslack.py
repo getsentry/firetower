@@ -22,6 +22,20 @@ class TestExtractNotionPageId:
         assert _extract_notion_page_id("https://notion.so/no-id-here") is None
 
 
+def _make_users_list_response(members: list[dict] | None = None) -> dict:
+    """Return a users_list response with the given members (or a default single user)."""
+    if members is None:
+        members = [
+            {
+                "id": "U1",
+                "deleted": False,
+                "is_bot": False,
+                "profile": {"email": "user@sentry.io"},
+            }
+        ]
+    return {"ok": True, "members": members, "response_metadata": {"next_cursor": ""}}
+
+
 class TestGetChannelMessages:
     def test_filters_bots_and_system_messages(self):
         mock_client = MagicMock()
@@ -51,9 +65,7 @@ class TestGetChannelMessages:
                 {"type": "message", "user": "U4", "ts": "1000000003.000000"},  # no text
             ],
         }
-        mock_client.users_info.return_value = {
-            "user": {"profile": {"email": "user@sentry.io"}}
-        }
+        mock_client.users_list.return_value = _make_users_list_response()
 
         messages = _get_channel_messages(mock_client, "C123")
 
@@ -79,9 +91,7 @@ class TestGetChannelMessages:
                 },
             ],
         }
-        mock_client.users_info.return_value = {
-            "user": {"profile": {"email": "user@sentry.io"}}
-        }
+        mock_client.users_list.return_value = _make_users_list_response()
 
         messages = _get_channel_messages(mock_client, "C123")
 
@@ -128,15 +138,53 @@ class TestGetChannelMessages:
                 },
             ],
         }
-        mock_client.users_info.return_value = {
-            "user": {"profile": {"email": "user@sentry.io"}}
-        }
+        mock_client.users_list.return_value = _make_users_list_response(
+            members=[
+                {
+                    "id": "U1",
+                    "deleted": False,
+                    "is_bot": False,
+                    "profile": {"email": "u1@sentry.io"},
+                },
+                {
+                    "id": "U2",
+                    "deleted": False,
+                    "is_bot": False,
+                    "profile": {"email": "u2@sentry.io"},
+                },
+            ]
+        )
 
         messages = _get_channel_messages(mock_client, "C123")
 
         assert len(messages) == 1
         assert len(messages[0]["replies"]) == 1
         assert messages[0]["replies"][0]["text"] == "reply"
+
+    def test_falls_back_to_users_info_for_cache_miss(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {
+                    "type": "message",
+                    "user": "U_UNKNOWN",
+                    "text": "hello",
+                    "ts": "1000000001.000000",
+                },
+            ],
+        }
+        # users_list returns no members, so U_UNKNOWN is a cache miss
+        mock_client.users_list.return_value = _make_users_list_response(members=[])
+        mock_client.users_info.return_value = {
+            "user": {"profile": {"email": "fallback@sentry.io"}}
+        }
+
+        messages = _get_channel_messages(mock_client, "C123")
+
+        assert len(messages) == 1
+        assert messages[0]["author"] == "fallback@sentry.io"
+        mock_client.users_info.assert_called_once_with(user="U_UNKNOWN")
 
 
 class TestHandleDumpslackCommand:
