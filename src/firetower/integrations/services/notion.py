@@ -45,26 +45,44 @@ class NotionService:
         self._users = users
         return users
 
-    def get_template_blocks(self) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+    def get_template_blocks(
+        self,
+    ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
         """Fetch template blocks one level deep, parallelizing child requests."""
         if not self.template_id:
             return [], {}
 
-        response = self.client.blocks.children.list(block_id=self.template_id)
-        blocks: list[dict[str, Any]] = response.get("results", [])
+        blocks = self._fetch_all_children(self.template_id)
 
         blocks_with_children = [b for b in blocks if b.get("has_children")]
         children: dict[str, list[dict[str, Any]]] = {}
 
         if blocks_with_children:
-            def _fetch_children(block: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
-                resp = self.client.blocks.children.list(block_id=block["id"])
-                return block["id"], resp.get("results", [])
+
+            def _fetch_children(
+                block: dict[str, Any],
+            ) -> tuple[str, list[dict[str, Any]]]:
+                return block["id"], self._fetch_all_children(block["id"])
 
             with ThreadPoolExecutor(max_workers=_TEMPLATE_FETCH_WORKERS) as pool:
                 children = dict(pool.map(_fetch_children, blocks_with_children))
 
         return blocks, children
+
+    def _fetch_all_children(self, block_id: str) -> list[dict[str, Any]]:
+        """Fetch all children of a block, handling pagination."""
+        results: list[dict[str, Any]] = []
+        start_cursor: str | None = None
+        while True:
+            kwargs: dict[str, Any] = {"block_id": block_id, "page_size": 100}
+            if start_cursor:
+                kwargs["start_cursor"] = start_cursor
+            response = self.client.blocks.children.list(**kwargs)
+            results.extend(response.get("results", []))
+            start_cursor = response.get("next_cursor")
+            if not start_cursor:
+                break
+        return results
 
     def create_postmortem_page(
         self,
@@ -108,7 +126,9 @@ class NotionService:
 
         overflow: list[dict[str, Any]] = []
         if template_blocks:
-            all_blocks = _build_appendable_blocks(template_blocks, template_children or {})
+            all_blocks = _build_appendable_blocks(
+                template_blocks, template_children or {}
+            )
             create_kwargs["children"] = all_blocks[:_NOTION_PAGE_CREATE_LIMIT]
             overflow = all_blocks[_NOTION_PAGE_CREATE_LIMIT:]
 
@@ -164,7 +184,9 @@ class NotionService:
 
         idx = 0
         while idx < len(message_blocks):
-            self._append_children(toggle_id, message_blocks[idx : idx + _BLOCK_CHILD_LIMIT])
+            self._append_children(
+                toggle_id, message_blocks[idx : idx + _BLOCK_CHILD_LIMIT]
+            )
             idx += _BLOCK_CHILD_LIMIT
 
     def _append_children(
@@ -190,7 +212,9 @@ class NotionService:
                 )
                 time.sleep(wait)
 
-        logger.error("Max retries reached appending children to Notion block %s", block_id)
+        logger.error(
+            "Max retries reached appending children to Notion block %s", block_id
+        )
         return None
 
 
@@ -221,11 +245,17 @@ def _strip_block(block: dict[str, Any]) -> dict[str, Any]:
     return {"type": block_type, block_type: block[block_type]}
 
 
+_NOTION_RICH_TEXT_LIMIT = 2000
+
+
 def _message_to_bullet(msg: dict[str, Any]) -> dict[str, Any]:
     dt: datetime = msg["date_time"]
     author = msg.get("author") or "unknown"
-    text = (msg.get("text") or "")[:2000]  # Notion rich_text limit
-    content = f"[{dt.strftime('%Y-%m-%d %H:%M UTC')}] {author}: {text}"
+    text = msg.get("text") or ""
+    # Truncate the full content string — the prefix adds ~40 chars before the message text.
+    content = f"[{dt.strftime('%Y-%m-%d %H:%M UTC')}] {author}: {text}"[
+        :_NOTION_RICH_TEXT_LIMIT
+    ]
     return {
         "type": "bulleted_list_item",
         "bulleted_list_item": {
@@ -236,7 +266,13 @@ def _message_to_bullet(msg: dict[str, Any]) -> dict[str, Any]:
 
 def _standard_postmortem_table() -> dict[str, Any]:
     """Five-column action items table used in standard postmortem docs."""
-    headers = ["Priority", "Description", "Improvement/Prevention", "Owner", "Ticket URL"]
+    headers = [
+        "Priority",
+        "Description",
+        "Improvement/Prevention",
+        "Owner",
+        "Ticket URL",
+    ]
     return {
         "type": "table",
         "table": {
@@ -247,7 +283,9 @@ def _standard_postmortem_table() -> dict[str, Any]:
                 {
                     "type": "table_row",
                     "table_row": {
-                        "cells": [[{"type": "text", "text": {"content": h}}] for h in headers]
+                        "cells": [
+                            [{"type": "text", "text": {"content": h}}] for h in headers
+                        ]
                     },
                 },
                 {"type": "table_row", "table_row": {"cells": [[], [], [], [], []]}},

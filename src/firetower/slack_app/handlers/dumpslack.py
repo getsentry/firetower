@@ -6,8 +6,9 @@ from typing import Any
 
 from django.conf import settings
 
-from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
+from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.integrations.services.notion import NotionService
+from firetower.slack_app.handlers.utils import get_incident_from_channel
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def handle_dumpslack_command(
         respond("Could not determine the channel ID.")
         return
 
-    incident = _get_incident_by_channel_id(channel_id)
+    incident = get_incident_from_channel(channel_id)
     if not incident:
         cmd = command.get("command", "/ft")
         respond(f"No incident found for this channel. Use `{cmd} new` to create one.")
@@ -45,7 +46,9 @@ def handle_dumpslack_command(
 
     existing_link = incident.external_links.filter(type=ExternalLinkType.NOTION).first()
 
-    respond("Fetching Slack history and generating postmortem doc, this may take a moment...")
+    respond(
+        "Fetching Slack history and generating postmortem doc, this may take a moment..."
+    )
 
     if existing_link:
         page_id = _extract_notion_page_id(existing_link.url)
@@ -87,7 +90,8 @@ def handle_dumpslack_command(
             )
         except Exception:
             logger.exception(
-                "Failed to create Notion postmortem page for %s", incident.incident_number
+                "Failed to create Notion postmortem page for %s",
+                incident.incident_number,
             )
             respond("Failed to create Notion postmortem page. Please try again.")
             return
@@ -122,22 +126,12 @@ def handle_dumpslack_command(
         notion.dump_slack_messages(page_id, messages)
     except Exception:
         logger.exception("Failed to dump Slack messages to Notion page %s", page_id)
-        respond(f"Postmortem doc created but Slack dump failed. Check: {page_url}")
+        respond(
+            f"Postmortem doc {action.lower()} but Slack dump failed. Check: {page_url}"
+        )
         return
 
     respond(f"{action} postmortem doc: {page_url}")
-
-
-def _get_incident_by_channel_id(channel_id: str) -> Incident | None:
-    link = (
-        ExternalLink.objects.filter(
-            type=ExternalLinkType.SLACK,
-            url__contains=channel_id,
-        )
-        .select_related("incident", "incident__captain")
-        .first()
-    )
-    return link.incident if link else None
 
 
 def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:

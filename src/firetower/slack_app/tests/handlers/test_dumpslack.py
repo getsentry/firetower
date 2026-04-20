@@ -28,13 +28,32 @@ class TestGetChannelMessages:
         mock_client.conversations_history.return_value = {
             "ok": True,
             "messages": [
-                {"type": "message", "user": "U1", "text": "real message", "ts": "1000000000.000000"},
-                {"type": "message", "user": "U2", "text": "bot msg", "ts": "1000000001.000000", "bot_id": "B1"},
-                {"type": "message", "user": "U3", "text": "joined", "ts": "1000000002.000000", "subtype": "channel_join"},
+                {
+                    "type": "message",
+                    "user": "U1",
+                    "text": "real message",
+                    "ts": "1000000000.000000",
+                },
+                {
+                    "type": "message",
+                    "user": "U2",
+                    "text": "bot msg",
+                    "ts": "1000000001.000000",
+                    "bot_id": "B1",
+                },
+                {
+                    "type": "message",
+                    "user": "U3",
+                    "text": "joined",
+                    "ts": "1000000002.000000",
+                    "subtype": "channel_join",
+                },
                 {"type": "message", "user": "U4", "ts": "1000000003.000000"},  # no text
             ],
         }
-        mock_client.users_info.return_value = {"user": {"profile": {"email": "user@sentry.io"}}}
+        mock_client.users_info.return_value = {
+            "user": {"profile": {"email": "user@sentry.io"}}
+        }
 
         messages = _get_channel_messages(mock_client, "C123")
 
@@ -46,11 +65,23 @@ class TestGetChannelMessages:
         mock_client.conversations_history.return_value = {
             "ok": True,
             "messages": [
-                {"type": "message", "user": "U1", "text": "second", "ts": "1000000002.000000"},
-                {"type": "message", "user": "U1", "text": "first", "ts": "1000000001.000000"},
+                {
+                    "type": "message",
+                    "user": "U1",
+                    "text": "second",
+                    "ts": "1000000002.000000",
+                },
+                {
+                    "type": "message",
+                    "user": "U1",
+                    "text": "first",
+                    "ts": "1000000001.000000",
+                },
             ],
         }
-        mock_client.users_info.return_value = {"user": {"profile": {"email": "user@sentry.io"}}}
+        mock_client.users_info.return_value = {
+            "user": {"profile": {"email": "user@sentry.io"}}
+        }
 
         messages = _get_channel_messages(mock_client, "C123")
 
@@ -83,11 +114,23 @@ class TestGetChannelMessages:
         mock_client.conversations_replies.return_value = {
             "ok": True,
             "messages": [
-                {"type": "message", "user": "U1", "text": "parent", "ts": "1000000001.000000"},
-                {"type": "message", "user": "U2", "text": "reply", "ts": "1000000002.000000"},
+                {
+                    "type": "message",
+                    "user": "U1",
+                    "text": "parent",
+                    "ts": "1000000001.000000",
+                },
+                {
+                    "type": "message",
+                    "user": "U2",
+                    "text": "reply",
+                    "ts": "1000000002.000000",
+                },
             ],
         }
-        mock_client.users_info.return_value = {"user": {"profile": {"email": "user@sentry.io"}}}
+        mock_client.users_info.return_value = {
+            "user": {"profile": {"email": "user@sentry.io"}}
+        }
 
         messages = _get_channel_messages(mock_client, "C123")
 
@@ -126,9 +169,12 @@ class TestHandleDumpslackCommand:
 
     def test_responds_when_no_incident_found(self):
         ack, body, command, client, respond, _ = self._make_args()
-        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings, patch(
-            "firetower.slack_app.handlers.dumpslack._get_incident_by_channel_id",
-            return_value=None,
+        with (
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+            patch(
+                "firetower.slack_app.handlers.dumpslack.get_incident_from_channel",
+                return_value=None,
+            ),
         ):
             mock_settings.NOTION = {"API_KEY": "key", "DATABASE_ID": "db"}
             handle_dumpslack_command(ack, body, command, client, respond)
