@@ -2,7 +2,7 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from notion_client import Client
 
@@ -32,7 +32,7 @@ class NotionService:
             kwargs: dict[str, Any] = {"page_size": 100}
             if start_cursor:
                 kwargs["start_cursor"] = start_cursor
-            response = self.client.users.list(**kwargs)
+            response = cast(dict[str, Any], self.client.users.list(**kwargs))
             for user in response.get("results", []):
                 if "person" in user:
                     email = user["person"].get("email", "")
@@ -77,7 +77,7 @@ class NotionService:
             kwargs: dict[str, Any] = {"block_id": block_id, "page_size": 100}
             if start_cursor:
                 kwargs["start_cursor"] = start_cursor
-            response = self.client.blocks.children.list(**kwargs)
+            response = cast(dict[str, Any], self.client.blocks.children.list(**kwargs))
             results.extend(response.get("results", []))
             start_cursor = response.get("next_cursor")
             if not start_cursor:
@@ -132,7 +132,7 @@ class NotionService:
             create_kwargs["children"] = all_blocks[:_NOTION_PAGE_CREATE_LIMIT]
             overflow = all_blocks[_NOTION_PAGE_CREATE_LIMIT:]
 
-        page: dict[str, Any] = self.client.pages.create(**create_kwargs)
+        page = cast(dict[str, Any], self.client.pages.create(**create_kwargs))
 
         if overflow:
             self._append_children(page["id"], overflow)
@@ -197,8 +197,11 @@ class NotionService:
     ) -> dict[str, Any] | None:
         for attempt in range(max_retries):
             try:
-                result: dict[str, Any] = self.client.blocks.children.append(
-                    block_id=block_id, children=children
+                result = cast(
+                    dict[str, Any],
+                    self.client.blocks.children.append(
+                        block_id=block_id, children=children
+                    ),
                 )
                 return result
             except Exception as exc:
