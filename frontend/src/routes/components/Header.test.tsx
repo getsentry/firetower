@@ -1,4 +1,3 @@
-import React from 'react';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {createMemoryHistory, createRouter, RouterProvider} from '@tanstack/react-router';
 import {render, screen} from '@testing-library/react';
@@ -7,6 +6,7 @@ import {beforeEach, describe, expect, it, vi} from 'bun:test';
 
 import {routeTree} from '../../routeTree.gen';
 import type {IncidentDetail} from '../$incidentId/queries/incidentDetailQueryOptions';
+import type {AvailabilityData} from '../availability/queries/availabilityQueryOptions';
 import type {CurrentUser} from '../queries/currentUserQueryOptions';
 import type {PaginatedIncidents} from '../queries/incidentsQueryOptions';
 
@@ -32,6 +32,7 @@ const mockIncidents: PaginatedIncidents = {
       service_tier: null,
       created_at: '2024-08-27T18:14:00Z',
       is_private: false,
+      captain: null,
     },
     {
       id: 'INC-1246',
@@ -43,6 +44,7 @@ const mockIncidents: PaginatedIncidents = {
       service_tier: null,
       created_at: '2024-08-27T15:32:00Z',
       is_private: true,
+      captain: null,
     },
   ],
 };
@@ -68,6 +70,7 @@ const mockIncidentDetail: IncidentDetail = {
       name: 'John Doe',
       avatar_url: 'https://example.com/avatar.jpg',
       role: 'Captain',
+      email: 'john@example.com',
     },
   ],
   external_links: {
@@ -78,11 +81,25 @@ const mockIncidentDetail: IncidentDetail = {
   time_analyzed: null,
   time_mitigated: null,
   time_recovered: null,
+  total_downtime: null,
 };
 
 const mockCurrentUser: CurrentUser = {
   name: 'Test User',
   avatar_url: null,
+};
+
+const mockAvailability: AvailabilityData = {
+  months: [
+    {
+      label: 'Apr 2026',
+      start: '2026-04-01',
+      end: '2026-04-30',
+      regions: [],
+    },
+  ],
+  quarters: [],
+  years: [],
 };
 
 const STORAGE_KEY = 'firetower_list_search';
@@ -131,12 +148,15 @@ describe('Header - Root Route (Incident List)', () => {
     });
   });
 
-  it('shows centered logo without back button', async () => {
+  it('shows nav tabs and centered logo without back button', async () => {
     renderRoute('/');
 
     expect(await screen.findByText('INC-1247')).toBeInTheDocument();
 
     expect(screen.getByAltText('Firetower')).toBeInTheDocument();
+
+    expect(screen.getByText('Incidents')).toBeInTheDocument();
+    expect(screen.getByText('Availability')).toBeInTheDocument();
 
     expect(screen.queryByText('All Incidents')).not.toBeInTheDocument();
     expect(screen.queryByText('←')).not.toBeInTheDocument();
@@ -168,6 +188,34 @@ describe('Header - Root Route (Incident List)', () => {
 
     const parsed = JSON.parse(stored!);
     expect(parsed).toEqual({});
+  });
+});
+
+describe('Header - Availability Route', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    sessionStorage.clear();
+    mockApiGet.mockImplementation((args: {path: string}) => {
+      if (args.path === '/ui/availability/') {
+        return Promise.resolve(mockAvailability);
+      }
+      if (args.path === '/ui/users/me/') {
+        return Promise.resolve(mockCurrentUser);
+      }
+      return Promise.reject(new Error('Not found'));
+    });
+  });
+
+  it('shows nav tabs with Availability active', async () => {
+    renderRoute('/availability');
+
+    expect(await screen.findByText('Availability by Region')).toBeInTheDocument();
+
+    expect(screen.getByText('Incidents')).toBeInTheDocument();
+    expect(screen.getByText('Availability')).toBeInTheDocument();
+
+    expect(screen.queryByText('All Incidents')).not.toBeInTheDocument();
+    expect(screen.queryByText('←')).not.toBeInTheDocument();
   });
 });
 
