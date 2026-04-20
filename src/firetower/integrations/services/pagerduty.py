@@ -63,8 +63,15 @@ class PagerDutyService:
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=10)
             resp.raise_for_status()
+            data = resp.json()
+            oncalls = data.get("oncalls", [])
+            logger.info(
+                "PagerDuty /oncalls response: %d entries for policy %s",
+                len(oncalls),
+                escalation_policy_id,
+            )
             results = []
-            for oncall in resp.json().get("oncalls", []):
+            for oncall in oncalls:
                 user = oncall.get("user", {})
                 email = user.get("email")
                 if email:
