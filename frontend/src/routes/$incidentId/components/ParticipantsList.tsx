@@ -203,7 +203,6 @@ function ParticipantDropdown({
             <div
               key={participant.email}
               role="option"
-              tabIndex={-1}
               aria-selected={participant.email === value}
               className={cn(
                 dropdownItemStyles({
