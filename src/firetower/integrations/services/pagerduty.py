@@ -59,7 +59,11 @@ class PagerDutyService:
         }
 
         url = f"{REST_API_URL}/oncalls"
-        params = {"escalation_policy_ids[]": escalation_policy_id, "limit": 100}
+        params = {
+            "escalation_policy_ids[]": escalation_policy_id,
+            "limit": 100,
+            "include[]": "users",
+        }
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=10)
             resp.raise_for_status()
