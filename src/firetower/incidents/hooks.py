@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -18,9 +19,19 @@ _slack_service = SlackService()
 
 PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 
-PAGING_POLICIES = {
-    "IMOC": {"label": "Incident Manager", "page_label": "IMOC"},
-    "PROD_ENG": {"label": "Prod Eng Oncall", "page_label": "PE Oncall"},
+
+@dataclass
+class PolicyConfig:
+    label: str
+    page_label: str
+    max_level: int
+
+
+PAGING_POLICIES: dict[str, PolicyConfig] = {
+    "IMOC": PolicyConfig(label="Incident Manager", page_label="IMOC", max_level=1),
+    "PROD_ENG": PolicyConfig(
+        label="Prod Eng On-Call", page_label="PE On-Call", max_level=2
+    ),
 }
 
 PD_SUMMARY_MAX_LENGTH = 1024
@@ -43,7 +54,7 @@ def _page_if_needed(incident: Incident) -> None:
     if slack_link and slack_link.url:
         links.append({"href": slack_link.url, "text": "Slack Channel"})
 
-    for policy_name in PAGING_POLICIES:
+    for policy_name, policy_info in PAGING_POLICIES.items():
         policy = escalation_policies.get(policy_name)
         if not policy:
             logger.info(f"No {policy_name} escalation policy configured, skipping page")
@@ -64,7 +75,7 @@ def _page_if_needed(incident: Incident) -> None:
                 return
 
         dedup_key = f"firetower-{incident.incident_number}-{policy_name}"
-        page_label = PAGING_POLICIES[policy_name]["page_label"]
+        page_label = policy_info.page_label
         summary = f"[{page_label}] [{incident.severity}] {incident.incident_number}: {incident.title}"
         summary = summary[:PD_SUMMARY_MAX_LENGTH]
 
@@ -181,7 +192,8 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
     role_entries: list[tuple[int, int, str]] = []
 
     for policy_index, (policy_name, policy_info) in enumerate(PAGING_POLICIES.items()):
-        policy_label = policy_info["label"]
+        policy_label = policy_info.label
+        max_level = policy_info.max_level
         policy = escalation_policies.get(policy_name)
         if not policy:
             logger.info(
@@ -222,6 +234,8 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
         for oncall_user in oncall_users:
             email = oncall_user.get("email")
             escalation_level: int | None = oncall_user.get("escalation_level")
+            if escalation_level is not None and escalation_level > max_level:
+                continue
             if not email:
                 logger.info("Skipping oncall user with no email")
                 continue
