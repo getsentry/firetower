@@ -18,15 +18,12 @@ _slack_service = SlackService()
 
 PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 
-PAGING_POLICIES: dict[str, str] = {
-    "IMOC": "Incident Manager",
-    "PROD_ENG": "Prod Eng Oncall",
+PAGING_POLICIES = {
+    "IMOC": {"label": "Incident Manager", "page_label": "IMOC"},
+    "PROD_ENG": {"label": "Prod Eng Oncall", "page_label": "PE Oncall"},
 }
 
-PAGE_LABELS: dict[str, str] = {
-    "IMOC": "IMOC",
-    "PROD_ENG": "PE Oncall",
-}
+PD_SUMMARY_MAX_LENGTH = 1024
 
 
 def _page_if_needed(incident: Incident) -> None:
@@ -61,8 +58,9 @@ def _page_if_needed(incident: Incident) -> None:
                 return
 
         dedup_key = f"firetower-{incident.incident_number}-{policy_name}"
-        page_label = PAGE_LABELS[policy_name]
+        page_label = PAGING_POLICIES[policy_name]["page_label"]
         summary = f"[{page_label}] [{incident.severity}] {incident.incident_number}: {incident.title}"
+        summary = summary[:PD_SUMMARY_MAX_LENGTH]
 
         links = [{"href": _build_incident_url(incident), "text": "View in Firetower"}]
         slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
@@ -181,7 +179,8 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
     pd_service = None
     role_entries: list[tuple[int, int, str]] = []
 
-    for policy_index, (policy_name, policy_label) in enumerate(PAGING_POLICIES.items()):
+    for policy_index, (policy_name, policy_info) in enumerate(PAGING_POLICIES.items()):
+        policy_label = policy_info["label"]
         policy = escalation_policies.get(policy_name)
         if not policy:
             logger.info(
@@ -438,7 +437,11 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         except Exception:
             logger.exception(f"Failed to page for incident {incident.id}")
 
-        channel_id = _get_channel_id(incident)
+        try:
+            channel_id = _get_channel_id(incident)
+        except Exception:
+            logger.exception(f"Failed to get channel id for incident {incident.id}")
+            channel_id = None
         if channel_id:
             try:
                 _invite_oncall_users(incident, channel_id)

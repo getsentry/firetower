@@ -8,13 +8,13 @@ from firetower.integrations.services.pagerduty import PagerDutyService
 MOCK_PD_CONFIG = {
     "API_TOKEN": "test-token",
     "ESCALATION_POLICIES": {
-        "HIGH_SEV": {
-            "id": "P17I207",
-            "integration_key": "test-integration-key",
+        "IMOC": {
+            "id": "PIMOC01",
+            "integration_key": "imoc-integration-key",
         },
-        "ProdEng": {
-            "id": "PABC123",
-            "integration_key": None,
+        "PROD_ENG": {
+            "id": "PPE001",
+            "integration_key": "prod-eng-integration-key",
         },
     },
 }
@@ -90,7 +90,8 @@ class TestGetOncallUsers:
         ]
         mock_get.assert_called_once()
         assert mock_get.call_args.kwargs["params"] == {
-            "escalation_policy_ids[]": "P17I207"
+            "escalation_policy_ids[]": "P17I207",
+            "limit": 100,
         }
 
     @patch("firetower.integrations.services.pagerduty.requests.get")
