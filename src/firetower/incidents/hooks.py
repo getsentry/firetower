@@ -227,22 +227,13 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
             )
             continue
 
-        logger.info(
-            "Processing %d oncall users from %s for incident %s",
-            len(oncall_users),
-            policy_name,
-            incident.id,
-        )
         for oncall_user in oncall_users:
             email = oncall_user.get("email")
             escalation_level: int | None = oncall_user.get("escalation_level")
             if escalation_level is not None and escalation_level > max_level:
                 continue
             if not email:
-                logger.info("Skipping oncall user with no email")
                 continue
-
-            logger.info("Looking up Slack user for oncall email %s", email)
             try:
                 slack_profile = _slack_service.get_user_profile_by_email(email)
             except Exception:
@@ -254,7 +245,6 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
                 continue
 
             slack_user_id = slack_profile["slack_user_id"]
-            logger.info("Found Slack user %s for oncall email %s", slack_user_id, email)
 
             try:
                 _slack_service.invite_to_channel(channel_id, [slack_user_id])
