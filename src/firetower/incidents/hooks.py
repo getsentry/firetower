@@ -18,8 +18,13 @@ _slack_service = SlackService()
 
 PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 
+PAGING_POLICIES: dict[str, str] = {
+    "IMOC": "Incident Manager",
+    "PROD_ENG": "Prod Eng Oncall",
+}
 
-def _page_high_sev_if_needed(incident: Incident) -> None:
+
+def _page_if_needed(incident: Incident) -> None:
     if incident.severity not in PAGEABLE_SEVERITIES:
         return
 
@@ -28,34 +33,42 @@ def _page_high_sev_if_needed(incident: Incident) -> None:
         return
 
     escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
-    high_sev_policy = escalation_policies.get("HIGH_SEV")
-    if not high_sev_policy:
-        logger.info("No HIGH_SEV escalation policy configured, skipping page")
-        return
 
-    integration_key = high_sev_policy.get("integration_key")
-    if not integration_key:
-        logger.info("No integration_key for HIGH_SEV escalation policy, skipping page")
-        return
+    pd_service = None
+    for policy_name in PAGING_POLICIES:
+        policy = escalation_policies.get(policy_name)
+        if not policy:
+            logger.info(f"No {policy_name} escalation policy configured, skipping page")
+            continue
 
-    try:
-        pd_service = PagerDutyService()
-    except Exception:
-        logger.exception("Failed to initialize PagerDutyService")
-        return
+        integration_key = policy.get("integration_key")
+        if not integration_key:
+            logger.info(
+                f"No integration_key for {policy_name} escalation policy, skipping page"
+            )
+            continue
 
-    dedup_key = f"firetower-{incident.incident_number}"
-    summary = f"[{incident.severity}] {incident.incident_number}: {incident.title}"
+        if pd_service is None:
+            try:
+                pd_service = PagerDutyService()
+            except Exception:
+                logger.exception("Failed to initialize PagerDutyService")
+                return
 
-    links = [{"href": _build_incident_url(incident), "text": "View in Firetower"}]
-    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
-    if slack_link and slack_link.url:
-        links.append({"href": slack_link.url, "text": "Slack Channel"})
+        dedup_key = f"firetower-{incident.incident_number}-{policy_name}"
+        summary = f"[{incident.severity}] {incident.incident_number}: {incident.title}"
 
-    try:
-        pd_service.trigger_incident(summary, dedup_key, integration_key, links=links)
-    except Exception:
-        logger.exception(f"Failed to page HIGH_SEV for incident {incident.id}")
+        links = [{"href": _build_incident_url(incident), "text": "View in Firetower"}]
+        slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+        if slack_link and slack_link.url:
+            links.append({"href": slack_link.url, "text": "Slack Channel"})
+
+        try:
+            pd_service.trigger_incident(
+                summary, dedup_key, integration_key, links=links
+            )
+        except Exception:
+            logger.exception(f"Failed to page {policy_name} for incident {incident.id}")
 
 
 def _build_channel_name(incident: Incident) -> str:
@@ -130,19 +143,18 @@ def _invite_user_to_channel(
         logger.exception(f"Failed to invite user {user.id} to channel {channel_id}")
 
 
-ONCALL_ROLE_LABELS: dict[int, str] = {
-    1: "Incident Manager",
-    2: "Prod Eng Oncall (Primary)",
-    3: "Prod Eng Oncall (Secondary)",
-}
-
-
-def _oncall_role_label(escalation_level: int | None) -> str:
-    if escalation_level is None:
-        return "Oncall"
-    return ONCALL_ROLE_LABELS.get(
-        escalation_level, f"Oncall (Level {escalation_level})"
-    )
+def _oncall_role_label(
+    policy_name: str, policy_label: str, escalation_level: int | None
+) -> str:
+    if policy_name == "IMOC":
+        return policy_label
+    if escalation_level == 1:
+        return f"{policy_label} (Primary)"
+    if escalation_level == 2:
+        return f"{policy_label} (Secondary)"
+    if escalation_level is not None:
+        return f"{policy_label} (Level {escalation_level})"
+    return policy_label
 
 
 def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
@@ -159,60 +171,76 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
         return
 
     escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
-    high_sev_policy = escalation_policies.get("HIGH_SEV")
-    if not high_sev_policy:
-        return
 
-    policy_id = high_sev_policy.get("id")
-    if not policy_id:
-        return
+    pd_service = None
+    role_entries: list[tuple[int, int, str]] = []
 
-    try:
-        pd_service = PagerDutyService()
-    except Exception:
-        logger.exception("Failed to initialize PagerDutyService for oncall invite")
-        return
-
-    try:
-        oncall_users = pd_service.get_oncall_users(policy_id)
-    except Exception:
-        logger.exception(f"Failed to fetch oncall users for incident {incident.id}")
-        return
-
-    role_entries: list[tuple[bool, int, str]] = []
-    for oncall_user in oncall_users:
-        email = oncall_user.get("email")
-        escalation_level: int | None = oncall_user.get("escalation_level")
-        if not email:
+    for policy_index, (policy_name, policy_label) in enumerate(PAGING_POLICIES.items()):
+        policy = escalation_policies.get(policy_name)
+        if not policy:
+            logger.info(
+                f"No {policy_name} escalation policy configured, skipping oncall invite"
+            )
             continue
+
+        policy_id = policy.get("id")
+        if not policy_id:
+            logger.info(
+                f"No id for {policy_name} escalation policy, skipping oncall invite"
+            )
+            continue
+
+        if pd_service is None:
+            try:
+                pd_service = PagerDutyService()
+            except Exception:
+                logger.exception(
+                    "Failed to initialize PagerDutyService for oncall invite"
+                )
+                return
 
         try:
-            slack_profile = _slack_service.get_user_profile_by_email(email)
-        except Exception:
-            logger.exception(f"Failed to look up Slack user for {email}")
-            continue
-
-        if not slack_profile or not slack_profile.get("slack_user_id"):
-            logger.info(f"Could not find Slack user for oncall email {email}")
-            continue
-
-        slack_user_id = slack_profile["slack_user_id"]
-
-        try:
-            _slack_service.invite_to_channel(channel_id, [slack_user_id])
+            oncall_users = pd_service.get_oncall_users(policy_id)
         except Exception:
             logger.exception(
-                f"Failed to invite oncall user {email} to channel {channel_id}"
+                f"Failed to fetch oncall users from {policy_name} for incident {incident.id}"
             )
+            continue
 
-        label = _oncall_role_label(escalation_level)
-        role_entries.append(
-            (
-                escalation_level is None,
-                escalation_level if escalation_level is not None else 0,
-                f"{label}: <@{slack_user_id}>",
+        for oncall_user in oncall_users:
+            email = oncall_user.get("email")
+            escalation_level: int | None = oncall_user.get("escalation_level")
+            if not email:
+                continue
+
+            try:
+                slack_profile = _slack_service.get_user_profile_by_email(email)
+            except Exception:
+                logger.exception(f"Failed to look up Slack user for {email}")
+                continue
+
+            if not slack_profile or not slack_profile.get("slack_user_id"):
+                logger.info(f"Could not find Slack user for oncall email {email}")
+                continue
+
+            slack_user_id = slack_profile["slack_user_id"]
+
+            try:
+                _slack_service.invite_to_channel(channel_id, [slack_user_id])
+            except Exception:
+                logger.exception(
+                    f"Failed to invite oncall user {email} to channel {channel_id}"
+                )
+
+            label = _oncall_role_label(policy_name, policy_label, escalation_level)
+            sort_level = escalation_level if escalation_level is not None else 999
+            role_entries.append(
+                (
+                    policy_index,
+                    sort_level,
+                    f"{label}: <@{slack_user_id}>",
+                )
             )
-        )
 
     if role_entries:
         role_entries.sort(key=lambda entry: (entry[0], entry[1]))
@@ -360,7 +388,7 @@ def on_incident_created(incident: Incident) -> None:
                 )
 
     try:
-        _page_high_sev_if_needed(incident)
+        _page_if_needed(incident)
     except Exception:
         logger.exception(f"Failed to page for incident {incident.id}")
 
@@ -400,7 +428,7 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         and incident.severity in PAGEABLE_SEVERITIES
     ):
         try:
-            _page_high_sev_if_needed(incident)
+            _page_if_needed(incident)
         except Exception:
             logger.exception(f"Failed to page for incident {incident.id}")
 

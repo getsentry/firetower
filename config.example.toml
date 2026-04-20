@@ -26,12 +26,13 @@ iap_audience = ""
 [pagerduty]
 api_token = ""
 
-[pagerduty.escalation_policies.HIGH_SEV]
+[pagerduty.escalation_policies.IMOC]
 id = ""
 integration_key = ""
 
-[pagerduty.escalation_policies.ExampleTeam]
+[pagerduty.escalation_policies.PROD_ENG]
 id = ""
+integration_key = ""
 
 [datadog]
 api_key = ""
