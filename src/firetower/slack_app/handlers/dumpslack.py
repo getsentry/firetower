@@ -1,7 +1,213 @@
+import logging
+import re
+from datetime import datetime, timezone
 from typing import Any
 
+from django.conf import settings
 
-def handle_dumpslack_command(ack: Any, command: dict, respond: Any) -> None:
+from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
+from firetower.integrations.services.notion import NotionService
+
+logger = logging.getLogger(__name__)
+
+
+def handle_dumpslack_command(
+    ack: Any,
+    body: dict[str, Any],
+    command: dict[str, Any],
+    client: Any,
+    respond: Any,
+) -> None:
     ack()
-    cmd = command.get("command", "/ft")
-    respond(f"`{cmd} dumpslack` is not yet implemented.")
+
+    notion_config = settings.NOTION
+    if not notion_config:
+        respond("Notion integration is not configured.")
+        return
+
+    channel_id = body.get("channel_id", "")
+    if not channel_id:
+        respond("Could not determine the channel ID.")
+        return
+
+    incident = _get_incident_by_channel_id(channel_id)
+    if not incident:
+        cmd = command.get("command", "/ft")
+        respond(f"No incident found for this channel. Use `{cmd} new` to create one.")
+        return
+
+    notion = NotionService(
+        api_key=notion_config["API_KEY"],
+        database_id=notion_config["DATABASE_ID"],
+        template_id=notion_config.get("TEMPLATE_ID", ""),
+    )
+
+    existing_link = incident.external_links.filter(type=ExternalLinkType.NOTION).first()
+
+    if existing_link:
+        page_id = _extract_notion_page_id(existing_link.url)
+        if not page_id:
+            respond("Could not parse existing Notion page ID from stored URL.")
+            return
+        page_url = existing_link.url
+        is_new = False
+    else:
+        base_url = settings.FIRETOWER_BASE_URL
+        incident_url = f"{base_url}/{incident.incident_number}"
+        captain_email = incident.captain.email if incident.captain else None
+
+        try:
+            page = notion.create_postmortem_page(
+                incident_number=incident.incident_number,
+                incident_title=incident.title,
+                incident_url=incident_url,
+                incident_date=incident.created_at,
+                severity=incident.severity,
+                captain_email=captain_email,
+            )
+        except Exception:
+            logger.exception("Failed to create Notion postmortem page for %s", incident.incident_number)
+            respond("Failed to create Notion postmortem page. Please try again.")
+            return
+
+        page_id = page["id"]
+        page_url = page["url"]
+        is_new = True
+
+        try:
+            ExternalLink.objects.update_or_create(
+                incident=incident,
+                type=ExternalLinkType.NOTION,
+                defaults={"url": page_url},
+            )
+        except Exception:
+            logger.exception("Failed to store Notion link on incident %s", incident.incident_number)
+
+        try:
+            client.bookmarks_add(
+                channel_id=channel_id,
+                title="Postmortem Doc",
+                type="link",
+                link=page_url,
+            )
+        except Exception:
+            logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
+
+    respond("Fetching Slack history and generating postmortem doc, this may take a moment...")
+
+    messages = _get_channel_messages(client, channel_id)
+
+    if is_new and notion.template_id:
+        try:
+            template_blocks, template_children = notion.get_template_blocks()
+            notion.apply_template(page_id, template_blocks, template_children)
+        except Exception:
+            logger.exception("Failed to apply Notion template to page %s", page_id)
+
+    try:
+        notion.dump_slack_messages(page_id, messages)
+    except Exception:
+        logger.exception("Failed to dump Slack messages to Notion page %s", page_id)
+        respond(f"Postmortem doc created but Slack dump failed. Check: {page_url}")
+        return
+
+    action = "Created" if is_new else "Updated"
+    respond(f"{action} postmortem doc: {page_url}")
+
+
+def _get_incident_by_channel_id(channel_id: str) -> Incident | None:
+    link = (
+        ExternalLink.objects.filter(
+            type=ExternalLinkType.SLACK,
+            url__contains=channel_id,
+        )
+        .select_related("incident", "incident__captain")
+        .first()
+    )
+    return link.incident if link else None
+
+
+def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
+    """Fetch up to 1000 channel messages with thread replies, excluding bots and system events."""
+    try:
+        response = client.conversations_history(channel=channel_id, limit=1000)
+    except Exception:
+        logger.exception("Failed to fetch history for channel %s", channel_id)
+        return []
+
+    if not response.get("ok"):
+        logger.error("conversations_history returned not-ok for channel %s", channel_id)
+        return []
+
+    email_cache: dict[str, str] = {}
+
+    def resolve_email(slack_user_id: str) -> str:
+        if slack_user_id not in email_cache:
+            try:
+                info = client.users_info(user=slack_user_id)
+                email_cache[slack_user_id] = (
+                    info["user"].get("profile", {}).get("email") or slack_user_id
+                )
+            except Exception:
+                email_cache[slack_user_id] = slack_user_id
+        return email_cache[slack_user_id]
+
+    content: list[dict[str, Any]] = []
+    for msg in response.get("messages", []):
+        if msg.get("type") != "message":
+            continue
+        if not msg.get("user") or not msg.get("text"):
+            continue
+        if msg.get("bot_id") or msg.get("subtype") in ("channel_join", "channel_leave"):
+            continue
+
+        dt = datetime.fromtimestamp(float(msg["ts"]), tz=timezone.utc)
+        author = resolve_email(msg["user"])
+
+        replies: list[dict[str, Any]] = []
+        if msg.get("reply_count", 0) > 0:
+            try:
+                reply_resp = client.conversations_replies(
+                    channel=channel_id, ts=msg["thread_ts"]
+                )
+                if reply_resp.get("ok"):
+                    for reply in reply_resp.get("messages", []):
+                        if reply.get("type") != "message" or reply["ts"] == msg["ts"]:
+                            continue
+                        if reply.get("bot_id"):
+                            continue
+                        replies.append(
+                            {
+                                "author": resolve_email(reply.get("user", "")),
+                                "date_time": datetime.fromtimestamp(
+                                    float(reply["ts"]), tz=timezone.utc
+                                ),
+                                "text": reply.get("text", ""),
+                            }
+                        )
+            except Exception:
+                logger.exception("Failed to fetch replies for message %s", msg["ts"])
+
+        content.append(
+            {
+                "author": author,
+                "date_time": dt,
+                "text": msg.get("text", ""),
+                "replies": replies,
+            }
+        )
+
+    content.reverse()  # chronological order
+    return content
+
+
+def _extract_notion_page_id(notion_url: str) -> str | None:
+    """Extract UUID from a Notion page URL (with or without hyphens)."""
+    match = re.search(
+        r"([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})(?:\?|$)",
+        notion_url.lower(),
+    )
+    if not match:
+        return None
+    raw = match.group(1).replace("-", "")
+    return f"{raw[:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:]}"

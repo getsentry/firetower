@@ -237,6 +237,16 @@ SLACK: SlackSettings = {
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
 
 FIRETOWER_BASE_URL = config.firetower_base_url
+
+NOTION: dict | None = (
+    {
+        "API_KEY": config.notion.api_key,
+        "DATABASE_ID": config.notion.database_id,
+        "TEMPLATE_ID": config.notion.template_id,
+    }
+    if config.notion
+    else None
+)
 HOOKS_ENABLED = config.hooks_enabled
 
 # Django REST Framework Configuration

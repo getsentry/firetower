@@ -38,6 +38,13 @@ class SlackConfig:
 
 
 @deserialize
+class NotionConfig:
+    api_key: str
+    database_id: str
+    template_id: str = ""
+
+
+@deserialize
 class AuthConfig:
     iap_enabled: bool
     iap_audience: str | None
@@ -58,6 +65,7 @@ class ConfigFile:
     django_secret_key: str
     sentry_dsn: str
     firetower_base_url: str
+    notion: NotionConfig | None = None
     hooks_enabled: bool = (
         False  # TODO: remove after hooks migration is complete and always enable
     )
@@ -118,6 +126,7 @@ class DummyConfigFile(ConfigFile):
             iap_audience="",
         )
         self.datadog = None
+        self.notion = None
         self.project_key = ""
         self.django_secret_key = ""
         self.sentry_dsn = ""

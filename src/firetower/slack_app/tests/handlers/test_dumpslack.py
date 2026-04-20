@@ -1,16 +1,137 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from firetower.slack_app.handlers.dumpslack import handle_dumpslack_command
+from firetower.slack_app.handlers.dumpslack import (
+    _extract_notion_page_id,
+    _get_channel_messages,
+    handle_dumpslack_command,
+)
 
 
-class TestDumpslackCommand:
-    def test_returns_not_implemented(self):
+class TestExtractNotionPageId:
+    def test_extracts_id_without_hyphens(self):
+        url = "https://www.notion.so/sentry/Title-abc123def456abc123def456abc123de"
+        result = _extract_notion_page_id(url)
+        assert result == "abc123de-f456-abc1-23de-f456abc123de"
+
+    def test_extracts_uuid_with_hyphens(self):
+        url = "https://www.notion.so/abc123de-f456-abc1-23de-f456abc123de"
+        result = _extract_notion_page_id(url)
+        assert result == "abc123de-f456-abc1-23de-f456abc123de"
+
+    def test_returns_none_for_invalid_url(self):
+        assert _extract_notion_page_id("https://notion.so/no-id-here") is None
+
+
+class TestGetChannelMessages:
+    def test_filters_bots_and_system_messages(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {"type": "message", "user": "U1", "text": "real message", "ts": "1000000000.000000"},
+                {"type": "message", "user": "U2", "text": "bot msg", "ts": "1000000001.000000", "bot_id": "B1"},
+                {"type": "message", "user": "U3", "text": "joined", "ts": "1000000002.000000", "subtype": "channel_join"},
+                {"type": "message", "user": "U4", "ts": "1000000003.000000"},  # no text
+            ],
+        }
+        mock_client.users_info.return_value = {"user": {"profile": {"email": "user@sentry.io"}}}
+
+        messages = _get_channel_messages(mock_client, "C123")
+
+        assert len(messages) == 1
+        assert messages[0]["text"] == "real message"
+
+    def test_returns_chronological_order(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {"type": "message", "user": "U1", "text": "second", "ts": "1000000002.000000"},
+                {"type": "message", "user": "U1", "text": "first", "ts": "1000000001.000000"},
+            ],
+        }
+        mock_client.users_info.return_value = {"user": {"profile": {"email": "user@sentry.io"}}}
+
+        messages = _get_channel_messages(mock_client, "C123")
+
+        assert messages[0]["text"] == "first"
+        assert messages[1]["text"] == "second"
+
+    def test_returns_empty_on_api_error(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.side_effect = Exception("api error")
+
+        messages = _get_channel_messages(mock_client, "C123")
+
+        assert messages == []
+
+    def test_fetches_thread_replies(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {
+                    "type": "message",
+                    "user": "U1",
+                    "text": "parent",
+                    "ts": "1000000001.000000",
+                    "thread_ts": "1000000001.000000",
+                    "reply_count": 1,
+                },
+            ],
+        }
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "messages": [
+                {"type": "message", "user": "U1", "text": "parent", "ts": "1000000001.000000"},
+                {"type": "message", "user": "U2", "text": "reply", "ts": "1000000002.000000"},
+            ],
+        }
+        mock_client.users_info.return_value = {"user": {"profile": {"email": "user@sentry.io"}}}
+
+        messages = _get_channel_messages(mock_client, "C123")
+
+        assert len(messages) == 1
+        assert len(messages[0]["replies"]) == 1
+        assert messages[0]["replies"][0]["text"] == "reply"
+
+
+class TestHandleDumpslackCommand:
+    def _make_args(self, notion_config=None, channel_id="C123"):
         ack = MagicMock()
         respond = MagicMock()
+        client = MagicMock()
+        body = {"channel_id": channel_id}
         command = {"command": "/ft"}
+        return ack, body, command, client, respond, notion_config
 
-        handle_dumpslack_command(ack, command, respond)
+    def test_responds_when_notion_not_configured(self):
+        ack, body, command, client, respond, _ = self._make_args()
+        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings:
+            mock_settings.NOTION = None
+            handle_dumpslack_command(ack, body, command, client, respond)
 
         ack.assert_called_once()
         respond.assert_called_once()
-        assert "not yet implemented" in respond.call_args[0][0]
+        assert "not configured" in respond.call_args[0][0]
+
+    def test_responds_when_no_channel_id(self):
+        ack, body, command, client, respond, _ = self._make_args(channel_id="")
+        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings:
+            mock_settings.NOTION = {"API_KEY": "key", "DATABASE_ID": "db"}
+            handle_dumpslack_command(ack, body, command, client, respond)
+
+        ack.assert_called_once()
+        assert "channel" in respond.call_args[0][0].lower()
+
+    def test_responds_when_no_incident_found(self):
+        ack, body, command, client, respond, _ = self._make_args()
+        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings, patch(
+            "firetower.slack_app.handlers.dumpslack._get_incident_by_channel_id",
+            return_value=None,
+        ):
+            mock_settings.NOTION = {"API_KEY": "key", "DATABASE_ID": "db"}
+            handle_dumpslack_command(ack, body, command, client, respond)
+
+        ack.assert_called_once()
+        assert "No incident" in respond.call_args[0][0]

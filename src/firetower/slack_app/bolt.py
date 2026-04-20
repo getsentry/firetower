@@ -71,7 +71,7 @@ def get_bolt_app() -> App:
     return _bolt_app
 
 
-def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
+def handle_command(ack: Any, body: dict, command: dict, respond: Any, client: Any = None) -> None:
     raw_text = (body.get("text") or "").strip()
     parts = raw_text.split(None, 1)
     subcommand = parts[0].lower() if parts else ""
@@ -117,7 +117,7 @@ def handle_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
         elif subcommand == "statuspage":
             handle_statuspage_command(ack, command, respond)
         elif subcommand == "dumpslack":
-            handle_dumpslack_command(ack, command, respond)
+            handle_dumpslack_command(ack, body, command, client, respond)
         else:
             ack()
             cmd = command.get("command", "/ft")
