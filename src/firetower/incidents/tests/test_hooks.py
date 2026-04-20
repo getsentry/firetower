@@ -898,8 +898,8 @@ class TestInviteOncallUsers:
         mock_slack.post_message.assert_called_once()
         message = mock_slack.post_message.call_args[0][1]
         assert "Incident Manager: <@U_IMOC>" in message
-        assert "SRE Oncall (Primary): <@U_PRIMARY>" in message
-        assert "SRE Oncall (Secondary): <@U_SECONDARY>" in message
+        assert "Prod Eng Oncall (Primary): <@U_PRIMARY>" in message
+        assert "Prod Eng Oncall (Secondary): <@U_SECONDARY>" in message
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
@@ -1243,7 +1243,7 @@ class TestInviteOncallUsers:
         message = mock_slack.post_message.call_args[0][1]
         assert message == (
             "Incident Manager: <@U_IMOC>\n"
-            "SRE Oncall (Primary): <@U_PRI>\n"
-            "SRE Oncall (Secondary): <@U_SEC>\n"
+            "Prod Eng Oncall (Primary): <@U_PRI>\n"
+            "Prod Eng Oncall (Secondary): <@U_SEC>\n"
             "Oncall: <@U_UNK>"
         )

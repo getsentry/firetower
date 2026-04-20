@@ -132,8 +132,8 @@ def _invite_user_to_channel(
 
 ONCALL_ROLE_LABELS: dict[int, str] = {
     1: "Incident Manager",
-    2: "SRE Oncall (Primary)",
-    3: "SRE Oncall (Secondary)",
+    2: "Prod Eng Oncall (Primary)",
+    3: "Prod Eng Oncall (Secondary)",
 }
 
 
