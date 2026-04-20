@@ -10,6 +10,7 @@ from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
     IncidentSeverity,
+    IncidentStatus,
 )
 from firetower.integrations.services import PagerDutyService, SlackService
 from firetower.integrations.services.slack import escape_slack_text
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 _slack_service = SlackService()
 
 PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
+PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 
 
 @dataclass
@@ -39,7 +41,7 @@ PAGING_POLICIES: dict[str, PolicyConfig] = {
 PD_SUMMARY_MAX_LENGTH = 1024
 
 
-def _page_if_needed(incident: Incident) -> None:
+def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
     if incident.severity not in PAGEABLE_SEVERITIES:
         return
 
@@ -82,9 +84,14 @@ def _page_if_needed(incident: Incident) -> None:
         summary = summary[:PD_SUMMARY_MAX_LENGTH]
 
         try:
-            pd_service.trigger_incident(
+            success = pd_service.trigger_incident(
                 summary, dedup_key, integration_key, links=links
             )
+            if not success and channel_id:
+                _slack_service.post_message(
+                    channel_id,
+                    f":warning: Failed to page {page_label} via PagerDuty. Please manually escalate if needed.",
+                )
         except Exception:
             logger.exception(f"Failed to page {policy_name} for incident {incident.id}")
 
@@ -409,7 +416,7 @@ def on_incident_created(incident: Incident) -> None:
                 )
 
     try:
-        _page_if_needed(incident)
+        _page_if_needed(incident, channel_id=channel_id)
     except Exception:
         logger.exception(f"Failed to page for incident {incident.id}")
 
@@ -447,17 +454,19 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
     if (
         old_severity not in PAGEABLE_SEVERITIES
         and incident.severity in PAGEABLE_SEVERITIES
+        and incident.status in PAGEABLE_STATUSES
     ):
-        try:
-            _page_if_needed(incident)
-        except Exception:
-            logger.exception(f"Failed to page for incident {incident.id}")
-
         try:
             channel_id = _get_channel_id(incident)
         except Exception:
             logger.exception(f"Failed to get channel id for incident {incident.id}")
             channel_id = None
+
+        try:
+            _page_if_needed(incident, channel_id=channel_id)
+        except Exception:
+            logger.exception(f"Failed to page for incident {incident.id}")
+
         if channel_id:
             try:
                 _invite_oncall_users(incident, channel_id)

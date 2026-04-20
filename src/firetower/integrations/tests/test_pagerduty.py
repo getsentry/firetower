@@ -92,6 +92,7 @@ class TestGetOncallUsers:
         assert mock_get.call_args.kwargs["params"] == {
             "escalation_policy_ids[]": "P17I207",
             "limit": 100,
+            "include[]": "users",
         }
 
     @patch("firetower.integrations.services.pagerduty.requests.get")

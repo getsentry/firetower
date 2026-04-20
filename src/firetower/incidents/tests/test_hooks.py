@@ -987,7 +987,7 @@ class TestInviteOncallUsers:
         mock_pd = mock_pd_cls.return_value
         mock_pd.get_oncall_users.return_value = [
             {"email": "imoc1@example.com", "escalation_level": 1},
-            {"email": "imoc2@example.com", "escalation_level": 2},
+            {"email": "imoc2@example.com", "escalation_level": 1},
         ]
         mock_slack.get_user_profile_by_email.side_effect = [
             {"slack_user_id": "U_IMOC1"},
@@ -1312,9 +1312,7 @@ class TestInviteOncallUsers:
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_prod_eng_unknown_level_uses_numbered_label(
-        self, mock_pd_cls, mock_slack, settings
-    ):
+    def test_prod_eng_secondary_label(self, mock_pd_cls, mock_slack, settings):
         settings.PAGERDUTY = {
             "API_TOKEN": "test-token",
             "ESCALATION_POLICIES": {
@@ -1323,7 +1321,7 @@ class TestInviteOncallUsers:
         }
         mock_pd = mock_pd_cls.return_value
         mock_pd.get_oncall_users.return_value = [
-            {"email": "user@example.com", "escalation_level": 4},
+            {"email": "user@example.com", "escalation_level": 2},
         ]
         mock_slack.get_user_profile_by_email.return_value = {"slack_user_id": "U_X"}
 
@@ -1335,7 +1333,7 @@ class TestInviteOncallUsers:
         _invite_oncall_users(incident, "C99999")
 
         message = mock_slack.post_message.call_args[0][1]
-        assert message == "On-Call Prod Eng (Level 4): <@U_X>"
+        assert message == "On-Call Prod Eng (Secondary): <@U_X>"
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")

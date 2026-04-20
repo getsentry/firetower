@@ -80,7 +80,7 @@ class PagerDutyService:
                         }
                     )
             return results
-        except requests.RequestException:
+        except (requests.RequestException, ValueError):
             logger.exception(
                 "Failed to fetch oncall users from PagerDuty",
                 extra={"escalation_policy_id": escalation_policy_id},
