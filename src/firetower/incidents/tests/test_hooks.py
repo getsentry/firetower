@@ -612,7 +612,10 @@ class TestPageIfNeeded:
 
         imoc_call, pe_call = mock_pd.trigger_incident.call_args_list
 
-        expected_summary = f"[P0] {incident.incident_number}: Major outage"
+        expected_imoc_summary = f"[P0] [IMOC] {incident.incident_number}: Major outage"
+        expected_pe_summary = (
+            f"[P0] [PE Oncall] {incident.incident_number}: Major outage"
+        )
         expected_links = [
             {
                 "href": f"https://firetower.example.com/{incident.incident_number}",
@@ -622,7 +625,7 @@ class TestPageIfNeeded:
 
         assert imoc_call == (
             (
-                expected_summary,
+                expected_imoc_summary,
                 f"firetower-{incident.incident_number}-IMOC",
                 "imoc-integration-key",
             ),
@@ -630,7 +633,7 @@ class TestPageIfNeeded:
         )
         assert pe_call == (
             (
-                expected_summary,
+                expected_pe_summary,
                 f"firetower-{incident.incident_number}-PROD_ENG",
                 "prod-eng-integration-key",
             ),

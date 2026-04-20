@@ -23,6 +23,11 @@ PAGING_POLICIES: dict[str, str] = {
     "PROD_ENG": "Prod Eng Oncall",
 }
 
+PAGE_LABELS: dict[str, str] = {
+    "IMOC": "IMOC",
+    "PROD_ENG": "PE Oncall",
+}
+
 
 def _page_if_needed(incident: Incident) -> None:
     if incident.severity not in PAGEABLE_SEVERITIES:
@@ -56,7 +61,8 @@ def _page_if_needed(incident: Incident) -> None:
                 return
 
         dedup_key = f"firetower-{incident.incident_number}-{policy_name}"
-        summary = f"[{incident.severity}] {incident.incident_number}: {incident.title}"
+        page_label = PAGE_LABELS[policy_name]
+        summary = f"[{incident.severity}] [{page_label}] {incident.incident_number}: {incident.title}"
 
         links = [{"href": _build_incident_url(incident), "text": "View in Firetower"}]
         slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
