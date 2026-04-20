@@ -612,9 +612,9 @@ class TestPageIfNeeded:
 
         imoc_call, pe_call = mock_pd.trigger_incident.call_args_list
 
-        expected_imoc_summary = f"[P0] [IMOC] {incident.incident_number}: Major outage"
+        expected_imoc_summary = f"[IMOC] [P0] {incident.incident_number}: Major outage"
         expected_pe_summary = (
-            f"[P0] [PE Oncall] {incident.incident_number}: Major outage"
+            f"[PE Oncall] [P0] {incident.incident_number}: Major outage"
         )
         expected_links = [
             {
