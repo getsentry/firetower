@@ -37,6 +37,12 @@ def _page_if_needed(incident: Incident) -> None:
     escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
 
     pd_service = None
+
+    links = [{"href": _build_incident_url(incident), "text": "View in Firetower"}]
+    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    if slack_link and slack_link.url:
+        links.append({"href": slack_link.url, "text": "Slack Channel"})
+
     for policy_name in PAGING_POLICIES:
         policy = escalation_policies.get(policy_name)
         if not policy:
@@ -61,11 +67,6 @@ def _page_if_needed(incident: Incident) -> None:
         page_label = PAGING_POLICIES[policy_name]["page_label"]
         summary = f"[{page_label}] [{incident.severity}] {incident.incident_number}: {incident.title}"
         summary = summary[:PD_SUMMARY_MAX_LENGTH]
-
-        links = [{"href": _build_incident_url(incident), "text": "View in Firetower"}]
-        slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
-        if slack_link and slack_link.url:
-            links.append({"href": slack_link.url, "text": "Slack Channel"})
 
         try:
             pd_service.trigger_incident(
