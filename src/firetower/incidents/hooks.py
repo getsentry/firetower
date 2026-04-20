@@ -281,6 +281,74 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
             )
 
 
+def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
+    if incident.severity not in PAGEABLE_SEVERITIES:
+        return
+
+    status_channel_name = f"{incident.incident_number.lower()}-status"
+    try:
+        status_channel_id = _slack_service.create_channel(
+            status_channel_name, is_private=False
+        )
+    except Exception:
+        logger.exception(f"Failed to create status channel for incident {incident.id}")
+        return
+
+    if not status_channel_id:
+        logger.info(
+            f"Status channel {status_channel_name} already exists or could not be created"
+        )
+        return
+
+    incident_url = _build_incident_url(incident)
+    try:
+        _slack_service.post_message(
+            status_channel_id,
+            f"This is the status channel for *{incident.incident_number}*.\n"
+            f"For detailed incident information, see <{incident_url}|{incident.incident_number} in Firetower>.\n"
+            f"For incident response coordination, join <#{main_channel_id}>.",
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to post initial message in status channel for incident {incident.id}"
+        )
+
+    users_to_invite: list[str] = []
+
+    if incident.captain:
+        captain_slack_id = _get_slack_user_id(incident.captain)
+        if captain_slack_id:
+            users_to_invite.append(captain_slack_id)
+
+    if incident.reporter:
+        reporter_slack_id = _get_slack_user_id(incident.reporter)
+        if reporter_slack_id and reporter_slack_id not in users_to_invite:
+            users_to_invite.append(reporter_slack_id)
+
+    always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
+    for uid in always_invited:
+        if uid not in users_to_invite:
+            users_to_invite.append(uid)
+
+    if users_to_invite:
+        try:
+            _slack_service.invite_to_channel(status_channel_id, users_to_invite)
+        except Exception:
+            logger.exception(
+                f"Failed to invite users to status channel for incident {incident.id}"
+            )
+
+    try:
+        _slack_service.post_message(
+            main_channel_id,
+            f"<#{status_channel_id}> has been created for status updates.",
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to post status channel link in main channel for incident {incident.id}"
+        )
+
+
 def on_incident_created(incident: Incident) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
@@ -401,6 +469,13 @@ def on_incident_created(incident: Incident) -> None:
                 f"Failed to invite oncall users for incident {incident.id}"
             )
 
+        try:
+            _create_status_channel(incident, channel_id)
+        except Exception:
+            logger.exception(
+                f"Failed to create status channel for incident {incident.id}"
+            )
+
         feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
         if feed_channel_id and not incident.is_private:
             feed_message = (
@@ -473,6 +548,13 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
             except Exception:
                 logger.exception(
                     f"Failed to invite oncall users for incident {incident.id}"
+                )
+
+            try:
+                _create_status_channel(incident, channel_id)
+            except Exception:
+                logger.exception(
+                    f"Failed to create status channel for incident {incident.id}"
                 )
 
 
