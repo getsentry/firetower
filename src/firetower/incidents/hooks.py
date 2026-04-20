@@ -28,9 +28,11 @@ class PolicyConfig:
 
 
 PAGING_POLICIES: dict[str, PolicyConfig] = {
-    "IMOC": PolicyConfig(label="Incident Manager", page_label="IMOC", max_level=1),
+    "IMOC": PolicyConfig(
+        label="On-Call Incident Manager", page_label="IMOC", max_level=1
+    ),
     "PROD_ENG": PolicyConfig(
-        label="Prod Eng On-Call", page_label="PE On-Call", max_level=2
+        label="On-Call Prod Eng", page_label="PE On-Call", max_level=2
     ),
 }
 
