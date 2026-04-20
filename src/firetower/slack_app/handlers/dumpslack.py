@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from django.conf import settings
@@ -161,7 +161,7 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
         if msg.get("bot_id") or msg.get("subtype") in ("channel_join", "channel_leave"):
             continue
 
-        dt = datetime.fromtimestamp(float(msg["ts"]), tz=timezone.utc)
+        dt = datetime.fromtimestamp(float(msg["ts"]), tz=UTC)
         author = resolve_email(msg["user"])
 
         replies: list[dict[str, Any]] = []
@@ -180,7 +180,7 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
                             {
                                 "author": resolve_email(reply.get("user", "")),
                                 "date_time": datetime.fromtimestamp(
-                                    float(reply["ts"]), tz=timezone.utc
+                                    float(reply["ts"]), tz=UTC
                                 ),
                                 "text": reply.get("text", ""),
                             }

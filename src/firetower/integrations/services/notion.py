@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from notion_client import Client
@@ -128,7 +128,7 @@ class NotionService:
         messages: list[dict[str, Any]],
     ) -> None:
         """Append a collapsible Slack discussion section to the page."""
-        timestamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         toggle: dict[str, Any] = {
             "type": "toggle",
             "toggle": {
@@ -163,8 +163,7 @@ class NotionService:
         message_blocks: list[dict[str, Any]] = []
         for msg in messages:
             message_blocks.append(_message_to_bullet(msg))
-            for reply in msg.get("replies", []):
-                message_blocks.append(_message_to_bullet(reply))
+            message_blocks.extend(_message_to_bullet(r) for r in msg.get("replies", []))
 
         idx = 0
         while idx < len(message_blocks):
