@@ -124,8 +124,13 @@ class TestOnIncidentCreated:
             email="reporter@example.com",
         )
 
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_creates_channel_and_link(self, mock_slack):
+    def test_creates_channel_and_link(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+    ):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
 
@@ -179,8 +184,13 @@ class TestOnIncidentCreated:
             incident=incident, type=ExternalLinkType.SLACK
         ).exists()
 
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_invites_captain_with_slack_profile(self, mock_slack):
+    def test_invites_captain_with_slack_profile(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+    ):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
 
@@ -239,8 +249,13 @@ class TestOnIncidentCreated:
         ]
         assert len(feed_calls) == 0
 
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_invites_always_invited_ids(self, mock_slack, settings):
+    def test_invites_always_invited_ids(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel, settings
+    ):
         settings.SLACK["ALWAYS_INVITED_IDS"] = ["U_SRE1", "U_SRE2"]
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
@@ -360,8 +375,13 @@ class TestOnStatusChanged:
 
 @pytest.mark.django_db
 class TestOnSeverityChanged:
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_severity_update_message(self, mock_slack):
+    def test_posts_severity_update_message(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+    ):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = Incident.objects.create(
@@ -769,7 +789,7 @@ class TestOnIncidentCreatedPagerDuty:
 
         on_incident_created(incident)
 
-        mock_page.assert_called_once_with(incident)
+        mock_page.assert_called_once_with(incident, channel_id="C99999")
 
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
@@ -784,7 +804,7 @@ class TestOnIncidentCreatedPagerDuty:
 
         on_incident_created(incident)
 
-        mock_page.assert_called_once_with(incident)
+        mock_page.assert_called_once_with(incident, channel_id="C99999")
 
 
 @pytest.mark.django_db
@@ -806,7 +826,7 @@ class TestOnSeverityChangedPagerDuty:
 
         on_severity_changed(incident, IncidentSeverity.P2)
 
-        mock_page.assert_called_once_with(incident)
+        mock_page.assert_called_once_with(incident, channel_id="C12345")
 
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
@@ -825,7 +845,7 @@ class TestOnSeverityChangedPagerDuty:
 
         on_severity_changed(incident, IncidentSeverity.P3)
 
-        mock_page.assert_called_once_with(incident)
+        mock_page.assert_called_once_with(incident, channel_id="C12345")
 
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
