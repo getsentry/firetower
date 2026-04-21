@@ -464,19 +464,27 @@ def on_incident_created(incident: Incident) -> None:
                     f"Failed to post description for incident {incident.id}"
                 )
 
-        if incident.captain:
-            _invite_user_to_channel(channel_id, incident.captain, captain_slack_id)
+        ids_to_invite: list[str] = []
+        if captain_slack_id:
+            ids_to_invite.append(captain_slack_id)
+
+        if incident.reporter:
+            reporter_slack_id = _get_slack_user_id(incident.reporter)
+            if reporter_slack_id and reporter_slack_id not in ids_to_invite:
+                ids_to_invite.append(reporter_slack_id)
 
         always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
-        if always_invited:
-            ids_to_invite = [uid for uid in always_invited if uid != captain_slack_id]
-            if ids_to_invite:
-                try:
-                    _slack_service.invite_to_channel(channel_id, ids_to_invite)
-                except Exception:
-                    logger.exception(
-                        f"Failed to invite always_invited users to channel {channel_id} for incident {incident.id}"
-                    )
+        for uid in always_invited:
+            if uid not in ids_to_invite:
+                ids_to_invite.append(uid)
+
+        if ids_to_invite:
+            try:
+                _slack_service.invite_to_channel(channel_id, ids_to_invite)
+            except Exception:
+                logger.exception(
+                    f"Failed to invite users to channel {channel_id} for incident {incident.id}"
+                )
 
         try:
             _invite_oncall_users(incident, channel_id)
