@@ -199,6 +199,7 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
 
     pd_service = None
     role_entries: list[tuple[int, int, str]] = []
+    users_to_invite: list[tuple[str, str]] = []
 
     for policy_index, (policy_name, policy_info) in enumerate(PAGING_POLICIES.items()):
         policy_label = policy_info.label
@@ -253,13 +254,6 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
 
             slack_user_id = slack_profile["slack_user_id"]
 
-            try:
-                _slack_service.invite_to_channel(channel_id, [slack_user_id])
-            except Exception:
-                logger.exception(
-                    f"Failed to invite oncall user {email} to channel {channel_id}"
-                )
-
             label = _oncall_role_label(policy_name, policy_label, escalation_level)
             sort_level = escalation_level if escalation_level is not None else 999
             role_entries.append(
@@ -269,6 +263,7 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
                     f"{label}: <@{slack_user_id}>",
                 )
             )
+            users_to_invite.append((slack_user_id, email))
 
     if role_entries:
         role_entries.sort(key=lambda entry: (entry[0], entry[1]))
@@ -278,6 +273,14 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
         except Exception:
             logger.exception(
                 f"Failed to post oncall role message for incident {incident.id}"
+            )
+
+    for slack_user_id, email in users_to_invite:
+        try:
+            _slack_service.invite_to_channel(channel_id, [slack_user_id])
+        except Exception:
+            logger.exception(
+                f"Failed to invite oncall user {email} to channel {channel_id}"
             )
 
 
