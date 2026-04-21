@@ -265,6 +265,15 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
             )
             users_to_invite.append((slack_user_id, email))
 
+    if users_to_invite:
+        invite_ids = [slack_user_id for slack_user_id, _ in users_to_invite]
+        try:
+            _slack_service.invite_to_channel(channel_id, invite_ids)
+        except Exception:
+            logger.exception(
+                f"Failed to invite oncall users to channel {channel_id} for incident {incident.id}"
+            )
+
     if role_entries:
         role_entries.sort(key=lambda entry: (entry[0], entry[1]))
         message = "\n".join(line for _, _, line in role_entries)
@@ -273,14 +282,6 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
         except Exception:
             logger.exception(
                 f"Failed to post oncall role message for incident {incident.id}"
-            )
-
-    for slack_user_id, email in users_to_invite:
-        try:
-            _slack_service.invite_to_channel(channel_id, [slack_user_id])
-        except Exception:
-            logger.exception(
-                f"Failed to invite oncall user {email} to channel {channel_id}"
             )
 
 

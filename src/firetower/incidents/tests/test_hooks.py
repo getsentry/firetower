@@ -1012,10 +1012,9 @@ class TestInviteOncallUsers:
         assert mock_pd.get_oncall_users.call_count == 2
         mock_pd.get_oncall_users.assert_any_call("PIMOC01")
         mock_pd.get_oncall_users.assert_any_call("PPE001")
-        assert mock_slack.invite_to_channel.call_count == 3
-        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_IMOC"])
-        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_PRIMARY"])
-        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_SECONDARY"])
+        mock_slack.invite_to_channel.assert_called_once_with(
+            "C99999", ["U_IMOC", "U_PRIMARY", "U_SECONDARY"]
+        )
 
         mock_slack.post_message.assert_called_once()
         message = mock_slack.post_message.call_args[0][1]
@@ -1090,9 +1089,9 @@ class TestInviteOncallUsers:
         assert mock_slack.get_user_profile_by_email.call_count == 2
         mock_slack.get_user_profile_by_email.assert_any_call("pe_l1@example.com")
         mock_slack.get_user_profile_by_email.assert_any_call("pe_l2@example.com")
-        assert mock_slack.invite_to_channel.call_count == 2
-        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_PE_L1"])
-        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_PE_L2"])
+        mock_slack.invite_to_channel.assert_called_once_with(
+            "C99999", ["U_PE_L1", "U_PE_L2"]
+        )
         message = mock_slack.post_message.call_args[0][1]
         assert "U_PE_L1" in message
         assert "U_PE_L2" in message
@@ -1252,7 +1251,7 @@ class TestInviteOncallUsers:
             {"slack_user_id": "U_USER1"},
             {"slack_user_id": "U_USER2"},
         ]
-        mock_slack.invite_to_channel.side_effect = [Exception("Slack error"), True]
+        mock_slack.invite_to_channel.side_effect = Exception("Slack error")
 
         incident = Incident.objects.create(
             title="Test",
@@ -1261,7 +1260,9 @@ class TestInviteOncallUsers:
 
         _invite_oncall_users(incident, "C99999")
 
-        assert mock_slack.invite_to_channel.call_count == 2
+        mock_slack.invite_to_channel.assert_called_once_with(
+            "C99999", ["U_USER1", "U_USER2"]
+        )
         mock_slack.post_message.assert_called_once()
         message = mock_slack.post_message.call_args[0][1]
         assert "U_USER1" in message
