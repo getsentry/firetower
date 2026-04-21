@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -806,6 +806,35 @@ class TestOnIncidentCreatedPagerDuty:
 
         mock_page.assert_called_once_with(incident, channel_id="C99999")
 
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_pages_before_inviting_oncall_and_creating_status_channel(
+        self, mock_slack, mock_page, mock_invite, mock_create_status
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        parent = MagicMock()
+        parent.attach_mock(mock_page, "page")
+        parent.attach_mock(mock_invite, "invite")
+        parent.attach_mock(mock_create_status, "create_status")
+
+        incident = Incident.objects.create(
+            title="Major outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        on_incident_created(incident)
+
+        called_names = [c[0] for c in parent.mock_calls]
+        assert "page" in called_names
+        assert "invite" in called_names
+        assert "create_status" in called_names
+        assert called_names.index("page") < called_names.index("invite")
+        assert called_names.index("page") < called_names.index("create_status")
+
 
 @pytest.mark.django_db
 class TestOnSeverityChangedPagerDuty:
@@ -992,6 +1021,82 @@ class TestInviteOncallUsers:
         assert "On-Call Incident Manager: <@U_IMOC>" in message
         assert "On-Call Prod Eng (Primary): <@U_PRIMARY>" in message
         assert "On-Call Prod Eng (Secondary): <@U_SECONDARY>" in message
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_imoc_excludes_oncalls_above_max_level(
+        self, mock_pd_cls, mock_slack, settings
+    ):
+        settings.PAGERDUTY = {
+            "API_TOKEN": "test-token",
+            "ESCALATION_POLICIES": {
+                "IMOC": {"id": "PIMOC01"},
+            },
+        }
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.return_value = [
+            {"email": "imoc_l1@example.com", "escalation_level": 1},
+            {"email": "imoc_l2@example.com", "escalation_level": 2},
+            {"email": "imoc_l3@example.com", "escalation_level": 3},
+            {"email": "imoc_l4@example.com", "escalation_level": 4},
+        ]
+        mock_slack.get_user_profile_by_email.return_value = {"slack_user_id": "U_L1"}
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        mock_slack.get_user_profile_by_email.assert_called_once_with(
+            "imoc_l1@example.com"
+        )
+        mock_slack.invite_to_channel.assert_called_once_with("C99999", ["U_L1"])
+        message = mock_slack.post_message.call_args[0][1]
+        assert message == "On-Call Incident Manager: <@U_L1>"
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_prod_eng_excludes_oncalls_above_max_level(
+        self, mock_pd_cls, mock_slack, settings
+    ):
+        settings.PAGERDUTY = {
+            "API_TOKEN": "test-token",
+            "ESCALATION_POLICIES": {
+                "PROD_ENG": {"id": "PPE001"},
+            },
+        }
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.return_value = [
+            {"email": "pe_l1@example.com", "escalation_level": 1},
+            {"email": "pe_l2@example.com", "escalation_level": 2},
+            {"email": "pe_l3@example.com", "escalation_level": 3},
+            {"email": "pe_l4@example.com", "escalation_level": 4},
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            {"slack_user_id": "U_PE_L1"},
+            {"slack_user_id": "U_PE_L2"},
+        ]
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        assert mock_slack.get_user_profile_by_email.call_count == 2
+        mock_slack.get_user_profile_by_email.assert_any_call("pe_l1@example.com")
+        mock_slack.get_user_profile_by_email.assert_any_call("pe_l2@example.com")
+        assert mock_slack.invite_to_channel.call_count == 2
+        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_PE_L1"])
+        mock_slack.invite_to_channel.assert_any_call("C99999", ["U_PE_L2"])
+        message = mock_slack.post_message.call_args[0][1]
+        assert "U_PE_L1" in message
+        assert "U_PE_L2" in message
+        assert "L3" not in message
+        assert "L4" not in message
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")

@@ -24,7 +24,7 @@ MOCK_PD_CONFIG = {
 def pd_service():
     with patch("firetower.integrations.services.pagerduty.settings") as mock_settings:
         mock_settings.PAGERDUTY = MOCK_PD_CONFIG
-        return PagerDutyService()
+        yield PagerDutyService()
 
 
 class TestPagerDutyServiceInit:

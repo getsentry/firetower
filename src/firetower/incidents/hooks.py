@@ -391,6 +391,16 @@ def on_incident_created(incident: Incident) -> None:
                 f"Failed to create Slack channel for incident {incident.id}"
             )
 
+    # Page P0/P1 early so on-call responders are alerted before we decorate the
+    # Slack channel. _page_if_needed reads the Slack link URL from the DB
+    # (already saved above), so the PD payload is complete even if channel_id
+    # is None here; channel_id is only used to post a fallback warning back to
+    # Slack if PD fails.
+    try:
+        _page_if_needed(incident, channel_id=channel_id)
+    except Exception:
+        logger.exception(f"Failed to page for incident {incident.id}")
+
     if channel_id:
         captain_slack_id = (
             _get_slack_user_id(incident.captain) if incident.captain else None
@@ -489,11 +499,6 @@ def on_incident_created(incident: Incident) -> None:
                 logger.exception(
                     f"Failed to post feed channel message for incident {incident.id}"
                 )
-
-    try:
-        _page_if_needed(incident, channel_id=channel_id)
-    except Exception:
-        logger.exception(f"Failed to page for incident {incident.id}")
 
     # TODO: Datadog notebook creation step will be added in RELENG-467
 
