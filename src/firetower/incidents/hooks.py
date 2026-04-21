@@ -285,6 +285,9 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
     if incident.severity not in PAGEABLE_SEVERITIES:
         return
 
+    if incident.is_private:
+        return
+
     status_channel_name = f"{incident.incident_number.lower()}-status"
     try:
         status_channel_id = _slack_service.create_channel(

@@ -7,6 +7,7 @@ from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
     _build_channel_name,
     _build_channel_topic,
+    _create_status_channel,
     _invite_oncall_users,
     _page_if_needed,
     on_captain_changed,
@@ -1519,3 +1520,46 @@ class TestInviteOncallUsers:
         mock_pd.get_oncall_users.assert_called_once_with("PPE001")
         message = mock_slack.post_message.call_args[0][1]
         assert message == "On-Call Prod Eng (Primary): <@U_PE>"
+
+
+@pytest.mark.django_db
+class TestCreateStatusChannel:
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_for_private_incident(self, mock_slack):
+        incident = Incident.objects.create(
+            title="Sensitive",
+            severity=IncidentSeverity.P0,
+            is_private=True,
+        )
+
+        _create_status_channel(incident, "C_MAIN")
+
+        mock_slack.create_channel.assert_not_called()
+        mock_slack.post_message.assert_not_called()
+        mock_slack.invite_to_channel.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_for_non_pageable_severity(self, mock_slack):
+        incident = Incident.objects.create(
+            title="Minor",
+            severity=IncidentSeverity.P2,
+        )
+
+        _create_status_channel(incident, "C_MAIN")
+
+        mock_slack.create_channel.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_creates_public_channel_for_public_incident(self, mock_slack, settings):
+        settings.SLACK = {"ALWAYS_INVITED_IDS": []}
+        mock_slack.create_channel.return_value = "C_STATUS"
+        incident = Incident.objects.create(
+            title="Public outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        _create_status_channel(incident, "C_MAIN")
+
+        mock_slack.create_channel.assert_called_once()
+        _, kwargs = mock_slack.create_channel.call_args
+        assert kwargs["is_private"] is False
