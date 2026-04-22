@@ -101,7 +101,7 @@ class StatuspageService:
             headers=self._headers(),
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        if response.status_code == 200:
+        if response.ok:
             return response.json()
         if response.status_code == 404:
             logger.info("Statuspage incident %s not found", incident_id)

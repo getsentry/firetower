@@ -96,7 +96,7 @@ def _build_statuspage_modal(
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Title:* {statuspage_incident['name']}",
+                    "text": f"*Title:* {statuspage_incident.get('name', '')}",
                 },
             }
         )
@@ -408,13 +408,13 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
                     impact=impact,
                     components=components or None,
                 )
+                statuspage_url = service.get_incident_url(result["id"])
+                statuspage_link.url = statuspage_url
+                statuspage_link.save(update_fields=["url"])
             except Exception:
                 if created:
                     statuspage_link.delete()
                 raise
-            statuspage_url = service.get_incident_url(result["id"])
-            statuspage_link.url = statuspage_url
-            statuspage_link.save(update_fields=["url"])
             client.chat_postMessage(
                 channel=channel_id,
                 text=f"Statuspage post created: {statuspage_url}",

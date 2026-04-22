@@ -86,6 +86,7 @@ class TestStatuspageServiceGetIncident:
     def test_get_incident_success(self):
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.ok = True
         mock_response.json.return_value = {
             "id": "abc123",
             "name": "Test Incident",
@@ -113,6 +114,7 @@ class TestStatuspageServiceGetIncident:
     def test_get_incident_not_found(self):
         mock_response = MagicMock()
         mock_response.status_code = 404
+        mock_response.ok = False
 
         with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
             service = StatuspageService()
