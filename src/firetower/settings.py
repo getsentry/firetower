@@ -237,6 +237,16 @@ SLACK: SlackSettings = {
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
 
 FIRETOWER_BASE_URL = config.firetower_base_url
+
+NOTION: dict | None = (
+    {
+        "INTEGRATION_TOKEN": config.notion.integration_token,
+        "DATABASE_ID": config.notion.database_id,
+        "TEMPLATE_ID": config.notion.template_id,
+    }
+    if config.notion
+    else None
+)
 HOOKS_ENABLED = config.hooks_enabled
 
 # Django REST Framework Configuration
@@ -312,12 +322,12 @@ LOGGING = {
     },
     "root": {
         "handlers": ["console"],
-        "level": "INFO",
+        "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO"),
     },
     "loggers": {
         "firetower": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO"),
             "propagate": False,
         },
     },
