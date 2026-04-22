@@ -112,6 +112,7 @@ class StatuspageService:
             response.status_code,
         )
         response.raise_for_status()
+        return None
 
     def create_incident(
         self,

@@ -57,9 +57,9 @@ def _build_statuspage_modal(
             latest_status = incident_updates[0]["status"]
             for update in incident_updates:
                 for component in update.get("affected_components") or []:
-                    component_id = component["id"]
+                    component_id = component["code"]
                     if component_id not in affected_components:
-                        affected_components[component_id] = component["new_status"]
+                        affected_components[component_id] = component["new_value"]
         default_impact = statuspage_incident.get("impact", default_impact)
 
     initial_status = next(
@@ -322,10 +322,9 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
     service = StatuspageService()
     if not service.configured:
         ack()
-        channel_id_for_msg = view.get("private_metadata", "")
-        if channel_id_for_msg:
+        if channel_id:
             client.chat_postMessage(
-                channel=channel_id_for_msg,
+                channel=channel_id,
                 text=(
                     "Statuspage is not configured. Please contact your administrator."
                 ),
