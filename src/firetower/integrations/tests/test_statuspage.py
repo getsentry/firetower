@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 from django.conf import settings
 
 from firetower.integrations.services.statuspage import StatuspageService
@@ -125,6 +126,24 @@ class TestStatuspageServiceGetIncident:
         ):
             result = service.get_incident("nonexistent")
             assert result is None
+
+    def test_get_incident_server_error_raises(self):
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.ok = False
+        mock_response.raise_for_status.side_effect = requests.HTTPError(
+            "500 Server Error"
+        )
+
+        with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
+            service = StatuspageService()
+
+        with patch(
+            "firetower.integrations.services.statuspage.requests.get",
+            return_value=mock_response,
+        ):
+            with pytest.raises(requests.HTTPError):
+                service.get_incident("abc123")
 
 
 class TestStatuspageServiceCreateIncident:

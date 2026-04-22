@@ -60,7 +60,7 @@ class StatuspageService:
 
         self.api_key = statuspage_config["API_KEY"]
         self.page_id = statuspage_config["PAGE_ID"]
-        self.base_url = statuspage_config["URL"]
+        self.base_url = statuspage_config["URL"].rstrip("/") + "/"
         self.configured = bool(self.api_key and self.page_id)
 
         if not self.configured:
@@ -112,7 +112,6 @@ class StatuspageService:
             response.status_code,
         )
         response.raise_for_status()
-        return None
 
     def create_incident(
         self,

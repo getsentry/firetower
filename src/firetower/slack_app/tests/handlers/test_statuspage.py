@@ -464,6 +464,9 @@ class TestStatuspageSubmission:
 
         ack.assert_called_once()
         assert "went wrong" in client.chat_postMessage.call_args[1]["text"]
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.STATUSPAGE
+        ).exists()
 
     def test_no_incident_for_channel(self, db):
         ack = MagicMock()

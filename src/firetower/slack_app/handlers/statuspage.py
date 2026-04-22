@@ -50,7 +50,7 @@ def _build_statuspage_modal(
     if statuspage_incident:
         incident_updates = sorted(
             statuspage_incident.get("incident_updates", []),
-            key=lambda x: x["created_at"],
+            key=lambda x: x.get("created_at", ""),
             reverse=True,
         )
         if incident_updates:
@@ -338,12 +338,6 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
         .get("value", "investigating")
     )
     title = values.get("title_block", {}).get("title_input", {}).get("value", "")
-    impact = (
-        values.get("impact_block", {})
-        .get("impact_select", {})
-        .get("selected_option", {})
-        .get("value", "major")
-    )
 
     ack()
 
@@ -400,6 +394,12 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
         else:
             if not title:
                 title = incident.title
+            impact = (
+                values.get("impact_block", {})
+                .get("impact_select", {})
+                .get("selected_option", {})
+                .get("value", "major")
+            )
             try:
                 result = service.create_incident(
                     title=title,
@@ -412,14 +412,14 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
                 statuspage_link.url = statuspage_url
                 statuspage_link.save(update_fields=["url"])
             except Exception:
-                if created:
+                if created or not statuspage_link.url:
                     statuspage_link.delete()
                 raise
             client.chat_postMessage(
                 channel=channel_id,
                 text=f"Statuspage post created: {statuspage_url}",
             )
-    except (requests.RequestException, KeyError):
+    except Exception:
         logger.exception("Failed to create/update statuspage incident")
         client.chat_postMessage(
             channel=channel_id,
