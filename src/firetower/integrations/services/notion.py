@@ -14,8 +14,8 @@ _TEMPLATE_FETCH_WORKERS = 3  # stay comfortably under Notion's 3 req/s rate limi
 
 
 class NotionService:
-    def __init__(self, api_key: str, database_id: str, template_id: str = "") -> None:
-        self.client: Client = Client(auth=api_key)
+    def __init__(self, integration_token: str, database_id: str, template_id: str = "") -> None:
+        self.client: Client = Client(auth=integration_token)
         self.database_id = database_id
         self.template_id = template_id
         self._users: dict[str, dict[str, str]] | None = None

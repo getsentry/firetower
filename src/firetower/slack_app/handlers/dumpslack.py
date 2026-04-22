@@ -39,7 +39,7 @@ def handle_dumpslack_command(
         return
 
     notion = NotionService(
-        api_key=notion_config["API_KEY"],
+        integration_token=notion_config["INTEGRATION_TOKEN"],
         database_id=notion_config["DATABASE_ID"],
         template_id=notion_config.get("TEMPLATE_ID", ""),
     )

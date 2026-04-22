@@ -240,7 +240,7 @@ FIRETOWER_BASE_URL = config.firetower_base_url
 
 NOTION: dict | None = (
     {
-        "API_KEY": config.notion.api_key,
+        "INTEGRATION_TOKEN": config.notion.integration_token,
         "DATABASE_ID": config.notion.database_id,
         "TEMPLATE_ID": config.notion.template_id,
     }

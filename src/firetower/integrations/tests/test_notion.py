@@ -14,7 +14,7 @@ from firetower.integrations.services.notion import (
 @pytest.fixture
 def notion():
     svc = NotionService(
-        api_key="test-key",
+        integration_token="test-key",
         database_id="db-id",
         template_id="tmpl-id",
     )

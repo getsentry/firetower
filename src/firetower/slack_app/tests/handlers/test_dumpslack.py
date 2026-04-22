@@ -209,7 +209,7 @@ class TestHandleDumpslackCommand:
     def test_responds_when_no_channel_id(self):
         ack, body, command, client, respond, _ = self._make_args(channel_id="")
         with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings:
-            mock_settings.NOTION = {"API_KEY": "key", "DATABASE_ID": "db"}
+            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
             handle_dumpslack_command(ack, body, command, client, respond)
 
         ack.assert_called_once()
@@ -224,7 +224,7 @@ class TestHandleDumpslackCommand:
                 return_value=None,
             ),
         ):
-            mock_settings.NOTION = {"API_KEY": "key", "DATABASE_ID": "db"}
+            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
             handle_dumpslack_command(ack, body, command, client, respond)
 
         ack.assert_called_once()

@@ -39,7 +39,7 @@ class SlackConfig:
 
 @deserialize
 class NotionConfig:
-    api_key: str
+    integration_token: str
     database_id: str
     template_id: str = ""
 
