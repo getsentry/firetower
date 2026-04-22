@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import pytest
 from django.conf import settings
 
 from .services.statuspage import StatuspageService
@@ -106,6 +107,7 @@ class TestStatuspageServiceGetIncident:
             mock_get.assert_called_once_with(
                 "https://api.statuspage.io/v1/pages/test-page-id/incidents/abc123",
                 headers=service._headers(),
+                timeout=15,
             )
 
     def test_get_incident_not_found(self):
@@ -186,11 +188,8 @@ class TestStatuspageServiceCreateIncident:
             "firetower.integrations.services.statuspage.requests.post",
             return_value=mock_response,
         ):
-            try:
+            with pytest.raises(Exception, match="API error"):
                 service.create_incident("title", "investigating", "msg")
-                assert False, "Should have raised"
-            except Exception:
-                pass
 
 
 class TestStatuspageServiceUpdateIncident:
@@ -295,3 +294,21 @@ class TestStatuspageServiceUrlHelpers:
         with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
             service = StatuspageService()
         assert service.extract_incident_id_from_url("") is None
+
+    def test_extract_incident_id_from_url_without_incidents_segment(self):
+        with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
+            service = StatuspageService()
+        assert (
+            service.extract_incident_id_from_url("https://test.statuspage.io/foo/bar")
+            is None
+        )
+
+    def test_extract_incident_id_from_url_with_query_and_fragment(self):
+        with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
+            service = StatuspageService()
+        assert (
+            service.extract_incident_id_from_url(
+                "https://test.statuspage.io/incidents/abc123?utm=foo#bar"
+            )
+            == "abc123"
+        )

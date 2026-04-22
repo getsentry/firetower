@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.slack_app.handlers.statuspage import (
@@ -128,6 +129,25 @@ class TestBuildStatuspageModal:
         )
         assert status_block["element"]["initial_option"]["value"] == "monitoring"
 
+    def test_component_fetch_failure_shows_warning(self):
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.get_components.side_effect = requests.RequestException("boom")
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+            )
+
+        section_blocks = [b for b in modal["blocks"] if b.get("type") == "section"]
+        assert any(
+            "Could not load Statuspage components" in b["text"]["text"]
+            for b in section_blocks
+        )
+
     def test_components_rendered_when_service_configured(self):
         mock_components = [
             {"id": "c1", "name": "API", "group_id": None, "position": 1},
@@ -146,7 +166,9 @@ class TestBuildStatuspageModal:
             )
 
         component_blocks = [
-            b for b in modal["blocks"] if b.get("block_id") in ("c1", "c2")
+            b
+            for b in modal["blocks"]
+            if b.get("block_id") in ("component_c1", "component_c2")
         ]
         assert len(component_blocks) == 2
 
@@ -165,7 +187,9 @@ class TestStatuspageCommand:
             ) as MockService,
             patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
         ):
-            MockService.return_value.configured = False
+            instance = MockService.return_value
+            instance.configured = True
+            instance.get_components.return_value = ([], {})
             handle_statuspage_command(ack, body, command, respond)
 
             ack.assert_called_once()
@@ -173,6 +197,21 @@ class TestStatuspageCommand:
             view = mock_app.return_value.client.views_open.call_args[1]["view"]
             assert view["callback_id"] == "statuspage_modal"
             assert view["title"]["text"] == "New Statuspage Post"
+
+    def test_unconfigured_service_responds_error(self, incident):
+        ack = MagicMock()
+        body = {"channel_id": CHANNEL_ID, "trigger_id": "T123"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            handle_statuspage_command(ack, body, command, respond)
+
+        ack.assert_called_once()
+        assert "not configured" in respond.call_args[0][0]
 
     def test_opens_modal_for_existing_post(self, incident):
         ExternalLink.objects.create(
@@ -206,9 +245,10 @@ class TestStatuspageCommand:
             patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
         ):
             instance = MockService.return_value
-            instance.configured = False
+            instance.configured = True
             instance.extract_incident_id_from_url.return_value = "sp123"
             instance.get_incident.return_value = sp_data
+            instance.get_components.return_value = ([], {})
 
             handle_statuspage_command(ack, body, command, respond)
 
@@ -270,7 +310,7 @@ class TestStatuspageSubmission:
         }
         if components:
             for comp_id, comp_status in components.items():
-                values[comp_id] = {
+                values[f"component_{comp_id}"] = {
                     "component_impact_select": {
                         "selected_option": {"value": comp_status},
                     }
@@ -401,6 +441,8 @@ class TestStatuspageSubmission:
 
             handle_statuspage_submission(ack, body, view, client)
 
+        ack.assert_called_once_with()
+        client.chat_postMessage.assert_called_once()
         assert "not configured" in client.chat_postMessage.call_args[1]["text"]
 
     def test_api_error_sends_failure_message(self, incident):
@@ -414,10 +456,13 @@ class TestStatuspageSubmission:
         ) as MockService:
             instance = MockService.return_value
             instance.configured = True
-            instance.create_incident.side_effect = Exception("API error")
+            instance.create_incident.side_effect = requests.RequestException(
+                "API error"
+            )
 
             handle_statuspage_submission(ack, body, view, client)
 
+        ack.assert_called_once()
         assert "went wrong" in client.chat_postMessage.call_args[1]["text"]
 
     def test_no_incident_for_channel(self, db):
@@ -426,10 +471,17 @@ class TestStatuspageSubmission:
         view = self._make_view(channel_id="C_NONEXISTENT")
         client = MagicMock()
 
-        handle_statuspage_submission(ack, body, view, client)
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = True
+            handle_statuspage_submission(ack, body, view, client)
 
         ack.assert_called_once()
-        client.chat_postMessage.assert_not_called()
+        client.chat_postMessage.assert_called_once()
+        assert (
+            "Could not find an incident" in client.chat_postMessage.call_args[1]["text"]
+        )
 
     def test_uses_incident_title_when_no_title_in_form(self, incident):
         ack = MagicMock()

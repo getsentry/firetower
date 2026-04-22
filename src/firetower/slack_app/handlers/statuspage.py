@@ -1,6 +1,8 @@
 import logging
 from typing import Any
 
+import requests
+
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.integrations.services.statuspage import (
     COMPONENT_STATUS_OPTIONS,
@@ -14,13 +16,15 @@ from firetower.slack_app.handlers.utils import get_incident_from_channel
 
 logger = logging.getLogger(__name__)
 
+COMPONENT_BLOCK_PREFIX = "component_"
+
 
 def _build_statuspage_modal(
     channel_id: str,
     incident_title: str,
     incident_severity: str,
-    statuspage_incident: dict | None = None,
-) -> dict:
+    statuspage_incident: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     status_options = [
         {"text": {"type": "plain_text", "text": label}, "value": value}
         for value, label in STATUS_OPTIONS
@@ -53,7 +57,7 @@ def _build_statuspage_modal(
             latest_status = incident_updates[0]["status"]
             for update in incident_updates:
                 for component in update.get("affected_components") or []:
-                    component_id = component["code"]
+                    component_id = component["id"]
                     if component_id not in affected_components:
                         affected_components[component_id] = component["new_status"]
         default_impact = statuspage_incident.get("impact", default_impact)
@@ -64,7 +68,10 @@ def _build_statuspage_modal(
     )
     initial_impact = next(
         (opt for opt in impact_options if opt["value"] == default_impact),
-        impact_options[1],
+        next(
+            (opt for opt in impact_options if opt["value"] == "major"),
+            impact_options[0],
+        ),
     )
 
     blocks: list[dict[str, Any]] = []
@@ -147,12 +154,29 @@ def _build_statuspage_modal(
     if service.configured:
         try:
             top_level, children_map = service.get_components()
+        except requests.RequestException:
+            logger.exception("Failed to fetch statuspage components")
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            ":warning: Could not load Statuspage components. "
+                            "You can still submit, but component statuses "
+                            "won't be updated."
+                        ),
+                    },
+                }
+            )
+        else:
             parent_ids = set(children_map.keys())
+            sorted_top = sorted(top_level, key=lambda x: x.get("position", 0))
 
-            non_parents = [c for c in top_level if c["id"] not in parent_ids]
+            non_parents = [c for c in sorted_top if c["id"] not in parent_ids]
             if non_parents:
                 blocks.append({"type": "divider"})
-            for component in sorted(non_parents, key=lambda x: x.get("position", 0)):
+            for component in non_parents:
                 current_impact = affected_components.get(component["id"], "operational")
                 initial_component_option = next(
                     (
@@ -165,7 +189,7 @@ def _build_statuspage_modal(
                 blocks.append(
                     {
                         "type": "section",
-                        "block_id": component["id"],
+                        "block_id": f"{COMPONENT_BLOCK_PREFIX}{component['id']}",
                         "text": {"type": "mrkdwn", "text": f"*{component['name']}*"},
                         "accessory": {
                             "type": "static_select",
@@ -176,7 +200,7 @@ def _build_statuspage_modal(
                     }
                 )
 
-            for parent in sorted(top_level, key=lambda x: x.get("position", 0)):
+            for parent in sorted_top:
                 if parent["id"] not in parent_ids:
                     continue
                 blocks.append(
@@ -205,7 +229,7 @@ def _build_statuspage_modal(
                     blocks.append(
                         {
                             "type": "section",
-                            "block_id": child["id"],
+                            "block_id": f"{COMPONENT_BLOCK_PREFIX}{child['id']}",
                             "text": {"type": "mrkdwn", "text": f"*{child['name']}*"},
                             "accessory": {
                                 "type": "static_select",
@@ -215,8 +239,6 @@ def _build_statuspage_modal(
                             },
                         }
                     )
-        except Exception:
-            logger.exception("Failed to fetch statuspage components")
 
     return {
         "type": "modal",
@@ -247,16 +269,30 @@ def handle_statuspage_command(
         respond("Could not open modal — missing trigger_id.")
         return
 
+    service = StatuspageService()
+    if not service.configured:
+        respond("Statuspage is not configured.")
+        return
+
     statuspage_incident = None
     statuspage_link = incident.external_links.filter(
         type=ExternalLinkType.STATUSPAGE
     ).first()
 
     if statuspage_link:
-        service = StatuspageService()
         sp_id = service.extract_incident_id_from_url(statuspage_link.url)
         if sp_id:
-            statuspage_incident = service.get_incident(sp_id)
+            try:
+                statuspage_incident = service.get_incident(sp_id)
+            except requests.RequestException:
+                logger.exception(
+                    "Failed to fetch existing statuspage incident %s", sp_id
+                )
+                respond(
+                    "Could not reach Statuspage to load the existing post. "
+                    "Please try again in a moment."
+                )
+                return
 
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
@@ -275,13 +311,33 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
     values = view.get("state", {}).get("values", {})
     channel_id = view.get("private_metadata", "")
 
+    message = values.get("message_block", {}).get("message_input", {}).get("value", "")
+    if not message:
+        ack(
+            response_action="errors",
+            errors={"message_block": "Message is required."},
+        )
+        return
+
+    service = StatuspageService()
+    if not service.configured:
+        ack()
+        channel_id_for_msg = view.get("private_metadata", "")
+        if channel_id_for_msg:
+            client.chat_postMessage(
+                channel=channel_id_for_msg,
+                text=(
+                    "Statuspage is not configured. Please contact your administrator."
+                ),
+            )
+        return
+
     status = (
         values.get("status_block", {})
         .get("status_select", {})
         .get("selected_option", {})
         .get("value", "investigating")
     )
-    message = values.get("message_block", {}).get("message_input", {}).get("value", "")
     title = values.get("title_block", {}).get("title_input", {}).get("value", "")
     impact = (
         values.get("impact_block", {})
@@ -290,45 +346,40 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
         .get("value", "major")
     )
 
-    if not message:
-        ack(
-            response_action="errors",
-            errors={"message_block": "Message is required."},
-        )
-        return
-
     ack()
 
     incident = get_incident_from_channel(channel_id)
     if not incident:
         logger.error("Statuspage submission: no incident for channel %s", channel_id)
+        if channel_id:
+            client.chat_postMessage(
+                channel=channel_id,
+                text=(
+                    "Could not find an incident associated with this channel — "
+                    "the Statuspage submission was not processed."
+                ),
+            )
         return
 
     components: dict[str, str] = {}
-    reserved_blocks = {"status_block", "title_block", "message_block", "impact_block"}
     for block_id, block_content in values.items():
-        if block_id in reserved_blocks:
+        if not block_id.startswith(COMPONENT_BLOCK_PREFIX):
             continue
         select_data = block_content.get("component_impact_select", {})
         if select_data:
             selected = select_data.get("selected_option", {})
             if selected:
-                components[block_id] = selected.get("value", "operational")
-
-    service = StatuspageService()
-    if not service.configured:
-        client.chat_postMessage(
-            channel=channel_id,
-            text="Statuspage is not configured. Please contact your administrator.",
-        )
-        return
-
-    statuspage_link = incident.external_links.filter(
-        type=ExternalLinkType.STATUSPAGE
-    ).first()
+                component_id = block_id[len(COMPONENT_BLOCK_PREFIX) :]
+                components[component_id] = selected.get("value", "operational")
 
     try:
-        if statuspage_link:
+        statuspage_link, created = ExternalLink.objects.get_or_create(
+            incident=incident,
+            type=ExternalLinkType.STATUSPAGE,
+            defaults={"url": ""},
+        )
+
+        if not created and statuspage_link.url:
             sp_id = service.extract_incident_id_from_url(statuspage_link.url)
             if not sp_id:
                 client.chat_postMessage(
@@ -350,24 +401,26 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
         else:
             if not title:
                 title = incident.title
-            result = service.create_incident(
-                title=title,
-                status=status,
-                message=message,
-                impact=impact,
-                components=components or None,
-            )
+            try:
+                result = service.create_incident(
+                    title=title,
+                    status=status,
+                    message=message,
+                    impact=impact,
+                    components=components or None,
+                )
+            except Exception:
+                if created:
+                    statuspage_link.delete()
+                raise
             statuspage_url = service.get_incident_url(result["id"])
-            ExternalLink.objects.create(
-                incident=incident,
-                type=ExternalLinkType.STATUSPAGE,
-                url=statuspage_url,
-            )
+            statuspage_link.url = statuspage_url
+            statuspage_link.save(update_fields=["url"])
             client.chat_postMessage(
                 channel=channel_id,
                 text=f"Statuspage post created: {statuspage_url}",
             )
-    except Exception:
+    except (requests.RequestException, KeyError):
         logger.exception("Failed to create/update statuspage incident")
         client.chat_postMessage(
             channel=channel_id,

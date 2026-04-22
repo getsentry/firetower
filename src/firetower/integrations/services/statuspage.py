@@ -8,6 +8,7 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 STATUSPAGE_API_BASE = "https://api.statuspage.io/v1"
+REQUEST_TIMEOUT_SECONDS = 15
 
 STATUS_OPTIONS = [
     ("investigating", "Investigating"),
@@ -80,6 +81,7 @@ class StatuspageService:
         response = requests.get(
             self._api_url("components"),
             headers=self._headers(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         components = response.json()
@@ -97,15 +99,19 @@ class StatuspageService:
         response = requests.get(
             self._api_url(f"incidents/{incident_id}"),
             headers=self._headers(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         if response.status_code == 200:
             return response.json()
+        if response.status_code == 404:
+            logger.info("Statuspage incident %s not found", incident_id)
+            return None
         logger.error(
             "Failed to fetch statuspage incident %s: %s",
             incident_id,
             response.status_code,
         )
-        return None
+        response.raise_for_status()
 
     def create_incident(
         self,
@@ -131,6 +137,7 @@ class StatuspageService:
             self._api_url("incidents"),
             json=payload,
             headers=self._headers(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         return response.json()
@@ -156,6 +163,7 @@ class StatuspageService:
             self._api_url(f"incidents/{incident_id}"),
             json=payload,
             headers=self._headers(),
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         return response.json()
@@ -166,5 +174,10 @@ class StatuspageService:
     def extract_incident_id_from_url(self, url: str) -> str | None:
         if not url:
             return None
-        parts = url.rstrip("/").split("/")
-        return parts[-1] if parts else None
+        path = url.split("?", 1)[0].split("#", 1)[0].rstrip("/")
+        marker = "/incidents/"
+        idx = path.find(marker)
+        if idx == -1:
+            return None
+        incident_id = path[idx + len(marker) :].split("/", 1)[0]
+        return incident_id or None
