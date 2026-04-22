@@ -322,12 +322,12 @@ LOGGING = {
     },
     "root": {
         "handlers": ["console"],
-        "level": "INFO",
+        "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO"),
     },
     "loggers": {
         "firetower": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO"),
             "propagate": False,
         },
     },
