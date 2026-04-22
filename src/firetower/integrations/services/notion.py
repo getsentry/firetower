@@ -132,6 +132,7 @@ class NotionService:
             create_kwargs["children"] = all_blocks[:_NOTION_PAGE_CREATE_LIMIT]
             overflow = all_blocks[_NOTION_PAGE_CREATE_LIMIT:]
 
+        logger.debug("Creating Notion page with database_id=%r", self.database_id)
         page = cast(dict[str, Any], self.client.pages.create(**create_kwargs))
 
         if overflow:
