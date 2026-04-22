@@ -59,7 +59,7 @@ def _build_statuspage_modal(
                 for component in update.get("affected_components") or []:
                     component_id = component["code"]
                     if component_id not in affected_components:
-                        affected_components[component_id] = component["new_value"]
+                        affected_components[component_id] = component["new_status"]
         default_impact = statuspage_incident.get("impact", default_impact)
 
     initial_status = next(
