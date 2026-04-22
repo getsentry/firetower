@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.conf import settings
 
-from .services.statuspage import StatuspageService
+from firetower.integrations.services.statuspage import StatuspageService
 
 MOCK_STATUSPAGE_CONFIG = {
     "API_KEY": "test-api-key",
