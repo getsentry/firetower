@@ -66,6 +66,7 @@ class ConfigFile:
     sentry_dsn: str
     firetower_base_url: str
     notion: NotionConfig | None = None
+    log_level: str = "INFO"
     hooks_enabled: bool = (
         False  # TODO: remove after hooks migration is complete and always enable
     )
@@ -132,4 +133,5 @@ class DummyConfigFile(ConfigFile):
         self.sentry_dsn = ""
         self.region_grouping: list[list[str]] = []
         self.firetower_base_url = ""
+        self.log_level = "INFO"
         self.hooks_enabled = False
