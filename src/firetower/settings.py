@@ -10,7 +10,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-import logging
 import os
 import sys
 from pathlib import Path
@@ -307,7 +306,7 @@ statsd.constant_tags = [
 
 # Logging configuration
 _log_level = os.environ.get("DJANGO_LOG_LEVEL", config.log_level)
-logging.info("Log level: %s", _log_level)
+print(f"Log level: {_log_level}", flush=True)
 
 LOGGING = {
     "version": 1,
