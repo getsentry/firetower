@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -305,6 +306,9 @@ statsd.constant_tags = [
 ]
 
 # Logging configuration
+_log_level = os.environ.get("DJANGO_LOG_LEVEL", config.log_level)
+logging.info("Log level: %s", _log_level)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -322,12 +326,12 @@ LOGGING = {
     },
     "root": {
         "handlers": ["console"],
-        "level": os.environ.get("DJANGO_LOG_LEVEL", config.log_level),
+        "level": _log_level,
     },
     "loggers": {
         "firetower": {
             "handlers": ["console"],
-            "level": os.environ.get("DJANGO_LOG_LEVEL", config.log_level),
+            "level": _log_level,
             "propagate": False,
         },
     },
