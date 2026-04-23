@@ -561,7 +561,7 @@ requires-dist = [
     { name = "django-kubernetes", specifier = ">=1.1.0" },
     { name = "djangorestframework", specifier = ">=3.15.2" },
     { name = "google-auth", specifier = ">=2.37.0" },
-    { name = "notion-client", specifier = ">=2.2.1" },
+    { name = "notion-client", specifier = ">=1.0.0,<2.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.11" },
     { name = "pyserde", extras = ["toml"], specifier = ">=0.28.0" },
     { name = "slack-bolt", specifier = ">=1.27.0" },
@@ -894,14 +894,14 @@ wheels = [
 
 [[package]]
 name = "notion-client"
-version = "3.0.0"
+version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a5/39/60afcbc0148c3dafaaefe851ae3f058077db49d66288dfb218a11a57b997/notion_client-3.0.0.tar.gz", hash = "sha256:05c4d2b4fa3491dc0de21c9c826277202ea8b8714077ee7f51a6e1a09ab23d0f", size = 31357, upload-time = "2026-02-16T11:15:48.024Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a5/49/d063b518d1a3b7591f0389806f7ea6484c84a8f76dcbd7fc6225550cf508/notion-client-1.0.0.tar.gz", hash = "sha256:281b37a1512abeccb81377d4a3461833f1c1fbd0ceb6e681e38b7cd446bf1bce", size = 14627, upload-time = "2022-04-18T14:51:06.198Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/aa/ce/6b03f9aedd2edfcc28e23ced5c2582d543f6ddbb2be5c570533f02890b27/notion_client-3.0.0-py2.py3-none-any.whl", hash = "sha256:177fc3d2ace7e8ef69cf96f46269e8a66071c2c7c526194bf06ce7925853e759", size = 18746, upload-time = "2026-02-16T11:15:46.602Z" },
+    { url = "https://files.pythonhosted.org/packages/58/b0/d446084e3cd195208e2d0a1075972f17a09633280de80b11edb7e7120eb9/notion_client-1.0.0-py2.py3-none-any.whl", hash = "sha256:01b3dfba071b5d09b6bdef2950624b7f000da2ece851c133ccf40815c4db167b", size = 14273, upload-time = "2022-04-18T14:51:04.494Z" },
 ]
 
 [[package]]
