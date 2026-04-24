@@ -28,6 +28,8 @@ from firetower.slack_app.handlers.resolved import (
 from firetower.slack_app.handlers.severity import handle_severity_command
 from firetower.slack_app.handlers.statuspage import (
     handle_statuspage_command,
+    handle_statuspage_confirm_resolve,
+    handle_statuspage_reset_and_resolve,
     handle_statuspage_submission,
 )
 from firetower.slack_app.handlers.subject import handle_subject_command
@@ -142,6 +144,8 @@ def _register_views(app: App) -> None:
     app.view("resolved_incident_modal")(handle_resolved_submission)
     app.view("captain_incident_modal")(handle_captain_submission)
     app.view("statuspage_modal")(handle_statuspage_submission)
+    app.view("statuspage_confirm_resolve")(handle_statuspage_confirm_resolve)
+    app.action("statuspage_reset_and_resolve")(handle_statuspage_reset_and_resolve)
     for action_id in (
         "impact_type_tags",
         "affected_service_tags",

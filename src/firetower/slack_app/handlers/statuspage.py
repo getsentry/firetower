@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any
 
@@ -307,29 +308,9 @@ def handle_statuspage_command(
     )
 
 
-def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
+def _extract_submission_data(view: dict) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
     channel_id = view.get("private_metadata", "")
-
-    message = values.get("message_block", {}).get("message_input", {}).get("value", "")
-    if not message:
-        ack(
-            response_action="errors",
-            errors={"message_block": "Message is required."},
-        )
-        return
-
-    service = StatuspageService()
-    if not service.configured:
-        ack()
-        if channel_id:
-            client.chat_postMessage(
-                channel=channel_id,
-                text=(
-                    "Statuspage is not configured. Please contact your administrator."
-                ),
-            )
-        return
 
     status = (
         values.get("status_block", {})
@@ -338,8 +319,96 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
         .get("value", "investigating")
     )
     title = values.get("title_block", {}).get("title_input", {}).get("value", "")
+    message = values.get("message_block", {}).get("message_input", {}).get("value", "")
+    impact = (
+        values.get("impact_block", {})
+        .get("impact_select", {})
+        .get("selected_option", {})
+        .get("value", "major")
+    )
 
-    ack()
+    components: dict[str, str] = {}
+    for block_id, block_content in values.items():
+        if not block_id.startswith(COMPONENT_BLOCK_PREFIX):
+            continue
+        select_data = block_content.get("component_impact_select", {})
+        if select_data:
+            selected = select_data.get("selected_option", {})
+            if selected:
+                component_id = block_id[len(COMPONENT_BLOCK_PREFIX) :]
+                components[component_id] = selected.get("value", "operational")
+
+    return {
+        "channel_id": channel_id,
+        "status": status,
+        "title": title,
+        "message": message,
+        "impact": impact,
+        "components": components,
+    }
+
+
+def _build_component_warning_modal(
+    data: dict[str, Any],
+    non_operational: list[tuple[str, str]],
+) -> dict[str, Any]:
+    component_lines = "\n".join(
+        f"• *{name}* — {status.replace('_', ' ')}" for name, status in non_operational
+    )
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    ":warning: You're resolving this Statuspage incident, "
+                    "but the following components are not set to *Operational*:\n\n"
+                    f"{component_lines}"
+                ),
+            },
+        },
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "action_id": "statuspage_reset_and_resolve",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Set All Operational & Resolve",
+                    },
+                    "style": "primary",
+                },
+            ],
+        },
+    ]
+    return {
+        "type": "modal",
+        "callback_id": "statuspage_confirm_resolve",
+        "private_metadata": json.dumps(data),
+        "title": {"type": "plain_text", "text": "Confirm Resolution"},
+        "submit": {"type": "plain_text", "text": "Resolve Anyway"},
+        "close": {"type": "plain_text", "text": "Go Back"},
+        "blocks": blocks,
+    }
+
+
+def _process_statuspage_submission(data: dict[str, Any], client: Any) -> None:
+    channel_id = data["channel_id"]
+    status = data["status"]
+    title = data["title"]
+    message = data["message"]
+    impact = data["impact"]
+    components = data["components"]
+
+    service = StatuspageService()
+    if not service.configured:
+        if channel_id:
+            client.chat_postMessage(
+                channel=channel_id,
+                text="Statuspage is not configured. Please contact your administrator.",
+            )
+        return
 
     incident = get_incident_from_channel(channel_id)
     if not incident:
@@ -353,17 +422,6 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
                 ),
             )
         return
-
-    components: dict[str, str] = {}
-    for block_id, block_content in values.items():
-        if not block_id.startswith(COMPONENT_BLOCK_PREFIX):
-            continue
-        select_data = block_content.get("component_impact_select", {})
-        if select_data:
-            selected = select_data.get("selected_option", {})
-            if selected:
-                component_id = block_id[len(COMPONENT_BLOCK_PREFIX) :]
-                components[component_id] = selected.get("value", "operational")
 
     try:
         statuspage_link, created = ExternalLink.objects.get_or_create(
@@ -394,12 +452,6 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
         else:
             if not title:
                 title = incident.title
-            impact = (
-                values.get("impact_block", {})
-                .get("impact_select", {})
-                .get("selected_option", {})
-                .get("value", "major")
-            )
             try:
                 result = service.create_incident(
                     title=title,
@@ -425,3 +477,84 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
             channel=channel_id,
             text="Something went wrong updating Statuspage. Please try again.",
         )
+
+
+def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
+    values = view.get("state", {}).get("values", {})
+    message = values.get("message_block", {}).get("message_input", {}).get("value", "")
+    if not message:
+        ack(
+            response_action="errors",
+            errors={"message_block": "Message is required."},
+        )
+        return
+
+    data = _extract_submission_data(view)
+
+    if data["status"] == "resolved":
+        non_operational = [
+            (cid, status)
+            for cid, status in data["components"].items()
+            if status != "operational"
+        ]
+        if non_operational:
+            service = StatuspageService()
+            if service.configured:
+                try:
+                    top_level, children_map = service.get_components()
+                except requests.RequestException:
+                    top_level, children_map = [], {}
+                all_components = {c["id"]: c["name"] for c in top_level}
+                for children in children_map.values():
+                    for c in children:
+                        all_components[c["id"]] = c["name"]
+                labeled = [
+                    (all_components.get(cid, cid), status)
+                    for cid, status in non_operational
+                ]
+            else:
+                labeled = non_operational
+            ack(
+                response_action="push",
+                view=_build_component_warning_modal(data, labeled),
+            )
+            return
+
+    ack()
+    _process_statuspage_submission(data, client)
+
+
+def handle_statuspage_confirm_resolve(
+    ack: Any, body: dict, view: dict, client: Any
+) -> None:
+    ack()
+    data = json.loads(view.get("private_metadata", "{}"))
+    _process_statuspage_submission(data, client)
+
+
+def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> None:
+    ack()
+    view = body.get("view", {})
+    data = json.loads(view.get("private_metadata", "{}"))
+    for cid in data.get("components", {}):
+        data["components"][cid] = "operational"
+    _process_statuspage_submission(data, client)
+    from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
+
+    get_bolt_app().client.views_update(
+        view_id=view["id"],
+        view={
+            "type": "modal",
+            "title": {"type": "plain_text", "text": "Confirm Resolution"},
+            "close": {"type": "plain_text", "text": "Close"},
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": ":white_check_mark: All components set to operational and statuspage resolved.",
+                    },
+                },
+            ],
+        },
+    )
