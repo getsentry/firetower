@@ -532,7 +532,7 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
 def handle_statuspage_confirm_resolve(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
-    ack()
+    ack(response_action="clear")
     data = json.loads(view.get("private_metadata", "{}"))
     _process_statuspage_submission(data, client)
 
