@@ -139,6 +139,12 @@ class StatuspageService:
             headers=self._headers(),
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
+        if not response.ok:
+            logger.error(
+                "Statuspage create_incident failed: %s %s",
+                response.status_code,
+                response.text,
+            )
         response.raise_for_status()
         return response.json()
 
@@ -165,6 +171,12 @@ class StatuspageService:
             headers=self._headers(),
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
+        if not response.ok:
+            logger.error(
+                "Statuspage update_incident failed: %s %s",
+                response.status_code,
+                response.text,
+            )
         response.raise_for_status()
         return response.json()
 

@@ -532,6 +532,10 @@ def handle_statuspage_confirm_resolve(
     _process_statuspage_submission(data, client)
 
 
+def handle_component_impact_select(ack: Any, body: dict) -> None:
+    ack()
+
+
 def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> None:
     ack()
     view = body.get("view", {})
@@ -545,6 +549,7 @@ def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> No
         view_id=view["id"],
         view={
             "type": "modal",
+            "clear_on_close": True,
             "title": {"type": "plain_text", "text": "Confirm Resolution"},
             "close": {"type": "plain_text", "text": "Close"},
             "blocks": [
