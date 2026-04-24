@@ -60,11 +60,12 @@ class StatuspageService:
 
         self.api_key = statuspage_config["API_KEY"]
         self.page_id = statuspage_config["PAGE_ID"]
-        self.base_url = statuspage_config["URL"].rstrip("/") + "/"
-        self.configured = bool(self.api_key and self.page_id)
+        raw_url = statuspage_config["URL"].strip()
+        self.base_url = (raw_url.rstrip("/") + "/") if raw_url else ""
+        self.configured = bool(self.api_key and self.page_id and self.base_url)
 
         if not self.configured:
-            logger.warning("StatuspageService missing API key or page ID")
+            logger.warning("StatuspageService missing API key, page ID, or URL")
 
     def _headers(self) -> dict[str, str]:
         return {

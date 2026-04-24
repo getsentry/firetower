@@ -55,12 +55,14 @@ def _build_statuspage_modal(
             reverse=True,
         )
         if incident_updates:
-            latest_status = incident_updates[0]["status"]
+            latest_status = incident_updates[0].get("status", "investigating")
             for update in incident_updates:
                 for component in update.get("affected_components") or []:
-                    component_id = component["code"]
-                    if component_id not in affected_components:
-                        affected_components[component_id] = component["new_status"]
+                    component_id = component.get("code", "")
+                    if component_id and component_id not in affected_components:
+                        affected_components[component_id] = component.get(
+                            "new_status", "operational"
+                        )
         default_impact = statuspage_incident.get("impact", default_impact)
 
     initial_status = next(
@@ -392,7 +394,7 @@ def _build_component_warning_modal(
     }
 
 
-def _process_statuspage_submission(data: dict[str, Any], client: Any) -> None:
+def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
     channel_id = data["channel_id"]
     status = data["status"]
     title = data["title"]
@@ -407,7 +409,7 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> None:
                 channel=channel_id,
                 text="Statuspage is not configured. Please contact your administrator.",
             )
-        return
+        return False
 
     incident = get_incident_from_channel(channel_id)
     if not incident:
@@ -420,7 +422,7 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> None:
                     "the Statuspage submission was not processed."
                 ),
             )
-        return
+        return False
 
     try:
         statuspage_link, created = ExternalLink.objects.get_or_create(
@@ -436,7 +438,7 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> None:
                     channel=channel_id,
                     text="Could not determine the existing statuspage incident ID.",
                 )
-                return
+                return False
             result = service.update_incident(
                 incident_id=sp_id,
                 status=status,
@@ -474,6 +476,8 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> None:
             channel=channel_id,
             text="Something went wrong updating Statuspage. Please try again.",
         )
+        return False
+    return True
 
 
 def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
@@ -543,9 +547,13 @@ def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> No
     data = json.loads(view.get("private_metadata", "{}"))
     for cid in data.get("components", {}):
         data["components"][cid] = "operational"
-    _process_statuspage_submission(data, client)
+    success = _process_statuspage_submission(data, client)
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
+    if success:
+        message = ":white_check_mark: All components set to operational and statuspage resolved."
+    else:
+        message = ":x: Something went wrong — check the incident channel for details."
     get_bolt_app().client.views_update(
         view_id=view["id"],
         view={
@@ -556,10 +564,7 @@ def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> No
             "blocks": [
                 {
                     "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": ":white_check_mark: All components set to operational and statuspage resolved.",
-                    },
+                    "text": {"type": "mrkdwn", "text": message},
                 },
             ],
         },
