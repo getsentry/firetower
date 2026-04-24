@@ -33,7 +33,7 @@ class TestBuildStatuspageModal:
         assert "status_block" in block_ids
         assert "impact_block" in block_ids
 
-    def test_new_post_prefills_title(self):
+    def test_new_post_shows_title_as_placeholder(self):
         with patch(
             "firetower.slack_app.handlers.statuspage.StatuspageService"
         ) as MockService:
@@ -47,7 +47,8 @@ class TestBuildStatuspageModal:
         title_block = next(
             b for b in modal["blocks"] if b.get("block_id") == "title_block"
         )
-        assert title_block["element"]["initial_value"] == "Database Issues"
+        assert "initial_value" not in title_block["element"]
+        assert title_block["element"]["placeholder"]["text"] == "Database Issues"
 
     def test_new_post_derives_impact_from_severity(self):
         with patch(
@@ -486,23 +487,15 @@ class TestStatuspageSubmission:
             "Could not find an incident" in client.chat_postMessage.call_args[1]["text"]
         )
 
-    def test_uses_incident_title_when_no_title_in_form(self, incident):
+    def test_rejects_empty_title(self, incident):
         ack = MagicMock()
         body = {}
         view = self._make_view(title="")
         client = MagicMock()
 
-        with patch(
-            "firetower.slack_app.handlers.statuspage.StatuspageService"
-        ) as MockService:
-            instance = MockService.return_value
-            instance.configured = True
-            instance.create_incident.return_value = {"id": "sp_new"}
-            instance.get_incident_url.return_value = (
-                "https://test.statuspage.io/incidents/sp_new"
-            )
+        handle_statuspage_submission(ack, body, view, client)
 
-            handle_statuspage_submission(ack, body, view, client)
-
-        call_kwargs = instance.create_incident.call_args[1]
-        assert call_kwargs["title"] == "Test Incident"
+        ack.assert_called_once_with(
+            response_action="errors",
+            errors={"title_block": "Title is required."},
+        )

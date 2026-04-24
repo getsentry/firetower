@@ -109,10 +109,9 @@ def _build_statuspage_modal(
                 "element": {
                     "type": "plain_text_input",
                     "action_id": "title_input",
-                    "initial_value": incident_title,
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "Enter a descriptive title for the customer",
+                        "text": incident_title,
                     },
                 },
                 "label": {"type": "plain_text", "text": "Title"},
@@ -450,8 +449,6 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> None:
                 text=f"Statuspage has been updated: {statuspage_url}",
             )
         else:
-            if not title:
-                title = incident.title
             try:
                 result = service.create_incident(
                     title=title,
@@ -481,12 +478,16 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> None:
 
 def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
     values = view.get("state", {}).get("values", {})
+    errors: dict[str, str] = {}
     message = values.get("message_block", {}).get("message_input", {}).get("value", "")
     if not message:
-        ack(
-            response_action="errors",
-            errors={"message_block": "Message is required."},
-        )
+        errors["message_block"] = "Message is required."
+    if "title_block" in values:
+        title = values["title_block"].get("title_input", {}).get("value", "")
+        if not title:
+            errors["title_block"] = "Title is required."
+    if errors:
+        ack(response_action="errors", errors=errors)
         return
 
     data = _extract_submission_data(view)
