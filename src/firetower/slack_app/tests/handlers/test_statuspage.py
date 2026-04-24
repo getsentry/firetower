@@ -1,16 +1,501 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from firetower.slack_app.handlers.statuspage import handle_statuspage_command
+import pytest
+import requests
+
+from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.slack_app.handlers.statuspage import (
+    _build_statuspage_modal,
+    handle_statuspage_command,
+    handle_statuspage_submission,
+)
+
+from .conftest import CHANNEL_ID
 
 
+class TestBuildStatuspageModal:
+    def test_new_post_has_title_input(self):
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test Outage",
+                incident_severity="P1",
+            )
+
+        assert modal["callback_id"] == "statuspage_modal"
+        assert modal["title"]["text"] == "New Statuspage Post"
+        block_ids = [b.get("block_id") for b in modal["blocks"]]
+        assert "title_block" in block_ids
+        assert "message_block" in block_ids
+        assert "status_block" in block_ids
+        assert "impact_block" in block_ids
+
+    def test_new_post_shows_title_as_placeholder(self):
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Database Issues",
+                incident_severity="P2",
+            )
+
+        title_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "title_block"
+        )
+        assert "initial_value" not in title_block["element"]
+        assert title_block["element"]["placeholder"]["text"] == "Database Issues"
+
+    def test_new_post_derives_impact_from_severity(self):
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Outage",
+                incident_severity="P0",
+            )
+
+        impact_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "impact_block"
+        )
+        assert impact_block["element"]["initial_option"]["value"] == "critical"
+
+    def test_update_shows_title_as_text(self):
+        sp_incident = {
+            "name": "Existing Issue",
+            "impact": "major",
+            "incident_updates": [
+                {
+                    "status": "identified",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "affected_components": [],
+                }
+            ],
+        }
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+                statuspage_incident=sp_incident,
+            )
+
+        assert modal["title"]["text"] == "Update Statuspage"
+        block_ids = [b.get("block_id") for b in modal["blocks"]]
+        assert "title_block" not in block_ids
+        assert "impact_block" not in block_ids
+
+        section_blocks = [b for b in modal["blocks"] if b.get("type") == "section"]
+        assert any("Existing Issue" in b["text"]["text"] for b in section_blocks)
+
+    def test_update_prefills_current_status(self):
+        sp_incident = {
+            "name": "Issue",
+            "impact": "minor",
+            "incident_updates": [
+                {
+                    "status": "monitoring",
+                    "created_at": "2024-01-02T00:00:00Z",
+                    "affected_components": [],
+                },
+                {
+                    "status": "investigating",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "affected_components": [],
+                },
+            ],
+        }
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+                statuspage_incident=sp_incident,
+            )
+
+        status_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "status_block"
+        )
+        assert status_block["element"]["initial_option"]["value"] == "monitoring"
+
+    def test_component_fetch_failure_shows_warning(self):
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.get_components.side_effect = requests.RequestException("boom")
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+            )
+
+        section_blocks = [b for b in modal["blocks"] if b.get("type") == "section"]
+        assert any(
+            "Could not load Statuspage components" in b["text"]["text"]
+            for b in section_blocks
+        )
+
+    def test_components_rendered_when_service_configured(self):
+        mock_components = [
+            {"id": "c1", "name": "API", "group_id": None, "position": 1},
+            {"id": "c2", "name": "Dashboard", "group_id": None, "position": 2},
+        ]
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.get_components.return_value = (mock_components, {})
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+            )
+
+        component_blocks = [
+            b
+            for b in modal["blocks"]
+            if b.get("block_id") in ("component_c1", "component_c2")
+        ]
+        assert len(component_blocks) == 2
+
+
+@pytest.mark.django_db
 class TestStatuspageCommand:
-    def test_returns_not_implemented(self):
+    def test_opens_modal_for_new_post(self, incident):
         ack = MagicMock()
-        respond = MagicMock()
+        body = {"channel_id": CHANNEL_ID, "trigger_id": "T123"}
         command = {"command": "/ft"}
+        respond = MagicMock()
 
-        handle_statuspage_command(ack, command, respond)
+        with (
+            patch(
+                "firetower.slack_app.handlers.statuspage.StatuspageService"
+            ) as MockService,
+            patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
+        ):
+            instance = MockService.return_value
+            instance.configured = True
+            instance.get_components.return_value = ([], {})
+            handle_statuspage_command(ack, body, command, respond)
+
+            ack.assert_called_once()
+            mock_app.return_value.client.views_open.assert_called_once()
+            view = mock_app.return_value.client.views_open.call_args[1]["view"]
+            assert view["callback_id"] == "statuspage_modal"
+            assert view["title"]["text"] == "New Statuspage Post"
+
+    def test_unconfigured_service_responds_error(self, incident):
+        ack = MagicMock()
+        body = {"channel_id": CHANNEL_ID, "trigger_id": "T123"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            handle_statuspage_command(ack, body, command, respond)
 
         ack.assert_called_once()
-        respond.assert_called_once()
-        assert "not yet implemented" in respond.call_args[0][0]
+        assert "not configured" in respond.call_args[0][0]
+
+    def test_opens_modal_for_existing_post(self, incident):
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.STATUSPAGE,
+            url="https://test.statuspage.io/incidents/sp123",
+        )
+
+        ack = MagicMock()
+        body = {"channel_id": CHANNEL_ID, "trigger_id": "T123"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        sp_data = {
+            "id": "sp123",
+            "name": "Existing",
+            "impact": "major",
+            "incident_updates": [
+                {
+                    "status": "investigating",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "affected_components": [],
+                }
+            ],
+        }
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.statuspage.StatuspageService"
+            ) as MockService,
+            patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
+        ):
+            instance = MockService.return_value
+            instance.configured = True
+            instance.extract_incident_id_from_url.return_value = "sp123"
+            instance.get_incident.return_value = sp_data
+            instance.get_components.return_value = ([], {})
+
+            handle_statuspage_command(ack, body, command, respond)
+
+            view = mock_app.return_value.client.views_open.call_args[1]["view"]
+            assert view["title"]["text"] == "Update Statuspage"
+
+    def test_no_incident_responds_error(self, db):
+        ack = MagicMock()
+        body = {"channel_id": "C_UNKNOWN", "trigger_id": "T123"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_statuspage_command(ack, body, command, respond)
+
+        ack.assert_called_once()
+        assert "Could not find" in respond.call_args[0][0]
+
+    def test_no_trigger_id(self, incident):
+        ack = MagicMock()
+        body = {"channel_id": CHANNEL_ID}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_statuspage_command(ack, body, command, respond)
+
+        ack.assert_called_once()
+        assert "trigger_id" in respond.call_args[0][0]
+
+
+@pytest.mark.django_db
+class TestStatuspageSubmission:
+    def _make_view(
+        self,
+        *,
+        status="investigating",
+        message="Looking into it",
+        title="Outage",
+        impact="major",
+        channel_id=CHANNEL_ID,
+        components=None,
+    ):
+        values: dict = {
+            "status_block": {
+                "status_select": {
+                    "selected_option": {"value": status},
+                }
+            },
+            "message_block": {
+                "message_input": {"value": message},
+            },
+            "title_block": {
+                "title_input": {"value": title},
+            },
+            "impact_block": {
+                "impact_select": {
+                    "selected_option": {"value": impact},
+                }
+            },
+        }
+        if components:
+            for comp_id, comp_status in components.items():
+                values[f"component_{comp_id}"] = {
+                    "component_impact_select": {
+                        "selected_option": {"value": comp_status},
+                    }
+                }
+        return {
+            "state": {"values": values},
+            "private_metadata": channel_id,
+        }
+
+    def test_creates_new_statuspage_incident(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view()
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.return_value = {"id": "new_sp_123"}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/new_sp_123"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        instance.create_incident.assert_called_once_with(
+            title="Outage",
+            status="investigating",
+            message="Looking into it",
+            impact="major",
+            components=None,
+        )
+
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.STATUSPAGE
+        )
+        assert link.url == "https://test.statuspage.io/incidents/new_sp_123"
+
+        assert "created" in client.chat_postMessage.call_args[1]["text"]
+
+    def test_creates_with_components(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(components={"comp1": "major_outage"})
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.return_value = {"id": "new_sp_456"}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/new_sp_456"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        instance.create_incident.assert_called_once_with(
+            title="Outage",
+            status="investigating",
+            message="Looking into it",
+            impact="major",
+            components={"comp1": "major_outage"},
+        )
+
+    def test_updates_existing_statuspage_incident(self, incident):
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.STATUSPAGE,
+            url="https://test.statuspage.io/incidents/existing_sp",
+        )
+
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(status="identified", message="Found the cause")
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.extract_incident_id_from_url.return_value = "existing_sp"
+            instance.update_incident.return_value = {"id": "existing_sp"}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/existing_sp"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        instance.update_incident.assert_called_once_with(
+            incident_id="existing_sp",
+            status="identified",
+            message="Found the cause",
+            components=None,
+        )
+        assert "updated" in client.chat_postMessage.call_args[1]["text"]
+
+    def test_empty_message_returns_error(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(message="")
+        client = MagicMock()
+
+        handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once_with(
+            response_action="errors",
+            errors={"message_block": "Message is required."},
+        )
+        client.chat_postMessage.assert_not_called()
+
+    def test_unconfigured_service_responds_error(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view()
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = False
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once_with()
+        client.chat_postMessage.assert_called_once()
+        assert "not configured" in client.chat_postMessage.call_args[1]["text"]
+
+    def test_api_error_sends_failure_message(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view()
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.side_effect = requests.RequestException(
+                "API error"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        assert "went wrong" in client.chat_postMessage.call_args[1]["text"]
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.STATUSPAGE
+        ).exists()
+
+    def test_no_incident_for_channel(self, db):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(channel_id="C_NONEXISTENT")
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = True
+            handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        client.chat_postMessage.assert_called_once()
+        assert (
+            "Could not find an incident" in client.chat_postMessage.call_args[1]["text"]
+        )
+
+    def test_rejects_empty_title(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(title="")
+        client = MagicMock()
+
+        handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once_with(
+            response_action="errors",
+            errors={"title_block": "Title is required."},
+        )

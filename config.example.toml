@@ -37,3 +37,8 @@ integration_key = ""
 [datadog]
 api_key = ""
 app_key = ""
+
+[statuspage]
+api_key = ""
+page_id = ""
+url = "https://your-page.statuspage.io/"

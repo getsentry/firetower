@@ -50,6 +50,13 @@ class SlackConfig:
 
 
 @deserialize
+class StatuspageConfig:
+    api_key: str
+    page_id: str
+    url: str
+
+
+@deserialize
 class AuthConfig:
     iap_enabled: bool
     iap_audience: str | None
@@ -66,6 +73,7 @@ class ConfigFile:
     slack: SlackConfig
     auth: AuthConfig
     pagerduty: PagerDutyConfig | None
+    statuspage: StatuspageConfig | None
 
     project_key: str
     django_secret_key: str
@@ -132,6 +140,7 @@ class DummyConfigFile(ConfigFile):
         )
         self.datadog = None
         self.pagerduty = None
+        self.statuspage = None
         self.project_key = ""
         self.django_secret_key = ""
         self.sentry_dsn = ""

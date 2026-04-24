@@ -515,6 +515,7 @@ dependencies = [
     { name = "google-auth" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pyserde", extra = ["toml"] },
+    { name = "requests" },
     { name = "slack-bolt" },
     { name = "slack-sdk" },
 ]
@@ -549,6 +550,7 @@ requires-dist = [
     { name = "google-auth", specifier = ">=2.37.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.11" },
     { name = "pyserde", extras = ["toml"], specifier = ">=0.28.0" },
+    { name = "requests", specifier = ">=2.32.0" },
     { name = "slack-bolt", specifier = ">=1.27.0" },
     { name = "slack-sdk", specifier = ">=3.31.0" },
 ]

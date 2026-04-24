@@ -2,5 +2,6 @@
 
 from .pagerduty import PagerDutyService
 from .slack import SlackService
+from .statuspage import StatuspageService
 
-__all__ = ["PagerDutyService", "SlackService"]
+__all__ = ["PagerDutyService", "SlackService", "StatuspageService"]
