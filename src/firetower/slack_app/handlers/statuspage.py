@@ -473,10 +473,7 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
                     components=components or None,
                 )
                 statuspage_url = service.get_incident_url(result["id"])
-                client.chat_postMessage(
-                    channel=channel_id,
-                    text=f"Statuspage has been updated: {statuspage_url}",
-                )
+                success_message = f"Statuspage has been updated: {statuspage_url}"
             else:
                 result = service.create_incident(
                     title=title,
@@ -488,10 +485,8 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
                 statuspage_url = service.get_incident_url(result["id"])
                 statuspage_link.url = statuspage_url
                 statuspage_link.save(update_fields=["url"])
-                client.chat_postMessage(
-                    channel=channel_id,
-                    text=f"Statuspage post created: {statuspage_url}",
-                )
+                success_message = f"Statuspage post created: {statuspage_url}"
+        client.chat_postMessage(channel=channel_id, text=success_message)
     except Exception:
         logger.exception("Failed to create/update statuspage incident")
         client.chat_postMessage(
