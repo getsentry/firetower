@@ -389,6 +389,11 @@ def _build_component_warning_modal(
                     },
                     "style": "primary",
                 },
+            ],
+        },
+        {
+            "type": "actions",
+            "elements": [
                 {
                     "type": "button",
                     "action_id": "statuspage_resolve_anyway",
