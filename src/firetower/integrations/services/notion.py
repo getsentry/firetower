@@ -10,10 +10,15 @@ logger = logging.getLogger(__name__)
 _BLOCK_CHILD_LIMIT = 85  # Notion enforces a hard limit of 100; stay below for safety
 _NOTION_RICH_TEXT_LIMIT = 2000
 
+# Module-level cache so the full user-list pagination (7+ pages for large workspaces)
+# only runs once per process rather than once per command invocation.
+_users_cache: dict[str, dict[str, dict[str, str]]] = {}
+
 
 class NotionService:
     def __init__(self, integration_token: str, database_id: str, template_id: str = "") -> None:
         self.client: Client = Client(auth=integration_token, notion_version="2021-08-16")
+        self._integration_token = integration_token
         self.database_id = database_id
         self.template_id = template_id
         self._users: dict[str, dict[str, str]] | None = None
@@ -23,6 +28,11 @@ class NotionService:
         if self._users is not None:
             return self._users
 
+        cached = _users_cache.get(self._integration_token)
+        if cached is not None:
+            self._users = cached
+            return cached
+
         users: dict[str, dict[str, str]] = {}
         start_cursor: str | None = None
 
@@ -30,7 +40,23 @@ class NotionService:
             kwargs: dict[str, Any] = {"page_size": 100}
             if start_cursor:
                 kwargs["start_cursor"] = start_cursor
-            response = cast(dict[str, Any], self.client.users.list(**kwargs))
+
+            for attempt in range(3):
+                try:
+                    response = cast(dict[str, Any], self.client.users.list(**kwargs))
+                    break
+                except Exception as exc:
+                    if attempt == 2:
+                        raise
+                    wait = 2**attempt
+                    logger.warning(
+                        "Notion users.list failed (attempt %d/3): %s. Retrying in %ds.",
+                        attempt + 1,
+                        exc,
+                        wait,
+                    )
+                    time.sleep(wait)
+
             for user in response.get("results", []):
                 if "person" in user:
                     email = user["person"].get("email", "")
@@ -40,6 +66,7 @@ class NotionService:
             if not start_cursor:
                 break
 
+        _users_cache[self._integration_token] = users
         self._users = users
         return users
 

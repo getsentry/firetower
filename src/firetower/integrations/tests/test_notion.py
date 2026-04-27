@@ -7,6 +7,7 @@ from firetower.integrations.services.notion import (
     NotionService,
     _clean_block,
     _message_to_bullet,
+    _users_cache,
 )
 
 
@@ -22,6 +23,12 @@ def notion():
 
 
 class TestGetUsers:
+    @pytest.fixture(autouse=True)
+    def clear_users_cache(self):
+        _users_cache.pop("test-key", None)
+        yield
+        _users_cache.pop("test-key", None)
+
     def test_returns_email_to_user_map(self, notion):
         notion.client.users.list.return_value = {
             "results": [
@@ -75,6 +82,53 @@ class TestGetUsers:
         notion.get_users()
 
         notion.client.users.list.assert_called_once()
+
+    def test_module_cache_shared_across_instances(self, notion):
+        notion.client.users.list.return_value = {
+            "results": [{"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}],
+            "next_cursor": None,
+        }
+
+        notion.get_users()
+
+        second = NotionService(
+            integration_token="test-key", database_id="db-id"
+        )
+        second.client = MagicMock()
+        second.get_users()
+
+        second.client.users.list.assert_not_called()
+
+    def test_retries_transient_errors_mid_pagination(self, notion):
+        notion.client.users.list.side_effect = [
+            {
+                "results": [{"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}],
+                "next_cursor": "cursor1",
+            },
+            Exception("502 Bad Gateway"),
+            {
+                "results": [{"person": {"email": "b@sentry.io"}, "name": "Bob", "id": "U2"}],
+                "next_cursor": None,
+            },
+        ]
+
+        with patch("firetower.integrations.services.notion.time.sleep"):
+            users = notion.get_users()
+
+        assert len(users) == 2
+        assert notion.client.users.list.call_count == 3
+
+    def test_raises_after_max_retries(self, notion):
+        notion.client.users.list.side_effect = [
+            {"results": [], "next_cursor": "cursor1"},
+            Exception("502"),
+            Exception("502"),
+            Exception("502"),
+        ]
+
+        with patch("firetower.integrations.services.notion.time.sleep"):
+            with pytest.raises(Exception, match="502"):
+                notion.get_users()
 
 
 class TestFetchAllChildren:
