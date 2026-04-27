@@ -1,11 +1,11 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from firetower.integrations.services.notion import (
     NotionService,
-    _build_slack_markdown,
+    _message_to_bullet,
     _users_cache,
 )
 
@@ -158,79 +158,122 @@ class TestSendMarkdown:
         assert mock_patch.call_count == 2
 
 
-class TestApplyTemplate:
-    def test_new_page_sends_template_then_slack(self, notion):
-        with patch.object(notion, "_send_markdown", return_value=True) as mock_send:
-            notion.apply_template("page-id", messages=[], update_slack=False)
+class TestAppendChildren:
+    def test_returns_result_on_success(self, notion):
+        notion.client.blocks.children.append.return_value = {"results": [{"id": "b1"}]}
 
-        assert mock_send.call_count == 2
-        template_call, slack_call = mock_send.call_args_list
-        assert template_call.args[1] == "# Template\n\nSome content."
-        assert "<details>" in slack_call.args[1]
+        result = notion._append_children("block-id", [{"type": "paragraph"}])
 
-    def test_update_slack_skips_template(self, notion):
-        with patch.object(notion, "_send_markdown", return_value=True) as mock_send:
-            notion.apply_template("page-id", messages=[], update_slack=True)
+        assert result == {"results": [{"id": "b1"}]}
 
-        assert mock_send.call_count == 1
-        assert "<details>" in mock_send.call_args.args[1]
-
-    def test_new_page_without_template_sends_only_slack(self):
-        svc = NotionService(integration_token="test-key", database_id="db-id")
-        svc.client = MagicMock()
-
-        with patch.object(svc, "_send_markdown", return_value=True) as mock_send:
-            svc.apply_template("page-id", messages=[], update_slack=False)
-
-        assert mock_send.call_count == 1
-        assert "<details>" in mock_send.call_args.args[1]
-
-
-class TestBuildSlackMarkdown:
-    def test_wraps_messages_in_toggle(self):
-        messages = [
-            {
-                "author": "a@sentry.io",
-                "date_time": datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
-                "text": "Hello world",
-                "replies": [],
-            }
+    def test_retries_on_failure_then_succeeds(self, notion):
+        notion.client.blocks.children.append.side_effect = [
+            Exception("rate limited"),
+            {"results": []},
         ]
 
-        md = _build_slack_markdown(messages)
+        with patch("firetower.integrations.services.notion.time.sleep"):
+            result = notion._append_children(
+                "block-id", [{"type": "paragraph"}], max_retries=2
+            )
 
-        assert md.startswith("<details>")
-        assert md.endswith("</details>")
-        assert "<summary>" in md
-        assert "- [2024-01-15 10:30 UTC] a@sentry.io: Hello world" in md
+        assert result == {"results": []}
+        assert notion.client.blocks.children.append.call_count == 2
 
-    def test_indents_replies(self):
+    def test_returns_none_after_max_retries(self, notion):
+        notion.client.blocks.children.append.side_effect = Exception("always fails")
+
+        with patch("firetower.integrations.services.notion.time.sleep"):
+            result = notion._append_children(
+                "block-id", [{"type": "paragraph"}], max_retries=2
+            )
+
+        assert result is None
+        assert notion.client.blocks.children.append.call_count == 2
+
+
+class TestMessageToBullet:
+    def test_uses_date_mention_for_timestamp(self):
+        dt = datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
+        msg = {"author": "alice@sentry.io", "date_time": dt, "text": "Hello world"}
+
+        block = _message_to_bullet(msg)
+
+        rich_text = block["bulleted_list_item"]["rich_text"]
+        assert rich_text[0]["type"] == "mention"
+        assert rich_text[0]["mention"]["type"] == "date"
+        assert rich_text[0]["mention"]["date"]["start"] == dt.isoformat()
+
+    def test_appends_author_and_text_after_mention(self):
+        dt = datetime(2024, 1, 15, 10, 30, tzinfo=UTC)
+        msg = {"author": "alice@sentry.io", "date_time": dt, "text": "Hello world"}
+
+        block = _message_to_bullet(msg)
+
+        suffix = block["bulleted_list_item"]["rich_text"][1]["text"]["content"]
+        assert suffix == " alice@sentry.io: Hello world"
+
+    def test_truncates_long_suffix(self):
+        dt = datetime(2024, 1, 1, tzinfo=UTC)
+        msg = {"author": "a@sentry.io", "date_time": dt, "text": "x" * 2100}
+
+        block = _message_to_bullet(msg)
+
+        suffix = block["bulleted_list_item"]["rich_text"][1]["text"]["content"]
+        assert len(suffix) <= 2000
+
+
+class TestApplyTemplate:
+    def _make_append_response(self, block_id: str) -> dict:
+        return {"results": [{"id": block_id}]}
+
+    def test_new_page_sends_markdown_then_slack_blocks(self, notion):
+        notion.client.blocks.children.append.return_value = self._make_append_response(
+            "toggle-id"
+        )
+
+        with patch.object(notion, "_send_markdown", return_value=True) as mock_md:
+            notion.apply_template("page-id", messages=[], update_slack=False)
+
+        mock_md.assert_called_once_with("page-id", "# Template\n\nSome content.")
+        notion.client.blocks.children.append.assert_called_once()
+        toggle_block = notion.client.blocks.children.append.call_args.kwargs["children"][0]
+        assert toggle_block["type"] == "toggle"
+
+    def test_update_slack_skips_markdown_template(self, notion):
+        notion.client.blocks.children.append.return_value = self._make_append_response(
+            "toggle-id"
+        )
+
+        with patch.object(notion, "_send_markdown", return_value=True) as mock_md:
+            notion.apply_template("page-id", messages=[], update_slack=True)
+
+        mock_md.assert_not_called()
+
+    def test_appends_replies_as_children_of_parent_bullet(self, notion):
+        notion.client.blocks.children.append.side_effect = [
+            {"results": [{"id": "toggle-id"}]},
+            {"results": [{"id": "bullet-id"}]},
+            {"results": [{"id": "reply-id"}]},
+        ]
+
         messages = [
             {
                 "author": "a@sentry.io",
-                "date_time": datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
+                "date_time": datetime(2024, 1, 1, tzinfo=UTC),
                 "text": "main",
                 "replies": [
                     {
                         "author": "b@sentry.io",
-                        "date_time": datetime(2024, 1, 15, 10, 31, tzinfo=UTC),
+                        "date_time": datetime(2024, 1, 1, 0, 1, tzinfo=UTC),
                         "text": "reply",
                     }
                 ],
             }
         ]
 
-        md = _build_slack_markdown(messages)
+        with patch.object(notion, "_send_markdown", return_value=True):
+            notion.apply_template("page-id", messages=messages, update_slack=True)
 
-        lines = md.splitlines()
-        main_line = next(l for l in lines if "main" in l)
-        reply_line = next(l for l in lines if "reply" in l)
-        assert main_line.startswith("- ")
-        assert reply_line.startswith("  - ")
-
-    def test_empty_messages_produces_empty_toggle(self):
-        md = _build_slack_markdown([])
-
-        assert "<details>" in md
-        assert "</details>" in md
-        assert "- " not in md
+        reply_call = notion.client.blocks.children.append.call_args_list[2]
+        assert reply_call.kwargs["block_id"] == "bullet-id"
