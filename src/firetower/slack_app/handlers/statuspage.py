@@ -19,7 +19,6 @@ from firetower.slack_app.handlers.utils import get_incident_from_channel
 logger = logging.getLogger(__name__)
 
 COMPONENT_BLOCK_PREFIX = "component_"
-SLACK_PRIVATE_METADATA_MAX_BYTES = 3000
 
 
 def _parse_private_metadata(raw: str) -> dict[str, Any]:
@@ -27,24 +26,10 @@ def _parse_private_metadata(raw: str) -> dict[str, Any]:
     try:
         parsed = json.loads(raw or "{}")
     except json.JSONDecodeError:
-        return {"channel_id": raw, "component_names": {}}
+        return {"channel_id": raw}
     if not isinstance(parsed, dict):
-        return {"channel_id": "", "component_names": {}}
+        return {"channel_id": ""}
     return parsed
-
-
-def _clamp_private_metadata(payload: dict[str, Any]) -> str:
-    """JSON-encode payload, dropping component_names if it would exceed Slack's limit."""
-    encoded = json.dumps(payload)
-    if len(encoded) > SLACK_PRIVATE_METADATA_MAX_BYTES:
-        logger.info(
-            "Statuspage modal private_metadata exceeded Slack's limit (%d bytes); "
-            "dropping component_names — warning modal will fall back to raw IDs.",
-            len(encoded),
-        )
-        trimmed = {k: v for k, v in payload.items() if k != "component_names"}
-        encoded = json.dumps(trimmed)
-    return encoded
 
 
 def _build_statuspage_modal(
@@ -179,7 +164,6 @@ def _build_statuspage_modal(
             }
         )
 
-    component_names: dict[str, str] = {}
     service = StatuspageService()
     if service.configured:
         try:
@@ -207,7 +191,6 @@ def _build_statuspage_modal(
             if non_parents:
                 blocks.append({"type": "divider"})
             for component in non_parents:
-                component_names[component["id"]] = component["name"]
                 current_impact = affected_components.get(component["id"], "operational")
                 initial_component_option = next(
                     (
@@ -248,7 +231,6 @@ def _build_statuspage_modal(
                     key=lambda x: x.get("position", 0),
                 )
                 for child in children:
-                    component_names[child["id"]] = child["name"]
                     current_impact = affected_components.get(child["id"], "operational")
                     initial_component_option = next(
                         (
@@ -272,9 +254,7 @@ def _build_statuspage_modal(
                         }
                     )
 
-    private_metadata = _clamp_private_metadata(
-        {"channel_id": channel_id, "component_names": component_names}
-    )
+    private_metadata = json.dumps({"channel_id": channel_id})
     return {
         "type": "modal",
         "callback_id": "statuspage_modal",
@@ -354,7 +334,6 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
     metadata = _parse_private_metadata(view.get("private_metadata", "{}"))
     channel_id = metadata.get("channel_id", "")
-    component_names = metadata.get("component_names", {})
 
     status = (
         values.get("status_block", {})
@@ -389,7 +368,6 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
         "message": message,
         "impact": impact,
         "components": components,
-        "component_names": component_names,
     }
 
 
@@ -439,7 +417,7 @@ def _build_component_warning_modal(
     return {
         "type": "modal",
         "callback_id": "statuspage_confirm_resolve",
-        "private_metadata": _clamp_private_metadata(data),
+        "private_metadata": json.dumps(data),
         "title": {"type": "plain_text", "text": "Confirm Resolution"},
         "close": {"type": "plain_text", "text": "Go Back"},
         "blocks": blocks,
@@ -556,9 +534,17 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
             if status != "operational"
         ]
         if non_operational:
-            component_names = data["component_names"]
+            service = StatuspageService()
+            try:
+                top_level, children_map = service.get_components()
+            except requests.RequestException:
+                top_level, children_map = [], {}
+            all_components = {c["id"]: c["name"] for c in top_level}
+            for children in children_map.values():
+                for c in children:
+                    all_components[c["id"]] = c["name"]
             labeled = [
-                (component_names.get(cid, cid), status)
+                (all_components.get(cid, cid), status)
                 for cid, status in non_operational
             ]
             ack(

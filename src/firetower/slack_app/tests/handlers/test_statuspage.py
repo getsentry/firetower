@@ -295,7 +295,6 @@ class TestStatuspageSubmission:
         impact="major",
         channel_id=CHANNEL_ID,
         components=None,
-        component_names=None,
     ):
         values: dict = {
             "status_block": {
@@ -324,12 +323,7 @@ class TestStatuspageSubmission:
                 }
         return {
             "state": {"values": values},
-            "private_metadata": json.dumps(
-                {
-                    "channel_id": channel_id,
-                    "component_names": component_names or {},
-                }
-            ),
+            "private_metadata": json.dumps({"channel_id": channel_id}),
         }
 
     def test_creates_new_statuspage_incident(self, incident):
@@ -529,7 +523,6 @@ class TestStatuspageResetAndResolve:
             "message": "Resolved",
             "impact": "major",
             "components": {"c1": "major_outage", "c2": "degraded_performance"},
-            "component_names": {"c1": "API", "c2": "Web"},
         }
         ack = MagicMock()
         body = self._make_body(data)
@@ -564,7 +557,6 @@ class TestStatuspageResetAndResolve:
             "message": "Resolved",
             "impact": "major",
             "components": {"c1": "major_outage"},
-            "component_names": {"c1": "API"},
         }
         ack = MagicMock()
         body = self._make_body(data)
@@ -602,7 +594,6 @@ class TestStatuspageResolveAnyway:
             "message": "Resolved",
             "impact": "major",
             "components": {"c1": "major_outage", "c2": "degraded_performance"},
-            "component_names": {"c1": "API", "c2": "Web"},
         }
         ack = MagicMock()
         body = self._make_body(data)
@@ -640,7 +631,6 @@ class TestStatuspageResolveAnyway:
             "message": "Resolved",
             "impact": "major",
             "components": {"c1": "major_outage"},
-            "component_names": {"c1": "API"},
         }
         ack = MagicMock()
         body = self._make_body(data)
@@ -670,7 +660,6 @@ class TestStatuspageConfirmResolve:
             "message": "Resolved anyway",
             "impact": "major",
             "components": {"c1": "major_outage"},
-            "component_names": {"c1": "API"},
         }
         ack = MagicMock()
         body = {}
@@ -692,24 +681,24 @@ class TestParsePrivateMetadata:
         "raw,expected",
         [
             (
-                json.dumps({"channel_id": "C123", "component_names": {"a": "A"}}),
-                {"channel_id": "C123", "component_names": {"a": "A"}},
+                json.dumps({"channel_id": "C123"}),
+                {"channel_id": "C123"},
             ),
             (
                 "C_12345",
-                {"channel_id": "C_12345", "component_names": {}},
+                {"channel_id": "C_12345"},
             ),
             (
                 json.dumps("hello"),
-                {"channel_id": "", "component_names": {}},
+                {"channel_id": ""},
             ),
             (
                 json.dumps(None),
-                {"channel_id": "", "component_names": {}},
+                {"channel_id": ""},
             ),
             (
                 json.dumps(123),
-                {"channel_id": "", "component_names": {}},
+                {"channel_id": ""},
             ),
             ("", {}),
             (None, {}),
