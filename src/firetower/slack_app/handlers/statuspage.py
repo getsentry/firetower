@@ -516,21 +516,18 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
         ]
         if non_operational:
             service = StatuspageService()
-            if service.configured:
-                try:
-                    top_level, children_map = service.get_components()
-                except requests.RequestException:
-                    top_level, children_map = [], {}
-                all_components = {c["id"]: c["name"] for c in top_level}
-                for children in children_map.values():
-                    for c in children:
-                        all_components[c["id"]] = c["name"]
-                labeled = [
-                    (all_components.get(cid, cid), status)
-                    for cid, status in non_operational
-                ]
-            else:
-                labeled = non_operational
+            try:
+                top_level, children_map = service.get_components()
+            except requests.RequestException:
+                top_level, children_map = [], {}
+            all_components = {c["id"]: c["name"] for c in top_level}
+            for children in children_map.values():
+                for c in children:
+                    all_components[c["id"]] = c["name"]
+            labeled = [
+                (all_components.get(cid, cid), status)
+                for cid, status in non_operational
+            ]
             ack(
                 response_action="push",
                 view=_build_component_warning_modal(data, labeled),
