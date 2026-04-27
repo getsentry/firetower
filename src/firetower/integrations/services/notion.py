@@ -17,7 +17,7 @@ _users_cache: dict[str, dict[str, dict[str, str]]] = {}
 
 class NotionService:
     def __init__(self, integration_token: str, database_id: str, template_id: str = "") -> None:
-        self.client: Client = Client(auth=integration_token, notion_version="2021-08-16")
+        self.client: Client = Client(auth=integration_token)
         self._integration_token = integration_token
         self.database_id = database_id
         self.template_id = template_id
