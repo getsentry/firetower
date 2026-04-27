@@ -362,8 +362,10 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
 
 
 def _create_datadog_notebook(incident: Incident, channel_id: str | None) -> None:
+    notebook_url: str | None = None
     try:
         if incident.is_private:
+            logger.info(f"Skipping Datadog notebook for private incident {incident.id}")
             if channel_id:
                 try:
                     _slack_service.post_message(
@@ -417,7 +419,7 @@ def _create_datadog_notebook(incident: Incident, channel_id: str | None) -> None
 
         # Post Slack side effects after the transaction commits so a Slack
         # failure does not orphan the external Datadog notebook.
-        if channel_id:
+        if channel_id and notebook_url:
             try:
                 _slack_service.add_bookmark(
                     channel_id, "Datadog Notebook", notebook_url

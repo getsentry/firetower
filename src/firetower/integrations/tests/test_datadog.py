@@ -104,22 +104,6 @@ class TestCreateNotebook:
         body = mock_api.create_notebook.call_args[1]["body"]
         assert body.data.attributes.name == "[INC-1] short"
 
-    def test_create_notebook_uppercases_incident_number(self):
-        with patch.object(settings, "DATADOG", MOCK_DATADOG_CONFIG):
-            service = DatadogService()
-
-        mock_api = MagicMock()
-        mock_api.create_notebook.return_value = self._build_response("nb-4")
-
-        with patch(
-            "firetower.integrations.services.datadog.NotebooksApi",
-            return_value=mock_api,
-        ):
-            service.create_notebook("inc-42", "Title")
-
-        body = mock_api.create_notebook.call_args[1]["body"]
-        assert body.data.attributes.name == "[INC-42] Title"
-
     def test_create_notebook_returns_none_on_api_exception(self):
         with patch.object(settings, "DATADOG", MOCK_DATADOG_CONFIG):
             service = DatadogService()

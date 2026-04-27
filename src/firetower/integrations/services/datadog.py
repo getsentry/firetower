@@ -38,6 +38,9 @@ class DatadogService:
         prefix = f"[{incident_number.upper()}] "
         max_title_length = NOTEBOOK_NAME_MAX_LENGTH - len(prefix)
 
+        if max_title_length <= 3:
+            return prefix[:NOTEBOOK_NAME_MAX_LENGTH]
+
         if len(title) > max_title_length:
             truncated_title = title[: max_title_length - 3] + "..."
         else:
@@ -56,6 +59,7 @@ class DatadogService:
             configuration = Configuration()
             configuration.api_key["apiKeyAuth"] = self.api_key
             configuration.api_key["appKeyAuth"] = self.app_key
+            configuration.request_timeout = REQUEST_TIMEOUT_SECONDS
 
             with ApiClient(configuration) as api_client:
                 api_instance = NotebooksApi(api_client)
