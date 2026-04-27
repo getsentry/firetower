@@ -29,7 +29,6 @@ from firetower.slack_app.handlers.severity import handle_severity_command
 from firetower.slack_app.handlers.statuspage import (
     handle_component_impact_select,
     handle_statuspage_command,
-    handle_statuspage_confirm_resolve,
     handle_statuspage_reset_and_resolve,
     handle_statuspage_resolve_anyway,
     handle_statuspage_submission,
@@ -146,7 +145,6 @@ def _register_views(app: App) -> None:
     app.view("resolved_incident_modal")(handle_resolved_submission)
     app.view("captain_incident_modal")(handle_captain_submission)
     app.view("statuspage_modal")(handle_statuspage_submission)
-    app.view("statuspage_confirm_resolve")(handle_statuspage_confirm_resolve)
     app.action("component_impact_select")(handle_component_impact_select)
     app.action("statuspage_reset_and_resolve")(handle_statuspage_reset_and_resolve)
     app.action("statuspage_resolve_anyway")(handle_statuspage_resolve_anyway)

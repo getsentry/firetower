@@ -9,7 +9,6 @@ from firetower.slack_app.handlers.statuspage import (
     _build_statuspage_modal,
     _parse_private_metadata,
     handle_statuspage_command,
-    handle_statuspage_confirm_resolve,
     handle_statuspage_reset_and_resolve,
     handle_statuspage_resolve_anyway,
     handle_statuspage_submission,
@@ -649,31 +648,6 @@ class TestStatuspageResolveAnyway:
         assert update_kwargs["view"]["clear_on_close"] is True
         section_text = update_kwargs["view"]["blocks"][0]["text"]["text"]
         assert "went wrong" in section_text
-
-
-class TestStatuspageConfirmResolve:
-    def test_clears_modal_stack_and_processes_submission(self):
-        data = {
-            "channel_id": CHANNEL_ID,
-            "status": "resolved",
-            "title": "Outage",
-            "message": "Resolved anyway",
-            "impact": "major",
-            "components": {"c1": "major_outage"},
-        }
-        ack = MagicMock()
-        body = {}
-        view = {"private_metadata": json.dumps(data)}
-        client = MagicMock()
-
-        with patch(
-            "firetower.slack_app.handlers.statuspage._process_statuspage_submission",
-            return_value=True,
-        ) as mock_process:
-            handle_statuspage_confirm_resolve(ack, body, view, client)
-
-        ack.assert_called_once_with(response_action="clear")
-        mock_process.assert_called_once_with(data, client)
 
 
 class TestParsePrivateMetadata:

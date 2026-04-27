@@ -416,7 +416,6 @@ def _build_component_warning_modal(
     ]
     return {
         "type": "modal",
-        "callback_id": "statuspage_confirm_resolve",
         "private_metadata": json.dumps(data),
         "title": {"type": "plain_text", "text": "Confirm Resolution"},
         "close": {"type": "plain_text", "text": "Go Back"},
@@ -554,15 +553,6 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
             return
 
     ack()
-    _process_statuspage_submission(data, client)
-
-
-# Retained for in-flight modals opened before the action-button migration; remove after 2026-05-04.
-def handle_statuspage_confirm_resolve(
-    ack: Any, body: dict, view: dict, client: Any
-) -> None:
-    ack(response_action="clear")
-    data = _parse_private_metadata(view.get("private_metadata", "{}"))
     _process_statuspage_submission(data, client)
 
 
