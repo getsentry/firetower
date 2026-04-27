@@ -7,7 +7,6 @@ import requests
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.slack_app.handlers.statuspage import (
     _build_statuspage_modal,
-    _parse_private_metadata,
     handle_statuspage_command,
     handle_statuspage_reset_and_resolve,
     handle_statuspage_resolve_anyway,
@@ -322,7 +321,7 @@ class TestStatuspageSubmission:
                 }
         return {
             "state": {"values": values},
-            "private_metadata": json.dumps({"channel_id": channel_id}),
+            "private_metadata": channel_id,
         }
 
     def test_creates_new_statuspage_incident(self, incident):
@@ -648,35 +647,3 @@ class TestStatuspageResolveAnyway:
         assert update_kwargs["view"]["clear_on_close"] is True
         section_text = update_kwargs["view"]["blocks"][0]["text"]["text"]
         assert "went wrong" in section_text
-
-
-class TestParsePrivateMetadata:
-    @pytest.mark.parametrize(
-        "raw,expected",
-        [
-            (
-                json.dumps({"channel_id": "C123"}),
-                {"channel_id": "C123"},
-            ),
-            (
-                "C_12345",
-                {"channel_id": "C_12345"},
-            ),
-            (
-                json.dumps("hello"),
-                {"channel_id": ""},
-            ),
-            (
-                json.dumps(None),
-                {"channel_id": ""},
-            ),
-            (
-                json.dumps(123),
-                {"channel_id": ""},
-            ),
-            ("", {}),
-            (None, {}),
-        ],
-    )
-    def test_parse_private_metadata(self, raw, expected):
-        assert _parse_private_metadata(raw) == expected

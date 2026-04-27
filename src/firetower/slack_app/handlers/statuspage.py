@@ -21,17 +21,6 @@ logger = logging.getLogger(__name__)
 COMPONENT_BLOCK_PREFIX = "component_"
 
 
-def _parse_private_metadata(raw: str) -> dict[str, Any]:
-    """Parse a modal's private_metadata, tolerating pre-deploy raw channel_id strings."""
-    try:
-        parsed = json.loads(raw or "{}")
-    except json.JSONDecodeError:
-        return {"channel_id": raw}
-    if not isinstance(parsed, dict):
-        return {"channel_id": ""}
-    return parsed
-
-
 def _build_statuspage_modal(
     channel_id: str,
     incident_title: str,
@@ -254,11 +243,10 @@ def _build_statuspage_modal(
                         }
                     )
 
-    private_metadata = json.dumps({"channel_id": channel_id})
     return {
         "type": "modal",
         "callback_id": "statuspage_modal",
-        "private_metadata": private_metadata,
+        "private_metadata": channel_id,
         "title": {
             "type": "plain_text",
             "text": "Update Statuspage" if is_update else "New Statuspage Post",
@@ -332,8 +320,7 @@ def handle_statuspage_command(
 
 def _extract_submission_data(view: dict) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
-    metadata = _parse_private_metadata(view.get("private_metadata", "{}"))
-    channel_id = metadata.get("channel_id", "")
+    channel_id = view.get("private_metadata", "")
 
     status = (
         values.get("status_block", {})
@@ -563,7 +550,7 @@ def handle_component_impact_select(ack: Any, body: dict) -> None:
 def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> None:
     ack()
     view = body.get("view", {})
-    data = _parse_private_metadata(view.get("private_metadata", "{}"))
+    data = json.loads(view.get("private_metadata", "{}"))
     data["components"] = dict.fromkeys(data.get("components", {}), "operational")
     success = _process_statuspage_submission(data, client)
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
@@ -592,7 +579,7 @@ def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> No
 def handle_statuspage_resolve_anyway(ack: Any, body: dict, client: Any) -> None:
     ack()
     view = body.get("view", {})
-    data = _parse_private_metadata(view.get("private_metadata", "{}"))
+    data = json.loads(view.get("private_metadata", "{}"))
     success = _process_statuspage_submission(data, client)
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
