@@ -272,6 +272,18 @@ PAGERDUTY = (
     else None
 )
 
+# Datadog Integration Configuration (used by DatadogService for notebook
+# creation; the statsd initialize() call below uses the same config keys for
+# internal observability metrics).
+DATADOG = (
+    {
+        "API_KEY": config.datadog.api_key,
+        "APP_KEY": config.datadog.app_key,
+    }
+    if config.datadog
+    else None
+)
+
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     # Pagination
