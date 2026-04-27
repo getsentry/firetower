@@ -19,6 +19,32 @@ from firetower.slack_app.handlers.utils import get_incident_from_channel
 logger = logging.getLogger(__name__)
 
 COMPONENT_BLOCK_PREFIX = "component_"
+SLACK_PRIVATE_METADATA_MAX_BYTES = 3000
+
+
+def _parse_private_metadata(raw: str) -> dict[str, Any]:
+    """Parse a modal's private_metadata, tolerating pre-deploy raw channel_id strings."""
+    try:
+        parsed = json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        return {"channel_id": raw, "component_names": {}}
+    if not isinstance(parsed, dict):
+        return {"channel_id": "", "component_names": {}}
+    return parsed
+
+
+def _clamp_private_metadata(payload: dict[str, Any]) -> str:
+    """JSON-encode payload, dropping component_names if it would exceed Slack's limit."""
+    encoded = json.dumps(payload)
+    if len(encoded) > SLACK_PRIVATE_METADATA_MAX_BYTES:
+        logger.info(
+            "Statuspage modal private_metadata exceeded Slack's limit (%d bytes); "
+            "dropping component_names — warning modal will fall back to raw IDs.",
+            len(encoded),
+        )
+        trimmed = {k: v for k, v in payload.items() if k != "component_names"}
+        encoded = json.dumps(trimmed)
+    return encoded
 
 
 def _build_statuspage_modal(
@@ -246,7 +272,7 @@ def _build_statuspage_modal(
                         }
                     )
 
-    private_metadata = json.dumps(
+    private_metadata = _clamp_private_metadata(
         {"channel_id": channel_id, "component_names": component_names}
     )
     return {
@@ -326,7 +352,7 @@ def handle_statuspage_command(
 
 def _extract_submission_data(view: dict) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
-    metadata = json.loads(view.get("private_metadata", "{}"))
+    metadata = _parse_private_metadata(view.get("private_metadata", "{}"))
     channel_id = metadata.get("channel_id", "")
     component_names = metadata.get("component_names", {})
 
@@ -404,7 +430,7 @@ def _build_component_warning_modal(
     return {
         "type": "modal",
         "callback_id": "statuspage_confirm_resolve",
-        "private_metadata": json.dumps(data),
+        "private_metadata": _clamp_private_metadata(data),
         "title": {"type": "plain_text", "text": "Confirm Resolution"},
         "submit": {"type": "plain_text", "text": "Resolve Anyway"},
         "close": {"type": "plain_text", "text": "Go Back"},
@@ -444,6 +470,9 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
 
     try:
         with transaction.atomic():
+            # Hold the row lock across the Statuspage API call so concurrent submits
+            # serialize and only one external incident is created. Trade-off: a stuck
+            # Statuspage API blocks DB writers on this row until REQUEST_TIMEOUT_SECONDS.
             statuspage_link, created = (
                 ExternalLink.objects.select_for_update().get_or_create(
                     incident=incident,
@@ -472,21 +501,16 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
                     text=f"Statuspage has been updated: {statuspage_url}",
                 )
             else:
-                try:
-                    result = service.create_incident(
-                        title=title,
-                        status=status,
-                        message=message,
-                        impact=impact,
-                        components=components or None,
-                    )
-                    statuspage_url = service.get_incident_url(result["id"])
-                    statuspage_link.url = statuspage_url
-                    statuspage_link.save(update_fields=["url"])
-                except Exception:
-                    if created or not statuspage_link.url:
-                        statuspage_link.delete()
-                    raise
+                result = service.create_incident(
+                    title=title,
+                    status=status,
+                    message=message,
+                    impact=impact,
+                    components=components or None,
+                )
+                statuspage_url = service.get_incident_url(result["id"])
+                statuspage_link.url = statuspage_url
+                statuspage_link.save(update_fields=["url"])
                 client.chat_postMessage(
                     channel=channel_id,
                     text=f"Statuspage post created: {statuspage_url}",
@@ -543,7 +567,7 @@ def handle_statuspage_confirm_resolve(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
     ack(response_action="clear")
-    data = json.loads(view.get("private_metadata", "{}"))
+    data = _parse_private_metadata(view.get("private_metadata", "{}"))
     _process_statuspage_submission(data, client)
 
 
@@ -554,9 +578,8 @@ def handle_component_impact_select(ack: Any, body: dict) -> None:
 def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> None:
     ack()
     view = body.get("view", {})
-    data = json.loads(view.get("private_metadata", "{}"))
-    for cid in data.get("components", {}):
-        data["components"][cid] = "operational"
+    data = _parse_private_metadata(view.get("private_metadata", "{}"))
+    data["components"] = dict.fromkeys(data.get("components", {}), "operational")
     success = _process_statuspage_submission(data, client)
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
