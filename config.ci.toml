@@ -23,3 +23,8 @@ incident_guide_message = ""
 [auth]
 iap_enabled = false
 iap_audience = ""
+
+[pagerduty]
+api_token = ""
+
+[pagerduty.escalation_policies]
