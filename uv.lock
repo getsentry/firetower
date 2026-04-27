@@ -346,6 +346,21 @@ wheels = [
 ]
 
 [[package]]
+name = "datadog-api-client"
+version = "2.17.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "python-dateutil" },
+    { name = "typing-extensions" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2b/e1/65052c2cae6bdf11fa69b32db52b1964a10a9255367f6ff7406d6402add6/datadog-api-client-2.17.0.tar.gz", hash = "sha256:b487ace26a5165ba981b70f0705401319fa70fa92372ecce48b668191494d7fb", size = 1904123, upload-time = "2023-09-14T15:15:33.292Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/87/014ea35fdb683b276e8d87022b249bac54f2f4d8992f26433b5953acb139/datadog_api_client-2.17.0-py3-none-any.whl", hash = "sha256:ec1b8ab9f85e9984099299e117a5bccd21b49163484dfc460da05cb80558f1f9", size = 2068870, upload-time = "2023-09-14T15:15:31.277Z" },
+]
+
+[[package]]
 name = "ddtrace"
 version = "3.18.1"
 source = { registry = "https://pypi.org/simple" }
@@ -507,6 +522,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
     { name = "datadog" },
+    { name = "datadog-api-client" },
     { name = "ddtrace" },
     { name = "django" },
     { name = "django-cors-headers" },
@@ -542,6 +558,7 @@ prod = [
 requires-dist = [
     { name = "cryptography", specifier = ">=46.0.5" },
     { name = "datadog", specifier = "==0.52.1" },
+    { name = "datadog-api-client", specifier = "==2.17.0" },
     { name = "ddtrace", specifier = "==3.18.1" },
     { name = "django", specifier = ">=5.2.9,<6" },
     { name = "django-cors-headers", specifier = ">=4.9.0" },
@@ -1092,6 +1109,18 @@ wheels = [
 ]
 
 [[package]]
+name = "python-dateutil"
+version = "2.9.0.post0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee498c46e004a0eb49bc148f2fd230864601a86dcf6db/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3", size = 342432, upload-time = "2024-03-01T18:36:20.211Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427", size = 229892, upload-time = "2024-03-01T18:36:18.57Z" },
+]
+
+[[package]]
 name = "pyupgrade"
 version = "3.21.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1231,6 +1260,15 @@ wheels = [
 [package.optional-dependencies]
 django = [
     { name = "django" },
+]
+
+[[package]]
+name = "six"
+version = "1.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
 ]
 
 [[package]]
