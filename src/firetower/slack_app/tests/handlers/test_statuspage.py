@@ -490,6 +490,55 @@ class TestStatuspageSubmission:
             "Could not find an incident" in client.chat_postMessage.call_args[1]["text"]
         )
 
+    def test_resolved_with_non_operational_components_pushes_warning_modal(
+        self, incident
+    ):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(
+            status="resolved",
+            components={"c1": "major_outage"},
+        )
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.get_components.return_value = (
+                [{"id": "c1", "name": "API", "position": 1}],
+                {},
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        ack_kwargs = ack.call_args[1]
+        assert ack_kwargs["response_action"] == "push"
+        pushed_view = ack_kwargs["view"]
+
+        expected_data = {
+            "channel_id": CHANNEL_ID,
+            "status": "resolved",
+            "title": "Outage",
+            "message": "Looking into it",
+            "impact": "major",
+            "components": {"c1": "major_outage"},
+        }
+        assert pushed_view["private_metadata"] == json.dumps(expected_data)
+
+        actions_blocks = [
+            b for b in pushed_view["blocks"] if b.get("type") == "actions"
+        ]
+        assert len(actions_blocks) == 2
+
+        second_button = actions_blocks[1]["elements"][0]
+        assert second_button["text"]["text"] == "Resolve Without Updating Components"
+        assert second_button["style"] == "danger"
+
+        client.chat_postMessage.assert_not_called()
+
     def test_rejects_empty_title(self, incident):
         ack = MagicMock()
         body = {}

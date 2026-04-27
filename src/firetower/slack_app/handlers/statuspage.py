@@ -486,7 +486,6 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
                 statuspage_link.url = statuspage_url
                 statuspage_link.save(update_fields=["url"])
                 success_message = f"Statuspage post created: {statuspage_url}"
-        client.chat_postMessage(channel=channel_id, text=success_message)
     except Exception:
         logger.exception("Failed to create/update statuspage incident")
         client.chat_postMessage(
@@ -494,6 +493,16 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
             text="Something went wrong updating Statuspage. Please try again.",
         )
         return False
+
+    try:
+        client.chat_postMessage(channel=channel_id, text=success_message)
+    except Exception:
+        logger.exception(
+            "Failed to post statuspage success message for incident %s (%s)",
+            incident.id,
+            success_message,
+        )
+
     return True
 
 
