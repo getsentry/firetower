@@ -79,6 +79,14 @@ def handle_command(
     subcommand = parts[0].lower() if parts else ""
     args = parts[1] if len(parts) > 1 else ""
 
+    logger.debug(
+        "Command triggered: %s %s (user=%s, channel=%s)",
+        command.get("command", "/ft"),
+        subcommand or "(none)",
+        body.get("user_id", "unknown"),
+        body.get("channel_id", "unknown"),
+    )
+
     metric_subcommand = (
         (subcommand or "help")
         if subcommand in KNOWN_SUBCOMMANDS or subcommand == ""
