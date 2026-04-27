@@ -296,6 +296,14 @@ def handle_statuspage_command(
                     "Please try again in a moment."
                 )
                 return
+            if statuspage_incident is None:
+                logger.info(
+                    "Removing stale Statuspage ExternalLink for incident %s "
+                    "(Statuspage incident %s missing)",
+                    incident.id,
+                    sp_id,
+                )
+                statuspage_link.delete()
 
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
