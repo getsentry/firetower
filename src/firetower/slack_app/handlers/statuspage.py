@@ -424,6 +424,15 @@ def _build_component_warning_modal(
                     },
                     "style": "primary",
                 },
+                {
+                    "type": "button",
+                    "action_id": "statuspage_resolve_anyway",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Resolve Anyway",
+                    },
+                    "style": "danger",
+                },
             ],
         },
     ]
@@ -432,7 +441,6 @@ def _build_component_warning_modal(
         "callback_id": "statuspage_confirm_resolve",
         "private_metadata": _clamp_private_metadata(data),
         "title": {"type": "plain_text", "text": "Confirm Resolution"},
-        "submit": {"type": "plain_text", "text": "Resolve Anyway"},
         "close": {"type": "plain_text", "text": "Go Back"},
         "blocks": blocks,
     }
@@ -563,6 +571,7 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
     _process_statuspage_submission(data, client)
 
 
+# Retained for in-flight modals from before the action-button migration; safe to remove after one deploy cycle.
 def handle_statuspage_confirm_resolve(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
@@ -585,6 +594,34 @@ def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> No
 
     if success:
         message = ":white_check_mark: All components set to operational and statuspage resolved."
+    else:
+        message = ":x: Something went wrong — check the incident channel for details."
+    get_bolt_app().client.views_update(
+        view_id=view["id"],
+        view={
+            "type": "modal",
+            "clear_on_close": True,
+            "title": {"type": "plain_text", "text": "Confirm Resolution"},
+            "close": {"type": "plain_text", "text": "Close"},
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": message},
+                },
+            ],
+        },
+    )
+
+
+def handle_statuspage_resolve_anyway(ack: Any, body: dict, client: Any) -> None:
+    ack()
+    view = body.get("view", {})
+    data = _parse_private_metadata(view.get("private_metadata", "{}"))
+    success = _process_statuspage_submission(data, client)
+    from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
+
+    if success:
+        message = ":white_check_mark: Statuspage resolved."
     else:
         message = ":x: Something went wrong — check the incident channel for details."
     get_bolt_app().client.views_update(
