@@ -127,6 +127,7 @@ class NotionService:
         self._send_markdown(page_id, _build_slack_markdown(messages))
 
     def _send_markdown(self, page_id: str, content: str, max_retries: int = 3) -> bool:
+        # notion-client v3 does not wrap the Markdown API endpoint, so we call it directly.
         for attempt in range(max_retries):
             try:
                 response = httpx.patch(
