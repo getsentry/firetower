@@ -8,6 +8,8 @@ from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.slack_app.handlers.statuspage import (
     _build_statuspage_modal,
     handle_statuspage_command,
+    handle_statuspage_confirm_resolve,
+    handle_statuspage_reset_and_resolve,
     handle_statuspage_submission,
 )
 
@@ -506,3 +508,102 @@ class TestStatuspageSubmission:
             response_action="errors",
             errors={"title_block": "Title is required."},
         )
+
+
+class TestStatuspageResetAndResolve:
+    def _make_body(self, data: dict) -> dict:
+        return {
+            "view": {
+                "id": "V_WARNING",
+                "private_metadata": json.dumps(data),
+            }
+        }
+
+    def test_sets_all_components_operational_and_processes(self):
+        data = {
+            "channel_id": CHANNEL_ID,
+            "status": "resolved",
+            "title": "Outage",
+            "message": "Resolved",
+            "impact": "major",
+            "components": {"c1": "major_outage", "c2": "degraded_performance"},
+            "component_names": {"c1": "API", "c2": "Web"},
+        }
+        ack = MagicMock()
+        body = self._make_body(data)
+        client = MagicMock()
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.statuspage._process_statuspage_submission",
+                return_value=True,
+            ) as mock_process,
+            patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
+        ):
+            handle_statuspage_reset_and_resolve(ack, body, client)
+
+        ack.assert_called_once_with()
+        mock_process.assert_called_once()
+        passed_data = mock_process.call_args[0][0]
+        assert passed_data["components"] == {"c1": "operational", "c2": "operational"}
+        mock_app.return_value.client.views_update.assert_called_once()
+        update_kwargs = mock_app.return_value.client.views_update.call_args[1]
+        assert update_kwargs["view_id"] == "V_WARNING"
+        assert update_kwargs["view"]["clear_on_close"] is True
+        section_text = update_kwargs["view"]["blocks"][0]["text"]["text"]
+        assert "operational" in section_text
+        assert "resolved" in section_text
+
+    def test_failure_shows_failure_message(self):
+        data = {
+            "channel_id": CHANNEL_ID,
+            "status": "resolved",
+            "title": "Outage",
+            "message": "Resolved",
+            "impact": "major",
+            "components": {"c1": "major_outage"},
+            "component_names": {"c1": "API"},
+        }
+        ack = MagicMock()
+        body = self._make_body(data)
+        client = MagicMock()
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.statuspage._process_statuspage_submission",
+                return_value=False,
+            ),
+            patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
+        ):
+            handle_statuspage_reset_and_resolve(ack, body, client)
+
+        update_kwargs = mock_app.return_value.client.views_update.call_args[1]
+        assert update_kwargs["view"]["clear_on_close"] is True
+        section_text = update_kwargs["view"]["blocks"][0]["text"]["text"]
+        assert "went wrong" in section_text
+
+
+class TestStatuspageConfirmResolve:
+    def test_clears_modal_stack_and_processes_submission(self):
+        data = {
+            "channel_id": CHANNEL_ID,
+            "status": "resolved",
+            "title": "Outage",
+            "message": "Resolved anyway",
+            "impact": "major",
+            "components": {"c1": "major_outage"},
+            "component_names": {"c1": "API"},
+        }
+        ack = MagicMock()
+        body = {}
+        view = {"private_metadata": json.dumps(data)}
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage._process_statuspage_submission",
+            return_value=True,
+        ) as mock_process:
+            handle_statuspage_confirm_resolve(ack, body, view, client)
+
+        ack.assert_called_once_with(response_action="clear")
+        mock_process.assert_called_once_with(data, client)
