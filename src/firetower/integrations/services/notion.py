@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from notion_client import Client
+from notion_client.errors import APIResponseError
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +206,21 @@ class NotionService:
                     ),
                 )
                 return result
+            except APIResponseError as exc:
+                if exc.status == 404:
+                    logger.error(
+                        "Notion block %s not found, skipping append", block_id
+                    )
+                    return None
+                wait = 2**attempt
+                logger.warning(
+                    "Notion append failed (attempt %d/%d): %s. Retrying in %ds.",
+                    attempt + 1,
+                    max_retries,
+                    exc,
+                    wait,
+                )
+                time.sleep(wait)
             except Exception as exc:
                 wait = 2**attempt
                 logger.warning(
