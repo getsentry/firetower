@@ -242,7 +242,7 @@ NOTION: dict | None = (
     {
         "INTEGRATION_TOKEN": config.notion.integration_token,
         "DATABASE_ID": config.notion.database_id,
-        "TEMPLATE_ID": config.notion.template_id,
+        "TEMPLATE_MARKDOWN": config.notion.template_markdown,
     }
     if config.notion
     else None

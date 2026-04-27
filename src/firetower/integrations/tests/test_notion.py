@@ -1,12 +1,11 @@
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from firetower.integrations.services.notion import (
     NotionService,
-    _clean_block,
-    _message_to_bullet,
+    _build_slack_markdown,
     _users_cache,
 )
 
@@ -16,7 +15,7 @@ def notion():
     svc = NotionService(
         integration_token="test-key",
         database_id="db-id",
-        template_id="tmpl-id",
+        template_markdown="# Template\n\nSome content.",
     )
     svc.client = MagicMock()
     return svc
@@ -34,11 +33,7 @@ class TestGetUsers:
             "results": [
                 {"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"},
                 {"person": {"email": "b@sentry.io"}, "name": "Bob", "id": "U2"},
-                {
-                    "object": "bot",
-                    "name": "Integrations",
-                    "id": "B1",
-                },  # no "person" key
+                {"object": "bot", "name": "Integrations", "id": "B1"},
             ],
             "next_cursor": None,
         }
@@ -53,15 +48,11 @@ class TestGetUsers:
     def test_paginates_until_no_next_cursor(self, notion):
         notion.client.users.list.side_effect = [
             {
-                "results": [
-                    {"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}
-                ],
+                "results": [{"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}],
                 "next_cursor": "cursor1",
             },
             {
-                "results": [
-                    {"person": {"email": "b@sentry.io"}, "name": "Bob", "id": "U2"}
-                ],
+                "results": [{"person": {"email": "b@sentry.io"}, "name": "Bob", "id": "U2"}],
                 "next_cursor": None,
             },
         ]
@@ -73,10 +64,7 @@ class TestGetUsers:
         notion.client.users.list.assert_any_call(page_size=100, start_cursor="cursor1")
 
     def test_caches_result_on_second_call(self, notion):
-        notion.client.users.list.return_value = {
-            "results": [],
-            "next_cursor": None,
-        }
+        notion.client.users.list.return_value = {"results": [], "next_cursor": None}
 
         notion.get_users()
         notion.get_users()
@@ -91,9 +79,7 @@ class TestGetUsers:
 
         notion.get_users()
 
-        second = NotionService(
-            integration_token="test-key", database_id="db-id"
-        )
+        second = NotionService(integration_token="test-key", database_id="db-id")
         second.client = MagicMock()
         second.get_users()
 
@@ -131,188 +117,120 @@ class TestGetUsers:
                 notion.get_users()
 
 
-class TestFetchAllChildren:
-    def test_returns_all_results_across_pages(self, notion):
-        notion.client.blocks.children.list.side_effect = [
-            {"results": [{"id": "b1"}], "next_cursor": "c1"},
-            {"results": [{"id": "b2"}], "next_cursor": None},
-        ]
+class TestSendMarkdown:
+    def test_sends_insert_content_patch(self, notion):
+        with patch("firetower.integrations.services.notion.httpx.patch") as mock_patch:
+            mock_patch.return_value = MagicMock(status_code=200)
+            mock_patch.return_value.raise_for_status = MagicMock()
 
-        results = notion._fetch_all_children("parent-id")
+            result = notion._send_markdown("page-id", "# Hello")
 
-        assert [r["id"] for r in results] == ["b1", "b2"]
-        assert notion.client.blocks.children.list.call_count == 2
-
-
-class TestAppendChildren:
-    def test_returns_result_on_success(self, notion):
-        notion.client.blocks.children.append.return_value = {"results": [{"id": "b1"}]}
-
-        result = notion._append_children("block-id", [{"type": "paragraph"}])
-
-        assert result == {"results": [{"id": "b1"}]}
+        assert result is True
+        mock_patch.assert_called_once()
+        call_kwargs = mock_patch.call_args
+        assert "pages/page-id/markdown" in call_kwargs.args[0]
+        assert call_kwargs.kwargs["json"] == {
+            "type": "insert_content",
+            "insert_content": {"content": "# Hello"},
+        }
 
     def test_retries_on_failure_then_succeeds(self, notion):
-        notion.client.blocks.children.append.side_effect = [
-            Exception("rate limited"),
-            {"results": []},
-        ]
+        mock_response = MagicMock(status_code=200)
+        mock_response.raise_for_status = MagicMock()
 
-        with patch("firetower.integrations.services.notion.time.sleep"):
-            result = notion._append_children(
-                "block-id", [{"type": "paragraph"}], max_retries=2
-            )
+        with patch("firetower.integrations.services.notion.httpx.patch") as mock_patch:
+            mock_patch.side_effect = [Exception("rate limited"), mock_response]
 
-        assert result == {"results": []}
-        assert notion.client.blocks.children.append.call_count == 2
+            with patch("firetower.integrations.services.notion.time.sleep"):
+                result = notion._send_markdown("page-id", "content", max_retries=2)
 
-    def test_retries_on_404(self, notion):
-        notion.client.blocks.children.append.side_effect = [
-            Exception("object_not_found"),
-            {"results": []},
-        ]
+        assert result is True
+        assert mock_patch.call_count == 2
 
-        with patch("firetower.integrations.services.notion.time.sleep"):
-            result = notion._append_children(
-                "block-id", [{"type": "paragraph"}], max_retries=2
-            )
+    def test_returns_false_after_max_retries(self, notion):
+        with patch("firetower.integrations.services.notion.httpx.patch") as mock_patch:
+            mock_patch.side_effect = Exception("always fails")
 
-        assert result == {"results": []}
-        assert notion.client.blocks.children.append.call_count == 2
+            with patch("firetower.integrations.services.notion.time.sleep"):
+                result = notion._send_markdown("page-id", "content", max_retries=2)
 
-    def test_returns_none_after_max_retries(self, notion):
-        notion.client.blocks.children.append.side_effect = Exception("always fails")
-
-        with patch("firetower.integrations.services.notion.time.sleep"):
-            result = notion._append_children(
-                "block-id", [{"type": "paragraph"}], max_retries=2
-            )
-
-        assert result is None
-        assert notion.client.blocks.children.append.call_count == 2
-
-
-class TestMessageToBullet:
-    def test_formats_message_correctly(self):
-        msg = {
-            "author": "alice@sentry.io",
-            "date_time": datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
-            "text": "Hello world",
-        }
-
-        block = _message_to_bullet(msg)
-
-        assert block["type"] == "bulleted_list_item"
-        content = block["bulleted_list_item"]["rich_text"][0]["text"]["content"]
-        assert content == "[2024-01-15 10:30 UTC] alice@sentry.io: Hello world"
-
-    def test_truncates_long_messages(self):
-        msg = {
-            "author": "a@sentry.io",
-            "date_time": datetime(2024, 1, 1, tzinfo=UTC),
-            "text": "x" * 2100,
-        }
-
-        block = _message_to_bullet(msg)
-        content = block["bulleted_list_item"]["rich_text"][0]["text"]["content"]
-        assert len(content) <= 2000
-
-
-class TestCleanBlock:
-    def test_removes_archived_and_in_trash(self):
-        block = {
-            "id": "b1",
-            "type": "paragraph",
-            "archived": False,
-            "in_trash": False,
-            "paragraph": {"rich_text": []},
-        }
-
-        result = _clean_block(block)
-
-        assert "archived" not in result
-        assert "in_trash" not in result
-        assert result["id"] == "b1"
-        assert result["type"] == "paragraph"
-
-    def test_preserves_all_other_keys(self):
-        block = {
-            "id": "b1",
-            "type": "heading_1",
-            "created_time": "2024-01-01",
-            "heading_1": {"rich_text": [{"text": {"content": "Title"}}]},
-        }
-
-        result = _clean_block(block)
-
-        assert result == block
+        assert result is False
+        assert mock_patch.call_count == 2
 
 
 class TestApplyTemplate:
-    def _make_append_response(self, block_id: str, block_type: str = "paragraph") -> dict:
-        return {"results": [{"id": block_id, "type": block_type}]}
+    def test_new_page_sends_template_then_slack(self, notion):
+        with patch.object(notion, "_send_markdown", return_value=True) as mock_send:
+            notion.apply_template("page-id", messages=[], update_slack=False)
 
-    def test_skips_template_when_update_slack(self, notion):
-        notion.client.blocks.children.append.return_value = self._make_append_response(
-            "toggle-id", "toggle"
-        )
+        assert mock_send.call_count == 2
+        template_call, slack_call = mock_send.call_args_list
+        assert template_call.args[1] == "# Template\n\nSome content."
+        assert "<details>" in slack_call.args[1]
 
-        notion.apply_template(
-            "page-id", template=[{"type": "paragraph", "id": "t1", "paragraph": {}}],
-            template_children={}, messages=[], update_slack=True,
-        )
+    def test_update_slack_skips_template(self, notion):
+        with patch.object(notion, "_send_markdown", return_value=True) as mock_send:
+            notion.apply_template("page-id", messages=[], update_slack=True)
 
-        # Only the toggle append should happen, not the template block
-        assert notion.client.blocks.children.append.call_count == 1
-        args = notion.client.blocks.children.append.call_args
-        assert args.kwargs["children"][0]["type"] == "toggle"
+        assert mock_send.call_count == 1
+        assert "<details>" in mock_send.call_args.args[1]
 
-    def test_appends_template_blocks_one_at_a_time(self, notion):
-        notion.client.blocks.children.append.return_value = self._make_append_response(
-            "new-id", "paragraph"
-        )
+    def test_new_page_without_template_sends_only_slack(self):
+        svc = NotionService(integration_token="test-key", database_id="db-id")
+        svc.client = MagicMock()
 
-        template = [
-            {"id": "t1", "type": "paragraph", "paragraph": {"rich_text": []}},
-            {"id": "t2", "type": "heading_1", "heading_1": {"rich_text": []}},
-        ]
+        with patch.object(svc, "_send_markdown", return_value=True) as mock_send:
+            svc.apply_template("page-id", messages=[], update_slack=False)
 
-        notion.apply_template(
-            "page-id", template=template, template_children={}, messages=[], update_slack=False,
-        )
+        assert mock_send.call_count == 1
+        assert "<details>" in mock_send.call_args.args[1]
 
-        # 2 template blocks + 1 toggle = 3 calls
-        assert notion.client.blocks.children.append.call_count == 3
 
-    def test_appends_replies_as_children_of_parent_bullet(self, notion):
-        notion.client.blocks.children.append.side_effect = [
-            # toggle append
-            {"results": [{"id": "toggle-id", "type": "toggle"}]},
-            # batch of 1 message
-            {"results": [{"id": "bullet-id", "type": "bulleted_list_item"}]},
-            # replies append
-            {"results": [{"id": "reply-id", "type": "bulleted_list_item"}]},
-        ]
-
+class TestBuildSlackMarkdown:
+    def test_wraps_messages_in_toggle(self):
         messages = [
             {
                 "author": "a@sentry.io",
-                "date_time": datetime(2024, 1, 1, tzinfo=UTC),
+                "date_time": datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
+                "text": "Hello world",
+                "replies": [],
+            }
+        ]
+
+        md = _build_slack_markdown(messages)
+
+        assert md.startswith("<details>")
+        assert md.endswith("</details>")
+        assert "<summary>" in md
+        assert "- [2024-01-15 10:30 UTC] a@sentry.io: Hello world" in md
+
+    def test_indents_replies(self):
+        messages = [
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 15, 10, 30, tzinfo=UTC),
                 "text": "main",
                 "replies": [
                     {
                         "author": "b@sentry.io",
-                        "date_time": datetime(2024, 1, 1, 0, 1, tzinfo=UTC),
+                        "date_time": datetime(2024, 1, 15, 10, 31, tzinfo=UTC),
                         "text": "reply",
                     }
                 ],
             }
         ]
 
-        notion.apply_template(
-            "page-id", template=[], template_children={}, messages=messages, update_slack=True,
-        )
+        md = _build_slack_markdown(messages)
 
-        # Third call should append the reply to the bullet block ID
-        reply_call = notion.client.blocks.children.append.call_args_list[2]
-        assert reply_call.kwargs["block_id"] == "bullet-id"
+        lines = md.splitlines()
+        main_line = next(l for l in lines if "main" in l)
+        reply_line = next(l for l in lines if "reply" in l)
+        assert main_line.startswith("- ")
+        assert reply_line.startswith("  - ")
+
+    def test_empty_messages_produces_empty_toggle(self):
+        md = _build_slack_markdown([])
+
+        assert "<details>" in md
+        assert "</details>" in md
+        assert "- " not in md

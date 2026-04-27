@@ -40,7 +40,7 @@ def handle_dumpslack_command(
     notion = NotionService(
         integration_token=notion_config["INTEGRATION_TOKEN"],
         database_id=notion_config["DATABASE_ID"],
-        template_id=notion_config.get("TEMPLATE_ID", ""),
+        template_markdown=notion_config.get("TEMPLATE_MARKDOWN", ""),
     )
 
     existing_link = incident.external_links.filter(type=ExternalLinkType.NOTION).first()
@@ -50,8 +50,6 @@ def handle_dumpslack_command(
     )
 
     messages = _get_channel_messages(client, channel_id)
-    template_blocks: list[dict[str, Any]] = []
-    template_children: dict[str, list[dict[str, Any]]] = {}
 
     if existing_link:
         page_id = _extract_notion_page_id(existing_link.url)
@@ -61,12 +59,6 @@ def handle_dumpslack_command(
         page_url = existing_link.url
         update_slack = True
     else:
-        if notion.template_id:
-            try:
-                template_blocks, template_children = notion.get_template_blocks()
-            except Exception:
-                logger.exception("Failed to fetch Notion template blocks")
-
         base_url = settings.FIRETOWER_BASE_URL
         incident_url = f"{base_url}/{incident.incident_number}"
         captain_email = incident.captain.email if incident.captain else None
@@ -116,9 +108,7 @@ def handle_dumpslack_command(
     action = "Created" if not existing_link else "Updated"
 
     try:
-        notion.apply_template(
-            page_id, template_blocks, template_children, messages, update_slack=update_slack
-        )
+        notion.apply_template(page_id, messages, update_slack=update_slack)
     except Exception:
         logger.exception(
             "Failed to populate Notion page %s", page_id

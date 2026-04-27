@@ -31,4 +31,6 @@ app_key = ""
 # [notion]
 # integration_token = ""
 # database_id = ""
-# template_id = ""
+# template_markdown = """
+# # Your postmortem template in Markdown here
+# """

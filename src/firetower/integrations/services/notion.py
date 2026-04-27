@@ -3,12 +3,14 @@ import time
 from datetime import UTC, datetime
 from typing import Any, cast
 
+import httpx
 from notion_client import Client
 
 logger = logging.getLogger(__name__)
 
-_BLOCK_CHILD_LIMIT = 85  # Notion enforces a hard limit of 100; stay below for safety
-_NOTION_RICH_TEXT_LIMIT = 2000
+_NOTION_API_BASE = "https://api.notion.com/v1"
+# Markdown API requires a newer version than the library default.
+_MARKDOWN_NOTION_VERSION = "2026-03-11"
 
 # Module-level cache so the full user-list pagination (7+ pages for large workspaces)
 # only runs once per process rather than once per command invocation.
@@ -16,11 +18,13 @@ _users_cache: dict[str, dict[str, dict[str, str]]] = {}
 
 
 class NotionService:
-    def __init__(self, integration_token: str, database_id: str, template_id: str = "") -> None:
+    def __init__(
+        self, integration_token: str, database_id: str, template_markdown: str = ""
+    ) -> None:
         self.client: Client = Client(auth=integration_token)
         self._integration_token = integration_token
         self.database_id = database_id
-        self.template_id = template_id
+        self.template_markdown = template_markdown
         self._users: dict[str, dict[str, str]] | None = None
 
     def get_users(self) -> dict[str, dict[str, str]]:
@@ -70,34 +74,6 @@ class NotionService:
         self._users = users
         return users
 
-    def get_template_blocks(
-        self,
-    ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
-        if not self.template_id:
-            return [], {}
-
-        blocks = self._fetch_all_children(self.template_id)
-        children: dict[str, list[dict[str, Any]]] = {}
-        for block in blocks:
-            if block.get("has_children"):
-                children[block["id"]] = self._fetch_all_children(block["id"])
-        return blocks, children
-
-    def _fetch_all_children(self, block_id: str) -> list[dict[str, Any]]:
-        """Fetch all children of a block, handling pagination."""
-        results: list[dict[str, Any]] = []
-        start_cursor: str | None = None
-        while True:
-            kwargs: dict[str, Any] = {"block_id": block_id, "page_size": 100}
-            if start_cursor:
-                kwargs["start_cursor"] = start_cursor
-            response = cast(dict[str, Any], self.client.blocks.children.list(**kwargs))
-            results.extend(response.get("results", []))
-            start_cursor = response.get("next_cursor")
-            if not start_cursor:
-                break
-        return results
-
     def create_postmortem_page(
         self,
         incident_number: str,
@@ -142,161 +118,67 @@ class NotionService:
     def apply_template(
         self,
         page_id: str,
-        template: list[dict[str, Any]],
-        template_children: dict[str, list[dict[str, Any]]],
         messages: list[dict[str, Any]],
         update_slack: bool = False,
     ) -> None:
-        if not update_slack:
-            for block in template:
-                if block["type"] == "table":
-                    block_to_append: dict[str, Any] = _standard_postmortem_table()
-                else:
-                    block_to_append = _clean_block(block)
-                response = self._append_children(page_id, [block_to_append])
-                if block["type"] != "table" and block.get("id") in template_children:
-                    if response is None:
-                        logger.error(
-                            "Failed to append template block %s, skipping children",
-                            block.get("id"),
-                        )
-                        continue
-                    cleaned = [_clean_block(b) for b in template_children[block["id"]]]
-                    self._append_children(response["results"][0]["id"], cleaned)
+        if not update_slack and self.template_markdown:
+            self._send_markdown(page_id, self.template_markdown)
 
-        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-        toggle: dict[str, Any] = {
-            "type": "toggle",
-            "toggle": {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {
-                            "content": (
-                                f"Slack channel discussions as of {timestamp}. "
-                                "This should not be used in place of the Timeline."
-                            )
-                        },
-                    }
-                ],
-                "color": "default",
-                "children": [],
-            },
-        }
-        response = self._append_children(page_id, [toggle])
-        if response is None:
-            logger.error(
-                "Failed to append slack toggle to page %s, aborting slack dump", page_id
-            )
-            return
-        toggle_id = response["results"][0]["id"]
+        self._send_markdown(page_id, _build_slack_markdown(messages))
 
-        index = 0
-        while index < len(messages):
-            stopping_index, batch = _create_slack_content(messages, index)
-            response = self._append_children(toggle_id, batch)
-            if response is not None:
-                slack_index = index
-                notion_index = 0
-                while (
-                    slack_index < len(messages)
-                    and notion_index < len(response["results"])
-                ):
-                    slack_msg = messages[slack_index]
-                    if slack_msg.get("replies"):
-                        reply_blocks = [_message_to_bullet(r) for r in slack_msg["replies"]]
-                        self._append_children(
-                            response["results"][notion_index]["id"], reply_blocks
-                        )
-                    slack_index += 1
-                    notion_index += 1
-            index = stopping_index
-
-    def _append_children(
-        self,
-        block_id: str,
-        children: list[dict[str, Any]],
-        max_retries: int = 3,
-    ) -> dict[str, Any] | None:
+    def _send_markdown(self, page_id: str, content: str, max_retries: int = 3) -> bool:
         for attempt in range(max_retries):
             try:
-                return cast(
-                    dict[str, Any],
-                    self.client.blocks.children.append(
-                        block_id=block_id, children=children
-                    ),
+                response = httpx.patch(
+                    f"{_NOTION_API_BASE}/pages/{page_id}/markdown",
+                    headers={
+                        "Authorization": f"Bearer {self._integration_token}",
+                        "Notion-Version": _MARKDOWN_NOTION_VERSION,
+                    },
+                    json={"type": "insert_content", "insert_content": {"content": content}},
+                    timeout=60.0,
                 )
+                response.raise_for_status()
+                return True
             except Exception as exc:
+                if attempt == max_retries - 1:
+                    logger.error(
+                        "Max retries reached sending markdown to Notion page %s", page_id
+                    )
+                    return False
                 wait = 2**attempt
                 logger.warning(
-                    "Notion append failed (attempt %d/%d): %s. Retrying in %ds.",
+                    "Notion markdown send failed (attempt %d/%d): %s. Retrying in %ds.",
                     attempt + 1,
                     max_retries,
                     exc,
                     wait,
                 )
                 time.sleep(wait)
-        logger.error(
-            "Max retries reached appending children to Notion block %s", block_id
-        )
-        return None
+        return False
 
 
-def _clean_block(block: dict[str, Any]) -> dict[str, Any]:
-    return {k: v for k, v in block.items() if k not in ("archived", "in_trash")}
-
-
-def _create_slack_content(
-    messages: list[dict[str, Any]], starting_index: int
-) -> tuple[int, list[dict[str, Any]]]:
-    bullets: list[dict[str, Any]] = []
-    index = starting_index
-    while index < len(messages) and len(bullets) < _BLOCK_CHILD_LIMIT:
-        bullets.append(_message_to_bullet(messages[index]))
-        index += 1
-    return index, bullets
-
-
-def _message_to_bullet(msg: dict[str, Any]) -> dict[str, Any]:
-    dt: datetime = msg["date_time"]
-    author = msg.get("author") or "unknown"
-    text = msg.get("text") or ""
-    content = f"[{dt.strftime('%Y-%m-%d %H:%M UTC')}] {author}: {text}"[
-        :_NOTION_RICH_TEXT_LIMIT
+def _build_slack_markdown(messages: list[dict[str, Any]]) -> str:
+    timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+    lines = [
+        "<details>",
+        (
+            f"<summary>Slack channel discussions as of {timestamp}. "
+            "This should not be used in place of the Timeline.</summary>"
+        ),
+        "",
     ]
-    return {
-        "type": "bulleted_list_item",
-        "bulleted_list_item": {
-            "rich_text": [{"type": "text", "text": {"content": content}}]
-        },
-    }
-
-
-def _standard_postmortem_table() -> dict[str, Any]:
-    headers = [
-        "Priority",
-        "Description",
-        "Improvement/Prevention",
-        "Owner",
-        "Ticket URL",
-    ]
-    return {
-        "type": "table",
-        "table": {
-            "table_width": 5,
-            "has_column_header": True,
-            "has_row_header": False,
-            "children": [
-                {
-                    "type": "table_row",
-                    "table_row": {
-                        "cells": [
-                            [{"type": "text", "text": {"content": h}}] for h in headers
-                        ]
-                    },
-                },
-                {"type": "table_row", "table_row": {"cells": [[], [], [], [], []]}},
-                {"type": "table_row", "table_row": {"cells": [[], [], [], [], []]}},
-            ],
-        },
-    }
+    for msg in messages:
+        dt: datetime = msg["date_time"]
+        author = msg.get("author") or "unknown"
+        text = msg.get("text") or ""
+        lines.append(f"- [{dt.strftime('%Y-%m-%d %H:%M UTC')}] {author}: {text}")
+        for reply in msg.get("replies", []):
+            r_dt: datetime = reply["date_time"]
+            r_author = reply.get("author") or "unknown"
+            r_text = reply.get("text") or ""
+            lines.append(
+                f"  - [{r_dt.strftime('%Y-%m-%d %H:%M UTC')}] {r_author}: {r_text}"
+            )
+    lines.extend(["", "</details>"])
+    return "\n".join(lines)
