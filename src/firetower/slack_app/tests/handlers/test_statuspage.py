@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -290,6 +291,7 @@ class TestStatuspageSubmission:
         impact="major",
         channel_id=CHANNEL_ID,
         components=None,
+        component_names=None,
     ):
         values: dict = {
             "status_block": {
@@ -318,7 +320,12 @@ class TestStatuspageSubmission:
                 }
         return {
             "state": {"values": values},
-            "private_metadata": channel_id,
+            "private_metadata": json.dumps(
+                {
+                    "channel_id": channel_id,
+                    "component_names": component_names or {},
+                }
+            ),
         }
 
     def test_creates_new_statuspage_incident(self, incident):

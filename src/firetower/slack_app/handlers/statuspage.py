@@ -153,6 +153,7 @@ def _build_statuspage_modal(
             }
         )
 
+    component_names: dict[str, str] = {}
     service = StatuspageService()
     if service.configured:
         try:
@@ -180,6 +181,7 @@ def _build_statuspage_modal(
             if non_parents:
                 blocks.append({"type": "divider"})
             for component in non_parents:
+                component_names[component["id"]] = component["name"]
                 current_impact = affected_components.get(component["id"], "operational")
                 initial_component_option = next(
                     (
@@ -220,6 +222,7 @@ def _build_statuspage_modal(
                     key=lambda x: x.get("position", 0),
                 )
                 for child in children:
+                    component_names[child["id"]] = child["name"]
                     current_impact = affected_components.get(child["id"], "operational")
                     initial_component_option = next(
                         (
@@ -243,10 +246,13 @@ def _build_statuspage_modal(
                         }
                     )
 
+    private_metadata = json.dumps(
+        {"channel_id": channel_id, "component_names": component_names}
+    )
     return {
         "type": "modal",
         "callback_id": "statuspage_modal",
-        "private_metadata": channel_id,
+        "private_metadata": private_metadata,
         "title": {
             "type": "plain_text",
             "text": "Update Statuspage" if is_update else "New Statuspage Post",
@@ -320,7 +326,9 @@ def handle_statuspage_command(
 
 def _extract_submission_data(view: dict) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
-    channel_id = view.get("private_metadata", "")
+    metadata = json.loads(view.get("private_metadata", "{}"))
+    channel_id = metadata.get("channel_id", "")
+    component_names = metadata.get("component_names", {})
 
     status = (
         values.get("status_block", {})
@@ -355,6 +363,7 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
         "message": message,
         "impact": impact,
         "components": components,
+        "component_names": component_names,
     }
 
 
@@ -515,17 +524,9 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
             if status != "operational"
         ]
         if non_operational:
-            service = StatuspageService()
-            try:
-                top_level, children_map = service.get_components()
-            except requests.RequestException:
-                top_level, children_map = [], {}
-            all_components = {c["id"]: c["name"] for c in top_level}
-            for children in children_map.values():
-                for c in children:
-                    all_components[c["id"]] = c["name"]
+            component_names = data["component_names"]
             labeled = [
-                (all_components.get(cid, cid), status)
+                (component_names.get(cid, cid), status)
                 for cid, status in non_operational
             ]
             ack(
