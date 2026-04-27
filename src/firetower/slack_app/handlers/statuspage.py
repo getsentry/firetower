@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 import requests
+from django.db import transaction
 
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.integrations.services.statuspage import (
@@ -425,51 +426,54 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
         return False
 
     try:
-        statuspage_link, created = ExternalLink.objects.get_or_create(
-            incident=incident,
-            type=ExternalLinkType.STATUSPAGE,
-            defaults={"url": ""},
-        )
-
-        if not created and statuspage_link.url:
-            sp_id = service.extract_incident_id_from_url(statuspage_link.url)
-            if not sp_id:
-                client.chat_postMessage(
-                    channel=channel_id,
-                    text="Could not determine the existing statuspage incident ID.",
+        with transaction.atomic():
+            statuspage_link, created = (
+                ExternalLink.objects.select_for_update().get_or_create(
+                    incident=incident,
+                    type=ExternalLinkType.STATUSPAGE,
+                    defaults={"url": ""},
                 )
-                return False
-            result = service.update_incident(
-                incident_id=sp_id,
-                status=status,
-                message=message,
-                components=components or None,
             )
-            statuspage_url = service.get_incident_url(result["id"])
-            client.chat_postMessage(
-                channel=channel_id,
-                text=f"Statuspage has been updated: {statuspage_url}",
-            )
-        else:
-            try:
-                result = service.create_incident(
-                    title=title,
+
+            if not created and statuspage_link.url:
+                sp_id = service.extract_incident_id_from_url(statuspage_link.url)
+                if not sp_id:
+                    client.chat_postMessage(
+                        channel=channel_id,
+                        text="Could not determine the existing statuspage incident ID.",
+                    )
+                    return False
+                result = service.update_incident(
+                    incident_id=sp_id,
                     status=status,
                     message=message,
-                    impact=impact,
                     components=components or None,
                 )
                 statuspage_url = service.get_incident_url(result["id"])
-                statuspage_link.url = statuspage_url
-                statuspage_link.save(update_fields=["url"])
-            except Exception:
-                if created or not statuspage_link.url:
-                    statuspage_link.delete()
-                raise
-            client.chat_postMessage(
-                channel=channel_id,
-                text=f"Statuspage post created: {statuspage_url}",
-            )
+                client.chat_postMessage(
+                    channel=channel_id,
+                    text=f"Statuspage has been updated: {statuspage_url}",
+                )
+            else:
+                try:
+                    result = service.create_incident(
+                        title=title,
+                        status=status,
+                        message=message,
+                        impact=impact,
+                        components=components or None,
+                    )
+                    statuspage_url = service.get_incident_url(result["id"])
+                    statuspage_link.url = statuspage_url
+                    statuspage_link.save(update_fields=["url"])
+                except Exception:
+                    if created or not statuspage_link.url:
+                        statuspage_link.delete()
+                    raise
+                client.chat_postMessage(
+                    channel=channel_id,
+                    text=f"Statuspage post created: {statuspage_url}",
+                )
     except Exception:
         logger.exception("Failed to create/update statuspage incident")
         client.chat_postMessage(
