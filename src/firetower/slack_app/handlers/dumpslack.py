@@ -1,6 +1,5 @@
 import logging
 import re
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any
 
@@ -50,28 +49,23 @@ def handle_dumpslack_command(
         "Fetching Slack history and generating postmortem doc, this may take a moment..."
     )
 
+    messages = _get_channel_messages(client, channel_id)
+    template_blocks: list[dict[str, Any]] = []
+    template_children: dict[str, list[dict[str, Any]]] = {}
+
     if existing_link:
         page_id = _extract_notion_page_id(existing_link.url)
         if not page_id:
             respond("Could not parse existing Notion page ID from stored URL.")
             return
         page_url = existing_link.url
-        messages = _get_channel_messages(client, channel_id)
+        update_slack = True
     else:
-        # Fetch template blocks and Slack messages in parallel before creating the page.
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            messages_future = pool.submit(_get_channel_messages, client, channel_id)
-            template_future = (
-                pool.submit(notion.get_template_blocks) if notion.template_id else None
-            )
-            messages = messages_future.result()
+        if notion.template_id:
             try:
-                template_blocks, template_children = (
-                    template_future.result() if template_future else ([], {})
-                )
+                template_blocks, template_children = notion.get_template_blocks()
             except Exception:
                 logger.exception("Failed to fetch Notion template blocks")
-                template_blocks, template_children = [], {}
 
         base_url = settings.FIRETOWER_BASE_URL
         incident_url = f"{base_url}/{incident.incident_number}"
@@ -85,8 +79,6 @@ def handle_dumpslack_command(
                 incident_date=incident.created_at,
                 severity=incident.severity,
                 captain_email=captain_email,
-                template_blocks=template_blocks,
-                template_children=template_children,
             )
         except Exception:
             logger.exception(
@@ -98,6 +90,7 @@ def handle_dumpslack_command(
 
         page_id = page["id"]
         page_url = page["url"]
+        update_slack = False
 
         try:
             ExternalLink.objects.update_or_create(
@@ -123,11 +116,15 @@ def handle_dumpslack_command(
     action = "Created" if not existing_link else "Updated"
 
     try:
-        notion.dump_slack_messages(page_id, messages)
+        notion.apply_template(
+            page_id, template_blocks, template_children, messages, update_slack=update_slack
+        )
     except Exception:
-        logger.exception("Failed to dump Slack messages to Notion page %s", page_id)
+        logger.exception(
+            "Failed to populate Notion page %s", page_id
+        )
         respond(
-            f"Postmortem doc {action.lower()} but Slack dump failed. Check: {page_url}"
+            f"Postmortem doc {action.lower()} but content dump failed. Check: {page_url}"
         )
         return
 
@@ -135,11 +132,6 @@ def handle_dumpslack_command(
 
 
 def _build_user_email_cache(client: Any) -> dict[str, str]:
-    """Batch-fetch all workspace users and return a slack_user_id -> email mapping.
-
-    One users.list call (paginated) instead of one users_info call per unique
-    author avoids N sequential API calls on channels with many participants.
-    """
     cache: dict[str, str] = {}
     cursor: str | None = None
 
@@ -169,7 +161,6 @@ def _build_user_email_cache(client: Any) -> dict[str, str]:
 
 
 def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
-    """Fetch up to 1000 channel messages with thread replies, excluding bots and system events."""
     try:
         response = client.conversations_history(channel=channel_id, limit=1000)
     except Exception:
@@ -185,7 +176,6 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
     def resolve_email(slack_user_id: str) -> str:
         if slack_user_id in email_cache:
             return email_cache[slack_user_id]
-        # User not in the bulk list; fall back to individual lookup.
         try:
             info = client.users_info(user=slack_user_id)
             email = info["user"].get("profile", {}).get("email") or slack_user_id
@@ -239,12 +229,11 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
             }
         )
 
-    content.reverse()  # chronological order
+    content.reverse()
     return content
 
 
 def _extract_notion_page_id(notion_url: str) -> str | None:
-    """Extract UUID from a Notion page URL (with or without hyphens)."""
     match = re.search(
         r"([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})(?:\?|$)",
         notion_url.lower(),

@@ -1,17 +1,14 @@
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any, cast
 
 from notion_client import Client
-from notion_client.errors import APIResponseError
 
 logger = logging.getLogger(__name__)
 
-_BLOCK_CHILD_LIMIT = 85  # Notion enforces 100; stay below for safety
-_NOTION_PAGE_CREATE_LIMIT = 100  # max children in pages.create
-_TEMPLATE_FETCH_WORKERS = 3  # stay comfortably under Notion's 3 req/s rate limit
+_BLOCK_CHILD_LIMIT = 85  # Notion enforces a hard limit of 100; stay below for safety
+_NOTION_RICH_TEXT_LIMIT = 2000
 
 
 class NotionService:
@@ -49,25 +46,14 @@ class NotionService:
     def get_template_blocks(
         self,
     ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
-        """Fetch template blocks one level deep, parallelizing child requests."""
         if not self.template_id:
             return [], {}
 
         blocks = self._fetch_all_children(self.template_id)
-
-        blocks_with_children = [b for b in blocks if b.get("has_children")]
         children: dict[str, list[dict[str, Any]]] = {}
-
-        if blocks_with_children:
-
-            def _fetch_children(
-                block: dict[str, Any],
-            ) -> tuple[str, list[dict[str, Any]]]:
-                return block["id"], self._fetch_all_children(block["id"])
-
-            with ThreadPoolExecutor(max_workers=_TEMPLATE_FETCH_WORKERS) as pool:
-                children = dict(pool.map(_fetch_children, blocks_with_children))
-
+        for block in blocks:
+            if block.get("has_children"):
+                children[block["id"]] = self._fetch_all_children(block["id"])
         return blocks, children
 
     def _fetch_all_children(self, block_id: str) -> list[dict[str, Any]]:
@@ -93,10 +79,7 @@ class NotionService:
         incident_date: datetime,
         severity: str | None = None,
         captain_email: str | None = None,
-        template_blocks: list[dict[str, Any]] | None = None,
-        template_children: dict[str, list[dict[str, Any]]] | None = None,
     ) -> dict[str, Any]:
-        """Create postmortem page, optionally embedding template blocks in the same API call."""
         properties: dict[str, Any] = {
             "Name": {
                 "title": [
@@ -120,33 +103,40 @@ class NotionService:
                     "people": [{"object": "user", "id": notion_user["id"]}]
                 }
 
-        create_kwargs: dict[str, Any] = {
-            "parent": {"database_id": self.database_id},
-            "properties": properties,
-        }
-
-        overflow: list[dict[str, Any]] = []
-        if template_blocks:
-            all_blocks = _build_appendable_blocks(
-                template_blocks, template_children or {}
-            )
-            create_kwargs["children"] = all_blocks[:_NOTION_PAGE_CREATE_LIMIT]
-            overflow = all_blocks[_NOTION_PAGE_CREATE_LIMIT:]
-
         logger.debug("Creating Notion page with database_id=%r", self.database_id)
-        page = cast(dict[str, Any], self.client.pages.create(**create_kwargs))
+        return cast(
+            dict[str, Any],
+            self.client.pages.create(
+                parent={"database_id": self.database_id},
+                properties=properties,
+            ),
+        )
 
-        if overflow:
-            self._append_children(page["id"], overflow)
-
-        return page
-
-    def dump_slack_messages(
+    def apply_template(
         self,
         page_id: str,
+        template: list[dict[str, Any]],
+        template_children: dict[str, list[dict[str, Any]]],
         messages: list[dict[str, Any]],
+        update_slack: bool = False,
     ) -> None:
-        """Append a collapsible Slack discussion section to the page."""
+        if not update_slack:
+            for block in template:
+                if block["type"] == "table":
+                    block_to_append: dict[str, Any] = _standard_postmortem_table()
+                else:
+                    block_to_append = _clean_block(block)
+                response = self._append_children(page_id, [block_to_append])
+                if block["type"] != "table" and block.get("id") in template_children:
+                    if response is None:
+                        logger.error(
+                            "Failed to append template block %s, skipping children",
+                            block.get("id"),
+                        )
+                        continue
+                    cleaned = [_clean_block(b) for b in template_children[block["id"]]]
+                    self._append_children(response["results"][0]["id"], cleaned)
+
         timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         toggle: dict[str, Any] = {
             "type": "toggle",
@@ -166,30 +156,34 @@ class NotionService:
                 "children": [],
             },
         }
-
         response = self._append_children(page_id, [toggle])
-        if not response:
-            return
-
-        toggle_id = next(
-            (b["id"] for b in response.get("results", []) if b.get("type") == "toggle"),
-            None,
-        )
-        if not toggle_id:
-            logger.error("Could not find created toggle block ID")
-            return
-
-        message_blocks: list[dict[str, Any]] = []
-        for msg in messages:
-            message_blocks.append(_message_to_bullet(msg))
-            message_blocks.extend(_message_to_bullet(r) for r in msg.get("replies", []))
-
-        idx = 0
-        while idx < len(message_blocks):
-            self._append_children(
-                toggle_id, message_blocks[idx : idx + _BLOCK_CHILD_LIMIT]
+        if response is None:
+            logger.error(
+                "Failed to append slack toggle to page %s, aborting slack dump", page_id
             )
-            idx += _BLOCK_CHILD_LIMIT
+            return
+        toggle_id = response["results"][0]["id"]
+
+        index = 0
+        while index < len(messages):
+            stopping_index, batch = _create_slack_content(messages, index)
+            response = self._append_children(toggle_id, batch)
+            if response is not None:
+                slack_index = index
+                notion_index = 0
+                while (
+                    slack_index < len(messages)
+                    and notion_index < len(response["results"])
+                ):
+                    slack_msg = messages[slack_index]
+                    if slack_msg.get("replies"):
+                        reply_blocks = [_message_to_bullet(r) for r in slack_msg["replies"]]
+                        self._append_children(
+                            response["results"][notion_index]["id"], reply_blocks
+                        )
+                    slack_index += 1
+                    notion_index += 1
+            index = stopping_index
 
     def _append_children(
         self,
@@ -199,28 +193,12 @@ class NotionService:
     ) -> dict[str, Any] | None:
         for attempt in range(max_retries):
             try:
-                result = cast(
+                return cast(
                     dict[str, Any],
                     self.client.blocks.children.append(
                         block_id=block_id, children=children
                     ),
                 )
-                return result
-            except APIResponseError as exc:
-                if exc.status == 404:
-                    logger.error(
-                        "Notion block %s not found, skipping append", block_id
-                    )
-                    return None
-                wait = 2**attempt
-                logger.warning(
-                    "Notion append failed (attempt %d/%d): %s. Retrying in %ds.",
-                    attempt + 1,
-                    max_retries,
-                    exc,
-                    wait,
-                )
-                time.sleep(wait)
             except Exception as exc:
                 wait = 2**attempt
                 logger.warning(
@@ -231,48 +209,31 @@ class NotionService:
                     wait,
                 )
                 time.sleep(wait)
-
         logger.error(
             "Max retries reached appending children to Notion block %s", block_id
         )
         return None
 
 
-def _build_appendable_blocks(
-    template_blocks: list[dict[str, Any]],
-    template_children: dict[str, list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
-    """Convert template blocks into the stripped form required by the Notion append API."""
-    result: list[dict[str, Any]] = []
-    for block in template_blocks:
-        block_type = block["type"]
-        if block_type == "table":
-            # The Notion API cannot duplicate tables directly; use a hardcoded postmortem schema.
-            result.append(_standard_postmortem_table())
-        else:
-            stripped = _strip_block(block)
-            if block["id"] in template_children:
-                stripped[block_type]["children"] = [
-                    _strip_block(c) for c in template_children[block["id"]]
-                ]
-            result.append(stripped)
-    return result
+def _clean_block(block: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in block.items() if k not in ("archived", "in_trash")}
 
 
-def _strip_block(block: dict[str, Any]) -> dict[str, Any]:
-    """Return only the type key and its content dict, dropping all metadata."""
-    block_type = block["type"]
-    return {"type": block_type, block_type: block[block_type]}
-
-
-_NOTION_RICH_TEXT_LIMIT = 2000
+def _create_slack_content(
+    messages: list[dict[str, Any]], starting_index: int
+) -> tuple[int, list[dict[str, Any]]]:
+    bullets: list[dict[str, Any]] = []
+    index = starting_index
+    while index < len(messages) and len(bullets) < _BLOCK_CHILD_LIMIT:
+        bullets.append(_message_to_bullet(messages[index]))
+        index += 1
+    return index, bullets
 
 
 def _message_to_bullet(msg: dict[str, Any]) -> dict[str, Any]:
     dt: datetime = msg["date_time"]
     author = msg.get("author") or "unknown"
     text = msg.get("text") or ""
-    # Truncate the full content string — the prefix adds ~40 chars before the message text.
     content = f"[{dt.strftime('%Y-%m-%d %H:%M UTC')}] {author}: {text}"[
         :_NOTION_RICH_TEXT_LIMIT
     ]
@@ -285,7 +246,6 @@ def _message_to_bullet(msg: dict[str, Any]) -> dict[str, Any]:
 
 
 def _standard_postmortem_table() -> dict[str, Any]:
-    """Five-column action items table used in standard postmortem docs."""
     headers = [
         "Priority",
         "Description",

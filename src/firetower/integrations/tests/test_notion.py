@@ -1,13 +1,12 @@
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from firetower.integrations.services.notion import (
     NotionService,
-    _build_appendable_blocks,
+    _clean_block,
     _message_to_bullet,
-    _strip_block,
 )
 
 
@@ -113,6 +112,20 @@ class TestAppendChildren:
         assert result == {"results": []}
         assert notion.client.blocks.children.append.call_count == 2
 
+    def test_retries_on_404(self, notion):
+        notion.client.blocks.children.append.side_effect = [
+            Exception("object_not_found"),
+            {"results": []},
+        ]
+
+        with patch("firetower.integrations.services.notion.time.sleep"):
+            result = notion._append_children(
+                "block-id", [{"type": "paragraph"}], max_retries=2
+            )
+
+        assert result == {"results": []}
+        assert notion.client.blocks.children.append.call_count == 2
+
     def test_returns_none_after_max_retries(self, notion):
         notion.client.blocks.children.append.side_effect = Exception("always fails")
 
@@ -151,82 +164,101 @@ class TestMessageToBullet:
         assert len(content) <= 2000
 
 
-class TestBuildAppendableBlocks:
-    def test_strips_metadata_from_blocks(self):
-        blocks = [
-            {
-                "id": "b1",
-                "type": "paragraph",
-                "created_time": "2024-01-01",
-                "paragraph": {"rich_text": [{"text": {"content": "hello"}}]},
-                "has_children": False,
-            }
-        ]
-
-        result = _build_appendable_blocks(blocks, {})
-
-        assert result == [
-            {
-                "type": "paragraph",
-                "paragraph": {"rich_text": [{"text": {"content": "hello"}}]},
-            }
-        ]
-
-    def test_inlines_children_for_blocks_with_children(self):
-        blocks = [
-            {
-                "id": "b1",
-                "type": "toggle",
-                "toggle": {"rich_text": []},
-                "has_children": True,
-            }
-        ]
-        children = {
-            "b1": [
-                {
-                    "id": "c1",
-                    "type": "paragraph",
-                    "paragraph": {"rich_text": []},
-                    "has_children": False,
-                }
-            ]
+class TestCleanBlock:
+    def test_removes_archived_and_in_trash(self):
+        block = {
+            "id": "b1",
+            "type": "paragraph",
+            "archived": False,
+            "in_trash": False,
+            "paragraph": {"rich_text": []},
         }
 
-        result = _build_appendable_blocks(blocks, children)
+        result = _clean_block(block)
 
-        assert result[0]["toggle"]["children"] == [
-            {"type": "paragraph", "paragraph": {"rich_text": []}}
-        ]
+        assert "archived" not in result
+        assert "in_trash" not in result
+        assert result["id"] == "b1"
+        assert result["type"] == "paragraph"
 
-    def test_replaces_table_blocks_with_standard_schema(self):
-        blocks = [
-            {
-                "id": "t1",
-                "type": "table",
-                "table": {"table_width": 3},
-                "has_children": True,
-            }
-        ]
-
-        result = _build_appendable_blocks(blocks, {})
-
-        assert result[0]["type"] == "table"
-        assert result[0]["table"]["table_width"] == 5
-        assert result[0]["table"]["has_column_header"] is True
-
-
-class TestStripBlock:
-    def test_removes_metadata_keys(self):
+    def test_preserves_all_other_keys(self):
         block = {
-            "id": "abc",
+            "id": "b1",
             "type": "heading_1",
             "created_time": "2024-01-01",
             "heading_1": {"rich_text": [{"text": {"content": "Title"}}]},
         }
 
-        result = _strip_block(block)
+        result = _clean_block(block)
 
-        assert result == {
-            "type": "heading_1",
-            "heading_1": {"rich_text": [{"text": {"content": "Title"}}]},
-        }
+        assert result == block
+
+
+class TestApplyTemplate:
+    def _make_append_response(self, block_id: str, block_type: str = "paragraph") -> dict:
+        return {"results": [{"id": block_id, "type": block_type}]}
+
+    def test_skips_template_when_update_slack(self, notion):
+        notion.client.blocks.children.append.return_value = self._make_append_response(
+            "toggle-id", "toggle"
+        )
+
+        notion.apply_template(
+            "page-id", template=[{"type": "paragraph", "id": "t1", "paragraph": {}}],
+            template_children={}, messages=[], update_slack=True,
+        )
+
+        # Only the toggle append should happen, not the template block
+        assert notion.client.blocks.children.append.call_count == 1
+        args = notion.client.blocks.children.append.call_args
+        assert args.kwargs["children"][0]["type"] == "toggle"
+
+    def test_appends_template_blocks_one_at_a_time(self, notion):
+        notion.client.blocks.children.append.return_value = self._make_append_response(
+            "new-id", "paragraph"
+        )
+
+        template = [
+            {"id": "t1", "type": "paragraph", "paragraph": {"rich_text": []}},
+            {"id": "t2", "type": "heading_1", "heading_1": {"rich_text": []}},
+        ]
+
+        notion.apply_template(
+            "page-id", template=template, template_children={}, messages=[], update_slack=False,
+        )
+
+        # 2 template blocks + 1 toggle = 3 calls
+        assert notion.client.blocks.children.append.call_count == 3
+
+    def test_appends_replies_as_children_of_parent_bullet(self, notion):
+        notion.client.blocks.children.append.side_effect = [
+            # toggle append
+            {"results": [{"id": "toggle-id", "type": "toggle"}]},
+            # batch of 1 message
+            {"results": [{"id": "bullet-id", "type": "bulleted_list_item"}]},
+            # replies append
+            {"results": [{"id": "reply-id", "type": "bulleted_list_item"}]},
+        ]
+
+        messages = [
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 1, tzinfo=UTC),
+                "text": "main",
+                "replies": [
+                    {
+                        "author": "b@sentry.io",
+                        "date_time": datetime(2024, 1, 1, 0, 1, tzinfo=UTC),
+                        "text": "reply",
+                    }
+                ],
+            }
+        ]
+
+        notion.apply_template(
+            "page-id", template=[], template_children={}, messages=messages, update_slack=True,
+        )
+
+        # Third call should append the reply to the bullet block ID
+        reply_call = notion.client.blocks.children.append.call_args_list[2]
+        assert reply_call.kwargs["block_id"] == "bullet-id"
