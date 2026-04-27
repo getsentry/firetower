@@ -11,6 +11,7 @@ from firetower.slack_app.handlers.statuspage import (
     handle_statuspage_command,
     handle_statuspage_confirm_resolve,
     handle_statuspage_reset_and_resolve,
+    handle_statuspage_resolve_anyway,
     handle_statuspage_submission,
 )
 
@@ -577,6 +578,76 @@ class TestStatuspageResetAndResolve:
             patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
         ):
             handle_statuspage_reset_and_resolve(ack, body, client)
+
+        update_kwargs = mock_app.return_value.client.views_update.call_args[1]
+        assert update_kwargs["view"]["clear_on_close"] is True
+        section_text = update_kwargs["view"]["blocks"][0]["text"]["text"]
+        assert "went wrong" in section_text
+
+
+class TestStatuspageResolveAnyway:
+    def _make_body(self, data: dict) -> dict:
+        return {
+            "view": {
+                "id": "V_WARNING",
+                "private_metadata": json.dumps(data),
+            }
+        }
+
+    def test_processes_submission_and_shows_success(self):
+        data = {
+            "channel_id": CHANNEL_ID,
+            "status": "resolved",
+            "title": "Outage",
+            "message": "Resolved",
+            "impact": "major",
+            "components": {"c1": "major_outage", "c2": "degraded_performance"},
+            "component_names": {"c1": "API", "c2": "Web"},
+        }
+        ack = MagicMock()
+        body = self._make_body(data)
+        client = MagicMock()
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.statuspage._process_statuspage_submission",
+                return_value=True,
+            ) as mock_process,
+            patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
+        ):
+            handle_statuspage_resolve_anyway(ack, body, client)
+
+        ack.assert_called_once_with()
+        mock_process.assert_called_once_with(data, client)
+        mock_app.return_value.client.views_update.assert_called_once()
+        update_kwargs = mock_app.return_value.client.views_update.call_args[1]
+        assert update_kwargs["view_id"] == "V_WARNING"
+        assert update_kwargs["view"]["clear_on_close"] is True
+        section_text = update_kwargs["view"]["blocks"][0]["text"]["text"]
+        assert "resolved" in section_text
+
+    def test_failure_shows_failure_message(self):
+        data = {
+            "channel_id": CHANNEL_ID,
+            "status": "resolved",
+            "title": "Outage",
+            "message": "Resolved",
+            "impact": "major",
+            "components": {"c1": "major_outage"},
+            "component_names": {"c1": "API"},
+        }
+        ack = MagicMock()
+        body = self._make_body(data)
+        client = MagicMock()
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.statuspage._process_statuspage_submission",
+                return_value=False,
+            ),
+            patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
+        ):
+            handle_statuspage_resolve_anyway(ack, body, client)
 
         update_kwargs = mock_app.return_value.client.views_update.call_args[1]
         assert update_kwargs["view"]["clear_on_close"] is True
