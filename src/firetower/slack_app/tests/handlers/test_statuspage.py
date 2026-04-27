@@ -534,7 +534,7 @@ class TestStatuspageSubmission:
         assert len(actions_blocks) == 2
 
         second_button = actions_blocks[1]["elements"][0]
-        assert second_button["text"]["text"] == "Resolve Without Updating Components"
+        assert second_button["text"]["text"] == "Resolve & Keep Current Statuses"
         assert second_button["style"] == "danger"
 
         client.chat_postMessage.assert_not_called()

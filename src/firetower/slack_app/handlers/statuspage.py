@@ -399,7 +399,7 @@ def _build_component_warning_modal(
                     "action_id": "statuspage_resolve_anyway",
                     "text": {
                         "type": "plain_text",
-                        "text": "Resolve Without Updating Components",
+                        "text": "Resolve & Keep Current Statuses",
                     },
                     "style": "danger",
                 },
