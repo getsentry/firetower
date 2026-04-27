@@ -619,12 +619,18 @@ class TestStatuspageResolveAnyway:
 
         ack.assert_called_once_with()
         mock_process.assert_called_once_with(data, client)
+        passed_data = mock_process.call_args[0][0]
+        assert passed_data["components"] == {
+            "c1": "major_outage",
+            "c2": "degraded_performance",
+        }
         mock_app.return_value.client.views_update.assert_called_once()
         update_kwargs = mock_app.return_value.client.views_update.call_args[1]
         assert update_kwargs["view_id"] == "V_WARNING"
         assert update_kwargs["view"]["clear_on_close"] is True
         section_text = update_kwargs["view"]["blocks"][0]["text"]["text"]
-        assert "resolved" in section_text
+        assert ":white_check_mark:" in section_text
+        assert "left as-is" in section_text
 
     def test_failure_shows_failure_message(self):
         data = {

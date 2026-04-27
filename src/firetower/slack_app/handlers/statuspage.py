@@ -571,7 +571,7 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
     _process_statuspage_submission(data, client)
 
 
-# Retained for in-flight modals from before the action-button migration; safe to remove after one deploy cycle.
+# Retained for in-flight modals opened before the action-button migration; remove after 2026-05-04.
 def handle_statuspage_confirm_resolve(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
@@ -621,7 +621,9 @@ def handle_statuspage_resolve_anyway(ack: Any, body: dict, client: Any) -> None:
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
     if success:
-        message = ":white_check_mark: Statuspage resolved."
+        message = (
+            ":white_check_mark: Statuspage resolved (component statuses left as-is)."
+        )
     else:
         message = ":x: Something went wrong — check the incident channel for details."
     get_bolt_app().client.views_update(
