@@ -119,7 +119,7 @@ def handle_dumpslack_command(
         )
         return
 
-    respond(f"{action} postmortem doc: {page_url}")
+    client.chat_postMessage(channel=channel_id, text=f"{action} postmortem doc: {page_url}")
 
 
 def _build_user_email_cache(client: Any) -> dict[str, str]:
