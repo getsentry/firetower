@@ -87,6 +87,17 @@ def handle_dumpslack_command(
         page_url = page["url"]
         update_slack = False
 
+        try:
+            ExternalLink.objects.update_or_create(
+                incident=incident,
+                type=ExternalLinkType.NOTION,
+                defaults={"url": page_url},
+            )
+        except Exception:
+            logger.exception(
+                "Failed to store Notion link on incident %s", incident.incident_number
+            )
+
     action = "Created" if not existing_link else "Updated"
 
     try:
@@ -99,17 +110,6 @@ def handle_dumpslack_command(
         return
 
     if not existing_link:
-        try:
-            ExternalLink.objects.update_or_create(
-                incident=incident,
-                type=ExternalLinkType.NOTION,
-                defaults={"url": page_url},
-            )
-        except Exception:
-            logger.exception(
-                "Failed to store Notion link on incident %s", incident.incident_number
-            )
-
         try:
             client.bookmarks_add(
                 channel_id=channel_id,
