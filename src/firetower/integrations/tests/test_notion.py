@@ -535,3 +535,33 @@ class TestApplyTemplate:
         assert any("block IDs" in msg for msg in warning_args)
         # Only bullet-1's reply is appended; msg2's reply is skipped (no block ID).
         assert notion.client.blocks.children.append.call_count == 3
+
+    def test_aborts_and_logs_error_when_create_slack_content_makes_no_progress(
+        self, notion
+    ):
+        notion.client.blocks.children.append.return_value = {
+            "results": [{"id": "toggle-id"}]
+        }
+        messages = [
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 1, tzinfo=UTC),
+                "text": "msg",
+                "images": [],
+                "replies": [],
+            }
+        ]
+        with (
+            patch.object(notion, "_send_markdown", return_value=True),
+            patch(
+                "firetower.integrations.services.notion._create_slack_content",
+                return_value=(0, []),  # stopping_index == index == 0: no progress
+            ),
+            patch("firetower.integrations.services.notion.logger") as mock_logger,
+        ):
+            notion.apply_template("page-id", messages=messages, update_slack=True)
+
+        error_args = [call[0][0] for call in mock_logger.error.call_args_list]
+        assert any("no progress" in msg for msg in error_args)
+        # append called once for the toggle; never called again for bullets
+        assert notion.client.blocks.children.append.call_count == 1

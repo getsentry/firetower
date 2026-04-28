@@ -157,6 +157,13 @@ class NotionService:
         index = 0
         while index < len(messages):
             stopping_index, batch = _create_slack_content(messages, index)
+            if stopping_index <= index:
+                logger.error(
+                    "_create_slack_content made no progress at index %d for page %s, aborting",
+                    index,
+                    page_id,
+                )
+                break
             response = self._append_children(toggle_id, batch)
             if response is not None:
                 batch_size = stopping_index - index
