@@ -16,7 +16,7 @@ def handle_help_command(ack: Any, command: dict, respond: Any) -> None:
         f"  `{cmd} update` - Interactively update incident metadata (alias: `{cmd} edit`)\n"
         f"  `{cmd} mitigated` - Mark incident as mitigated (alias: `{cmd} mit`)\n"
         f"  `{cmd} resolved` - Mark incident as resolved (alias: `{cmd} fixed`)\n"
-        f"  `{cmd} statuspage` - Create or update a statuspage post (not yet implemented)\n"
+        f"  `{cmd} statuspage` - Create or update a statuspage post\n"
         f"  `{cmd} dumpslack` - Dump slack channel history (not yet implemented)\n"
         f"  `{cmd} reopen` - Reopen an incident\n"
     )

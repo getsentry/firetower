@@ -236,6 +236,23 @@ SLACK: SlackSettings = {
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
 
+
+class StatuspageSettings(TypedDict):
+    API_KEY: str
+    PAGE_ID: str
+    URL: str
+
+
+STATUSPAGE: StatuspageSettings | None = (
+    {
+        "API_KEY": config.statuspage.api_key,
+        "PAGE_ID": config.statuspage.page_id,
+        "URL": config.statuspage.url,
+    }
+    if config.statuspage
+    else None
+)
+
 FIRETOWER_BASE_URL = config.firetower_base_url
 HOOKS_ENABLED = config.hooks_enabled
 
