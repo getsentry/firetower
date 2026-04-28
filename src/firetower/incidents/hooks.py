@@ -361,20 +361,19 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
         )
 
 
-def _create_datadog_notebook(incident: Incident, channel_id: str | None) -> None:
+def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
     try:
         if incident.is_private:
             logger.info(f"Skipping Datadog notebook for private incident {incident.id}")
-            if channel_id:
-                try:
-                    _slack_service.post_message(
-                        channel_id,
-                        "Datadog notebook creation skipped due to private incident.",
-                    )
-                except Exception:
-                    logger.exception(
-                        f"Failed to post Datadog skip message for incident {incident.id}"
-                    )
+            try:
+                _slack_service.post_message(
+                    channel_id,
+                    "Datadog notebook creation skipped due to private incident.",
+                )
+            except Exception:
+                logger.exception(
+                    f"Failed to post Datadog skip message for incident {incident.id}"
+                )
             return
 
         service = DatadogService()
@@ -414,13 +413,6 @@ def _create_datadog_notebook(incident: Incident, channel_id: str | None) -> None
 
             link.url = notebook_url
             link.save(update_fields=["url"])
-
-        if not channel_id:
-            logger.warning(
-                f"Datadog notebook {notebook_url} created for incident {incident.id} "
-                f"but no Slack channel to bookmark it in"
-            )
-            return
 
         # Post Slack side effects after the transaction commits so a Slack
         # failure does not orphan the external Datadog notebook. Each side
@@ -555,6 +547,8 @@ def on_incident_created(incident: Incident) -> None:
                     f"Failed to post description for incident {incident.id}"
                 )
 
+        _create_datadog_notebook(incident, channel_id)
+
         ids_to_invite: list[str] = []
         if captain_slack_id:
             ids_to_invite.append(captain_slack_id)
@@ -604,8 +598,6 @@ def on_incident_created(incident: Incident) -> None:
                 logger.exception(
                     f"Failed to post feed channel message for incident {incident.id}"
                 )
-
-    _create_datadog_notebook(incident, channel_id)
 
 
 def on_status_changed(incident: Incident, old_status: str) -> None:
