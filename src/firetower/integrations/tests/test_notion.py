@@ -223,6 +223,63 @@ class TestMessageToBullet:
         assert len(suffix) <= 2000
 
 
+class TestUploadFileToNotion:
+    def test_returns_upload_id_on_success(self, notion):
+        create_response = MagicMock()
+        create_response.json.return_value = {"id": "upload-123"}
+        create_response.raise_for_status = MagicMock()
+        send_response = MagicMock()
+        send_response.raise_for_status = MagicMock()
+
+        with patch("firetower.integrations.services.notion.httpx.post") as mock_post:
+            mock_post.side_effect = [create_response, send_response]
+            result = notion._upload_file_to_notion(b"IMG", "image.png", "image/png")
+
+        assert result == "upload-123"
+        assert mock_post.call_count == 2
+        create_call, send_call = mock_post.call_args_list
+        assert "file_uploads" in create_call.args[0]
+        assert f"file_uploads/upload-123/send" in send_call.args[0]
+
+    def test_returns_none_when_create_fails(self, notion):
+        with patch("firetower.integrations.services.notion.httpx.post", side_effect=Exception("500")):
+            result = notion._upload_file_to_notion(b"IMG", "image.png", "image/png")
+
+        assert result is None
+
+    def test_returns_none_when_send_fails(self, notion):
+        create_response = MagicMock()
+        create_response.json.return_value = {"id": "upload-123"}
+        create_response.raise_for_status = MagicMock()
+
+        with patch("firetower.integrations.services.notion.httpx.post") as mock_post:
+            mock_post.side_effect = [create_response, Exception("413 too large")]
+            result = notion._upload_file_to_notion(b"IMG", "image.png", "image/png")
+
+        assert result is None
+
+
+class TestCreateImageBlock:
+    def test_returns_image_block_on_success(self, notion):
+        with patch.object(notion, "_upload_file_to_notion", return_value="upload-abc"):
+            block = notion._create_image_block({"data": b"PNG", "content_type": "image/png"})
+
+        assert block == {
+            "type": "image",
+            "image": {"type": "file_upload", "file_upload": {"id": "upload-abc"}},
+        }
+
+    def test_returns_none_when_upload_fails(self, notion):
+        with patch.object(notion, "_upload_file_to_notion", return_value=None):
+            block = notion._create_image_block({"data": b"PNG", "content_type": "image/png"})
+
+        assert block is None
+
+    def test_returns_none_when_data_missing(self, notion):
+        block = notion._create_image_block({"content_type": "image/png"})
+        assert block is None
+
+
 class TestApplyTemplate:
     def _make_append_response(self, block_id: str) -> dict:
         return {"results": [{"id": block_id}]}
@@ -277,3 +334,65 @@ class TestApplyTemplate:
 
         reply_call = notion.client.blocks.children.append.call_args_list[2]
         assert reply_call.kwargs["block_id"] == "bullet-id"
+
+    def test_appends_images_before_replies_as_children_of_bullet(self, notion):
+        notion.client.blocks.children.append.side_effect = [
+            {"results": [{"id": "toggle-id"}]},
+            {"results": [{"id": "bullet-id"}]},
+            {"results": [{"id": "children-id"}]},
+        ]
+        image_block = {
+            "type": "image",
+            "image": {"type": "file_upload", "file_upload": {"id": "upload-1"}},
+        }
+        messages = [
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 1, tzinfo=UTC),
+                "text": "check this graph",
+                "images": [{"data": b"PNG", "content_type": "image/png"}],
+                "replies": [
+                    {
+                        "author": "b@sentry.io",
+                        "date_time": datetime(2024, 1, 1, 0, 1, tzinfo=UTC),
+                        "text": "reply",
+                    }
+                ],
+            }
+        ]
+
+        with (
+            patch.object(notion, "_send_markdown", return_value=True),
+            patch.object(notion, "_create_image_block", return_value=image_block),
+        ):
+            notion.apply_template("page-id", messages=messages, update_slack=True)
+
+        children_call = notion.client.blocks.children.append.call_args_list[2]
+        assert children_call.kwargs["block_id"] == "bullet-id"
+        appended = children_call.kwargs["children"]
+        assert appended[0]["type"] == "image"
+        assert appended[1]["type"] == "bulleted_list_item"
+
+    def test_skips_failed_image_uploads(self, notion):
+        notion.client.blocks.children.append.side_effect = [
+            {"results": [{"id": "toggle-id"}]},
+            {"results": [{"id": "bullet-id"}]},
+        ]
+        messages = [
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 1, tzinfo=UTC),
+                "text": "check this graph",
+                "images": [{"data": b"PNG", "content_type": "image/png"}],
+                "replies": [],
+            }
+        ]
+
+        with (
+            patch.object(notion, "_send_markdown", return_value=True),
+            patch.object(notion, "_create_image_block", return_value=None),
+        ):
+            notion.apply_template("page-id", messages=messages, update_slack=True)
+
+        # Only 2 appends: toggle creation + bullet batch. No children call since image failed.
+        assert notion.client.blocks.children.append.call_count == 2

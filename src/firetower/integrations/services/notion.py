@@ -166,10 +166,17 @@ class NotionService:
                     and notion_index < len(response["results"])
                 ):
                     slack_msg = messages[slack_index]
-                    if slack_msg.get("replies"):
-                        reply_blocks = [_message_to_bullet(r) for r in slack_msg["replies"]]
+                    children: list[dict[str, Any]] = []
+                    for img in slack_msg.get("images", []):
+                        block = self._create_image_block(img)
+                        if block is not None:
+                            children.append(block)
+                    children.extend(
+                        _message_to_bullet(r) for r in slack_msg.get("replies", [])
+                    )
+                    if children:
                         self._append_children(
-                            response["results"][notion_index]["id"], reply_blocks
+                            response["results"][notion_index]["id"], children
                         )
                     slack_index += 1
                     notion_index += 1
@@ -206,6 +213,55 @@ class NotionService:
                 )
                 time.sleep(wait)
         return False
+
+    def _upload_file_to_notion(
+        self, data: bytes, filename: str, content_type: str
+    ) -> str | None:
+        auth_headers = {
+            "Authorization": f"Bearer {self._integration_token}",
+            "Notion-Version": _MARKDOWN_NOTION_VERSION,
+        }
+        try:
+            create_resp = httpx.post(
+                f"{_NOTION_API_BASE}/file_uploads",
+                headers={**auth_headers, "Content-Type": "application/json"},
+                json={"name": filename},
+                timeout=30.0,
+            )
+            create_resp.raise_for_status()
+            upload_id = create_resp.json()["id"]
+        except Exception as exc:
+            logger.warning("Failed to create Notion file upload: %s", exc)
+            return None
+        try:
+            send_resp = httpx.post(
+                f"{_NOTION_API_BASE}/file_uploads/{upload_id}/send",
+                headers=auth_headers,
+                files={"file": (filename, data, content_type)},
+                timeout=60.0,
+            )
+            send_resp.raise_for_status()
+            return upload_id
+        except Exception as exc:
+            logger.warning("Failed to send file to Notion upload %s: %s", upload_id, exc)
+            return None
+
+    def _create_image_block(self, image: dict[str, Any]) -> dict[str, Any] | None:
+        data = image.get("data")
+        content_type = image.get("content_type", "image/png")
+        if not data:
+            return None
+        ext = content_type.split("/")[-1] if "/" in content_type else "png"
+        upload_id = self._upload_file_to_notion(data, f"image.{ext}", content_type)
+        if not upload_id:
+            return None
+        return {
+            "type": "image",
+            "image": {
+                "type": "file_upload",
+                "file_upload": {"id": upload_id},
+            },
+        }
 
     def _append_children(
         self,

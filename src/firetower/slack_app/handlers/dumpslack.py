@@ -3,6 +3,7 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 from django.conf import settings
 
 from firetower.incidents.models import ExternalLink, ExternalLinkType
@@ -210,17 +211,56 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
             except Exception:
                 logger.exception("Failed to fetch replies for message %s", msg["ts"])
 
+        images = []
+        for url in _extract_image_urls(msg):
+            result = _download_image(url, client.token)
+            if result:
+                data, content_type = result
+                images.append({"data": data, "content_type": content_type})
+
         content.append(
             {
                 "author": author,
                 "date_time": dt,
                 "text": msg.get("text", ""),
                 "replies": replies,
+                "images": images,
             }
         )
 
     content.reverse()
     return content
+
+
+def _extract_image_urls(msg: dict[str, Any]) -> list[str]:
+    urls = []
+    for attachment in msg.get("attachments", []):
+        url = attachment.get("image_url")
+        if url:
+            urls.append(url)
+    for file_info in msg.get("files", []):
+        if file_info.get("mimetype", "").startswith("image/"):
+            url = file_info.get("url_private") or file_info.get("url_private_download", "")
+            if url:
+                urls.append(url)
+    return urls
+
+
+def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
+    headers: dict[str, str] = {}
+    if "slack.com" in url:
+        headers["Authorization"] = f"Bearer {slack_token}"
+    try:
+        resp = httpx.get(url, headers=headers, timeout=30.0, follow_redirects=True)
+        resp.raise_for_status()
+        content_type = resp.headers.get("content-type", "image/png").split(";")[0].strip()
+        if not content_type.startswith("image/"):
+            logger.warning("URL %s returned non-image content-type %s", url, content_type)
+            return None
+        return resp.content, content_type
+    except Exception:
+        logger.exception("Failed to download image from %s", url)
+        return None
 
 
 def _extract_notion_page_id(notion_url: str) -> str | None:
