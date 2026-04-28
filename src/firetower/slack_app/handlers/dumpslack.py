@@ -155,7 +155,7 @@ def _build_user_email_cache(client: Any) -> dict[str, str]:
             if email:
                 cache[member["id"]] = email
         cursor = response.get("response_metadata", {}).get("next_cursor") or None
-        if not response.get("has_more") or not cursor:
+        if not cursor:
             break
 
     return cache

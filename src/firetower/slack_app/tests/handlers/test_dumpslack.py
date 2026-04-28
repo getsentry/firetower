@@ -70,18 +70,16 @@ class TestBuildUserEmailCache:
 
         assert cache == {"U1": "a@sentry.io"}
 
-    def test_paginates_using_has_more_and_cursor(self):
+    def test_paginates_using_next_cursor(self):
         mock_client = MagicMock()
         mock_client.users_list.side_effect = [
             {
                 "ok": True,
-                "has_more": True,
                 "members": [self._member("U1", "a@sentry.io")],
                 "response_metadata": {"next_cursor": "cur1"},
             },
             {
                 "ok": True,
-                "has_more": False,
                 "members": [self._member("U2", "b@sentry.io")],
                 "response_metadata": {"next_cursor": ""},
             },
@@ -92,19 +90,6 @@ class TestBuildUserEmailCache:
         assert len(cache) == 2
         assert mock_client.users_list.call_count == 2
         mock_client.users_list.assert_any_call(limit=200, cursor="cur1")
-
-    def test_stops_when_has_more_false_even_if_cursor_present(self):
-        mock_client = MagicMock()
-        mock_client.users_list.return_value = {
-            "ok": True,
-            "has_more": False,
-            "members": [self._member("U1", "a@sentry.io")],
-            "response_metadata": {"next_cursor": "stale-cursor"},
-        }
-
-        _build_user_email_cache(mock_client)
-
-        assert mock_client.users_list.call_count == 1
 
     def test_skips_bots_and_deleted_members(self):
         mock_client = MagicMock()
