@@ -152,6 +152,38 @@ def _build_user_email_cache(client: Any) -> dict[str, str]:
     return cache
 
 
+def _get_thread_replies(
+    client: Any, channel_id: str, thread_ts: str
+) -> list[dict[str, Any]]:
+    """Return all non-parent replies for a thread, paginating with cursor."""
+    replies: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        kwargs: dict[str, Any] = {"channel": channel_id, "ts": thread_ts, "limit": 999}
+        if cursor:
+            kwargs["cursor"] = cursor
+        try:
+            response = client.conversations_replies(**kwargs)
+        except Exception:
+            logger.exception("Failed to fetch replies for thread %s", thread_ts)
+            break
+        if not response.get("ok"):
+            logger.error(
+                "conversations_replies returned not-ok for thread %s", thread_ts
+            )
+            break
+        for msg in response.get("messages", []):
+            if msg.get("type") != "message" or msg["ts"] == thread_ts:
+                continue
+            if msg.get("bot_id"):
+                continue
+            replies.append(msg)
+        cursor = response.get("response_metadata", {}).get("next_cursor") or None
+        if not response.get("has_more") or not cursor:
+            break
+    return replies
+
+
 def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
     all_messages: list[dict[str, Any]] = []
     cursor: str | None = None
@@ -204,29 +236,19 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
         dt = datetime.fromtimestamp(float(msg["ts"]), tz=UTC)
         author = resolve_email(msg["user"])
 
-        replies: list[dict[str, Any]] = []
-        if msg.get("reply_count", 0) > 0:
-            try:
-                reply_resp = client.conversations_replies(
-                    channel=channel_id, ts=msg["thread_ts"]
-                )
-                if reply_resp.get("ok"):
-                    for reply in reply_resp.get("messages", []):
-                        if reply.get("type") != "message" or reply["ts"] == msg["ts"]:
-                            continue
-                        if reply.get("bot_id"):
-                            continue
-                        replies.append(
-                            {
-                                "author": resolve_email(reply.get("user", "")),
-                                "date_time": datetime.fromtimestamp(
-                                    float(reply["ts"]), tz=UTC
-                                ),
-                                "text": reply.get("text", ""),
-                            }
-                        )
-            except Exception:
-                logger.exception("Failed to fetch replies for message %s", msg["ts"])
+        raw_replies = (
+            _get_thread_replies(client, channel_id, msg["thread_ts"])
+            if msg.get("reply_count", 0) > 0
+            else []
+        )
+        replies: list[dict[str, Any]] = [
+            {
+                "author": resolve_email(reply.get("user", "")),
+                "date_time": datetime.fromtimestamp(float(reply["ts"]), tz=UTC),
+                "text": reply.get("text", ""),
+            }
+            for reply in raw_replies
+        ]
 
         images = []
         for item in image_urls:

@@ -5,6 +5,7 @@ from firetower.slack_app.handlers.dumpslack import (
     _extract_image_urls,
     _extract_notion_page_id,
     _get_channel_messages,
+    _get_thread_replies,
     _is_slack_url,
     handle_dumpslack_command,
 )
@@ -131,6 +132,7 @@ class TestGetChannelMessages:
         }
         mock_client.conversations_replies.return_value = {
             "ok": True,
+            "has_more": False,
             "messages": [
                 {
                     "type": "message",
@@ -145,6 +147,7 @@ class TestGetChannelMessages:
                     "ts": "1000000002.000000",
                 },
             ],
+            "response_metadata": {"next_cursor": ""},
         }
         mock_client.users_list.return_value = _make_users_list_response(
             members=[
@@ -257,6 +260,102 @@ class TestGetChannelMessages:
         assert len(messages) == 1
         assert messages[0]["author"] == "fallback@sentry.io"
         mock_client.users_info.assert_called_once_with(user="U_UNKNOWN")
+
+
+class TestGetThreadReplies:
+    def test_returns_replies_excluding_parent(self):
+        mock_client = MagicMock()
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "has_more": False,
+            "messages": [
+                {"type": "message", "user": "U1", "text": "parent", "ts": "1.0"},
+                {"type": "message", "user": "U2", "text": "reply1", "ts": "2.0"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        replies = _get_thread_replies(mock_client, "C123", "1.0")
+
+        assert len(replies) == 1
+        assert replies[0]["text"] == "reply1"
+
+    def test_paginates_via_next_cursor(self):
+        mock_client = MagicMock()
+        mock_client.conversations_replies.side_effect = [
+            {
+                "ok": True,
+                "has_more": True,
+                "messages": [
+                    {"type": "message", "user": "U1", "text": "parent", "ts": "1.0"},
+                    {"type": "message", "user": "U2", "text": "r1", "ts": "2.0"},
+                ],
+                "response_metadata": {"next_cursor": "cur1"},
+            },
+            {
+                "ok": True,
+                "has_more": False,
+                "messages": [
+                    {"type": "message", "user": "U3", "text": "r2", "ts": "3.0"},
+                ],
+                "response_metadata": {"next_cursor": ""},
+            },
+        ]
+
+        replies = _get_thread_replies(mock_client, "C123", "1.0")
+
+        assert len(replies) == 2
+        assert mock_client.conversations_replies.call_count == 2
+        mock_client.conversations_replies.assert_any_call(
+            channel="C123", ts="1.0", limit=999, cursor="cur1"
+        )
+
+    def test_passes_limit_999_on_first_call(self):
+        mock_client = MagicMock()
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "has_more": False,
+            "messages": [],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        _get_thread_replies(mock_client, "C123", "1.0")
+
+        mock_client.conversations_replies.assert_called_once_with(
+            channel="C123", ts="1.0", limit=999
+        )
+
+    def test_skips_bot_replies(self):
+        mock_client = MagicMock()
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "has_more": False,
+            "messages": [
+                {"type": "message", "user": "U1", "text": "parent", "ts": "1.0"},
+                {
+                    "type": "message",
+                    "user": "B1",
+                    "bot_id": "B1",
+                    "text": "bot reply",
+                    "ts": "2.0",
+                },
+                {"type": "message", "user": "U2", "text": "human reply", "ts": "3.0"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        replies = _get_thread_replies(mock_client, "C123", "1.0")
+
+        assert len(replies) == 1
+        assert replies[0]["text"] == "human reply"
+
+    def test_returns_empty_on_api_error(self):
+        mock_client = MagicMock()
+        mock_client.conversations_replies.side_effect = Exception("timeout")
+
+        replies = _get_thread_replies(mock_client, "C123", "1.0")
+
+        assert replies == []
 
 
 class TestExtractImageUrls:
