@@ -222,7 +222,9 @@ class TestExtractImageUrls:
     def test_source_url_empty_when_no_link_fields(self):
         msg = {"attachments": [{"image_url": "https://p.datadoghq.com/img/graph.png"}]}
         result = _extract_image_urls(msg)
-        assert result == [{"image_url": "https://p.datadoghq.com/img/graph.png", "source_url": ""}]
+        assert result == [
+            {"image_url": "https://p.datadoghq.com/img/graph.png", "source_url": ""}
+        ]
 
     def test_extracts_slack_file_url_with_empty_source(self):
         msg = {
@@ -241,7 +243,14 @@ class TestExtractImageUrls:
         ]
 
     def test_skips_non_image_files(self):
-        msg = {"files": [{"mimetype": "application/pdf", "url_private": "https://files.slack.com/doc.pdf"}]}
+        msg = {
+            "files": [
+                {
+                    "mimetype": "application/pdf",
+                    "url_private": "https://files.slack.com/doc.pdf",
+                }
+            ]
+        }
         assert _extract_image_urls(msg) == []
 
     def test_skips_attachments_without_image_url(self):
@@ -278,8 +287,13 @@ class TestDownloadImage:
         mock_response.headers = {"content-type": "image/png"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("firetower.slack_app.handlers.dumpslack.httpx.get", return_value=mock_response) as mock_get:
-            result = _download_image("https://p.datadoghq.com/img/graph.png", "xoxb-token")
+        with patch(
+            "firetower.slack_app.handlers.dumpslack.httpx.get",
+            return_value=mock_response,
+        ) as mock_get:
+            result = _download_image(
+                "https://p.datadoghq.com/img/graph.png", "xoxb-token"
+            )
 
         assert result == (b"PNG_DATA", "image/png")
         call_headers = mock_get.call_args.kwargs["headers"]
@@ -291,14 +305,22 @@ class TestDownloadImage:
         mock_response.headers = {"content-type": "image/jpeg"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("firetower.slack_app.handlers.dumpslack.httpx.get", return_value=mock_response) as mock_get:
-            _download_image("https://files.slack.com/files-pri/T1/img.jpg", "xoxb-token")
+        with patch(
+            "firetower.slack_app.handlers.dumpslack.httpx.get",
+            return_value=mock_response,
+        ) as mock_get:
+            _download_image(
+                "https://files.slack.com/files-pri/T1/img.jpg", "xoxb-token"
+            )
 
         call_headers = mock_get.call_args.kwargs["headers"]
         assert call_headers["Authorization"] == "Bearer xoxb-token"
 
     def test_returns_none_on_request_failure(self):
-        with patch("firetower.slack_app.handlers.dumpslack.httpx.get", side_effect=Exception("timeout")):
+        with patch(
+            "firetower.slack_app.handlers.dumpslack.httpx.get",
+            side_effect=Exception("timeout"),
+        ):
             result = _download_image("https://example.com/img.png", "token")
 
         assert result is None
@@ -309,7 +331,10 @@ class TestDownloadImage:
         mock_response.headers = {"content-type": "text/html"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("firetower.slack_app.handlers.dumpslack.httpx.get", return_value=mock_response):
+        with patch(
+            "firetower.slack_app.handlers.dumpslack.httpx.get",
+            return_value=mock_response,
+        ):
             result = _download_image("https://example.com/page", "token")
 
         assert result is None

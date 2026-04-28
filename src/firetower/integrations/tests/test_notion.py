@@ -48,11 +48,15 @@ class TestGetUsers:
     def test_paginates_until_no_next_cursor(self, notion):
         notion.client.users.list.side_effect = [
             {
-                "results": [{"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}],
+                "results": [
+                    {"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}
+                ],
                 "next_cursor": "cursor1",
             },
             {
-                "results": [{"person": {"email": "b@sentry.io"}, "name": "Bob", "id": "U2"}],
+                "results": [
+                    {"person": {"email": "b@sentry.io"}, "name": "Bob", "id": "U2"}
+                ],
                 "next_cursor": None,
             },
         ]
@@ -73,7 +77,9 @@ class TestGetUsers:
 
     def test_module_cache_shared_across_instances(self, notion):
         notion.client.users.list.return_value = {
-            "results": [{"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}],
+            "results": [
+                {"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}
+            ],
             "next_cursor": None,
         }
 
@@ -88,12 +94,16 @@ class TestGetUsers:
     def test_retries_transient_errors_mid_pagination(self, notion):
         notion.client.users.list.side_effect = [
             {
-                "results": [{"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}],
+                "results": [
+                    {"person": {"email": "a@sentry.io"}, "name": "Alice", "id": "U1"}
+                ],
                 "next_cursor": "cursor1",
             },
             Exception("502 Bad Gateway"),
             {
-                "results": [{"person": {"email": "b@sentry.io"}, "name": "Bob", "id": "U2"}],
+                "results": [
+                    {"person": {"email": "b@sentry.io"}, "name": "Bob", "id": "U2"}
+                ],
                 "next_cursor": None,
             },
         ]
@@ -242,7 +252,10 @@ class TestUploadFileToNotion:
         assert "file_uploads/upload-123/send" in send_call.args[0]
 
     def test_returns_none_when_create_fails(self, notion):
-        with patch("firetower.integrations.services.notion.httpx.post", side_effect=Exception("500")):
+        with patch(
+            "firetower.integrations.services.notion.httpx.post",
+            side_effect=Exception("500"),
+        ):
             result = notion._upload_file_to_notion(b"IMG", "image.png", "image/png")
 
         assert result is None
@@ -262,7 +275,9 @@ class TestUploadFileToNotion:
 class TestCreateImageBlock:
     def test_returns_image_block_on_success(self, notion):
         with patch.object(notion, "_upload_file_to_notion", return_value="upload-abc"):
-            block = notion._create_image_block({"data": b"PNG", "content_type": "image/png"})
+            block = notion._create_image_block(
+                {"data": b"PNG", "content_type": "image/png"}
+            )
 
         assert block == {
             "type": "image",
@@ -271,7 +286,9 @@ class TestCreateImageBlock:
 
     def test_returns_none_when_upload_fails(self, notion):
         with patch.object(notion, "_upload_file_to_notion", return_value=None):
-            block = notion._create_image_block({"data": b"PNG", "content_type": "image/png"})
+            block = notion._create_image_block(
+                {"data": b"PNG", "content_type": "image/png"}
+            )
 
         assert block is None
 
@@ -291,8 +308,13 @@ class TestCreateImageBlock:
 
         caption = block["image"]["caption"]
         assert len(caption) == 1
-        assert caption[0]["text"]["content"] == "https://app.datadoghq.com/dashboard/abc"
-        assert caption[0]["text"]["link"]["url"] == "https://app.datadoghq.com/dashboard/abc"
+        assert (
+            caption[0]["text"]["content"] == "https://app.datadoghq.com/dashboard/abc"
+        )
+        assert (
+            caption[0]["text"]["link"]["url"]
+            == "https://app.datadoghq.com/dashboard/abc"
+        )
 
     def test_omits_caption_when_source_url_empty(self, notion):
         with patch.object(notion, "_upload_file_to_notion", return_value="upload-abc"):
@@ -317,7 +339,9 @@ class TestApplyTemplate:
 
         mock_md.assert_called_once_with("page-id", "# Template\n\nSome content.")
         notion.client.blocks.children.append.assert_called_once()
-        toggle_block = notion.client.blocks.children.append.call_args.kwargs["children"][0]
+        toggle_block = notion.client.blocks.children.append.call_args.kwargs[
+            "children"
+        ][0]
         assert toggle_block["type"] == "toggle"
 
     def test_update_slack_skips_markdown_template(self, notion):

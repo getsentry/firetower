@@ -42,7 +42,9 @@ class Command(BaseCommand):
             template_markdown=notion_config.get("TEMPLATE_MARKDOWN", ""),
         )
 
-        existing_link = incident.external_links.filter(type=ExternalLinkType.NOTION).first()
+        existing_link = incident.external_links.filter(
+            type=ExternalLinkType.NOTION
+        ).first()
 
         self.stdout.write("Fetching Slack messages...")
         messages = _get_channel_messages(client, channel_id)

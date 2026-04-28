@@ -161,9 +161,8 @@ class NotionService:
             if response is not None:
                 slack_index = index
                 notion_index = 0
-                while (
-                    slack_index < len(messages)
-                    and notion_index < len(response["results"])
+                while slack_index < len(messages) and notion_index < len(
+                    response["results"]
                 ):
                     slack_msg = messages[slack_index]
                     children: list[dict[str, Any]] = []
@@ -192,7 +191,10 @@ class NotionService:
                         "Authorization": f"Bearer {self._integration_token}",
                         "Notion-Version": _MARKDOWN_NOTION_VERSION,
                     },
-                    json={"type": "insert_content", "insert_content": {"content": content}},
+                    json={
+                        "type": "insert_content",
+                        "insert_content": {"content": content},
+                    },
                     timeout=60.0,
                 )
                 response.raise_for_status()
@@ -200,7 +202,8 @@ class NotionService:
             except Exception as exc:
                 if attempt == max_retries - 1:
                     logger.error(
-                        "Max retries reached sending markdown to Notion page %s", page_id
+                        "Max retries reached sending markdown to Notion page %s",
+                        page_id,
                     )
                     return False
                 wait = 2**attempt
@@ -243,7 +246,9 @@ class NotionService:
             send_resp.raise_for_status()
             return upload_id
         except Exception as exc:
-            logger.warning("Failed to send file to Notion upload %s: %s", upload_id, exc)
+            logger.warning(
+                "Failed to send file to Notion upload %s: %s", upload_id, exc
+            )
             return None
 
     def _create_image_block(self, image: dict[str, Any]) -> dict[str, Any] | None:

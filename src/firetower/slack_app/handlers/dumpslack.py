@@ -112,15 +112,15 @@ def handle_dumpslack_command(
     try:
         notion.apply_template(page_id, messages, update_slack=update_slack)
     except Exception:
-        logger.exception(
-            "Failed to populate Notion page %s", page_id
-        )
+        logger.exception("Failed to populate Notion page %s", page_id)
         respond(
             f"Postmortem doc {action.lower()} but content dump failed. Check: {page_url}"
         )
         return
 
-    client.chat_postMessage(channel=channel_id, text=f"{action} postmortem doc: {page_url}")
+    client.chat_postMessage(
+        channel=channel_id, text=f"{action} postmortem doc: {page_url}"
+    )
 
 
 def _build_user_email_cache(client: Any) -> dict[str, str]:
@@ -253,7 +253,9 @@ def _extract_image_urls(msg: dict[str, Any]) -> list[dict[str, str]]:
             items.append({"image_url": image_url, "source_url": source_url})
     for file_info in msg.get("files", []):
         if file_info.get("mimetype", "").startswith("image/"):
-            url = file_info.get("url_private") or file_info.get("url_private_download", "")
+            url = file_info.get("url_private") or file_info.get(
+                "url_private_download", ""
+            )
             if url:
                 items.append({"image_url": url, "source_url": ""})
     return items
@@ -274,9 +276,13 @@ def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
     try:
         resp = httpx.get(url, headers=headers, timeout=30.0, follow_redirects=True)
         resp.raise_for_status()
-        content_type = resp.headers.get("content-type", "image/png").split(";")[0].strip()
+        content_type = (
+            resp.headers.get("content-type", "image/png").split(";")[0].strip()
+        )
         if not content_type.startswith("image/"):
-            logger.warning("URL %s returned non-image content-type %s", url, content_type)
+            logger.warning(
+                "URL %s returned non-image content-type %s", url, content_type
+            )
             return None
         return resp.content, content_type
     except Exception:
