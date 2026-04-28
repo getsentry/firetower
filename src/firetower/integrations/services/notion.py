@@ -68,7 +68,7 @@ class NotionService:
                 if "person" in user:
                     email = user["person"].get("email", "")
                     if email:
-                        users[email] = {"name": user["name"], "id": user["id"]}
+                        users[email] = {"name": user.get("name", ""), "id": user["id"]}
             start_cursor = response.get("next_cursor")
             if not start_cursor:
                 break

@@ -126,6 +126,18 @@ class TestGetUsers:
             with pytest.raises(Exception, match="502"):
                 notion.get_users()
 
+    def test_tolerates_user_with_missing_name(self, notion):
+        notion.client.users.list.return_value = {
+            "results": [
+                {"person": {"email": "a@sentry.io"}, "id": "U1"},  # no "name" key
+            ],
+            "next_cursor": None,
+        }
+
+        users = notion.get_users()
+
+        assert users == {"a@sentry.io": {"name": "", "id": "U1"}}
+
 
 class TestSendMarkdown:
     def test_sends_insert_content_patch(self, notion):
