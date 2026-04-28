@@ -17,6 +17,7 @@ dependencies = [
     "pyserde[toml]>=0.28.0",
     "httpx>=0.28.0",
     "notion-client>=3.0.0,<4.0.0",
+    "requests>=2.32.0",
     "slack-bolt>=1.27.0",
     "slack-sdk>=3.31.0",
 ]

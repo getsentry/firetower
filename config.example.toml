@@ -39,9 +39,14 @@ integration_key = ""
 api_key = ""
 app_key = ""
 
-# [notion]
-# integration_token = ""
-# database_id = ""
-# template_markdown = """
-# # Your postmortem template in Markdown here
-# """
+[notion]
+integration_token = ""
+database_id = ""
+template_markdown = """
+# Your postmortem template in Markdown here
+"""
+
+[statuspage]
+api_key = ""
+page_id = ""
+url = "https://your-page.statuspage.io/"
