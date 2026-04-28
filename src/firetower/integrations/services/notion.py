@@ -125,7 +125,10 @@ class NotionService:
         update_slack: bool = False,
     ) -> None:
         if not update_slack and self.template_markdown:
-            self._send_markdown(page_id, self.template_markdown)
+            if not self._send_markdown(page_id, self.template_markdown):
+                raise RuntimeError(
+                    f"Failed to apply markdown template to Notion page {page_id}"
+                )
 
         timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         toggle: dict[str, Any] = {
@@ -148,10 +151,9 @@ class NotionService:
         }
         response = self._append_children(page_id, [toggle])
         if response is None:
-            logger.error(
-                "Failed to append slack toggle to page %s, aborting slack dump", page_id
+            raise RuntimeError(
+                f"Failed to append slack toggle to Notion page {page_id}"
             )
-            return
         toggle_id = response["results"][0]["id"]
 
         index = 0
@@ -165,7 +167,15 @@ class NotionService:
                 )
                 break
             response = self._append_children(toggle_id, batch)
-            if response is not None:
+            if response is None:
+                logger.warning(
+                    "Appending bullet batch (messages %d-%d) to page %s failed after retries; "
+                    "those messages will be absent from the Notion dump.",
+                    index,
+                    stopping_index - 1,
+                    page_id,
+                )
+            else:
                 batch_size = stopping_index - index
                 returned = len(response["results"])
                 if returned < batch_size:

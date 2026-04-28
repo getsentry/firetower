@@ -348,6 +348,32 @@ class TestGetChannelMessages:
         assert messages[0]["author"] == "fallback@sentry.io"
         mock_client.users_info.assert_called_once_with(user="U_UNKNOWN")
 
+    def test_preserves_partial_results_when_pagination_fails_mid_way(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.side_effect = [
+            {
+                "ok": True,
+                "has_more": True,
+                "messages": [
+                    {
+                        "type": "message",
+                        "user": "U1",
+                        "text": "page1",
+                        "ts": "1000000001.0",
+                    },
+                ],
+                "response_metadata": {"next_cursor": "cur1"},
+            },
+            Exception("network error"),
+        ]
+        mock_client.users_list.return_value = _make_users_list_response()
+
+        messages = _get_channel_messages(mock_client, "C123")
+
+        # First page was fetched before the error; should not be discarded
+        assert len(messages) == 1
+        assert messages[0]["text"] == "page1"
+
 
 class TestGetThreadReplies:
     def test_returns_replies_excluding_parent(self):

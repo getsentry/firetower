@@ -87,6 +87,18 @@ def handle_dumpslack_command(
         page_url = page["url"]
         update_slack = False
 
+    action = "Created" if not existing_link else "Updated"
+
+    try:
+        notion.apply_template(page_id, messages, update_slack=update_slack)
+    except Exception:
+        logger.exception("Failed to populate Notion page %s", page_id)
+        respond(
+            f"Postmortem doc {action.lower()} but content dump failed. Check: {page_url}"
+        )
+        return
+
+    if not existing_link:
         try:
             ExternalLink.objects.update_or_create(
                 incident=incident,
@@ -107,17 +119,6 @@ def handle_dumpslack_command(
             )
         except Exception:
             logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
-
-    action = "Created" if not existing_link else "Updated"
-
-    try:
-        notion.apply_template(page_id, messages, update_slack=update_slack)
-    except Exception:
-        logger.exception("Failed to populate Notion page %s", page_id)
-        respond(
-            f"Postmortem doc {action.lower()} but content dump failed. Check: {page_url}"
-        )
-        return
 
     try:
         client.chat_postMessage(
@@ -205,13 +206,13 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
             response = client.conversations_history(**kwargs)
         except Exception:
             logger.exception("Failed to fetch history for channel %s", channel_id)
-            return []
+            break
 
         if not response.get("ok"):
             logger.error(
                 "conversations_history returned not-ok for channel %s", channel_id
             )
-            return []
+            break
 
         all_messages.extend(response.get("messages", []))
         cursor = response.get("response_metadata", {}).get("next_cursor") or None
@@ -237,10 +238,10 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
             continue
         if not msg.get("user"):
             continue
+        if msg.get("bot_id") or msg.get("subtype") in ("channel_join", "channel_leave"):
+            continue
         image_urls = _extract_image_urls(msg)
         if not msg.get("text") and not image_urls:
-            continue
-        if msg.get("bot_id") or msg.get("subtype") in ("channel_join", "channel_leave"):
             continue
 
         dt = datetime.fromtimestamp(float(msg["ts"]), tz=UTC)

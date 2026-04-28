@@ -356,6 +356,25 @@ class TestApplyTemplate:
         ][0]
         assert toggle_block["type"] == "toggle"
 
+    def test_raises_when_send_markdown_fails(self, notion):
+        notion.client.blocks.children.append.return_value = self._make_append_response(
+            "toggle-id"
+        )
+
+        with (
+            patch.object(notion, "_send_markdown", return_value=False),
+            pytest.raises(RuntimeError, match="template"),
+        ):
+            notion.apply_template("page-id", messages=[], update_slack=False)
+
+    def test_raises_when_toggle_creation_fails(self, notion):
+        with (
+            patch.object(notion, "_send_markdown", return_value=True),
+            patch.object(notion, "_append_children", return_value=None),
+            pytest.raises(RuntimeError, match="toggle"),
+        ):
+            notion.apply_template("page-id", messages=[], update_slack=False)
+
     def test_update_slack_skips_markdown_template(self, notion):
         notion.client.blocks.children.append.return_value = self._make_append_response(
             "toggle-id"
@@ -577,3 +596,28 @@ class TestApplyTemplate:
         assert any("no progress" in msg for msg in error_args)
         # append called once for the toggle; never called again for bullets
         assert notion.client.blocks.children.append.call_count == 1
+
+    def test_logs_warning_when_batch_append_returns_none(self, notion):
+        # Toggle append succeeds; bullet batch append exhausts retries → None
+        notion.client.blocks.children.append.side_effect = [
+            {"results": [{"id": "toggle-id"}]},
+            None,
+        ]
+        messages = [
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 1, tzinfo=UTC),
+                "text": "msg",
+                "images": [],
+                "replies": [],
+            }
+        ]
+
+        with (
+            patch.object(notion, "_send_markdown", return_value=True),
+            patch("firetower.integrations.services.notion.logger") as mock_logger,
+        ):
+            notion.apply_template("page-id", messages=messages, update_slack=True)
+
+        warning_args = [call[0][0] for call in mock_logger.warning.call_args_list]
+        assert any("absent from the Notion dump" in msg for msg in warning_args)
