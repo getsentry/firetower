@@ -518,6 +518,8 @@ def on_incident_created(incident: Incident) -> None:
                     f"Failed to post guide message for incident {incident.id}"
                 )
 
+        _create_datadog_notebook(incident, channel_id)
+
         ic_mention = ""
         if incident.captain:
             if captain_slack_id:
@@ -546,8 +548,6 @@ def on_incident_created(incident: Incident) -> None:
                 logger.exception(
                     f"Failed to post description for incident {incident.id}"
                 )
-
-        _create_datadog_notebook(incident, channel_id)
 
         ids_to_invite: list[str] = []
         if captain_slack_id:
