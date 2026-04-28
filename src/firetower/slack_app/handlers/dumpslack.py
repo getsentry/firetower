@@ -154,7 +154,7 @@ def _build_user_email_cache(client: Any) -> dict[str, str]:
 
 def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
     try:
-        response = client.conversations_history(channel=channel_id, limit=1000)
+        response = client.conversations_history(channel=channel_id, limit=999)
     except Exception:
         logger.exception("Failed to fetch history for channel %s", channel_id)
         return []

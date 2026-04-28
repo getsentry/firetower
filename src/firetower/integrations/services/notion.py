@@ -284,6 +284,8 @@ class NotionService:
                     ),
                 )
             except Exception as exc:
+                if attempt == max_retries - 1:
+                    break
                 wait = 2**attempt
                 logger.warning(
                     "Notion append failed (attempt %d/%d): %s. Retrying in %ds.",
