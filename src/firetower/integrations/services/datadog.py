@@ -8,6 +8,9 @@ from datadog_api_client.v1.model.notebook_create_data_attributes import (
     NotebookCreateDataAttributes,
 )
 from datadog_api_client.v1.model.notebook_create_request import NotebookCreateRequest
+from datadog_api_client.v1.model.notebook_global_time import NotebookGlobalTime
+from datadog_api_client.v1.model.notebook_resource_type import NotebookResourceType
+from datadog_api_client.v1.model.widget_live_span import WidgetLiveSpan
 
 from firetower.settings import config
 
@@ -72,9 +75,9 @@ class DatadogService:
                     attributes=NotebookCreateDataAttributes(
                         name=notebook_name,
                         cells=[],
-                        time={"live_span": "1h"},
+                        time=NotebookGlobalTime(live_span=WidgetLiveSpan("1h")),
                     ),
-                    type="notebooks",
+                    type=NotebookResourceType("notebooks"),
                 )
 
                 body = NotebookCreateRequest(data=notebook_data)
