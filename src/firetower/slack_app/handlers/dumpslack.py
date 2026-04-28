@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import httpx
 from django.conf import settings
+from slack_sdk.errors import SlackApiError
 
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.integrations.services.notion import NotionService
@@ -118,9 +119,16 @@ def handle_dumpslack_command(
         )
         return
 
-    client.chat_postMessage(
-        channel=channel_id, text=f"{action} postmortem doc: {page_url}"
-    )
+    try:
+        client.chat_postMessage(
+            channel=channel_id, text=f"{action} postmortem doc: {page_url}"
+        )
+    except SlackApiError:
+        logger.exception(
+            "Failed to post completion message to channel %s for page %s",
+            channel_id,
+            page_url,
+        )
 
 
 def _build_user_email_cache(client: Any) -> dict[str, str]:

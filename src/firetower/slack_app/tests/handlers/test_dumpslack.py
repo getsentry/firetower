@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock, patch
 
+from slack_sdk.errors import SlackApiError
+
 from firetower.slack_app.handlers.dumpslack import (
     _download_image,
     _extract_image_urls,
@@ -568,3 +570,37 @@ class TestHandleDumpslackCommand:
 
         ack.assert_called_once()
         assert "No incident" in respond.call_args[0][0]
+
+    def test_chat_post_message_failure_does_not_raise(self):
+        ack, body, command, client, respond, _ = self._make_args()
+        client.chat_postMessage.side_effect = SlackApiError(
+            message="not_in_channel", response={"ok": False, "error": "not_in_channel"}
+        )
+        mock_incident = MagicMock()
+        mock_incident.external_links.filter.return_value.first.return_value = None
+        mock_incident.captain = None
+        mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
+        with (
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+            patch(
+                "firetower.slack_app.handlers.dumpslack.get_incident_from_channel",
+                return_value=mock_incident,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService"
+            ) as mock_notion_cls,
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink"),
+        ):
+            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
+            mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_notion_cls.return_value.create_postmortem_page.return_value = mock_page
+            mock_notion_cls.return_value.apply_template.return_value = None
+            handle_dumpslack_command(ack, body, command, client, respond)
+
+        # SlackApiError on chat_postMessage must not propagate
+        client.chat_postMessage.assert_called_once()
+        ack.assert_called_once()
