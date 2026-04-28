@@ -159,11 +159,20 @@ class NotionService:
             stopping_index, batch = _create_slack_content(messages, index)
             response = self._append_children(toggle_id, batch)
             if response is not None:
+                batch_size = stopping_index - index
+                returned = len(response["results"])
+                if returned < batch_size:
+                    logger.warning(
+                        "Notion returned %d block IDs for %d appended bullets "
+                        "on page %s; images and replies for %d message(s) will be skipped.",
+                        returned,
+                        batch_size,
+                        page_id,
+                        batch_size - returned,
+                    )
                 slack_index = index
                 notion_index = 0
-                while slack_index < len(messages) and notion_index < len(
-                    response["results"]
-                ):
+                while slack_index < len(messages) and notion_index < returned:
                     slack_msg = messages[slack_index]
                     children: list[dict[str, Any]] = []
                     for img in slack_msg.get("images", []):

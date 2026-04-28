@@ -487,3 +487,51 @@ class TestApplyTemplate:
             )
             == 5
         )
+
+    def test_logs_warning_when_notion_returns_fewer_ids_than_batch(self, notion):
+        # Notion returns 1 block ID for a batch of 2 bullets.
+        notion.client.blocks.children.append.side_effect = [
+            {"results": [{"id": "toggle-id"}]},
+            {"results": [{"id": "bullet-1"}]},  # only 1 result for 2 bullets
+            {"results": []},  # reply append for bullet-1
+        ]
+        messages = [
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 1, tzinfo=UTC),
+                "text": "msg1",
+                "images": [],
+                "replies": [
+                    {
+                        "author": "b@sentry.io",
+                        "date_time": datetime(2024, 1, 1, 0, 1, tzinfo=UTC),
+                        "text": "reply",
+                    },
+                ],
+            },
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 1, 1, tzinfo=UTC),
+                "text": "msg2",
+                "images": [],
+                "replies": [
+                    {
+                        "author": "b@sentry.io",
+                        "date_time": datetime(2024, 1, 1, 1, 1, tzinfo=UTC),
+                        "text": "reply2",
+                    },
+                ],
+            },
+        ]
+
+        with (
+            patch.object(notion, "_send_markdown", return_value=True),
+            patch("firetower.integrations.services.notion.logger") as mock_logger,
+        ):
+            notion.apply_template("page-id", messages=messages, update_slack=True)
+
+        # Confirm the mismatch warning was emitted.
+        warning_args = [call[0][0] for call in mock_logger.warning.call_args_list]
+        assert any("block IDs" in msg for msg in warning_args)
+        # Only bullet-1's reply is appended; msg2's reply is skipped (no block ID).
+        assert notion.client.blocks.children.append.call_count == 3
