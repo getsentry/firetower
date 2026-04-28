@@ -339,7 +339,7 @@ statsd.constant_tags = [
 
 # Logging configuration
 _log_level = os.environ.get("DJANGO_LOG_LEVEL", config.log_level)
-print(f"Log level: {_log_level}", flush=True)
+print(f"Log level: {_log_level}", flush=True)  # noqa: T201
 
 LOGGING = {
     "version": 1,

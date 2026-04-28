@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -239,7 +239,7 @@ class TestUploadFileToNotion:
         assert mock_post.call_count == 2
         create_call, send_call = mock_post.call_args_list
         assert "file_uploads" in create_call.args[0]
-        assert f"file_uploads/upload-123/send" in send_call.args[0]
+        assert "file_uploads/upload-123/send" in send_call.args[0]
 
     def test_returns_none_when_create_fails(self, notion):
         with patch("firetower.integrations.services.notion.httpx.post", side_effect=Exception("500")):

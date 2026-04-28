@@ -2,6 +2,7 @@ import logging
 import re
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from django.conf import settings
@@ -258,9 +259,17 @@ def _extract_image_urls(msg: dict[str, Any]) -> list[dict[str, str]]:
     return items
 
 
+def _is_slack_url(url: str) -> bool:
+    try:
+        host = urlparse(url).hostname or ""
+        return host == "slack.com" or host.endswith(".slack.com")
+    except Exception:
+        return False
+
+
 def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
     headers: dict[str, str] = {}
-    if "slack.com" in url:
+    if _is_slack_url(url):
         headers["Authorization"] = f"Bearer {slack_token}"
     try:
         resp = httpx.get(url, headers=headers, timeout=30.0, follow_redirects=True)

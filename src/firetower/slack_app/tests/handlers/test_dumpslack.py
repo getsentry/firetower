@@ -5,6 +5,7 @@ from firetower.slack_app.handlers.dumpslack import (
     _extract_image_urls,
     _extract_notion_page_id,
     _get_channel_messages,
+    _is_slack_url,
     handle_dumpslack_command,
 )
 
@@ -250,6 +251,24 @@ class TestExtractImageUrls:
     def test_returns_empty_for_message_with_no_attachments_or_files(self):
         msg = {"text": "hello", "user": "U1"}
         assert _extract_image_urls(msg) == []
+
+
+class TestIsSlackUrl:
+    def test_matches_files_slack_com(self):
+        assert _is_slack_url("https://files.slack.com/files-pri/T1/img.jpg") is True
+
+    def test_matches_slack_com_subdomain(self):
+        assert _is_slack_url("https://slack-edge.com/img.png") is False
+        assert _is_slack_url("https://something.slack.com/path") is True
+
+    def test_rejects_slack_com_in_path(self):
+        assert _is_slack_url("https://evil.com/slack.com/img.png") is False
+
+    def test_rejects_slack_com_as_subdomain_of_attacker(self):
+        assert _is_slack_url("https://slack.com.evil.com/img.png") is False
+
+    def test_rejects_non_slack_url(self):
+        assert _is_slack_url("https://p.datadoghq.com/img/graph.png") is False
 
 
 class TestDownloadImage:
