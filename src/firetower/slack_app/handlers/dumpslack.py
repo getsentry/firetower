@@ -175,6 +175,8 @@ def _get_thread_replies(
         for msg in response.get("messages", []):
             if msg.get("type") != "message" or msg["ts"] == thread_ts:
                 continue
+            if not msg.get("user"):
+                continue
             if msg.get("bot_id"):
                 continue
             replies.append(msg)

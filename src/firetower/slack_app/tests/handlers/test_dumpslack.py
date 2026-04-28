@@ -349,6 +349,24 @@ class TestGetThreadReplies:
         assert len(replies) == 1
         assert replies[0]["text"] == "human reply"
 
+    def test_skips_replies_without_user(self):
+        mock_client = MagicMock()
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "has_more": False,
+            "messages": [
+                {"type": "message", "user": "U1", "text": "parent", "ts": "1.0"},
+                {"type": "message", "text": "no user", "ts": "2.0"},
+                {"type": "message", "user": "U2", "text": "has user", "ts": "3.0"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        replies = _get_thread_replies(mock_client, "C123", "1.0")
+
+        assert len(replies) == 1
+        assert replies[0]["text"] == "has user"
+
     def test_returns_empty_on_api_error(self):
         mock_client = MagicMock()
         mock_client.conversations_replies.side_effect = Exception("timeout")
