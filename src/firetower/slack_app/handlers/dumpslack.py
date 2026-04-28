@@ -219,6 +219,9 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
         if not response.get("has_more") or not cursor:
             break
 
+    if not all_messages:
+        return []
+
     email_cache = _build_user_email_cache(client)
 
     def resolve_email(slack_user_id: str) -> str:
