@@ -443,3 +443,47 @@ class TestApplyTemplate:
 
         # Only 2 appends: toggle creation + bullet batch. No children call since image failed.
         assert notion.client.blocks.children.append.call_count == 2
+
+    def test_batches_children_at_block_limit(self, notion):
+        notion.client.blocks.children.append.side_effect = [
+            {"results": [{"id": "toggle-id"}]},
+            {"results": [{"id": "bullet-id"}]},
+            {"results": []},
+            {"results": []},
+        ]
+        reply_bullet = {
+            "author": "b@sentry.io",
+            "date_time": datetime(2024, 1, 1, 0, 1, tzinfo=UTC),
+            "text": "reply",
+        }
+        messages = [
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 1, tzinfo=UTC),
+                "text": "main",
+                "images": [],
+                "replies": [reply_bullet] * 90,
+            }
+        ]
+
+        with patch.object(notion, "_send_markdown", return_value=True):
+            notion.apply_template("page-id", messages=messages, update_slack=True)
+
+        # 4 total: toggle, bullet batch, first 85 replies, last 5 replies
+        assert notion.client.blocks.children.append.call_count == 4
+        assert (
+            len(
+                notion.client.blocks.children.append.call_args_list[2].kwargs[
+                    "children"
+                ]
+            )
+            == 85
+        )
+        assert (
+            len(
+                notion.client.blocks.children.append.call_args_list[3].kwargs[
+                    "children"
+                ]
+            )
+            == 5
+        )

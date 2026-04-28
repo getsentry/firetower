@@ -24,6 +24,11 @@ class TestExtractNotionPageId:
     def test_returns_none_for_invalid_url(self):
         assert _extract_notion_page_id("https://notion.so/no-id-here") is None
 
+    def test_handles_trailing_slash(self):
+        url = "https://www.notion.so/sentry/Title-abc123def456abc123def456abc123de/"
+        result = _extract_notion_page_id(url)
+        assert result == "abc123de-f456-abc1-23de-f456abc123de"
+
 
 def _make_users_list_response(members: list[dict] | None = None) -> dict:
     """Return a users_list response with the given members (or a default single user)."""
@@ -163,6 +168,70 @@ class TestGetChannelMessages:
         assert len(messages) == 1
         assert len(messages[0]["replies"]) == 1
         assert messages[0]["replies"][0]["text"] == "reply"
+
+    def test_paginates_conversations_history(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.side_effect = [
+            {
+                "ok": True,
+                "has_more": True,
+                "messages": [
+                    {
+                        "type": "message",
+                        "user": "U1",
+                        "text": "page1",
+                        "ts": "1000000002.0",
+                    },
+                ],
+                "response_metadata": {"next_cursor": "cursor1"},
+            },
+            {
+                "ok": True,
+                "has_more": False,
+                "messages": [
+                    {
+                        "type": "message",
+                        "user": "U1",
+                        "text": "page2",
+                        "ts": "1000000001.0",
+                    },
+                ],
+                "response_metadata": {"next_cursor": ""},
+            },
+        ]
+        mock_client.users_list.return_value = _make_users_list_response()
+
+        messages = _get_channel_messages(mock_client, "C123")
+
+        assert len(messages) == 2
+        assert mock_client.conversations_history.call_count == 2
+        mock_client.conversations_history.assert_any_call(
+            channel="C123", limit=999, cursor="cursor1"
+        )
+
+    def test_includes_image_only_messages(self):
+        mock_client = MagicMock()
+        mock_client.token = "xoxb-token"
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {
+                    "type": "message",
+                    "user": "U1",
+                    "text": "",
+                    "ts": "1000000001.000000",
+                    "attachments": [{"image_url": "https://p.datadoghq.com/graph.png"}],
+                },
+            ],
+        }
+        mock_client.users_list.return_value = _make_users_list_response()
+
+        with patch(
+            "firetower.slack_app.handlers.dumpslack._download_image", return_value=None
+        ):
+            messages = _get_channel_messages(mock_client, "C123")
+
+        assert len(messages) == 1
 
     def test_falls_back_to_users_info_for_cache_miss(self):
         mock_client = MagicMock()

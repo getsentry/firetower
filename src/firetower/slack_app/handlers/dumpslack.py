@@ -153,15 +153,28 @@ def _build_user_email_cache(client: Any) -> dict[str, str]:
 
 
 def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
-    try:
-        response = client.conversations_history(channel=channel_id, limit=999)
-    except Exception:
-        logger.exception("Failed to fetch history for channel %s", channel_id)
-        return []
+    all_messages: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        kwargs: dict[str, Any] = {"channel": channel_id, "limit": 999}
+        if cursor:
+            kwargs["cursor"] = cursor
+        try:
+            response = client.conversations_history(**kwargs)
+        except Exception:
+            logger.exception("Failed to fetch history for channel %s", channel_id)
+            return []
 
-    if not response.get("ok"):
-        logger.error("conversations_history returned not-ok for channel %s", channel_id)
-        return []
+        if not response.get("ok"):
+            logger.error(
+                "conversations_history returned not-ok for channel %s", channel_id
+            )
+            return []
+
+        all_messages.extend(response.get("messages", []))
+        cursor = response.get("response_metadata", {}).get("next_cursor") or None
+        if not response.get("has_more") or not cursor:
+            break
 
     email_cache = _build_user_email_cache(client)
 
@@ -177,10 +190,13 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
             return slack_user_id
 
     content: list[dict[str, Any]] = []
-    for msg in response.get("messages", []):
+    for msg in all_messages:
         if msg.get("type") != "message":
             continue
-        if not msg.get("user") or not msg.get("text"):
+        if not msg.get("user"):
+            continue
+        image_urls = _extract_image_urls(msg)
+        if not msg.get("text") and not image_urls:
             continue
         if msg.get("bot_id") or msg.get("subtype") in ("channel_join", "channel_leave"):
             continue
@@ -213,7 +229,7 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
                 logger.exception("Failed to fetch replies for message %s", msg["ts"])
 
         images = []
-        for item in _extract_image_urls(msg):
+        for item in image_urls:
             result = _download_image(item["image_url"], client.token)
             if result:
                 data, content_type = result
@@ -292,7 +308,7 @@ def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
 
 def _extract_notion_page_id(notion_url: str) -> str | None:
     match = re.search(
-        r"([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})(?:\?|$)",
+        r"([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})(?:[/?]|$)",
         notion_url.lower(),
     )
     if not match:

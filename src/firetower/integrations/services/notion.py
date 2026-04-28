@@ -173,9 +173,10 @@ class NotionService:
                     children.extend(
                         _message_to_bullet(r) for r in slack_msg.get("replies", [])
                     )
-                    if children:
+                    bullet_id = response["results"][notion_index]["id"]
+                    for i in range(0, len(children), _BLOCK_CHILD_LIMIT):
                         self._append_children(
-                            response["results"][notion_index]["id"], children
+                            bullet_id, children[i : i + _BLOCK_CHILD_LIMIT]
                         )
                     slack_index += 1
                     notion_index += 1
