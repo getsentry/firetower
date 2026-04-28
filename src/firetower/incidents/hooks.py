@@ -362,7 +362,6 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
 
 
 def _create_datadog_notebook(incident: Incident, channel_id: str | None) -> None:
-    notebook_url: str | None = None
     try:
         if incident.is_private:
             logger.info(f"Skipping Datadog notebook for private incident {incident.id}")
@@ -378,29 +377,28 @@ def _create_datadog_notebook(incident: Incident, channel_id: str | None) -> None
                     )
             return
 
+        service = DatadogService()
+        if not service.configured:
+            logger.info(
+                f"DatadogService not configured, skipping notebook for incident {incident.id}"
+            )
+            return
+
+        notebook_url: str | None = None
         with transaction.atomic():
             # Hold the row lock across the Datadog API call so concurrent runs
-            # serialize and only one notebook is created. Trade-off: a stuck
-            # Datadog API blocks DB writers on this row until REQUEST_TIMEOUT_SECONDS.
-            datadog_link, created = (
-                ExternalLink.objects.select_for_update().get_or_create(
-                    incident=incident,
-                    type=ExternalLinkType.DATADOG,
-                    defaults={"url": ""},
-                )
+            # serialize and only one notebook is created. A placeholder row is
+            # inserted up front so select_for_update has something to lock.
+            # Trade-off: a stuck Datadog API blocks DB writers on this row
+            # until REQUEST_TIMEOUT_SECONDS.
+            link, created = ExternalLink.objects.select_for_update().get_or_create(
+                incident=incident,
+                type=ExternalLinkType.DATADOG,
+                defaults={"url": ""},
             )
-
-            if not created and datadog_link.url:
+            if not created and link.url:
                 logger.info(
                     f"Incident {incident.id} already has a Datadog notebook, skipping"
-                )
-                return
-
-            service = DatadogService()
-            if not service.configured:
-                datadog_link.delete()
-                logger.info(
-                    f"DatadogService not configured, skipping notebook for incident {incident.id}"
                 )
                 return
 
@@ -408,35 +406,40 @@ def _create_datadog_notebook(incident: Incident, channel_id: str | None) -> None
                 incident.incident_number, incident.title
             )
             if not notebook_url:
-                datadog_link.delete()
                 logger.info(
                     f"Datadog notebook creation returned no URL for incident {incident.id}"
                 )
+                link.delete()
                 return
 
-            datadog_link.url = notebook_url
-            datadog_link.save(update_fields=["url"])
+            link.url = notebook_url
+            link.save(update_fields=["url"])
+
+        if not channel_id:
+            logger.warning(
+                f"Datadog notebook {notebook_url} created for incident {incident.id} "
+                f"but no Slack channel to bookmark it in"
+            )
+            return
 
         # Post Slack side effects after the transaction commits so a Slack
-        # failure does not orphan the external Datadog notebook.
-        if channel_id and notebook_url:
-            try:
-                _slack_service.add_bookmark(
-                    channel_id, "Datadog Notebook", notebook_url
-                )
-            except Exception:
-                logger.exception(
-                    f"Failed to add Datadog bookmark for incident {incident.id}"
-                )
-            try:
-                _slack_service.post_message(
-                    channel_id,
-                    f"Datadog notebook created: {notebook_url}",
-                )
-            except Exception:
-                logger.exception(
-                    f"Failed to post Datadog notebook message for incident {incident.id}"
-                )
+        # failure does not orphan the external Datadog notebook. Each side
+        # effect is independent so one failure does not block the other.
+        try:
+            _slack_service.add_bookmark(channel_id, "Datadog Notebook", notebook_url)
+        except Exception:
+            logger.exception(
+                f"Failed to add Datadog bookmark for incident {incident.id}"
+            )
+        try:
+            _slack_service.post_message(
+                channel_id,
+                f"Datadog notebook created: {notebook_url}",
+            )
+        except Exception:
+            logger.exception(
+                f"Failed to post Datadog notebook message for incident {incident.id}"
+            )
     except Exception:
         logger.exception(
             f"Failed to create Datadog notebook for incident {incident.id}"
