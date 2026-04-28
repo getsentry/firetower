@@ -212,11 +212,17 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
                 logger.exception("Failed to fetch replies for message %s", msg["ts"])
 
         images = []
-        for url in _extract_image_urls(msg):
-            result = _download_image(url, client.token)
+        for item in _extract_image_urls(msg):
+            result = _download_image(item["image_url"], client.token)
             if result:
                 data, content_type = result
-                images.append({"data": data, "content_type": content_type})
+                images.append(
+                    {
+                        "data": data,
+                        "content_type": content_type,
+                        "source_url": item["source_url"],
+                    }
+                )
 
         content.append(
             {
@@ -232,18 +238,24 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
     return content
 
 
-def _extract_image_urls(msg: dict[str, Any]) -> list[str]:
-    urls = []
+def _extract_image_urls(msg: dict[str, Any]) -> list[dict[str, str]]:
+    items = []
     for attachment in msg.get("attachments", []):
-        url = attachment.get("image_url")
-        if url:
-            urls.append(url)
+        image_url = attachment.get("image_url")
+        if image_url:
+            source_url = (
+                attachment.get("title_link")
+                or attachment.get("from_url")
+                or attachment.get("original_url")
+                or ""
+            )
+            items.append({"image_url": image_url, "source_url": source_url})
     for file_info in msg.get("files", []):
         if file_info.get("mimetype", "").startswith("image/"):
             url = file_info.get("url_private") or file_info.get("url_private_download", "")
             if url:
-                urls.append(url)
-    return urls
+                items.append({"image_url": url, "source_url": ""})
+    return items
 
 
 def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:

@@ -279,6 +279,29 @@ class TestCreateImageBlock:
         block = notion._create_image_block({"content_type": "image/png"})
         assert block is None
 
+    def test_adds_clickable_caption_when_source_url_present(self, notion):
+        with patch.object(notion, "_upload_file_to_notion", return_value="upload-abc"):
+            block = notion._create_image_block(
+                {
+                    "data": b"PNG",
+                    "content_type": "image/png",
+                    "source_url": "https://app.datadoghq.com/dashboard/abc",
+                }
+            )
+
+        caption = block["image"]["caption"]
+        assert len(caption) == 1
+        assert caption[0]["text"]["content"] == "https://app.datadoghq.com/dashboard/abc"
+        assert caption[0]["text"]["link"]["url"] == "https://app.datadoghq.com/dashboard/abc"
+
+    def test_omits_caption_when_source_url_empty(self, notion):
+        with patch.object(notion, "_upload_file_to_notion", return_value="upload-abc"):
+            block = notion._create_image_block(
+                {"data": b"PNG", "content_type": "image/png", "source_url": ""}
+            )
+
+        assert "caption" not in block["image"]
+
 
 class TestApplyTemplate:
     def _make_append_response(self, block_id: str) -> dict:

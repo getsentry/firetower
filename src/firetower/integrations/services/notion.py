@@ -249,19 +249,25 @@ class NotionService:
     def _create_image_block(self, image: dict[str, Any]) -> dict[str, Any] | None:
         data = image.get("data")
         content_type = image.get("content_type", "image/png")
+        source_url = image.get("source_url", "")
         if not data:
             return None
         ext = content_type.split("/")[-1] if "/" in content_type else "png"
         upload_id = self._upload_file_to_notion(data, f"image.{ext}", content_type)
         if not upload_id:
             return None
-        return {
-            "type": "image",
-            "image": {
-                "type": "file_upload",
-                "file_upload": {"id": upload_id},
-            },
+        image_content: dict[str, Any] = {
+            "type": "file_upload",
+            "file_upload": {"id": upload_id},
         }
+        if source_url:
+            image_content["caption"] = [
+                {
+                    "type": "text",
+                    "text": {"content": source_url, "link": {"url": source_url}},
+                }
+            ]
+        return {"type": "image", "image": image_content}
 
     def _append_children(
         self,

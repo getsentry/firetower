@@ -190,11 +190,40 @@ class TestGetChannelMessages:
 
 
 class TestExtractImageUrls:
-    def test_extracts_attachment_image_url(self):
-        msg = {"attachments": [{"image_url": "https://p.datadoghq.com/img/graph.png"}]}
-        assert _extract_image_urls(msg) == ["https://p.datadoghq.com/img/graph.png"]
+    def test_extracts_attachment_image_url_with_source(self):
+        msg = {
+            "attachments": [
+                {
+                    "image_url": "https://p.datadoghq.com/img/graph.png",
+                    "title_link": "https://app.datadoghq.com/dashboard/abc",
+                }
+            ]
+        }
+        assert _extract_image_urls(msg) == [
+            {
+                "image_url": "https://p.datadoghq.com/img/graph.png",
+                "source_url": "https://app.datadoghq.com/dashboard/abc",
+            }
+        ]
 
-    def test_extracts_slack_file_url(self):
+    def test_falls_back_to_from_url_when_no_title_link(self):
+        msg = {
+            "attachments": [
+                {
+                    "image_url": "https://p.datadoghq.com/img/graph.png",
+                    "from_url": "https://app.datadoghq.com/dashboard/xyz",
+                }
+            ]
+        }
+        result = _extract_image_urls(msg)
+        assert result[0]["source_url"] == "https://app.datadoghq.com/dashboard/xyz"
+
+    def test_source_url_empty_when_no_link_fields(self):
+        msg = {"attachments": [{"image_url": "https://p.datadoghq.com/img/graph.png"}]}
+        result = _extract_image_urls(msg)
+        assert result == [{"image_url": "https://p.datadoghq.com/img/graph.png", "source_url": ""}]
+
+    def test_extracts_slack_file_url_with_empty_source(self):
         msg = {
             "files": [
                 {
@@ -204,7 +233,10 @@ class TestExtractImageUrls:
             ]
         }
         assert _extract_image_urls(msg) == [
-            "https://files.slack.com/files-pri/T1/screenshot.png"
+            {
+                "image_url": "https://files.slack.com/files-pri/T1/screenshot.png",
+                "source_url": "",
+            }
         ]
 
     def test_skips_non_image_files(self):
