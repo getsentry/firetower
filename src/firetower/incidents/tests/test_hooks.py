@@ -465,7 +465,9 @@ class TestOnStatusChanged:
 
     @patch("firetower.incidents.hooks.trigger_slack_dump_async")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_does_not_trigger_dump_without_slack_link(self, mock_slack, mock_dump_async):
+    def test_does_not_trigger_dump_without_slack_link(
+        self, mock_slack, mock_dump_async
+    ):
         mock_slack.parse_channel_id_from_url.return_value = None
 
         incident = Incident.objects.create(
