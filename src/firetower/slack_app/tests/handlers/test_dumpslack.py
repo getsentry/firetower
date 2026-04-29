@@ -10,6 +10,7 @@ from firetower.slack_app.handlers.dumpslack import (
     _get_channel_messages,
     _get_thread_replies,
     _is_slack_url,
+    _trigger_slack_dump,
     handle_dumpslack_command,
 )
 
@@ -624,6 +625,55 @@ class TestDownloadImage:
         assert result is None
 
 
+class TestTriggerSlackDump:
+    def test_skips_silently_when_notion_not_configured(self):
+        client = MagicMock()
+        mock_incident = MagicMock()
+        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings:
+            mock_settings.NOTION = None
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        client.chat_postMessage.assert_not_called()
+
+    def test_skips_silently_when_notion_token_empty(self):
+        client = MagicMock()
+        mock_incident = MagicMock()
+        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings:
+            mock_settings.NOTION = {"INTEGRATION_TOKEN": "", "DATABASE_ID": "db"}
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        client.chat_postMessage.assert_not_called()
+
+    def test_posts_start_message_and_completion(self):
+        client = MagicMock()
+        mock_incident = MagicMock()
+        mock_incident.external_links.filter.return_value.first.return_value = None
+        mock_incident.captain = None
+        mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
+        with (
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService"
+            ) as mock_notion_cls,
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink"),
+        ):
+            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
+            mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_notion_cls.return_value.create_postmortem_page.return_value = mock_page
+            mock_notion_cls.return_value.apply_template.return_value = None
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        assert client.chat_postMessage.call_count == 2
+        first_call_text = client.chat_postMessage.call_args_list[0][1]["text"]
+        assert "Fetching" in first_call_text
+        second_call_text = client.chat_postMessage.call_args_list[1][1]["text"]
+        assert "notion.so/page-id" in second_call_text
+
+
 class TestHandleDumpslackCommand:
     def _make_args(self, notion_config=None, channel_id="C123"):
         ack = MagicMock()
@@ -698,5 +748,5 @@ class TestHandleDumpslackCommand:
             handle_dumpslack_command(ack, body, command, client, respond)
 
         # SlackApiError on chat_postMessage must not propagate
-        client.chat_postMessage.assert_called_once()
+        client.chat_postMessage.assert_called()
         ack.assert_called_once()
