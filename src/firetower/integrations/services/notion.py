@@ -2,11 +2,12 @@ import logging
 import time
 from datetime import UTC, datetime
 from typing import Any, cast
-from urllib.parse import urlparse
 
 import requests
 import sentry_sdk
 from notion_client import Client
+
+from firetower.integrations.services.slack import is_slack_url
 
 logger = logging.getLogger(__name__)
 
@@ -286,14 +287,6 @@ class NotionService:
             )
             return None
 
-    @staticmethod
-    def _is_slack_url(url: str) -> bool:
-        try:
-            host = urlparse(url).hostname or ""
-            return host == "slack.com" or host.endswith(".slack.com")
-        except Exception:
-            return False
-
     def _create_image_block(self, image: dict[str, Any]) -> dict[str, Any] | None:
         data = image.get("data")
         content_type = image.get("content_type", "image/png")
@@ -308,7 +301,7 @@ class NotionService:
                 "type": "file_upload",
                 "file_upload": {"id": upload_id},
             }
-        elif image_url and not self._is_slack_url(image_url):
+        elif image_url and not is_slack_url(image_url):
             image_content = {"type": "external", "external": {"url": image_url}}
         else:
             return None

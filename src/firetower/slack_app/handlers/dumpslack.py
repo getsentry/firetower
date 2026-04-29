@@ -2,7 +2,6 @@ import logging
 import re
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlparse
 
 import requests
 import sentry_sdk
@@ -12,7 +11,7 @@ from django.db import transaction
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.integrations.services.notion import NotionService
-from firetower.integrations.services.slack import SlackService
+from firetower.integrations.services.slack import SlackService, is_slack_url
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
 logger = logging.getLogger(__name__)
@@ -327,17 +326,9 @@ def _extract_image_urls(msg: dict[str, Any]) -> list[dict[str, str]]:
     return items
 
 
-def _is_slack_url(url: str) -> bool:
-    try:
-        host = urlparse(url).hostname or ""
-        return host == "slack.com" or host.endswith(".slack.com")
-    except Exception:
-        return False
-
-
 def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
     headers: dict[str, str] = {}
-    if _is_slack_url(url):
+    if is_slack_url(url):
         headers["Authorization"] = f"Bearer {slack_token}"
     try:
         resp = requests.get(url, headers=headers, timeout=30.0)

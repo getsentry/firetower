@@ -2,13 +2,12 @@ from unittest.mock import MagicMock, patch
 
 from slack_sdk.errors import SlackApiError
 
-from firetower.integrations.services.slack import SlackService
+from firetower.integrations.services.slack import SlackService, is_slack_url
 from firetower.slack_app.handlers.dumpslack import (
     _download_image,
     _extract_image_urls,
     _extract_notion_page_id,
     _get_channel_messages,
-    _is_slack_url,
     _resolve_user_emails,
     _trigger_slack_dump,
     handle_dumpslack_command,
@@ -357,20 +356,20 @@ class TestExtractImageUrls:
 
 class TestIsSlackUrl:
     def test_matches_files_slack_com(self):
-        assert _is_slack_url("https://files.slack.com/files-pri/T1/img.jpg") is True
+        assert is_slack_url("https://files.slack.com/files-pri/T1/img.jpg") is True
 
     def test_matches_slack_com_subdomain(self):
-        assert _is_slack_url("https://slack-edge.com/img.png") is False
-        assert _is_slack_url("https://something.slack.com/path") is True
+        assert is_slack_url("https://slack-edge.com/img.png") is False
+        assert is_slack_url("https://something.slack.com/path") is True
 
     def test_rejects_slack_com_in_path(self):
-        assert _is_slack_url("https://evil.com/slack.com/img.png") is False
+        assert is_slack_url("https://evil.com/slack.com/img.png") is False
 
     def test_rejects_slack_com_as_subdomain_of_attacker(self):
-        assert _is_slack_url("https://slack.com.evil.com/img.png") is False
+        assert is_slack_url("https://slack.com.evil.com/img.png") is False
 
     def test_rejects_non_slack_url(self):
-        assert _is_slack_url("https://p.datadoghq.com/img/graph.png") is False
+        assert is_slack_url("https://p.datadoghq.com/img/graph.png") is False
 
 
 class TestDownloadImage:

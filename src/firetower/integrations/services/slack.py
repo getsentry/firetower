@@ -7,6 +7,7 @@ and retrieve user profile information (name, avatar).
 
 import logging
 from typing import Any
+from urllib.parse import urlparse
 
 from django.conf import settings
 from slack_sdk import WebClient
@@ -17,6 +18,14 @@ logger = logging.getLogger(__name__)
 
 def escape_slack_text(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def is_slack_url(url: str) -> bool:
+    try:
+        host = urlparse(url).hostname or ""
+        return host == "slack.com" or host.endswith(".slack.com")
+    except Exception:
+        return False
 
 
 class SlackService:
