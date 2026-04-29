@@ -127,7 +127,7 @@ class NotionService:
         page_id: str,
         messages: list[dict[str, Any]],
         update_slack: bool = False,
-    ) -> None:
+    ) -> int:
         if not update_slack and self.template_markdown:
             if not self._send_markdown(page_id, self.template_markdown):
                 raise RuntimeError(
@@ -160,6 +160,7 @@ class NotionService:
             )
         toggle_id = response["results"][0]["id"]
 
+        images_failed = 0
         index = 0
         while index < len(messages):
             stopping_index, batch = _create_slack_content(messages, index)
@@ -200,6 +201,8 @@ class NotionService:
                         block = self._create_image_block(img)
                         if block is not None:
                             children.append(block)
+                        else:
+                            images_failed += 1
                     children.extend(
                         _message_to_bullet(r) for r in slack_msg.get("replies", [])
                     )
@@ -211,6 +214,8 @@ class NotionService:
                     slack_index += 1
                     notion_index += 1
             index = stopping_index
+
+        return images_failed
 
     def _send_markdown(self, page_id: str, content: str, max_retries: int = 3) -> bool:
         # notion-client v3 does not wrap the Markdown API endpoint, so we call it directly.

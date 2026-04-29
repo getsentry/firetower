@@ -95,8 +95,9 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
 
     action = "Created" if not existing_link else "Updated"
 
+    images_failed = 0
     try:
-        notion.apply_template(page_id, messages, update_slack=update_slack)
+        images_failed = notion.apply_template(page_id, messages, update_slack=update_slack)
     except Exception:
         logger.exception("Failed to populate Notion page %s", page_id)
         try:
@@ -121,10 +122,14 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         except Exception:
             logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
 
-    try:
-        client.chat_postMessage(
-            channel=channel_id, text=f"{action} postmortem doc: {page_url}"
+    completion_text = f"{action} postmortem doc: {page_url}"
+    if images_failed:
+        completion_text += (
+            f"\n:warning: {images_failed} image(s) could not be uploaded to Notion. "
+            "Check server logs for details."
         )
+    try:
+        client.chat_postMessage(channel=channel_id, text=completion_text)
     except Exception:
         logger.exception(
             "Failed to post completion message to channel %s for page %s",
@@ -311,6 +316,12 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
                         "content_type": content_type,
                         "source_url": item["source_url"],
                     }
+                )
+            else:
+                logger.warning(
+                    "Failed to download image %s for channel %s",
+                    item["image_url"],
+                    channel_id,
                 )
 
         content.append(
