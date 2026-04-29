@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
 
-import httpx
+import requests
 import sentry_sdk
 from django.conf import settings
 from django.db import transaction
@@ -12,6 +12,7 @@ from django.db import transaction
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.integrations.services.notion import NotionService
+from firetower.integrations.services.slack import SlackService
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,8 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
 
     action = "Created" if created else "Updated"
 
-    messages = _get_channel_messages(client, channel_id)
+    slack_service = SlackService()
+    messages = _get_channel_messages(slack_service, channel_id)
 
     try:
         notion.apply_template(page_id, messages, update_slack=update_slack)
@@ -173,7 +175,9 @@ def handle_dumpslack_command(
     _trigger_slack_dump(client, channel_id, incident)
 
 
-def _resolve_user_emails(client: Any, slack_user_ids: set[str]) -> dict[str, str]:
+def _resolve_user_emails(
+    service: SlackService, slack_user_ids: set[str]
+) -> dict[str, str]:
     profiles = ExternalProfile.objects.filter(
         type=ExternalProfileType.SLACK,
         external_id__in=slack_user_ids,
@@ -181,73 +185,16 @@ def _resolve_user_emails(client: Any, slack_user_ids: set[str]) -> dict[str, str
     cache: dict[str, str] = {p.external_id: p.user.email for p in profiles}
 
     for slack_id in slack_user_ids - cache.keys():
-        try:
-            info = client.users_info(user=slack_id)
-            email = info["user"].get("profile", {}).get("email") or slack_id
-            cache[slack_id] = email
-        except Exception:
-            cache[slack_id] = slack_id
+        user_info = service.get_user_info(slack_id)
+        cache[slack_id] = (user_info or {}).get("email") or slack_id
 
     return cache
 
 
-def _get_thread_replies(
-    client: Any, channel_id: str, thread_ts: str
+def _get_channel_messages(
+    service: SlackService, channel_id: str
 ) -> list[dict[str, Any]]:
-    """Return all non-parent replies for a thread, paginating with cursor."""
-    replies: list[dict[str, Any]] = []
-    cursor: str | None = None
-    while True:
-        kwargs: dict[str, Any] = {"channel": channel_id, "ts": thread_ts, "limit": 999}
-        if cursor:
-            kwargs["cursor"] = cursor
-        try:
-            response = client.conversations_replies(**kwargs)
-        except Exception:
-            logger.exception("Failed to fetch replies for thread %s", thread_ts)
-            break
-        if not response.get("ok"):
-            logger.error(
-                "conversations_replies returned not-ok for thread %s", thread_ts
-            )
-            break
-        for msg in response.get("messages", []):
-            if msg.get("type") != "message" or msg["ts"] == thread_ts:
-                continue
-            if not msg.get("user"):
-                continue
-            if msg.get("bot_id"):
-                continue
-            replies.append(msg)
-        cursor = response.get("response_metadata", {}).get("next_cursor") or None
-        if not response.get("has_more") or not cursor:
-            break
-    return replies
-
-
-def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
-    all_messages: list[dict[str, Any]] = []
-    cursor: str | None = None
-    while True:
-        kwargs: dict[str, Any] = {"channel": channel_id, "limit": 999}
-        if cursor:
-            kwargs["cursor"] = cursor
-        try:
-            response = client.conversations_history(**kwargs)
-        except Exception:
-            logger.exception("Failed to fetch history for channel %s", channel_id)
-            break
-
-        if not response.get("ok"):
-            logger.error(
-                "conversations_history returned not-ok for channel %s", channel_id
-            )
-            break
-
-        all_messages.extend(response.get("messages", []))
-        cursor = response.get("response_metadata", {}).get("next_cursor") or None
-        if not response.get("has_more") or not cursor:
-            break
+    all_messages = service.get_channel_history(channel_id)
 
     if not all_messages:
         return []
@@ -267,8 +214,8 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
     all_raw_replies: dict[str, list[dict[str, Any]]] = {}
     for msg in filtered:
         if msg.get("reply_count", 0) > 0:
-            all_raw_replies[msg["thread_ts"]] = _get_thread_replies(
-                client, channel_id, msg["thread_ts"]
+            all_raw_replies[msg["thread_ts"]] = service.get_thread_replies(
+                channel_id, msg["thread_ts"]
             )
 
     slack_user_ids: set[str] = set()
@@ -279,7 +226,7 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
             if reply.get("user"):
                 slack_user_ids.add(reply["user"])
 
-    email_cache = _resolve_user_emails(client, slack_user_ids)
+    email_cache = _resolve_user_emails(service, slack_user_ids)
 
     content: list[dict[str, Any]] = []
     for msg in filtered:
@@ -299,7 +246,7 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
 
         images = []
         for item in image_urls:
-            result = _download_image(item["image_url"], client.token)
+            result = _download_image(item["image_url"], service.bot_token or "")
             if result:
                 data, content_type = result
                 images.append(
@@ -381,7 +328,7 @@ def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
     if _is_slack_url(url):
         headers["Authorization"] = f"Bearer {slack_token}"
     try:
-        resp = httpx.get(url, headers=headers, timeout=30.0, follow_redirects=True)
+        resp = requests.get(url, headers=headers, timeout=30.0)
         resp.raise_for_status()
         content_type = (
             resp.headers.get("content-type", "image/png").split(";")[0].strip()

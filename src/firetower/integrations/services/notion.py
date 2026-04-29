@@ -3,7 +3,7 @@ import time
 from datetime import UTC, datetime
 from typing import Any, cast
 
-import httpx
+import requests
 import sentry_sdk
 from notion_client import Client
 
@@ -217,7 +217,7 @@ class NotionService:
         # notion-client v3 does not wrap the Markdown API endpoint, so we call it directly.
         for attempt in range(max_retries):
             try:
-                response = httpx.patch(
+                response = requests.patch(
                     f"{_NOTION_API_BASE}/pages/{page_id}/markdown",
                     headers={
                         "Authorization": f"Bearer {self._integration_token}",
@@ -257,7 +257,7 @@ class NotionService:
             "Notion-Version": _MARKDOWN_NOTION_VERSION,
         }
         try:
-            create_resp = httpx.post(
+            create_resp = requests.post(
                 f"{_NOTION_API_BASE}/file_uploads",
                 headers={**auth_headers, "Content-Type": "application/json"},
                 json={"filename": filename},
@@ -270,7 +270,7 @@ class NotionService:
             logger.warning("Failed to create Notion file upload: %s", exc)
             return None
         try:
-            send_resp = httpx.post(
+            send_resp = requests.post(
                 f"{_NOTION_API_BASE}/file_uploads/{upload_id}/send",
                 headers=auth_headers,
                 files={"file": (filename, data, content_type)},

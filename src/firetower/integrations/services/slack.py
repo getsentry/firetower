@@ -325,9 +325,74 @@ class SlackService:
                 "is_bot": is_bot,
             }
 
-        except SlackApiError as e:
+        except Exception as e:
             logger.error(
                 f"Error fetching Slack user info: {e}",
                 extra={"slack_user_id": slack_user_id},
             )
             return None
+
+    def get_channel_history(self, channel_id: str) -> list[dict[str, Any]]:
+        """Return all messages from a channel, paginating automatically."""
+        if not self.client:
+            return []
+        messages: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            kwargs: dict[str, Any] = {"channel": channel_id, "limit": 999}
+            if cursor:
+                kwargs["cursor"] = cursor
+            try:
+                response = self.client.conversations_history(**kwargs)
+            except Exception:
+                logger.exception("Failed to fetch history for channel %s", channel_id)
+                break
+            if not response.get("ok"):
+                logger.error(
+                    "conversations_history returned not-ok for channel %s", channel_id
+                )
+                break
+            messages.extend(response.get("messages", []))
+            cursor = response.get("response_metadata", {}).get("next_cursor") or None
+            if not response.get("has_more") or not cursor:
+                break
+        return messages
+
+    def get_thread_replies(
+        self, channel_id: str, thread_ts: str
+    ) -> list[dict[str, Any]]:
+        """Return all non-parent human replies for a thread, paginating automatically."""
+        if not self.client:
+            return []
+        replies: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "channel": channel_id,
+                "ts": thread_ts,
+                "limit": 999,
+            }
+            if cursor:
+                kwargs["cursor"] = cursor
+            try:
+                response = self.client.conversations_replies(**kwargs)
+            except Exception:
+                logger.exception("Failed to fetch replies for thread %s", thread_ts)
+                break
+            if not response.get("ok"):
+                logger.error(
+                    "conversations_replies returned not-ok for thread %s", thread_ts
+                )
+                break
+            for msg in response.get("messages", []):
+                if msg.get("type") != "message" or msg["ts"] == thread_ts:
+                    continue
+                if not msg.get("user"):
+                    continue
+                if msg.get("bot_id"):
+                    continue
+                replies.append(msg)
+            cursor = response.get("response_metadata", {}).get("next_cursor") or None
+            if not response.get("has_more") or not cursor:
+                break
+        return replies

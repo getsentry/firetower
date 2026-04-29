@@ -375,3 +375,155 @@ class TestSlackService:
         url = service.build_channel_url("C12345")
         assert url == "https://sentry.slack.com/archives/C12345"
         assert service.parse_channel_id_from_url(url) == "C12345"
+
+    def test_get_channel_history_returns_all_messages(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "has_more": False,
+            "messages": [{"type": "message", "text": "hello", "ts": "1.0"}],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        messages = service.get_channel_history("C123")
+
+        assert len(messages) == 1
+        mock_client.conversations_history.assert_called_once_with(
+            channel="C123", limit=999
+        )
+
+    def test_get_channel_history_paginates(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.side_effect = [
+            {
+                "ok": True,
+                "has_more": True,
+                "messages": [{"type": "message", "text": "p1", "ts": "2.0"}],
+                "response_metadata": {"next_cursor": "cur1"},
+            },
+            {
+                "ok": True,
+                "has_more": False,
+                "messages": [{"type": "message", "text": "p2", "ts": "1.0"}],
+                "response_metadata": {"next_cursor": ""},
+            },
+        ]
+
+        messages = service.get_channel_history("C123")
+
+        assert len(messages) == 2
+        assert mock_client.conversations_history.call_count == 2
+        mock_client.conversations_history.assert_any_call(
+            channel="C123", limit=999, cursor="cur1"
+        )
+
+    def test_get_channel_history_returns_empty_on_error(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.side_effect = Exception("timeout")
+
+        messages = service.get_channel_history("C123")
+
+        assert messages == []
+
+    def test_get_channel_history_returns_empty_without_client(self):
+        mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}
+        with patch.object(settings, "SLACK", mock_slack_config):
+            service = SlackService()
+
+        assert service.get_channel_history("C123") == []
+
+    def test_get_thread_replies_excludes_parent(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "has_more": False,
+            "messages": [
+                {"type": "message", "user": "U1", "text": "parent", "ts": "1.0"},
+                {"type": "message", "user": "U2", "text": "reply", "ts": "2.0"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        replies = service.get_thread_replies("C123", "1.0")
+
+        assert len(replies) == 1
+        assert replies[0]["text"] == "reply"
+
+    def test_get_thread_replies_paginates(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_replies.side_effect = [
+            {
+                "ok": True,
+                "has_more": True,
+                "messages": [
+                    {"type": "message", "user": "U1", "text": "parent", "ts": "1.0"},
+                    {"type": "message", "user": "U2", "text": "r1", "ts": "2.0"},
+                ],
+                "response_metadata": {"next_cursor": "cur1"},
+            },
+            {
+                "ok": True,
+                "has_more": False,
+                "messages": [
+                    {"type": "message", "user": "U3", "text": "r2", "ts": "3.0"},
+                ],
+                "response_metadata": {"next_cursor": ""},
+            },
+        ]
+
+        replies = service.get_thread_replies("C123", "1.0")
+
+        assert len(replies) == 2
+        mock_client.conversations_replies.assert_any_call(
+            channel="C123", ts="1.0", limit=999, cursor="cur1"
+        )
+
+    def test_get_thread_replies_skips_bots(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "has_more": False,
+            "messages": [
+                {"type": "message", "user": "U1", "text": "parent", "ts": "1.0"},
+                {
+                    "type": "message",
+                    "user": "B1",
+                    "bot_id": "B1",
+                    "text": "bot",
+                    "ts": "2.0",
+                },
+                {"type": "message", "user": "U2", "text": "human", "ts": "3.0"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        replies = service.get_thread_replies("C123", "1.0")
+
+        assert len(replies) == 1
+        assert replies[0]["text"] == "human"
+
+    def test_get_thread_replies_skips_no_user(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "has_more": False,
+            "messages": [
+                {"type": "message", "user": "U1", "text": "parent", "ts": "1.0"},
+                {"type": "message", "text": "no user", "ts": "2.0"},
+                {"type": "message", "user": "U2", "text": "has user", "ts": "3.0"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        replies = service.get_thread_replies("C123", "1.0")
+
+        assert len(replies) == 1
+        assert replies[0]["text"] == "has user"
+
+    def test_get_thread_replies_returns_empty_on_error(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_replies.side_effect = Exception("timeout")
+
+        replies = service.get_thread_replies("C123", "1.0")
+
+        assert replies == []

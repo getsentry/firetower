@@ -16,7 +16,6 @@ dependencies = [
     "google-auth>=2.37.0",
     "psycopg[binary]>=3.2.11",
     "pyserde[toml]>=0.28.0",
-    "httpx>=0.28.0",
     "notion-client>=3.0.0,<4.0.0",
     "requests>=2.32.0",
     "slack-bolt>=1.27.0",
