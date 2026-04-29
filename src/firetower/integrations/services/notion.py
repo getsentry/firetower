@@ -150,7 +150,7 @@ class NotionService:
             },
         }
         response = self._append_children(page_id, [toggle])
-        if response is None or not response.get("results")::
+        if response is None or not response.get("results"):
             raise RuntimeError(
                 f"Failed to append slack toggle to Notion page {page_id}"
             )
