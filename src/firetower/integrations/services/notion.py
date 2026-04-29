@@ -9,6 +9,8 @@ from notion_client import Client
 logger = logging.getLogger(__name__)
 
 _NOTION_API_BASE = "https://api.notion.com/v1"
+
+
 # Markdown API requires a newer version than the library default.
 _MARKDOWN_NOTION_VERSION = "2026-03-11"
 
@@ -24,7 +26,9 @@ class NotionService:
     def __init__(
         self, integration_token: str, database_id: str, template_markdown: str = ""
     ) -> None:
-        self.client: Client = Client(auth=integration_token)
+        self.client: Client = Client(
+            auth=integration_token, notion_version=_MARKDOWN_NOTION_VERSION
+        )
         self._integration_token = integration_token
         self.database_id = database_id
         self.template_markdown = template_markdown
