@@ -43,18 +43,18 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
     page_id: str | None = None
     page_url: str = ""
     update_slack: bool = False
-    created: bool = False
+    notion_page_created: bool = False
 
     try:
         with transaction.atomic():
-            notion_link, created = (
+            notion_link, db_record_created = (
                 ExternalLink.objects.select_for_update().get_or_create(
                     incident=incident,
                     type=ExternalLinkType.NOTION,
                     defaults={"url": ""},
                 )
             )
-            if not created and notion_link.url:
+            if not db_record_created and notion_link.url:
                 page_id = _extract_notion_page_id(notion_link.url)
                 if not page_id:
                     try:
@@ -86,6 +86,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                 page_url = page["url"]
                 notion_link.url = page_url
                 notion_link.save(update_fields=["url"])
+                notion_page_created = True
     except Exception:
         logger.exception(
             "Failed to create Notion postmortem page for %s",
@@ -102,7 +103,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             )
         return
 
-    action = "Created" if created else "Updated"
+    action = "Created" if notion_page_created else "Updated"
 
     slack_service = SlackService()
     messages = _get_channel_messages(slack_service, channel_id)
@@ -122,7 +123,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             )
         return
 
-    if created:
+    if notion_page_created:
         try:
             client.bookmarks_add(
                 channel_id=channel_id,
@@ -172,7 +173,12 @@ def handle_dumpslack_command(
     respond(
         "Fetching Slack history and generating postmortem doc, this may take a moment..."
     )
-    _trigger_slack_dump(client, channel_id, incident)
+    from django.db import connection  # noqa: PLC0415
+
+    try:
+        _trigger_slack_dump(client, channel_id, incident)
+    finally:
+        connection.close()
 
 
 def _resolve_user_emails(
@@ -218,9 +224,11 @@ def _get_channel_messages(
     all_raw_replies: dict[str, list[dict[str, Any]]] = {}
     for msg in filtered:
         if msg.get("reply_count", 0) > 0:
-            all_raw_replies[msg["thread_ts"]] = service.get_thread_replies(
-                channel_id, msg["thread_ts"]
-            )
+            thread_ts = msg.get("thread_ts")
+            if thread_ts:
+                all_raw_replies[thread_ts] = service.get_thread_replies(
+                    channel_id, thread_ts
+                )
 
     slack_user_ids: set[str] = set()
     for msg in filtered:
