@@ -6,4 +6,10 @@ from .pagerduty import PagerDutyService
 from .slack import SlackService
 from .statuspage import StatuspageService
 
-__all__ = ["DatadogService", "NotionService", "PagerDutyService", "SlackService", "StatuspageService"]
+__all__ = [
+    "DatadogService",
+    "NotionService",
+    "PagerDutyService",
+    "SlackService",
+    "StatuspageService",
+]
