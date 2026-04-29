@@ -341,8 +341,9 @@ class TestOnIncidentCreated:
 @pytest.mark.django_db
 class TestOnStatusChanged:
     @patch("firetower.slack_app.handlers.dumpslack._trigger_slack_dump")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_status_update_message(self, mock_slack, mock_dump):
+    def test_posts_status_update_message(self, mock_slack, mock_bolt, mock_dump):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = Incident.objects.create(

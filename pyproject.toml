@@ -21,6 +21,7 @@ dependencies = [
     "requests>=2.32.0",
     "slack-bolt>=1.27.0",
     "slack-sdk>=3.31.0",
+    "sentry-sdk>=2.47.0",
 ]
 
 [build-system]
