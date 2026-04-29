@@ -5,6 +5,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+import sentry_sdk
 from django.conf import settings
 
 from firetower.incidents.models import ExternalLink, ExternalLinkType
@@ -399,7 +400,8 @@ def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
             )
             return None
         return resp.content, content_type
-    except Exception:
+    except Exception as exc:
+        sentry_sdk.capture_exception(exc)
         logger.exception("Failed to download image from %s", url)
         return None
 

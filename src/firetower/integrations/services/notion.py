@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import httpx
+import sentry_sdk
 from notion_client import Client
 
 logger = logging.getLogger(__name__)
@@ -270,6 +271,7 @@ class NotionService:
             create_resp.raise_for_status()
             upload_id = create_resp.json()["id"]
         except Exception as exc:
+            sentry_sdk.capture_exception(exc)
             logger.warning("Failed to create Notion file upload: %s", exc)
             return None
         try:
@@ -282,6 +284,7 @@ class NotionService:
             send_resp.raise_for_status()
             return upload_id
         except Exception as exc:
+            sentry_sdk.capture_exception(exc)
             logger.warning(
                 "Failed to send file to Notion upload %s: %s", upload_id, exc
             )
