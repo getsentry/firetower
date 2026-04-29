@@ -146,6 +146,18 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         )
 
 
+def trigger_slack_dump_async(client: Any, channel_id: str, incident: Any) -> None:
+    def _run() -> None:
+        from django.db import connection  # noqa: PLC0415
+
+        try:
+            _trigger_slack_dump(client, channel_id, incident)
+        finally:
+            connection.close()
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def handle_dumpslack_command(
     ack: Any,
     body: dict[str, Any],
@@ -173,16 +185,7 @@ def handle_dumpslack_command(
     respond(
         "Fetching Slack history and generating postmortem doc, this may take a moment..."
     )
-
-    def _run_dump() -> None:
-        from django.db import connection  # noqa: PLC0415
-
-        try:
-            _trigger_slack_dump(client, channel_id, incident)
-        finally:
-            connection.close()
-
-    threading.Thread(target=_run_dump, daemon=True).start()
+    trigger_slack_dump_async(client, channel_id, incident)
 
 
 def _resolve_user_emails(

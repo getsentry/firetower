@@ -1,5 +1,4 @@
 import logging
-import threading
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -624,24 +623,10 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
         try:
             from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
             from firetower.slack_app.handlers.dumpslack import (  # noqa: PLC0415
-                _trigger_slack_dump,
+                trigger_slack_dump_async,
             )
 
-            bolt_client = get_bolt_app().client
-
-            def _run_dump(client, cid, inc):  # type: ignore[no-untyped-def]
-                from django.db import connection  # noqa: PLC0415
-
-                try:
-                    _trigger_slack_dump(client, cid, inc)
-                finally:
-                    connection.close()
-
-            threading.Thread(
-                target=_run_dump,
-                args=(bolt_client, channel_id, incident),
-                daemon=True,
-            ).start()
+            trigger_slack_dump_async(get_bolt_app().client, channel_id, incident)
         except Exception:
             logger.exception(f"Failed to trigger slack dump for incident {incident.id}")
 
