@@ -483,6 +483,39 @@ class TestTriggerSlackDump:
         completion_text = client.chat_postMessage.call_args_list[0][1]["text"]
         assert "notion.so/page-id" in completion_text
 
+    def test_chat_post_message_failure_does_not_raise(self):
+        client = MagicMock()
+        client.chat_postMessage.side_effect = SlackApiError(
+            message="not_in_channel", response={"ok": False, "error": "not_in_channel"}
+        )
+        mock_incident = MagicMock()
+        mock_incident.captain = None
+        mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
+        mock_notion_link = MagicMock(url="")
+        with (
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService"
+            ) as mock_notion_cls,
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+        ):
+            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
+            mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                True,
+            )
+            mock_notion_cls.return_value.create_postmortem_page.return_value = mock_page
+            mock_notion_cls.return_value.apply_template.return_value = None
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        client.chat_postMessage.assert_called()
+
 
 class TestHandleDumpslackCommand:
     def _make_args(self, notion_config=None, channel_id="C123"):
@@ -527,15 +560,9 @@ class TestHandleDumpslackCommand:
         ack.assert_called_once()
         assert "No incident" in respond.call_args[0][0]
 
-    def test_chat_post_message_failure_does_not_raise(self):
+    def test_dispatches_async_dump(self):
         ack, body, command, client, respond, _ = self._make_args()
-        client.chat_postMessage.side_effect = SlackApiError(
-            message="not_in_channel", response={"ok": False, "error": "not_in_channel"}
-        )
         mock_incident = MagicMock()
-        mock_incident.captain = None
-        mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
-        mock_notion_link = MagicMock(url="")
         with (
             patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
             patch(
@@ -543,25 +570,12 @@ class TestHandleDumpslackCommand:
                 return_value=mock_incident,
             ),
             patch(
-                "firetower.slack_app.handlers.dumpslack.NotionService"
-            ) as mock_notion_cls,
-            patch(
-                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
-                return_value=[],
-            ),
-            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
-            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+                "firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async"
+            ) as mock_async,
         ):
             mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
-            mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
-            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
-                mock_notion_link,
-                True,
-            )
-            mock_notion_cls.return_value.create_postmortem_page.return_value = mock_page
-            mock_notion_cls.return_value.apply_template.return_value = None
             handle_dumpslack_command(ack, body, command, client, respond)
 
-        # SlackApiError on chat_postMessage must not propagate
-        client.chat_postMessage.assert_called()
         ack.assert_called_once()
+        respond.assert_called()
+        mock_async.assert_called_once_with(client, "C123", mock_incident)
