@@ -9,6 +9,7 @@ import sentry_sdk
 from django.conf import settings
 from django.db import transaction
 
+from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.integrations.services.notion import NotionService
 from firetower.slack_app.handlers.utils import get_incident_from_channel
@@ -172,31 +173,20 @@ def handle_dumpslack_command(
     _trigger_slack_dump(client, channel_id, incident)
 
 
-def _build_user_email_cache(client: Any) -> dict[str, str]:
-    cache: dict[str, str] = {}
-    cursor: str | None = None
+def _resolve_user_emails(client: Any, slack_user_ids: set[str]) -> dict[str, str]:
+    profiles = ExternalProfile.objects.filter(
+        type=ExternalProfileType.SLACK,
+        external_id__in=slack_user_ids,
+    ).select_related("user")
+    cache: dict[str, str] = {p.external_id: p.user.email for p in profiles}
 
-    while True:
-        kwargs: dict[str, Any] = {"limit": 200}
-        if cursor:
-            kwargs["cursor"] = cursor
+    for slack_id in slack_user_ids - cache.keys():
         try:
-            response = client.users_list(**kwargs)
+            info = client.users_info(user=slack_id)
+            email = info["user"].get("profile", {}).get("email") or slack_id
+            cache[slack_id] = email
         except Exception:
-            logger.exception("Failed to batch-fetch Slack users list")
-            break
-        if not response.get("ok"):
-            logger.error("users_list returned not-ok")
-            break
-        for member in response.get("members", []):
-            if member.get("deleted") or member.get("is_bot"):
-                continue
-            email = member.get("profile", {}).get("email", "")
-            if email:
-                cache[member["id"]] = email
-        cursor = response.get("response_metadata", {}).get("next_cursor") or None
-        if not cursor:
-            break
+            cache[slack_id] = slack_id
 
     return cache
 
@@ -262,20 +252,7 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
     if not all_messages:
         return []
 
-    email_cache = _build_user_email_cache(client)
-
-    def resolve_email(slack_user_id: str) -> str:
-        if slack_user_id in email_cache:
-            return email_cache[slack_user_id]
-        try:
-            info = client.users_info(user=slack_user_id)
-            email = info["user"].get("profile", {}).get("email") or slack_user_id
-            email_cache[slack_user_id] = email
-            return email
-        except Exception:
-            return slack_user_id
-
-    content: list[dict[str, Any]] = []
+    filtered: list[dict[str, Any]] = []
     for msg in all_messages:
         if msg.get("type") != "message":
             continue
@@ -283,21 +260,37 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
             continue
         if msg.get("bot_id") or msg.get("subtype") in ("channel_join", "channel_leave"):
             continue
-        image_urls = _extract_image_urls(msg)
-        if not msg.get("text") and not image_urls:
+        if not msg.get("text") and not _extract_image_urls(msg):
             continue
+        filtered.append(msg)
 
+    all_raw_replies: dict[str, list[dict[str, Any]]] = {}
+    for msg in filtered:
+        if msg.get("reply_count", 0) > 0:
+            all_raw_replies[msg["thread_ts"]] = _get_thread_replies(
+                client, channel_id, msg["thread_ts"]
+            )
+
+    slack_user_ids: set[str] = set()
+    for msg in filtered:
+        slack_user_ids.add(msg["user"])
+    for replies in all_raw_replies.values():
+        for reply in replies:
+            if reply.get("user"):
+                slack_user_ids.add(reply["user"])
+
+    email_cache = _resolve_user_emails(client, slack_user_ids)
+
+    content: list[dict[str, Any]] = []
+    for msg in filtered:
+        image_urls = _extract_image_urls(msg)
         dt = datetime.fromtimestamp(float(msg["ts"]), tz=UTC)
-        author = resolve_email(msg["user"])
+        author = email_cache.get(msg["user"], msg["user"])
 
-        raw_replies = (
-            _get_thread_replies(client, channel_id, msg["thread_ts"])
-            if msg.get("reply_count", 0) > 0
-            else []
-        )
+        raw_replies = all_raw_replies.get(msg.get("thread_ts"), [])
         replies: list[dict[str, Any]] = [
             {
-                "author": resolve_email(reply.get("user", "")),
+                "author": email_cache.get(reply.get("user", ""), reply.get("user", "")),
                 "date_time": datetime.fromtimestamp(float(reply["ts"]), tz=UTC),
                 "text": reply.get("text", ""),
             }

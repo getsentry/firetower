@@ -3,13 +3,13 @@ from unittest.mock import MagicMock, patch
 from slack_sdk.errors import SlackApiError
 
 from firetower.slack_app.handlers.dumpslack import (
-    _build_user_email_cache,
     _download_image,
     _extract_image_urls,
     _extract_notion_page_id,
     _get_channel_messages,
     _get_thread_replies,
     _is_slack_url,
+    _resolve_user_emails,
     _trigger_slack_dump,
     handle_dumpslack_command,
 )
@@ -35,87 +35,58 @@ class TestExtractNotionPageId:
         assert result == "abc123de-f456-abc1-23de-f456abc123de"
 
 
-def _make_users_list_response(members: list[dict] | None = None) -> dict:
-    """Return a users_list response with the given members (or a default single user)."""
-    if members is None:
-        members = [
-            {
-                "id": "U1",
-                "deleted": False,
-                "is_bot": False,
-                "profile": {"email": "user@sentry.io"},
-            }
-        ]
-    return {"ok": True, "members": members, "response_metadata": {"next_cursor": ""}}
+class TestResolveUserEmails:
+    def _mock_profile(self, external_id, email):
+        p = MagicMock()
+        p.external_id = external_id
+        p.user.email = email
+        return p
 
+    def test_returns_emails_from_db(self):
+        mock_client = MagicMock()
+        with patch("firetower.slack_app.handlers.dumpslack.ExternalProfile") as mock_ep:
+            mock_ep.objects.filter.return_value.select_related.return_value = [
+                self._mock_profile("U1", "u1@sentry.io")
+            ]
+            result = _resolve_user_emails(mock_client, {"U1"})
 
-class TestBuildUserEmailCache:
-    def _member(self, uid, email, deleted=False, is_bot=False):
-        return {
-            "id": uid,
-            "deleted": deleted,
-            "is_bot": is_bot,
-            "profile": {"email": email},
+        assert result == {"U1": "u1@sentry.io"}
+        mock_client.users_info.assert_not_called()
+
+    def test_falls_back_to_users_info_for_unknown_ids(self):
+        mock_client = MagicMock()
+        mock_client.users_info.return_value = {
+            "user": {"profile": {"email": "fallback@sentry.io"}}
         }
+        with patch("firetower.slack_app.handlers.dumpslack.ExternalProfile") as mock_ep:
+            mock_ep.objects.filter.return_value.select_related.return_value = []
+            result = _resolve_user_emails(mock_client, {"U_UNKNOWN"})
 
-    def test_returns_uid_to_email_map(self):
+        assert result == {"U_UNKNOWN": "fallback@sentry.io"}
+        mock_client.users_info.assert_called_once_with(user="U_UNKNOWN")
+
+    def test_falls_back_to_slack_id_on_api_error(self):
         mock_client = MagicMock()
-        mock_client.users_list.return_value = {
-            "ok": True,
-            "has_more": False,
-            "members": [self._member("U1", "a@sentry.io")],
-            "response_metadata": {"next_cursor": ""},
+        mock_client.users_info.side_effect = Exception("api error")
+        with patch("firetower.slack_app.handlers.dumpslack.ExternalProfile") as mock_ep:
+            mock_ep.objects.filter.return_value.select_related.return_value = []
+            result = _resolve_user_emails(mock_client, {"U_MISSING"})
+
+        assert result == {"U_MISSING": "U_MISSING"}
+
+    def test_mixes_db_and_api_results(self):
+        mock_client = MagicMock()
+        mock_client.users_info.return_value = {
+            "user": {"profile": {"email": "unknown@sentry.io"}}
         }
+        with patch("firetower.slack_app.handlers.dumpslack.ExternalProfile") as mock_ep:
+            mock_ep.objects.filter.return_value.select_related.return_value = [
+                self._mock_profile("U1", "known@sentry.io")
+            ]
+            result = _resolve_user_emails(mock_client, {"U1", "U2"})
 
-        cache = _build_user_email_cache(mock_client)
-
-        assert cache == {"U1": "a@sentry.io"}
-
-    def test_paginates_using_next_cursor(self):
-        mock_client = MagicMock()
-        mock_client.users_list.side_effect = [
-            {
-                "ok": True,
-                "members": [self._member("U1", "a@sentry.io")],
-                "response_metadata": {"next_cursor": "cur1"},
-            },
-            {
-                "ok": True,
-                "members": [self._member("U2", "b@sentry.io")],
-                "response_metadata": {"next_cursor": ""},
-            },
-        ]
-
-        cache = _build_user_email_cache(mock_client)
-
-        assert len(cache) == 2
-        assert mock_client.users_list.call_count == 2
-        mock_client.users_list.assert_any_call(limit=200, cursor="cur1")
-
-    def test_skips_bots_and_deleted_members(self):
-        mock_client = MagicMock()
-        mock_client.users_list.return_value = {
-            "ok": True,
-            "has_more": False,
-            "members": [
-                self._member("U1", "human@sentry.io"),
-                self._member("U2", "bot@sentry.io", is_bot=True),
-                self._member("U3", "gone@sentry.io", deleted=True),
-            ],
-            "response_metadata": {"next_cursor": ""},
-        }
-
-        cache = _build_user_email_cache(mock_client)
-
-        assert cache == {"U1": "human@sentry.io"}
-
-    def test_returns_empty_on_api_error(self):
-        mock_client = MagicMock()
-        mock_client.users_list.side_effect = Exception("timeout")
-
-        cache = _build_user_email_cache(mock_client)
-
-        assert cache == {}
+        assert result["U1"] == "known@sentry.io"
+        assert result["U2"] == "unknown@sentry.io"
 
 
 class TestGetChannelMessages:
@@ -147,9 +118,12 @@ class TestGetChannelMessages:
                 {"type": "message", "user": "U4", "ts": "1000000003.000000"},  # no text
             ],
         }
-        mock_client.users_list.return_value = _make_users_list_response()
 
-        messages = _get_channel_messages(mock_client, "C123")
+        with patch(
+            "firetower.slack_app.handlers.dumpslack._resolve_user_emails",
+            return_value={"U1": "user@sentry.io"},
+        ):
+            messages = _get_channel_messages(mock_client, "C123")
 
         assert len(messages) == 1
         assert messages[0]["text"] == "real message"
@@ -173,9 +147,12 @@ class TestGetChannelMessages:
                 },
             ],
         }
-        mock_client.users_list.return_value = _make_users_list_response()
 
-        messages = _get_channel_messages(mock_client, "C123")
+        with patch(
+            "firetower.slack_app.handlers.dumpslack._resolve_user_emails",
+            return_value={"U1": "user@sentry.io"},
+        ):
+            messages = _get_channel_messages(mock_client, "C123")
 
         assert messages[0]["text"] == "first"
         assert messages[1]["text"] == "second"
@@ -222,24 +199,12 @@ class TestGetChannelMessages:
             ],
             "response_metadata": {"next_cursor": ""},
         }
-        mock_client.users_list.return_value = _make_users_list_response(
-            members=[
-                {
-                    "id": "U1",
-                    "deleted": False,
-                    "is_bot": False,
-                    "profile": {"email": "u1@sentry.io"},
-                },
-                {
-                    "id": "U2",
-                    "deleted": False,
-                    "is_bot": False,
-                    "profile": {"email": "u2@sentry.io"},
-                },
-            ]
-        )
 
-        messages = _get_channel_messages(mock_client, "C123")
+        with patch(
+            "firetower.slack_app.handlers.dumpslack._resolve_user_emails",
+            return_value={"U1": "u1@sentry.io", "U2": "u2@sentry.io"},
+        ):
+            messages = _get_channel_messages(mock_client, "C123")
 
         assert len(messages) == 1
         assert len(messages[0]["replies"]) == 1
@@ -275,9 +240,12 @@ class TestGetChannelMessages:
                 "response_metadata": {"next_cursor": ""},
             },
         ]
-        mock_client.users_list.return_value = _make_users_list_response()
 
-        messages = _get_channel_messages(mock_client, "C123")
+        with patch(
+            "firetower.slack_app.handlers.dumpslack._resolve_user_emails",
+            return_value={"U1": "user@sentry.io"},
+        ):
+            messages = _get_channel_messages(mock_client, "C123")
 
         assert len(messages) == 2
         assert mock_client.conversations_history.call_count == 2
@@ -300,39 +268,20 @@ class TestGetChannelMessages:
                 },
             ],
         }
-        mock_client.users_list.return_value = _make_users_list_response()
 
-        with patch(
-            "firetower.slack_app.handlers.dumpslack._download_image", return_value=None
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack._download_image",
+                return_value=None,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack._resolve_user_emails",
+                return_value={"U1": "user@sentry.io"},
+            ),
         ):
             messages = _get_channel_messages(mock_client, "C123")
 
         assert len(messages) == 1
-
-    def test_falls_back_to_users_info_for_cache_miss(self):
-        mock_client = MagicMock()
-        mock_client.conversations_history.return_value = {
-            "ok": True,
-            "messages": [
-                {
-                    "type": "message",
-                    "user": "U_UNKNOWN",
-                    "text": "hello",
-                    "ts": "1000000001.000000",
-                },
-            ],
-        }
-        # users_list returns no members, so U_UNKNOWN is a cache miss
-        mock_client.users_list.return_value = _make_users_list_response(members=[])
-        mock_client.users_info.return_value = {
-            "user": {"profile": {"email": "fallback@sentry.io"}}
-        }
-
-        messages = _get_channel_messages(mock_client, "C123")
-
-        assert len(messages) == 1
-        assert messages[0]["author"] == "fallback@sentry.io"
-        mock_client.users_info.assert_called_once_with(user="U_UNKNOWN")
 
     def test_preserves_partial_results_when_pagination_fails_mid_way(self):
         mock_client = MagicMock()
@@ -352,9 +301,12 @@ class TestGetChannelMessages:
             },
             Exception("network error"),
         ]
-        mock_client.users_list.return_value = _make_users_list_response()
 
-        messages = _get_channel_messages(mock_client, "C123")
+        with patch(
+            "firetower.slack_app.handlers.dumpslack._resolve_user_emails",
+            return_value={"U1": "user@sentry.io"},
+        ):
+            messages = _get_channel_messages(mock_client, "C123")
 
         # First page was fetched before the error; should not be discarded
         assert len(messages) == 1
@@ -787,9 +739,9 @@ class TestHandleDumpslackCommand:
             message="not_in_channel", response={"ok": False, "error": "not_in_channel"}
         )
         mock_incident = MagicMock()
-        mock_incident.external_links.filter.return_value.first.return_value = None
         mock_incident.captain = None
         mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
+        mock_notion_link = MagicMock(url="")
         with (
             patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
             patch(
@@ -803,10 +755,15 @@ class TestHandleDumpslackCommand:
                 "firetower.slack_app.handlers.dumpslack._get_channel_messages",
                 return_value=[],
             ),
-            patch("firetower.slack_app.handlers.dumpslack.ExternalLink"),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
         ):
             mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
             mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                True,
+            )
             mock_notion_cls.return_value.create_postmortem_page.return_value = mock_page
             mock_notion_cls.return_value.apply_template.return_value = None
             handle_dumpslack_command(ack, body, command, client, respond)
