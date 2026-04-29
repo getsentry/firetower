@@ -374,10 +374,13 @@ class TestOnStatusChanged:
 
         mock_slack.post_message.assert_not_called()
 
+    @pytest.mark.parametrize("status", [IncidentStatus.DONE, IncidentStatus.POSTMORTEM])
     @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
     @patch("firetower.slack_app.bolt.get_bolt_app")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_triggers_dump_on_postmortem(self, mock_slack, mock_bolt, mock_dump_async):
+    def test_triggers_dump_on_resolved_statuses(
+        self, mock_slack, mock_bolt, mock_dump_async, status
+    ):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
         mock_client = MagicMock()
         mock_bolt.return_value.client = mock_client
@@ -385,7 +388,7 @@ class TestOnStatusChanged:
         incident = Incident.objects.create(
             title="Test",
             severity=IncidentSeverity.P1,
-            status=IncidentStatus.POSTMORTEM,
+            status=status,
         )
         ExternalLink.objects.create(
             incident=incident,
@@ -406,7 +409,6 @@ class TestOnStatusChanged:
             IncidentStatus.ACTIVE,
             IncidentStatus.CANCELLED,
             IncidentStatus.MITIGATED,
-            IncidentStatus.DONE,
         ):
             incident = Incident.objects.create(
                 title="Test",
