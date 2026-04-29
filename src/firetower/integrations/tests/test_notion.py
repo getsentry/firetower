@@ -141,7 +141,7 @@ class TestGetUsers:
 
 class TestSendMarkdown:
     def test_sends_insert_content_patch(self, notion):
-        with patch("firetower.integrations.services.notion.httpx.patch") as mock_patch:
+        with patch("firetower.integrations.services.notion.requests.patch") as mock_patch:
             mock_patch.return_value = MagicMock(status_code=200)
             mock_patch.return_value.raise_for_status = MagicMock()
 
@@ -160,7 +160,7 @@ class TestSendMarkdown:
         mock_response = MagicMock(status_code=200)
         mock_response.raise_for_status = MagicMock()
 
-        with patch("firetower.integrations.services.notion.httpx.patch") as mock_patch:
+        with patch("firetower.integrations.services.notion.requests.patch") as mock_patch:
             mock_patch.side_effect = [Exception("rate limited"), mock_response]
 
             with patch("firetower.integrations.services.notion.time.sleep"):
@@ -170,7 +170,7 @@ class TestSendMarkdown:
         assert mock_patch.call_count == 2
 
     def test_returns_false_after_max_retries(self, notion):
-        with patch("firetower.integrations.services.notion.httpx.patch") as mock_patch:
+        with patch("firetower.integrations.services.notion.requests.patch") as mock_patch:
             mock_patch.side_effect = Exception("always fails")
 
             with patch("firetower.integrations.services.notion.time.sleep"):
@@ -253,7 +253,7 @@ class TestUploadFileToNotion:
         send_response = MagicMock()
         send_response.raise_for_status = MagicMock()
 
-        with patch("firetower.integrations.services.notion.httpx.post") as mock_post:
+        with patch("firetower.integrations.services.notion.requests.post") as mock_post:
             mock_post.side_effect = [create_response, send_response]
             result = notion._upload_file_to_notion(b"IMG", "image.png", "image/png")
 
@@ -265,7 +265,7 @@ class TestUploadFileToNotion:
 
     def test_returns_none_when_create_fails(self, notion):
         with patch(
-            "firetower.integrations.services.notion.httpx.post",
+            "firetower.integrations.services.notion.requests.post",
             side_effect=Exception("500"),
         ):
             result = notion._upload_file_to_notion(b"IMG", "image.png", "image/png")
@@ -277,7 +277,7 @@ class TestUploadFileToNotion:
         create_response.json.return_value = {"id": "upload-123"}
         create_response.raise_for_status = MagicMock()
 
-        with patch("firetower.integrations.services.notion.httpx.post") as mock_post:
+        with patch("firetower.integrations.services.notion.requests.post") as mock_post:
             mock_post.side_effect = [create_response, Exception("413 too large")]
             result = notion._upload_file_to_notion(b"IMG", "image.png", "image/png")
 
