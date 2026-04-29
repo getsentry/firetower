@@ -234,11 +234,9 @@ def _get_channel_messages(
     all_raw_replies: dict[str, list[dict[str, Any]]] = {}
     for msg in filtered:
         if msg.get("reply_count", 0) > 0:
-            thread_ts = msg.get("thread_ts")
-            if thread_ts:
-                all_raw_replies[thread_ts] = service.get_thread_replies(
-                    channel_id, thread_ts
-                )
+            all_raw_replies[msg["ts"]] = service.get_thread_replies(
+                channel_id, msg["ts"]
+            )
 
     slack_user_ids: set[str] = set()
     for msg in filtered:
@@ -256,7 +254,7 @@ def _get_channel_messages(
         dt = datetime.fromtimestamp(float(msg["ts"]), tz=UTC)
         author = email_cache.get(msg["user"], msg["user"])
 
-        raw_replies = all_raw_replies.get(msg.get("thread_ts", ""), [])
+        raw_replies = all_raw_replies.get(msg["ts"], [])
         replies: list[dict[str, Any]] = [
             {
                 "author": email_cache.get(reply.get("user", ""), reply.get("user", "")),
