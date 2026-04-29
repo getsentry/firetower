@@ -522,8 +522,8 @@ class TestHandleDumpslackCommand:
     def test_responds_when_notion_not_configured(self):
         ack, body, command, client, respond, _ = self._make_args()
         with patch(
-            "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
-            return_value=None,
+            "firetower.slack_app.handlers.dumpslack.NotionService.is_configured",
+            return_value=False,
         ):
             handle_dumpslack_command(ack, body, command, client, respond)
 
@@ -534,8 +534,8 @@ class TestHandleDumpslackCommand:
     def test_responds_when_no_channel_id(self):
         ack, body, command, client, respond, _ = self._make_args(channel_id="")
         with patch(
-            "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
-            return_value=MagicMock(),
+            "firetower.slack_app.handlers.dumpslack.NotionService.is_configured",
+            return_value=True,
         ):
             handle_dumpslack_command(ack, body, command, client, respond)
 
@@ -546,8 +546,8 @@ class TestHandleDumpslackCommand:
         ack, body, command, client, respond, _ = self._make_args()
         with (
             patch(
-                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
-                return_value=MagicMock(),
+                "firetower.slack_app.handlers.dumpslack.NotionService.is_configured",
+                return_value=True,
             ),
             patch(
                 "firetower.slack_app.handlers.dumpslack.get_incident_from_channel",
@@ -564,8 +564,8 @@ class TestHandleDumpslackCommand:
         mock_incident = MagicMock()
         with (
             patch(
-                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
-                return_value=MagicMock(),
+                "firetower.slack_app.handlers.dumpslack.NotionService.is_configured",
+                return_value=True,
             ),
             patch(
                 "firetower.slack_app.handlers.dumpslack.get_incident_from_channel",

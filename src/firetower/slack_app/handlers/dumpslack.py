@@ -150,7 +150,7 @@ def handle_dumpslack_command(
 ) -> None:
     ack()
 
-    if not NotionService.from_settings():
+    if not NotionService.is_configured():
         respond("Notion integration is not configured.")
         return
 

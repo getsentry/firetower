@@ -377,52 +377,6 @@ class TestOnStatusChanged:
     @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
     @patch("firetower.slack_app.bolt.get_bolt_app")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_triggers_dump_on_mitigated(self, mock_slack, mock_bolt, mock_dump_async):
-        mock_slack.parse_channel_id_from_url.return_value = "C12345"
-        mock_client = MagicMock()
-        mock_bolt.return_value.client = mock_client
-
-        incident = Incident.objects.create(
-            title="Test",
-            severity=IncidentSeverity.P1,
-            status=IncidentStatus.MITIGATED,
-        )
-        ExternalLink.objects.create(
-            incident=incident,
-            type=ExternalLinkType.SLACK,
-            url="https://slack.com/archives/C12345",
-        )
-
-        on_status_changed(incident, IncidentStatus.ACTIVE)
-
-        mock_dump_async.assert_called_once_with(mock_client, "C12345", incident)
-
-    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
-    @patch("firetower.slack_app.bolt.get_bolt_app")
-    @patch("firetower.incidents.hooks._slack_service")
-    def test_triggers_dump_on_done(self, mock_slack, mock_bolt, mock_dump_async):
-        mock_slack.parse_channel_id_from_url.return_value = "C12345"
-        mock_client = MagicMock()
-        mock_bolt.return_value.client = mock_client
-
-        incident = Incident.objects.create(
-            title="Test",
-            severity=IncidentSeverity.P3,
-            status=IncidentStatus.DONE,
-        )
-        ExternalLink.objects.create(
-            incident=incident,
-            type=ExternalLinkType.SLACK,
-            url="https://slack.com/archives/C12345",
-        )
-
-        on_status_changed(incident, IncidentStatus.ACTIVE)
-
-        mock_dump_async.assert_called_once_with(mock_client, "C12345", incident)
-
-    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
-    @patch("firetower.slack_app.bolt.get_bolt_app")
-    @patch("firetower.incidents.hooks._slack_service")
     def test_triggers_dump_on_postmortem(self, mock_slack, mock_bolt, mock_dump_async):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
         mock_client = MagicMock()
@@ -448,7 +402,12 @@ class TestOnStatusChanged:
     def test_does_not_trigger_dump_on_other_statuses(self, mock_slack, mock_dump_async):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
-        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELLED):
+        for status in (
+            IncidentStatus.ACTIVE,
+            IncidentStatus.CANCELLED,
+            IncidentStatus.MITIGATED,
+            IncidentStatus.DONE,
+        ):
             incident = Incident.objects.create(
                 title="Test",
                 severity=IncidentSeverity.P1,
@@ -473,7 +432,7 @@ class TestOnStatusChanged:
         incident = Incident.objects.create(
             title="Test",
             severity=IncidentSeverity.P1,
-            status=IncidentStatus.MITIGATED,
+            status=IncidentStatus.POSTMORTEM,
         )
 
         on_status_changed(incident, IncidentStatus.ACTIVE)

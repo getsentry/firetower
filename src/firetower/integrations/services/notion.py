@@ -27,6 +27,15 @@ _users_cache: dict[str, dict[str, dict[str, str]]] = {}
 
 class NotionService:
     @classmethod
+    def is_configured(cls) -> bool:
+        from django.conf import settings  # noqa: PLC0415
+
+        config = settings.NOTION
+        return bool(
+            config and config.get("INTEGRATION_TOKEN") and config.get("DATABASE_ID")
+        )
+
+    @classmethod
     def from_settings(cls) -> "NotionService | None":
         from django.conf import settings  # noqa: PLC0415
 
