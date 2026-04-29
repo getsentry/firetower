@@ -221,8 +221,8 @@ def _get_channel_messages(
     slack_user_ids: set[str] = set()
     for msg in filtered:
         slack_user_ids.add(msg["user"])
-    for replies in all_raw_replies.values():
-        for reply in replies:
+    for thread_replies in all_raw_replies.values():
+        for reply in thread_replies:
             if reply.get("user"):
                 slack_user_ids.add(reply["user"])
 
@@ -234,7 +234,7 @@ def _get_channel_messages(
         dt = datetime.fromtimestamp(float(msg["ts"]), tz=UTC)
         author = email_cache.get(msg["user"], msg["user"])
 
-        raw_replies = all_raw_replies.get(msg.get("thread_ts"), [])
+        raw_replies = all_raw_replies.get(msg.get("thread_ts", ""), [])
         replies: list[dict[str, Any]] = [
             {
                 "author": email_cache.get(reply.get("user", ""), reply.get("user", "")),

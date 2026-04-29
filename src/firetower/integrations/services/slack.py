@@ -353,7 +353,8 @@ class SlackService:
                 )
                 break
             messages.extend(response.get("messages", []))
-            cursor = response.get("response_metadata", {}).get("next_cursor") or None
+            metadata: dict[str, Any] = response.get("response_metadata") or {}
+            cursor = metadata.get("next_cursor") or None
             if not response.get("has_more") or not cursor:
                 break
         return messages
@@ -384,15 +385,17 @@ class SlackService:
                     "conversations_replies returned not-ok for thread %s", thread_ts
                 )
                 break
-            for msg in response.get("messages", []):
-                if msg.get("type") != "message" or msg["ts"] == thread_ts:
+            raw_messages: list[dict[str, Any]] = response.get("messages") or []
+            for msg_dict in raw_messages:
+                if msg_dict.get("type") != "message" or msg_dict["ts"] == thread_ts:
                     continue
-                if not msg.get("user"):
+                if not msg_dict.get("user"):
                     continue
-                if msg.get("bot_id"):
+                if msg_dict.get("bot_id"):
                     continue
-                replies.append(msg)
-            cursor = response.get("response_metadata", {}).get("next_cursor") or None
+                replies.append(msg_dict)
+            reply_metadata: dict[str, Any] = response.get("response_metadata") or {}
+            cursor = reply_metadata.get("next_cursor") or None
             if not response.get("has_more") or not cursor:
                 break
         return replies
