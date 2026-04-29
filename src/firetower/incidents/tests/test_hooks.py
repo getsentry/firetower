@@ -1564,3 +1564,431 @@ class TestCreateStatusChannel:
         mock_slack.create_channel.assert_called_once()
         _, kwargs = mock_slack.create_channel.call_args
         assert kwargs["is_private"] is False
+
+
+@pytest.mark.django_db
+class TestOnIncidentCreatedDatadog:
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_public_incident_creates_notebook(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        mock_service = MagicMock()
+        mock_service.configured = True
+        mock_service.create_notebook.return_value = (
+            "https://app.datadoghq.com/notebook/abc123"
+        )
+        mock_datadog_cls.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        mock_service.create_notebook.assert_called_once_with(
+            incident.incident_number, "Production is down"
+        )
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.DATADOG
+        )
+        assert link.url == "https://app.datadoghq.com/notebook/abc123"
+
+        bookmark_calls = [
+            c
+            for c in mock_slack.add_bookmark.call_args_list
+            if c[0][1] == "Datadog Notebook"
+        ]
+        assert len(bookmark_calls) == 1
+        assert bookmark_calls[0][0][2] == "https://app.datadoghq.com/notebook/abc123"
+
+        message_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "Datadog notebook created" in c[0][1]
+        ]
+        assert len(message_calls) == 1
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_private_incident_skips_api_call(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C_PRIV"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C_PRIV"
+
+        incident = Incident.objects.create(
+            title="Sensitive incident",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        on_incident_created(incident)
+
+        mock_datadog_cls.assert_not_called()
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.DATADOG
+        ).exists()
+
+        skip_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if c[0][0] == "C_PRIV"
+            and c[0][1] == "Datadog notebook creation skipped due to private incident."
+        ]
+        assert len(skip_calls) == 1
+
+        bookmark_calls = [
+            c
+            for c in mock_slack.add_bookmark.call_args_list
+            if c[0][1] == "Datadog Notebook"
+        ]
+        assert len(bookmark_calls) == 0
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_unconfigured_service_no_link(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        mock_service = MagicMock()
+        mock_service.configured = False
+        mock_datadog_cls.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        mock_service.create_notebook.assert_not_called()
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.DATADOG
+        ).exists()
+
+        bookmark_calls = [
+            c
+            for c in mock_slack.add_bookmark.call_args_list
+            if c[0][1] == "Datadog Notebook"
+        ]
+        assert len(bookmark_calls) == 0
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_create_notebook_returns_none_deletes_placeholder(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        mock_service = MagicMock()
+        mock_service.configured = True
+        mock_service.create_notebook.return_value = None
+        mock_datadog_cls.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.DATADOG
+        ).exists()
+
+        bookmark_calls = [
+            c
+            for c in mock_slack.add_bookmark.call_args_list
+            if c[0][1] == "Datadog Notebook"
+        ]
+        assert len(bookmark_calls) == 0
+
+        notebook_msg_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "Datadog notebook created" in c[0][1]
+        ]
+        assert len(notebook_msg_calls) == 0
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_create_notebook_raises_does_not_break_hook(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        mock_datadog_cls.side_effect = RuntimeError("boom")
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        # Must not raise
+        on_incident_created(incident)
+
+        # Slack channel was still created (the rest of the hook ran)
+        mock_slack.create_channel.assert_called_once()
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_idempotent_when_link_exists(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        mock_service = MagicMock()
+        mock_service.configured = True
+        mock_datadog_cls.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.DATADOG,
+            url="https://app.datadoghq.com/notebook/existing",
+        )
+
+        on_incident_created(incident)
+
+        mock_service.create_notebook.assert_not_called()
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.DATADOG
+        )
+        assert link.url == "https://app.datadoghq.com/notebook/existing"
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_retries_when_link_exists_with_empty_url(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        mock_service = MagicMock()
+        mock_service.configured = True
+        mock_service.create_notebook.return_value = (
+            "https://app.datadoghq.com/notebook/recovered"
+        )
+        mock_datadog_cls.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.DATADOG,
+            url="",
+        )
+
+        on_incident_created(incident)
+
+        mock_service.create_notebook.assert_called_once_with(
+            incident.incident_number, "Production is down"
+        )
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.DATADOG
+        )
+        assert link.url == "https://app.datadoghq.com/notebook/recovered"
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_service_create_notebook_raises_does_not_break_hook(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        mock_service = MagicMock()
+        mock_service.configured = True
+        mock_service.create_notebook.side_effect = RuntimeError("boom")
+        mock_datadog_cls.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        # Must not raise
+        on_incident_created(incident)
+
+        # Slack channel was still created (the rest of the hook ran)
+        mock_slack.create_channel.assert_called_once()
+
+        # No leftover ExternalLink row (transaction rolled back)
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.DATADOG
+        ).exists()
+
+        # No Datadog bookmark posted
+        bookmark_calls = [
+            c
+            for c in mock_slack.add_bookmark.call_args_list
+            if c[0][1] == "Datadog Notebook"
+        ]
+        assert len(bookmark_calls) == 0
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_bookmark_failure_does_not_block_post_message(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        def add_bookmark_side_effect(channel_id, name, url):
+            if name == "Datadog Notebook":
+                raise RuntimeError("bookmark boom")
+            return None
+
+        mock_slack.add_bookmark.side_effect = add_bookmark_side_effect
+
+        mock_service = MagicMock()
+        mock_service.configured = True
+        mock_service.create_notebook.return_value = (
+            "https://app.datadoghq.com/notebook/abc123"
+        )
+        mock_datadog_cls.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        notebook_msg_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "Datadog notebook created" in c[0][1]
+        ]
+        assert len(notebook_msg_calls) == 1
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks.DatadogService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_post_message_failure_does_not_block_bookmark(
+        self,
+        mock_slack,
+        mock_datadog_cls,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        def post_message_side_effect(channel_id, message):
+            if "Datadog notebook created" in message:
+                raise RuntimeError("post boom")
+            return None
+
+        mock_slack.post_message.side_effect = post_message_side_effect
+
+        mock_service = MagicMock()
+        mock_service.configured = True
+        mock_service.create_notebook.return_value = (
+            "https://app.datadoghq.com/notebook/abc123"
+        )
+        mock_datadog_cls.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        bookmark_calls = [
+            c
+            for c in mock_slack.add_bookmark.call_args_list
+            if c[0][1] == "Datadog Notebook"
+        ]
+        assert len(bookmark_calls) == 1
