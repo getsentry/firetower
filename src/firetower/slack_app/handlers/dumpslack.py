@@ -24,7 +24,11 @@ def handle_dumpslack_command(
     ack()
 
     notion_config = settings.NOTION
-    if not notion_config or notion_config.get("INTEGRATION_TOKEN", "") == "" or notion_config.get("DATABASE_ID", "") == "":
+    if (
+        not notion_config
+        or notion_config.get("INTEGRATION_TOKEN", "") == ""
+        or notion_config.get("DATABASE_ID", "") == ""
+    ):
         respond("Notion integration is not configured.")
         return
 
