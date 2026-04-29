@@ -546,6 +546,67 @@ class TestExtractImageUrls:
         msg = {"text": "hello", "user": "U1"}
         assert _extract_image_urls(msg) == []
 
+    def test_extracts_top_level_image_block(self):
+        msg = {
+            "blocks": [
+                {
+                    "type": "image",
+                    "image_url": "https://example.com/graph.png",
+                    "alt_text": "graph",
+                }
+            ]
+        }
+        assert _extract_image_urls(msg) == [
+            {"image_url": "https://example.com/graph.png", "source_url": ""}
+        ]
+
+    def test_extracts_image_accessory_from_section_block(self):
+        msg = {
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": "some text"},
+                    "accessory": {
+                        "type": "image",
+                        "image_url": "https://example.com/thumb.png",
+                        "alt_text": "thumbnail",
+                    },
+                }
+            ]
+        }
+        assert _extract_image_urls(msg) == [
+            {"image_url": "https://example.com/thumb.png", "source_url": ""}
+        ]
+
+    def test_extracts_image_element_from_context_block(self):
+        msg = {
+            "blocks": [
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "image",
+                            "image_url": "https://example.com/icon.png",
+                            "alt_text": "icon",
+                        },
+                        {"type": "mrkdwn", "text": "some context"},
+                    ],
+                }
+            ]
+        }
+        assert _extract_image_urls(msg) == [
+            {"image_url": "https://example.com/icon.png", "source_url": ""}
+        ]
+
+    def test_skips_blocks_without_images(self):
+        msg = {
+            "blocks": [
+                {"type": "section", "text": {"type": "mrkdwn", "text": "hello"}},
+                {"type": "divider"},
+            ]
+        }
+        assert _extract_image_urls(msg) == []
+
 
 class TestIsSlackUrl:
     def test_matches_files_slack_com(self):

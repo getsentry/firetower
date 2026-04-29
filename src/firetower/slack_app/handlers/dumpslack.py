@@ -351,6 +351,21 @@ def _extract_image_urls(msg: dict[str, Any]) -> list[dict[str, str]]:
             )
             if url:
                 items.append({"image_url": url, "source_url": ""})
+    for block in msg.get("blocks", []):
+        if block.get("type") == "image":
+            image_url = block.get("image_url", "")
+            if image_url:
+                items.append({"image_url": image_url, "source_url": ""})
+        accessory = block.get("accessory") or {}
+        if accessory.get("type") == "image":
+            image_url = accessory.get("image_url", "")
+            if image_url:
+                items.append({"image_url": image_url, "source_url": ""})
+        for element in block.get("elements", []):
+            if isinstance(element, dict) and element.get("type") == "image":
+                image_url = element.get("image_url", "")
+                if image_url:
+                    items.append({"image_url": image_url, "source_url": ""})
     return items
 
 
