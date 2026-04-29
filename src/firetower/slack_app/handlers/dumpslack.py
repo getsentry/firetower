@@ -31,14 +31,6 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
 
     existing_link = incident.external_links.filter(type=ExternalLinkType.NOTION).first()
 
-    try:
-        client.chat_postMessage(
-            channel=channel_id,
-            text="Fetching Slack history and generating postmortem doc, this may take a moment...",
-        )
-    except Exception:
-        logger.exception("Failed to post dump start message to channel %s", channel_id)
-
     messages = _get_channel_messages(client, channel_id)
 
     if existing_link:
@@ -170,6 +162,9 @@ def handle_dumpslack_command(
         respond(f"No incident found for this channel. Use `{cmd} new` to create one.")
         return
 
+    respond(
+        "Fetching Slack history and generating postmortem doc, this may take a moment..."
+    )
     _trigger_slack_dump(client, channel_id, incident)
 
 

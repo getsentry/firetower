@@ -728,11 +728,9 @@ class TestTriggerSlackDump:
             mock_notion_cls.return_value.apply_template.return_value = None
             _trigger_slack_dump(client, "C123", mock_incident)
 
-        assert client.chat_postMessage.call_count == 2
-        first_call_text = client.chat_postMessage.call_args_list[0][1]["text"]
-        assert "Fetching" in first_call_text
-        second_call_text = client.chat_postMessage.call_args_list[1][1]["text"]
-        assert "notion.so/page-id" in second_call_text
+        assert client.chat_postMessage.call_count == 1
+        completion_text = client.chat_postMessage.call_args_list[0][1]["text"]
+        assert "notion.so/page-id" in completion_text
 
 
 class TestHandleDumpslackCommand:
