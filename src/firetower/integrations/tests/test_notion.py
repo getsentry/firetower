@@ -141,7 +141,9 @@ class TestGetUsers:
 
 class TestSendMarkdown:
     def test_sends_insert_content_patch(self, notion):
-        with patch("firetower.integrations.services.notion.requests.patch") as mock_patch:
+        with patch(
+            "firetower.integrations.services.notion.requests.patch"
+        ) as mock_patch:
             mock_patch.return_value = MagicMock(status_code=200)
             mock_patch.return_value.raise_for_status = MagicMock()
 
@@ -160,7 +162,9 @@ class TestSendMarkdown:
         mock_response = MagicMock(status_code=200)
         mock_response.raise_for_status = MagicMock()
 
-        with patch("firetower.integrations.services.notion.requests.patch") as mock_patch:
+        with patch(
+            "firetower.integrations.services.notion.requests.patch"
+        ) as mock_patch:
             mock_patch.side_effect = [Exception("rate limited"), mock_response]
 
             with patch("firetower.integrations.services.notion.time.sleep"):
@@ -170,7 +174,9 @@ class TestSendMarkdown:
         assert mock_patch.call_count == 2
 
     def test_returns_false_after_max_retries(self, notion):
-        with patch("firetower.integrations.services.notion.requests.patch") as mock_patch:
+        with patch(
+            "firetower.integrations.services.notion.requests.patch"
+        ) as mock_patch:
             mock_patch.side_effect = Exception("always fails")
 
             with patch("firetower.integrations.services.notion.time.sleep"):
