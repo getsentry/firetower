@@ -708,9 +708,9 @@ class TestTriggerSlackDump:
     def test_posts_start_message_and_completion(self):
         client = MagicMock()
         mock_incident = MagicMock()
-        mock_incident.external_links.filter.return_value.first.return_value = None
         mock_incident.captain = None
         mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
+        mock_notion_link = MagicMock(url="")
         with (
             patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
             patch(
@@ -720,10 +720,15 @@ class TestTriggerSlackDump:
                 "firetower.slack_app.handlers.dumpslack._get_channel_messages",
                 return_value=[],
             ),
-            patch("firetower.slack_app.handlers.dumpslack.ExternalLink"),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
         ):
             mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
             mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                True,
+            )
             mock_notion_cls.return_value.create_postmortem_page.return_value = mock_page
             mock_notion_cls.return_value.apply_template.return_value = None
             _trigger_slack_dump(client, "C123", mock_incident)
