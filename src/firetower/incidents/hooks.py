@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import transaction
 
 from firetower.auth.models import ExternalProfileType
 from firetower.incidents.models import (
@@ -12,7 +13,11 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
 )
-from firetower.integrations.services import PagerDutyService, SlackService
+from firetower.integrations.services import (
+    DatadogService,
+    PagerDutyService,
+    SlackService,
+)
 from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
@@ -356,6 +361,83 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
         )
 
 
+def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
+    try:
+        if incident.is_private:
+            logger.info(f"Skipping Datadog notebook for private incident {incident.id}")
+            try:
+                _slack_service.post_message(
+                    channel_id,
+                    "Datadog notebook creation skipped due to private incident.",
+                )
+            except Exception:
+                logger.exception(
+                    f"Failed to post Datadog skip message for incident {incident.id}"
+                )
+            return
+
+        service = DatadogService()
+        if not service.configured:
+            logger.info(
+                f"DatadogService not configured, skipping notebook for incident {incident.id}"
+            )
+            return
+
+        notebook_url: str | None = None
+        with transaction.atomic():
+            # Hold the row lock across the Datadog API call so concurrent runs
+            # serialize and only one notebook is created. A placeholder row is
+            # inserted up front so select_for_update has something to lock.
+            # Trade-off: a stuck Datadog API blocks DB writers on this row
+            # until REQUEST_TIMEOUT_SECONDS.
+            link, created = ExternalLink.objects.select_for_update().get_or_create(
+                incident=incident,
+                type=ExternalLinkType.DATADOG,
+                defaults={"url": ""},
+            )
+            if not created and link.url:
+                logger.info(
+                    f"Incident {incident.id} already has a Datadog notebook, skipping"
+                )
+                return
+
+            notebook_url = service.create_notebook(
+                incident.incident_number, incident.title
+            )
+            if not notebook_url:
+                logger.info(
+                    f"Datadog notebook creation returned no URL for incident {incident.id}"
+                )
+                link.delete()
+                return
+
+            link.url = notebook_url
+            link.save(update_fields=["url"])
+
+        # Post Slack side effects after the transaction commits so a Slack
+        # failure does not orphan the external Datadog notebook. Each side
+        # effect is independent so one failure does not block the other.
+        try:
+            _slack_service.add_bookmark(channel_id, "Datadog Notebook", notebook_url)
+        except Exception:
+            logger.exception(
+                f"Failed to add Datadog bookmark for incident {incident.id}"
+            )
+        try:
+            _slack_service.post_message(
+                channel_id,
+                f"Datadog notebook created: {notebook_url}",
+            )
+        except Exception:
+            logger.exception(
+                f"Failed to post Datadog notebook message for incident {incident.id}"
+            )
+    except Exception:
+        logger.exception(
+            f"Failed to create Datadog notebook for incident {incident.id}"
+        )
+
+
 def on_incident_created(incident: Incident) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
@@ -436,6 +518,8 @@ def on_incident_created(incident: Incident) -> None:
                     f"Failed to post guide message for incident {incident.id}"
                 )
 
+        _create_datadog_notebook(incident, channel_id)
+
         ic_mention = ""
         if incident.captain:
             if captain_slack_id:
@@ -514,8 +598,6 @@ def on_incident_created(incident: Incident) -> None:
                 logger.exception(
                     f"Failed to post feed channel message for incident {incident.id}"
                 )
-
-    # TODO: Datadog notebook creation step will be added in RELENG-467
 
 
 def on_status_changed(incident: Incident, old_status: str) -> None:
