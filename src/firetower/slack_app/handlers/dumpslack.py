@@ -1,5 +1,6 @@
 import logging
 import re
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
@@ -172,12 +173,16 @@ def handle_dumpslack_command(
     respond(
         "Fetching Slack history and generating postmortem doc, this may take a moment..."
     )
-    from django.db import connection  # noqa: PLC0415
 
-    try:
-        _trigger_slack_dump(client, channel_id, incident)
-    finally:
-        connection.close()
+    def _run_dump() -> None:
+        from django.db import connection  # noqa: PLC0415
+
+        try:
+            _trigger_slack_dump(client, channel_id, incident)
+        finally:
+            connection.close()
+
+    threading.Thread(target=_run_dump, daemon=True).start()
 
 
 def _resolve_user_emails(
