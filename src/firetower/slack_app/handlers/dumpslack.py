@@ -16,13 +16,20 @@ from firetower.slack_app.handlers.utils import get_incident_from_channel
 logger = logging.getLogger(__name__)
 
 
-def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
-    notion_config = settings.NOTION
+def _get_notion_config() -> dict | None:
+    config = settings.NOTION
     if (
-        not notion_config
-        or notion_config.get("INTEGRATION_TOKEN", "") == ""
-        or notion_config.get("DATABASE_ID", "") == ""
+        not config
+        or config.get("INTEGRATION_TOKEN", "") == ""
+        or config.get("DATABASE_ID", "") == ""
     ):
+        return None
+    return config
+
+
+def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
+    notion_config = _get_notion_config()
+    if not notion_config:
         return
 
     notion = NotionService(
@@ -144,12 +151,7 @@ def handle_dumpslack_command(
 ) -> None:
     ack()
 
-    notion_config = settings.NOTION
-    if (
-        not notion_config
-        or notion_config.get("INTEGRATION_TOKEN", "") == ""
-        or notion_config.get("DATABASE_ID", "") == ""
-    ):
+    if not _get_notion_config():
         respond("Notion integration is not configured.")
         return
 

@@ -194,7 +194,7 @@ class NotionService:
                     )
                 slack_index = index
                 notion_index = 0
-                while slack_index < len(messages) and notion_index < returned:
+                while slack_index < stopping_index and notion_index < returned:
                     slack_msg = messages[slack_index]
                     children: list[dict[str, Any]] = []
                     for img in slack_msg.get("images", []):
