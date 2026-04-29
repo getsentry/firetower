@@ -395,16 +395,15 @@ class SlackService:
                 )
                 break
             raw_messages: list[dict[str, Any]] = response.get("messages") or []
-            for msg_dict in raw_messages:
-                if not msg_dict.get("ts"):
-                    continue
-                if msg_dict.get("type") != "message" or msg_dict["ts"] == thread_ts:
-                    continue
-                if not msg_dict.get("user"):
-                    continue
-                if msg_dict.get("bot_id"):
-                    continue
-                replies.append(msg_dict)
+            replies.extend(
+                msg_dict
+                for msg_dict in raw_messages
+                if msg_dict.get("ts")
+                and msg_dict.get("type") == "message"
+                and msg_dict["ts"] != thread_ts
+                and msg_dict.get("user")
+                and not msg_dict.get("bot_id")
+            )
             reply_metadata: dict[str, Any] = response.get("response_metadata") or {}
             cursor = reply_metadata.get("next_cursor") or None
             if not response.get("has_more") or not cursor:
