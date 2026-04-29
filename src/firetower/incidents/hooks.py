@@ -615,7 +615,10 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
     except Exception:
         logger.exception(f"Error in on_status_changed for incident {incident.id}")
 
-    if incident.status in (IncidentStatus.MITIGATED, IncidentStatus.DONE) and channel_id:
+    if (
+        incident.status in (IncidentStatus.MITIGATED, IncidentStatus.DONE)
+        and channel_id
+    ):
         try:
             from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
             from firetower.slack_app.handlers.dumpslack import (  # noqa: PLC0415
@@ -624,9 +627,7 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
 
             _trigger_slack_dump(get_bolt_app().client, channel_id, incident)
         except Exception:
-            logger.exception(
-                f"Failed to trigger slack dump for incident {incident.id}"
-            )
+            logger.exception(f"Failed to trigger slack dump for incident {incident.id}")
 
 
 def on_severity_changed(incident: Incident, old_severity: str) -> None:

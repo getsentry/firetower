@@ -123,7 +123,9 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
 
     try:
-        client.chat_postMessage(channel=channel_id, text=f"{action} postmortem doc: {page_url}")
+        client.chat_postMessage(
+            channel=channel_id, text=f"{action} postmortem doc: {page_url}"
+        )
     except Exception:
         logger.exception(
             "Failed to post completion message to channel %s for page %s",
