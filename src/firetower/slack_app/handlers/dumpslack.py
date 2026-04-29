@@ -205,7 +205,7 @@ def _get_channel_messages(
             continue
         if not msg.get("user"):
             continue
-        if msg.get("bot_id") or msg.get("subtype") in ("channel_join", "channel_leave"):
+        if msg.get("bot_id") or msg.get("subtype") in ("channel_join", "channel_leave", "thread_broadcast"):
             continue
         if not msg.get("text") and not _extract_image_urls(msg):
             continue
