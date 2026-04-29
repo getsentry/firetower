@@ -628,8 +628,17 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
             )
 
             bolt_client = get_bolt_app().client
+
+            def _run_dump(client, cid, inc):  # type: ignore[no-untyped-def]
+                from django.db import connection  # noqa: PLC0415
+
+                try:
+                    _trigger_slack_dump(client, cid, inc)
+                finally:
+                    connection.close()
+
             threading.Thread(
-                target=_trigger_slack_dump,
+                target=_run_dump,
                 args=(bolt_client, channel_id, incident),
                 daemon=True,
             ).start()

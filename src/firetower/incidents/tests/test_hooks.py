@@ -24,7 +24,6 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
 )
-from firetower.slack_app.handlers.dumpslack import _trigger_slack_dump
 
 
 @pytest.mark.django_db
@@ -397,11 +396,9 @@ class TestOnStatusChanged:
 
         on_status_changed(incident, IncidentStatus.ACTIVE)
 
-        mock_thread.assert_called_once_with(
-            target=_trigger_slack_dump,
-            args=(mock_client, "C12345", incident),
-            daemon=True,
-        )
+        _, thread_kwargs = mock_thread.call_args
+        assert thread_kwargs["daemon"] is True
+        assert thread_kwargs["args"] == (mock_client, "C12345", incident)
         mock_thread.return_value.start.assert_called_once()
 
     @patch("firetower.slack_app.bolt.get_bolt_app")
@@ -425,11 +422,9 @@ class TestOnStatusChanged:
 
         on_status_changed(incident, IncidentStatus.ACTIVE)
 
-        mock_thread.assert_called_once_with(
-            target=_trigger_slack_dump,
-            args=(mock_client, "C12345", incident),
-            daemon=True,
-        )
+        _, thread_kwargs = mock_thread.call_args
+        assert thread_kwargs["daemon"] is True
+        assert thread_kwargs["args"] == (mock_client, "C12345", incident)
         mock_thread.return_value.start.assert_called_once()
 
     @patch("firetower.slack_app.bolt.get_bolt_app")
@@ -453,11 +448,9 @@ class TestOnStatusChanged:
 
         on_status_changed(incident, IncidentStatus.ACTIVE)
 
-        mock_thread.assert_called_once_with(
-            target=_trigger_slack_dump,
-            args=(mock_client, "C12345", incident),
-            daemon=True,
-        )
+        _, thread_kwargs = mock_thread.call_args
+        assert thread_kwargs["daemon"] is True
+        assert thread_kwargs["args"] == (mock_client, "C12345", incident)
         mock_thread.return_value.start.assert_called_once()
 
     @patch("firetower.incidents.hooks.threading.Thread")
