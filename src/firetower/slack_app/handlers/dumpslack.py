@@ -18,27 +18,10 @@ from firetower.slack_app.handlers.utils import get_incident_from_channel
 logger = logging.getLogger(__name__)
 
 
-def _get_notion_config() -> dict | None:
-    config = settings.NOTION
-    if (
-        not config
-        or config.get("INTEGRATION_TOKEN", "") == ""
-        or config.get("DATABASE_ID", "") == ""
-    ):
-        return None
-    return config
-
-
 def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
-    notion_config = _get_notion_config()
-    if not notion_config:
+    notion = NotionService.from_settings()
+    if not notion:
         return
-
-    notion = NotionService(
-        integration_token=notion_config["INTEGRATION_TOKEN"],
-        database_id=notion_config["DATABASE_ID"],
-        template_markdown=notion_config.get("TEMPLATE_MARKDOWN", ""),
-    )
 
     page_id: str | None = None
     page_url: str = ""
@@ -167,7 +150,7 @@ def handle_dumpslack_command(
 ) -> None:
     ack()
 
-    if not _get_notion_config():
+    if not NotionService.from_settings():
         respond("Notion integration is not configured.")
         return
 
@@ -216,6 +199,8 @@ def _get_channel_messages(
     filtered_image_urls: dict[str, list[dict[str, str]]] = {}
     for msg in all_messages:
         if msg.get("type") != "message":
+            continue
+        if not msg.get("ts"):
             continue
         if not msg.get("user"):
             continue

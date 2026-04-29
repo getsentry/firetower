@@ -436,17 +436,10 @@ class TestTriggerSlackDump:
     def test_skips_silently_when_notion_not_configured(self):
         client = MagicMock()
         mock_incident = MagicMock()
-        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings:
-            mock_settings.NOTION = None
-            _trigger_slack_dump(client, "C123", mock_incident)
-
-        client.chat_postMessage.assert_not_called()
-
-    def test_skips_silently_when_notion_token_empty(self):
-        client = MagicMock()
-        mock_incident = MagicMock()
-        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings:
-            mock_settings.NOTION = {"INTEGRATION_TOKEN": "", "DATABASE_ID": "db"}
+        with patch(
+            "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+            return_value=None,
+        ):
             _trigger_slack_dump(client, "C123", mock_incident)
 
         client.chat_postMessage.assert_not_called()
@@ -457,26 +450,26 @@ class TestTriggerSlackDump:
         mock_incident.captain = None
         mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
         mock_notion_link = MagicMock(url="")
+        mock_notion = MagicMock()
+        mock_notion.create_postmortem_page.return_value = mock_page
         with (
-            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
             patch(
-                "firetower.slack_app.handlers.dumpslack.NotionService"
-            ) as mock_notion_cls,
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
             patch(
                 "firetower.slack_app.handlers.dumpslack._get_channel_messages",
                 return_value=[],
             ),
             patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
             patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
         ):
-            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
             mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
             mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
                 mock_notion_link,
                 True,
             )
-            mock_notion_cls.return_value.create_postmortem_page.return_value = mock_page
-            mock_notion_cls.return_value.apply_template.return_value = None
             _trigger_slack_dump(client, "C123", mock_incident)
 
         assert client.chat_postMessage.call_count == 1
@@ -492,26 +485,26 @@ class TestTriggerSlackDump:
         mock_incident.captain = None
         mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
         mock_notion_link = MagicMock(url="")
+        mock_notion = MagicMock()
+        mock_notion.create_postmortem_page.return_value = mock_page
         with (
-            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
             patch(
-                "firetower.slack_app.handlers.dumpslack.NotionService"
-            ) as mock_notion_cls,
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
             patch(
                 "firetower.slack_app.handlers.dumpslack._get_channel_messages",
                 return_value=[],
             ),
             patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
             patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
         ):
-            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
             mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
             mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
                 mock_notion_link,
                 True,
             )
-            mock_notion_cls.return_value.create_postmortem_page.return_value = mock_page
-            mock_notion_cls.return_value.apply_template.return_value = None
             _trigger_slack_dump(client, "C123", mock_incident)
 
         client.chat_postMessage.assert_called()
@@ -528,8 +521,10 @@ class TestHandleDumpslackCommand:
 
     def test_responds_when_notion_not_configured(self):
         ack, body, command, client, respond, _ = self._make_args()
-        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings:
-            mock_settings.NOTION = None
+        with patch(
+            "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+            return_value=None,
+        ):
             handle_dumpslack_command(ack, body, command, client, respond)
 
         ack.assert_called_once()
@@ -538,8 +533,10 @@ class TestHandleDumpslackCommand:
 
     def test_responds_when_no_channel_id(self):
         ack, body, command, client, respond, _ = self._make_args(channel_id="")
-        with patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings:
-            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
+        with patch(
+            "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+            return_value=MagicMock(),
+        ):
             handle_dumpslack_command(ack, body, command, client, respond)
 
         ack.assert_called_once()
@@ -548,13 +545,15 @@ class TestHandleDumpslackCommand:
     def test_responds_when_no_incident_found(self):
         ack, body, command, client, respond, _ = self._make_args()
         with (
-            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=MagicMock(),
+            ),
             patch(
                 "firetower.slack_app.handlers.dumpslack.get_incident_from_channel",
                 return_value=None,
             ),
         ):
-            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
             handle_dumpslack_command(ack, body, command, client, respond)
 
         ack.assert_called_once()
@@ -564,7 +563,10 @@ class TestHandleDumpslackCommand:
         ack, body, command, client, respond, _ = self._make_args()
         mock_incident = MagicMock()
         with (
-            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=MagicMock(),
+            ),
             patch(
                 "firetower.slack_app.handlers.dumpslack.get_incident_from_channel",
                 return_value=mock_incident,
@@ -573,7 +575,6 @@ class TestHandleDumpslackCommand:
                 "firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async"
             ) as mock_async,
         ):
-            mock_settings.NOTION = {"INTEGRATION_TOKEN": "key", "DATABASE_ID": "db"}
             handle_dumpslack_command(ack, body, command, client, respond)
 
         ack.assert_called_once()
