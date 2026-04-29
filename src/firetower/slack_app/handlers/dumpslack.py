@@ -213,6 +213,7 @@ def _get_channel_messages(
         return []
 
     filtered: list[dict[str, Any]] = []
+    filtered_image_urls: dict[str, list[dict[str, str]]] = {}
     for msg in all_messages:
         if msg.get("type") != "message":
             continue
@@ -224,9 +225,11 @@ def _get_channel_messages(
             "thread_broadcast",
         ):
             continue
-        if not msg.get("text") and not _extract_image_urls(msg):
+        image_urls = _extract_image_urls(msg)
+        if not msg.get("text") and not image_urls:
             continue
         filtered.append(msg)
+        filtered_image_urls[msg["ts"]] = image_urls
 
     all_raw_replies: dict[str, list[dict[str, Any]]] = {}
     for msg in filtered:
@@ -249,7 +252,7 @@ def _get_channel_messages(
 
     content: list[dict[str, Any]] = []
     for msg in filtered:
-        image_urls = _extract_image_urls(msg)
+        image_urls = filtered_image_urls[msg["ts"]]
         dt = datetime.fromtimestamp(float(msg["ts"]), tz=UTC)
         author = email_cache.get(msg["user"], msg["user"])
 
