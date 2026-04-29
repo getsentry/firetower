@@ -396,6 +396,8 @@ class SlackService:
                 break
             raw_messages: list[dict[str, Any]] = response.get("messages") or []
             for msg_dict in raw_messages:
+                if not msg_dict.get("ts"):
+                    continue
                 if msg_dict.get("type") != "message" or msg_dict["ts"] == thread_ts:
                     continue
                 if not msg_dict.get("user"):
