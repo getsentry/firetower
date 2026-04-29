@@ -315,6 +315,7 @@ def _get_channel_messages(client: Any, channel_id: str) -> list[dict[str, Any]]:
                     {
                         "data": data,
                         "content_type": content_type,
+                        "image_url": item["image_url"],
                         "source_url": item["source_url"],
                     }
                 )
