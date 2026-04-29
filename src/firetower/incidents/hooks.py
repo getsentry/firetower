@@ -1,4 +1,5 @@
 import logging
+import threading
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -616,7 +617,8 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
         logger.exception(f"Error in on_status_changed for incident {incident.id}")
 
     if (
-        incident.status in (IncidentStatus.MITIGATED, IncidentStatus.DONE)
+        incident.status
+        in (IncidentStatus.MITIGATED, IncidentStatus.DONE, IncidentStatus.POSTMORTEM)
         and channel_id
     ):
         try:
@@ -625,7 +627,12 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
                 _trigger_slack_dump,
             )
 
-            _trigger_slack_dump(get_bolt_app().client, channel_id, incident)
+            bolt_client = get_bolt_app().client
+            threading.Thread(
+                target=_trigger_slack_dump,
+                args=(bolt_client, channel_id, incident),
+                daemon=True,
+            ).start()
         except Exception:
             logger.exception(f"Failed to trigger slack dump for incident {incident.id}")
 

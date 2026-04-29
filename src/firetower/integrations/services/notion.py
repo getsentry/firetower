@@ -260,7 +260,7 @@ class NotionService:
             create_resp = httpx.post(
                 f"{_NOTION_API_BASE}/file_uploads",
                 headers={**auth_headers, "Content-Type": "application/json"},
-                json={"name": filename},
+                json={"filename": filename},
                 timeout=30.0,
             )
             create_resp.raise_for_status()

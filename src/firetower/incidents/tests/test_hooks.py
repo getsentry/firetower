@@ -24,6 +24,7 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
 )
+from firetower.slack_app.handlers.dumpslack import _trigger_slack_dump
 
 
 @pytest.mark.django_db
@@ -340,10 +341,10 @@ class TestOnIncidentCreated:
 
 @pytest.mark.django_db
 class TestOnStatusChanged:
-    @patch("firetower.slack_app.handlers.dumpslack._trigger_slack_dump")
+    @patch("firetower.incidents.hooks.threading.Thread")
     @patch("firetower.slack_app.bolt.get_bolt_app")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_status_update_message(self, mock_slack, mock_bolt, mock_dump):
+    def test_posts_status_update_message(self, mock_slack, mock_bolt, mock_thread):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = Incident.objects.create(
@@ -375,10 +376,10 @@ class TestOnStatusChanged:
 
         mock_slack.post_message.assert_not_called()
 
-    @patch("firetower.slack_app.handlers.dumpslack._trigger_slack_dump")
     @patch("firetower.slack_app.bolt.get_bolt_app")
+    @patch("firetower.incidents.hooks.threading.Thread")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_triggers_dump_on_mitigated(self, mock_slack, mock_bolt, mock_dump):
+    def test_triggers_dump_on_mitigated(self, mock_slack, mock_thread, mock_bolt):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
         mock_client = MagicMock()
         mock_bolt.return_value.client = mock_client
@@ -396,12 +397,17 @@ class TestOnStatusChanged:
 
         on_status_changed(incident, IncidentStatus.ACTIVE)
 
-        mock_dump.assert_called_once_with(mock_client, "C12345", incident)
+        mock_thread.assert_called_once_with(
+            target=_trigger_slack_dump,
+            args=(mock_client, "C12345", incident),
+            daemon=True,
+        )
+        mock_thread.return_value.start.assert_called_once()
 
-    @patch("firetower.slack_app.handlers.dumpslack._trigger_slack_dump")
     @patch("firetower.slack_app.bolt.get_bolt_app")
+    @patch("firetower.incidents.hooks.threading.Thread")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_triggers_dump_on_done(self, mock_slack, mock_bolt, mock_dump):
+    def test_triggers_dump_on_done(self, mock_slack, mock_thread, mock_bolt):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
         mock_client = MagicMock()
         mock_bolt.return_value.client = mock_client
@@ -419,18 +425,47 @@ class TestOnStatusChanged:
 
         on_status_changed(incident, IncidentStatus.ACTIVE)
 
-        mock_dump.assert_called_once_with(mock_client, "C12345", incident)
+        mock_thread.assert_called_once_with(
+            target=_trigger_slack_dump,
+            args=(mock_client, "C12345", incident),
+            daemon=True,
+        )
+        mock_thread.return_value.start.assert_called_once()
 
-    @patch("firetower.slack_app.handlers.dumpslack._trigger_slack_dump")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    @patch("firetower.incidents.hooks.threading.Thread")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_does_not_trigger_dump_on_other_statuses(self, mock_slack, mock_dump):
+    def test_triggers_dump_on_postmortem(self, mock_slack, mock_thread, mock_bolt):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_client = MagicMock()
+        mock_bolt.return_value.client = mock_client
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.POSTMORTEM,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_status_changed(incident, IncidentStatus.ACTIVE)
+
+        mock_thread.assert_called_once_with(
+            target=_trigger_slack_dump,
+            args=(mock_client, "C12345", incident),
+            daemon=True,
+        )
+        mock_thread.return_value.start.assert_called_once()
+
+    @patch("firetower.incidents.hooks.threading.Thread")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_trigger_dump_on_other_statuses(self, mock_slack, mock_thread):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
-        for status in (
-            IncidentStatus.ACTIVE,
-            IncidentStatus.POSTMORTEM,
-            IncidentStatus.CANCELLED,
-        ):
+        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELLED):
             incident = Incident.objects.create(
                 title="Test",
                 severity=IncidentSeverity.P1,
@@ -443,11 +478,11 @@ class TestOnStatusChanged:
             )
             on_status_changed(incident, IncidentStatus.ACTIVE)
 
-        mock_dump.assert_not_called()
+        mock_thread.assert_not_called()
 
-    @patch("firetower.slack_app.handlers.dumpslack._trigger_slack_dump")
+    @patch("firetower.incidents.hooks.threading.Thread")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_does_not_trigger_dump_without_slack_link(self, mock_slack, mock_dump):
+    def test_does_not_trigger_dump_without_slack_link(self, mock_slack, mock_thread):
         mock_slack.parse_channel_id_from_url.return_value = None
 
         incident = Incident.objects.create(
@@ -458,7 +493,7 @@ class TestOnStatusChanged:
 
         on_status_changed(incident, IncidentStatus.ACTIVE)
 
-        mock_dump.assert_not_called()
+        mock_thread.assert_not_called()
 
 
 @pytest.mark.django_db
