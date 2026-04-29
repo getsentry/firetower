@@ -26,6 +26,23 @@ _users_cache: dict[str, dict[str, dict[str, str]]] = {}
 
 
 class NotionService:
+    @classmethod
+    def from_settings(cls) -> "NotionService | None":
+        from django.conf import settings  # noqa: PLC0415
+
+        config = settings.NOTION
+        if (
+            not config
+            or not config.get("INTEGRATION_TOKEN")
+            or not config.get("DATABASE_ID")
+        ):
+            return None
+        return cls(
+            integration_token=config["INTEGRATION_TOKEN"],
+            database_id=config["DATABASE_ID"],
+            template_markdown=config.get("TEMPLATE_MARKDOWN", ""),
+        )
+
     def __init__(
         self, integration_token: str, database_id: str, template_markdown: str = ""
     ) -> None:
