@@ -616,7 +616,8 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
         logger.exception(f"Error in on_status_changed for incident {incident.id}")
 
     if (
-        incident.status in (IncidentStatus.DONE, IncidentStatus.POSTMORTEM)
+        incident.status
+        in (IncidentStatus.MITIGATED, IncidentStatus.DONE, IncidentStatus.POSTMORTEM)
         and channel_id
     ):
         try:

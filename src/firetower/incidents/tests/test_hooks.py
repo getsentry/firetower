@@ -374,7 +374,10 @@ class TestOnStatusChanged:
 
         mock_slack.post_message.assert_not_called()
 
-    @pytest.mark.parametrize("status", [IncidentStatus.DONE, IncidentStatus.POSTMORTEM])
+    @pytest.mark.parametrize(
+        "status",
+        [IncidentStatus.MITIGATED, IncidentStatus.DONE, IncidentStatus.POSTMORTEM],
+    )
     @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
     @patch("firetower.slack_app.bolt.get_bolt_app")
     @patch("firetower.incidents.hooks._slack_service")
@@ -405,11 +408,7 @@ class TestOnStatusChanged:
     def test_does_not_trigger_dump_on_other_statuses(self, mock_slack, mock_dump_async):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
-        for status in (
-            IncidentStatus.ACTIVE,
-            IncidentStatus.CANCELLED,
-            IncidentStatus.MITIGATED,
-        ):
+        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELLED):
             incident = Incident.objects.create(
                 title="Test",
                 severity=IncidentSeverity.P1,
