@@ -70,12 +70,6 @@ def _detect_location() -> str:
 
 class GenAIService:
     @classmethod
-    def is_configured(cls) -> bool:
-        from django.conf import settings  # noqa: PLC0415
-
-        return bool(getattr(settings, "GENAI", None))
-
-    @classmethod
     def from_settings(cls) -> "GenAIService | None":
         from django.conf import settings  # noqa: PLC0415
 
