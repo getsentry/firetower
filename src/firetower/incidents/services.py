@@ -146,17 +146,39 @@ class ActionItemsSyncStats:
     skipped: bool = False
 
 
-def _resolve_assignee(email: str, linear_id: str | None = None) -> User | None:
-    user = get_or_create_user_from_email(email)
-    if not user:
-        return None
-    if linear_id:
-        ExternalProfile.objects.update_or_create(
-            user=user,
-            type=ExternalProfileType.LINEAR,
-            defaults={"external_id": linear_id},
-        )
-    return user
+def _resolve_assignees(
+    issues: dict[str, dict],
+) -> dict[str, User | None]:
+    email_to_linear_id: dict[str, str | None] = {}
+    for issue in issues.values():
+        email = issue.get("assignee_email")
+        if email:
+            email_to_linear_id[email] = issue.get("assignee_linear_id")
+
+    if not email_to_linear_id:
+        return {}
+
+    existing_users = {
+        u.email: u for u in User.objects.filter(email__in=email_to_linear_id.keys())
+    }
+
+    resolved: dict[str, User | None] = {}
+    for email, linear_id in email_to_linear_id.items():
+        user = existing_users.get(email)
+        if not user:
+            user = get_or_create_user_from_email(email)
+        if not user:
+            resolved[email] = None
+            continue
+        resolved[email] = user
+        if linear_id:
+            ExternalProfile.objects.update_or_create(
+                user=user,
+                type=ExternalProfileType.LINEAR,
+                defaults={"external_id": linear_id},
+            )
+
+    return resolved
 
 
 COMPLETED_STATUSES = {ActionItemStatus.DONE, ActionItemStatus.CANCELLED}
@@ -237,16 +259,13 @@ def sync_action_items_from_linear(
 
     logger.info(f"Syncing {len(all_issues)} Linear issues to incident {incident.id}")
 
+    assignee_map = _resolve_assignees(all_issues)
     seen_linear_ids: set[str] = set()
 
     for issue in all_issues.values():
         seen_linear_ids.add(issue["id"])
 
-        assignee = None
-        if issue.get("assignee_email"):
-            assignee = _resolve_assignee(
-                issue["assignee_email"], issue.get("assignee_linear_id")
-            )
+        assignee = assignee_map.get(issue.get("assignee_email", ""))
 
         _, created = ActionItem.objects.update_or_create(
             linear_issue_id=issue["id"],
