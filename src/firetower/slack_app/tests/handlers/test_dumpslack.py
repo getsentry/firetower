@@ -1,9 +1,11 @@
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from slack_sdk.errors import SlackApiError
 
 from firetower.integrations.services.slack import SlackService, is_slack_url
 from firetower.slack_app.handlers.dumpslack import (
+    _backfill_milestones,
     _download_image,
     _extract_image_urls,
     _extract_notion_page_id,
@@ -599,3 +601,83 @@ class TestHandleDumpslackCommand:
         ack.assert_called_once()
         respond.assert_called()
         mock_async.assert_called_once_with(client, "C123", mock_incident)
+
+
+class TestBackfillMilestones:
+    _TIMELINE_MD = (
+        "## Key Timestamps\n"
+        "- Started: [2024-01-15 14:00 UTC]\n"
+        "- Detected: [2024-01-15 14:05 UTC]\n"
+        "- Analyzed: [2024-01-15 14:30 UTC]\n"
+        "- Mitigation: [2024-01-15 15:00 UTC]\n"
+        "- Resolution: [2024-01-15 16:00 UTC]\n"
+    )
+
+    def test_sets_empty_fields(self):
+        incident = MagicMock()
+        incident.incident_number = "INC-1"
+        incident.time_started = None
+        incident.time_detected = None
+        incident.time_analyzed = None
+        incident.time_mitigated = None
+        incident.time_recovered = None
+
+        _backfill_milestones(incident, self._TIMELINE_MD)
+
+        incident.save.assert_called_once()
+        fields = set(incident.save.call_args[1]["update_fields"])
+        assert fields == {
+            "time_started",
+            "time_detected",
+            "time_analyzed",
+            "time_mitigated",
+            "time_recovered",
+        }
+        assert incident.time_started == datetime(2024, 1, 15, 14, 0, tzinfo=UTC)
+        assert incident.time_recovered == datetime(2024, 1, 15, 16, 0, tzinfo=UTC)
+
+    def test_skips_fields_that_already_have_values(self):
+        incident = MagicMock()
+        incident.incident_number = "INC-2"
+        incident.time_started = datetime(2024, 1, 15, 13, 50, tzinfo=UTC)
+        incident.time_detected = None
+        incident.time_analyzed = None
+        incident.time_mitigated = datetime(2024, 1, 15, 14, 55, tzinfo=UTC)
+        incident.time_recovered = None
+
+        _backfill_milestones(incident, self._TIMELINE_MD)
+
+        fields = set(incident.save.call_args[1]["update_fields"])
+        assert "time_started" not in fields
+        assert "time_mitigated" not in fields
+        assert fields == {"time_detected", "time_analyzed", "time_recovered"}
+
+    def test_no_save_when_all_fields_populated(self):
+        incident = MagicMock()
+        incident.incident_number = "INC-3"
+        incident.time_started = datetime(2024, 1, 15, 14, 0, tzinfo=UTC)
+        incident.time_detected = datetime(2024, 1, 15, 14, 5, tzinfo=UTC)
+        incident.time_analyzed = datetime(2024, 1, 15, 14, 30, tzinfo=UTC)
+        incident.time_mitigated = datetime(2024, 1, 15, 15, 0, tzinfo=UTC)
+        incident.time_recovered = datetime(2024, 1, 15, 16, 0, tzinfo=UTC)
+
+        _backfill_milestones(incident, self._TIMELINE_MD)
+
+        incident.save.assert_not_called()
+
+    def test_no_save_when_no_timestamps_parsed(self):
+        incident = MagicMock()
+        incident.incident_number = "INC-4"
+        incident.time_started = None
+
+        _backfill_milestones(incident, "## Timeline\n- some event\n")
+
+        incident.save.assert_not_called()
+
+    def test_save_exception_does_not_propagate(self):
+        incident = MagicMock()
+        incident.incident_number = "INC-5"
+        incident.time_started = None
+        incident.save.side_effect = RuntimeError("db error")
+
+        _backfill_milestones(incident, self._TIMELINE_MD)

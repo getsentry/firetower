@@ -1,4 +1,6 @@
 import logging
+import re
+from datetime import UTC, datetime
 from typing import Any
 
 import requests
@@ -39,7 +41,7 @@ Your response MUST follow this exact format:
 ## Key Timestamps
 - Started: [YYYY-MM-DD HH:MM UTC]
 - Detected: [YYYY-MM-DD HH:MM UTC]
-- Understanding: [YYYY-MM-DD HH:MM UTC]
+- Analyzed: [YYYY-MM-DD HH:MM UTC]
 - Mitigation: [YYYY-MM-DD HH:MM UTC]
 - Resolution: [YYYY-MM-DD HH:MM UTC]
 
@@ -66,6 +68,48 @@ def _detect_location() -> str:
             _DEFAULT_LOCATION,
         )
         return _DEFAULT_LOCATION
+
+
+_KEY_TIMESTAMPS_LABEL_MAP = {
+    "started": "time_started",
+    "detected": "time_detected",
+    "analyzed": "time_analyzed",
+    "mitigation": "time_mitigated",
+    "resolution": "time_recovered",
+}
+
+_KEY_TS_RE = re.compile(
+    r"-\s*(\w+):\s*\[?(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\s*UTC)\]?",
+    re.IGNORECASE,
+)
+
+
+def parse_key_timestamps(timeline_md: str) -> dict[str, datetime]:
+    """Extract Key Timestamps from the AI-generated timeline markdown.
+
+    Returns a dict mapping Incident model field names to parsed datetimes.
+    Only includes entries where the AI provided a real timestamp (not N/A).
+    """
+    section_match = re.search(
+        r"## Key Timestamps\s*\n((?:- .+\n?)+)", timeline_md, re.IGNORECASE
+    )
+    if not section_match:
+        return {}
+
+    results: dict[str, datetime] = {}
+    for match in _KEY_TS_RE.finditer(section_match.group(1)):
+        label = match.group(1).lower()
+        field = _KEY_TIMESTAMPS_LABEL_MAP.get(label)
+        if not field:
+            continue
+        raw_ts = match.group(2).strip()
+        for fmt in ("%Y-%m-%d %H:%M:%S UTC", "%Y-%m-%d %H:%M UTC"):
+            try:
+                results[field] = datetime.strptime(raw_ts, fmt).replace(tzinfo=UTC)
+                break
+            except ValueError:
+                continue
+    return results
 
 
 class GenAIService:

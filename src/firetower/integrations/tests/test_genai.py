@@ -4,7 +4,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from firetower.integrations.services.genai import GenAIService, _detect_location
+from firetower.integrations.services.genai import (
+    GenAIService,
+    _detect_location,
+    parse_key_timestamps,
+)
 from firetower.integrations.services.notion import (
     NotionService,
     _convert_markdown_to_notion_blocks,
@@ -290,3 +294,74 @@ class TestGenAIService:
         ]
         assert "first reply" in contents
         assert "second reply" in contents
+
+
+class TestParseKeyTimestamps:
+    def test_parses_all_timestamps(self):
+        md = (
+            "## Timeline\n"
+            "- [2024-01-15 14:30 UTC] - Incident started\n"
+            "\n"
+            "## Key Timestamps\n"
+            "- Started: [2024-01-15 14:00 UTC]\n"
+            "- Detected: [2024-01-15 14:05 UTC]\n"
+            "- Analyzed: [2024-01-15 14:30 UTC]\n"
+            "- Mitigation: [2024-01-15 15:00 UTC]\n"
+            "- Resolution: [2024-01-15 16:00 UTC]\n"
+        )
+        result = parse_key_timestamps(md)
+        assert result == {
+            "time_started": datetime(2024, 1, 15, 14, 0, tzinfo=UTC),
+            "time_detected": datetime(2024, 1, 15, 14, 5, tzinfo=UTC),
+            "time_analyzed": datetime(2024, 1, 15, 14, 30, tzinfo=UTC),
+            "time_mitigated": datetime(2024, 1, 15, 15, 0, tzinfo=UTC),
+            "time_recovered": datetime(2024, 1, 15, 16, 0, tzinfo=UTC),
+        }
+
+    def test_skips_na_timestamps(self):
+        md = (
+            "## Key Timestamps\n"
+            "- Started: [2024-01-15 14:00 UTC]\n"
+            "- Detected: N/A\n"
+            "- Analyzed: N/A\n"
+            "- Mitigation: [2024-01-15 15:00 UTC]\n"
+            "- Resolution: N/A\n"
+        )
+        result = parse_key_timestamps(md)
+        assert result == {
+            "time_started": datetime(2024, 1, 15, 14, 0, tzinfo=UTC),
+            "time_mitigated": datetime(2024, 1, 15, 15, 0, tzinfo=UTC),
+        }
+
+    def test_handles_timestamps_with_seconds(self):
+        md = "## Key Timestamps\n- Started: [2024-01-15 14:00:30 UTC]\n"
+        result = parse_key_timestamps(md)
+        assert result["time_started"] == datetime(2024, 1, 15, 14, 0, 30, tzinfo=UTC)
+
+    def test_returns_empty_when_no_key_timestamps_section(self):
+        md = "## Timeline\n- [2024-01-15 14:30 UTC] - event\n"
+        assert parse_key_timestamps(md) == {}
+
+    def test_returns_empty_for_empty_string(self):
+        assert parse_key_timestamps("") == {}
+
+    def test_ignores_unknown_labels(self):
+        md = (
+            "## Key Timestamps\n"
+            "- Started: [2024-01-15 14:00 UTC]\n"
+            "- Escalated: [2024-01-15 14:10 UTC]\n"
+        )
+        result = parse_key_timestamps(md)
+        assert list(result.keys()) == ["time_started"]
+
+    def test_unbracketed_timestamps(self):
+        md = (
+            "## Key Timestamps\n"
+            "- Started: 2024-01-15 14:00 UTC\n"
+            "- Detected: 2024-01-15 14:05 UTC\n"
+        )
+        result = parse_key_timestamps(md)
+        assert result == {
+            "time_started": datetime(2024, 1, 15, 14, 0, tzinfo=UTC),
+            "time_detected": datetime(2024, 1, 15, 14, 5, tzinfo=UTC),
+        }
