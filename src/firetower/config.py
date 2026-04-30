@@ -167,7 +167,7 @@ class DummyConfigFile(ConfigFile):
         self.statuspage = None
         self.project_key = ""
         self.firetower_base_url = ""
-        self.django_secret_key = ""
+        self.django_secret_key = "dummy_value_DO_NOT_USE"
         self.salt_key = ""
         self.sentry_dsn = ""
         self.region_grouping: list[list[str]] = []

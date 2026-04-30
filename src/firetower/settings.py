@@ -127,6 +127,7 @@ INSTALLED_APPS = [
     "firetower.incidents",
     "firetower.integrations",
     "firetower.slack_app",
+    "django_q",
 ]
 
 MIDDLEWARE = [
@@ -395,4 +396,14 @@ LOGGING = {
             "propagate": False,
         },
     },
+}
+
+Q_CLUSTER = {
+    "name": "firetower",
+    "orm": "default",
+    "workers": 4,
+    "timeout": 60,
+    "retry": 120,
+    "queue_limit": 50,
+    "bulk": 10,
 }
