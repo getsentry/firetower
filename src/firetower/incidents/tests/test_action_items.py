@@ -152,6 +152,26 @@ class TestSyncActionItemsFromLinear:
             assert stats.created == 2
             assert incident.action_items.count() == 2
 
+    def test_same_issue_on_multiple_incidents(self):
+        incident_a = self._make_incident(linear_parent_issue_id="parent-a")
+        incident_b = self._make_incident(linear_parent_issue_id="parent-b")
+
+        shared_issue = [
+            _make_linear_issue(id="shared-1", identifier="ENG-99", title="Shared task"),
+        ]
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_get.return_value.get_child_issues.return_value = shared_issue
+            mock_get.return_value.get_related_issues.return_value = []
+            mock_get.return_value.get_workflow_states.return_value = None
+
+            sync_action_items_from_linear(incident_a, force=True)
+            sync_action_items_from_linear(incident_b, force=True)
+
+        assert incident_a.action_items.filter(linear_issue_id="shared-1").exists()
+        assert incident_b.action_items.filter(linear_issue_id="shared-1").exists()
+        assert ActionItem.objects.filter(linear_issue_id="shared-1").count() == 2
+
     def test_deduplicates_children_and_relations(self):
         incident = self._make_incident()
 
