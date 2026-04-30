@@ -6,6 +6,7 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
+from datadog import statsd
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -15,6 +16,7 @@ from firetower.slack_app.bolt import get_bolt_app
 logger = logging.getLogger(__name__)
 
 _shutdown = threading.Event()
+_state: dict[str, SocketModeHandler] = {}
 
 
 def _on_close(close_status_code: int, close_msg: str | None) -> None:
@@ -34,7 +36,10 @@ def _handle_shutdown(signum: int, frame: Any) -> None:
 
 class _HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self, *args: Any) -> None:
-        self.send_response(200)
+        handler = _state.get("handler")
+        connected = handler is not None and handler.client.is_connected()
+        statsd.gauge("slack_bot.websocket.connected", 1 if connected else 0)
+        self.send_response(200 if connected else 503)
         self.end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -62,6 +67,7 @@ class Command(BaseCommand):
                 handler = SocketModeHandler(app=get_bolt_app(), app_token=app_token)
                 handler.client.on_close_listeners.append(_on_close)
                 handler.client.on_error_listeners.append(_on_error)
+                _state["handler"] = handler
                 logger.info("Starting Slack bot in Socket Mode")
                 handler.start()
             except Exception as e:
