@@ -2,7 +2,6 @@ import logging
 import os
 import signal
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
@@ -58,6 +57,7 @@ class Command(BaseCommand):
     help = "Start the Slack bot in Socket Mode"
 
     def handle(self, *args: Any, **options: Any) -> None:
+        _shutdown.clear()
         _start_health_server()
         signal.signal(signal.SIGTERM, _handle_shutdown)
         signal.signal(signal.SIGINT, _handle_shutdown)
@@ -82,4 +82,4 @@ class Command(BaseCommand):
                 if _shutdown.is_set():
                     break
                 logger.error("Slack bot crashed: %s, restarting in 5s", e)
-                time.sleep(5)
+                _shutdown.wait(timeout=5)
