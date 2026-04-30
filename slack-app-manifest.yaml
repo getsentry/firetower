@@ -24,6 +24,7 @@ oauth_config:
       - groups:history
       - groups:read
       - groups:write
+      - files:read
       - users:read
       - users:read.email
   pkce_enabled: false
