@@ -439,6 +439,12 @@ def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
         )
 
 
+def _linear_issue_title(incident: Incident) -> str:
+    if incident.is_private:
+        return f"[{incident.incident_number}] Private Incident"
+    return f"[{incident.incident_number}] {incident.title}"
+
+
 def _create_linear_parent_issue(incident: Incident) -> None:
     team_id = settings.LINEAR.get("TEAM_ID")
     if not team_id:
@@ -455,7 +461,7 @@ def _create_linear_parent_issue(incident: Incident) -> None:
 
     try:
         linear_service = LinearService()
-        title = f"[{incident.incident_number}] {incident.title}"
+        title = _linear_issue_title(incident)
         description = (
             "Relate action items to this ticket to have them tracked by Firetower. "
             "Child issues or other relations (related, blocking, etc.) will all work. "
@@ -750,7 +756,7 @@ def on_title_changed(incident: Incident) -> None:
             linear_service = LinearService()
             linear_service.update_issue(
                 incident.linear_parent_issue_id,
-                title=f"[{incident.incident_number}] {incident.title}",
+                title=_linear_issue_title(incident),
             )
         except Exception:
             logger.exception(
@@ -774,6 +780,18 @@ def on_visibility_changed(incident: Incident) -> None:
         _slack_service.post_message(channel_id, message)
     except Exception:
         logger.exception(f"Error in on_visibility_changed for incident {incident.id}")
+
+    if incident.linear_parent_issue_id:
+        try:
+            linear_service = LinearService()
+            linear_service.update_issue(
+                incident.linear_parent_issue_id,
+                title=_linear_issue_title(incident),
+            )
+        except Exception:
+            logger.exception(
+                f"Failed to update Linear issue title for incident {incident.id}"
+            )
 
 
 def on_captain_changed(incident: Incident) -> None:
