@@ -347,7 +347,7 @@ class ActionItem(models.Model):
     incident = models.ForeignKey(
         "Incident", on_delete=models.CASCADE, related_name="action_items"
     )
-    linear_issue_id = models.CharField(max_length=255, unique=True)
+    linear_issue_id = models.CharField(max_length=255)
     linear_identifier = models.CharField(max_length=25)
     title = models.CharField(max_length=500)
     status = models.CharField(
@@ -371,6 +371,7 @@ class ActionItem(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+        unique_together = [("incident", "linear_issue_id")]
 
     def __str__(self) -> str:
         return f"{self.linear_identifier}: {self.title}"

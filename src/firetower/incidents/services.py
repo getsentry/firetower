@@ -268,9 +268,9 @@ def sync_action_items_from_linear(
         assignee = assignee_map.get(issue.get("assignee_email", ""))
 
         _, created = ActionItem.objects.update_or_create(
+            incident=incident,
             linear_issue_id=issue["id"],
             defaults={
-                "incident": incident,
                 "linear_identifier": issue["identifier"],
                 "title": issue["title"],
                 "status": issue["status"],
