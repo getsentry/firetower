@@ -237,7 +237,9 @@ class TestGenAIService:
         call_args = genai_service._client.models.generate_content.call_args
         assert "DB outage" in call_args.kwargs["contents"]
 
-    def test_includes_thread_replies_skipping_parent(self, genai_service):
+    def test_includes_all_thread_replies(self, genai_service):
+        # SlackService.get_thread_replies already strips the parent message, so
+        # replies contains only real replies and no [1:] skip is needed.
         genai_service._client.models.generate_content.return_value = MagicMock(text="t")
         messages = [
             {
@@ -245,16 +247,15 @@ class TestGenAIService:
                 "date_time": datetime(2024, 1, 15, 14, 0, tzinfo=UTC),
                 "text": "parent",
                 "replies": [
-                    # index 0 is parent duplicate - should be skipped
-                    {
-                        "author": "a@sentry.io",
-                        "date_time": datetime(2024, 1, 15, 14, 0, tzinfo=UTC),
-                        "text": "parent",
-                    },
                     {
                         "author": "b@sentry.io",
                         "date_time": datetime(2024, 1, 15, 14, 1, tzinfo=UTC),
-                        "text": "reply",
+                        "text": "first reply",
+                    },
+                    {
+                        "author": "c@sentry.io",
+                        "date_time": datetime(2024, 1, 15, 14, 2, tzinfo=UTC),
+                        "text": "second reply",
                     },
                 ],
                 "images": [],
@@ -264,6 +265,5 @@ class TestGenAIService:
         contents = genai_service._client.models.generate_content.call_args.kwargs[
             "contents"
         ]
-        assert "reply" in contents
-        # parent text appears once (as the main message), not twice
-        assert contents.count("parent") == 1
+        assert "first reply" in contents
+        assert "second reply" in contents

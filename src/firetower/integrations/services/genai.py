@@ -113,7 +113,7 @@ class GenAIService:
                 text = msg.get("text", "")
                 formatted.append(f"[{ts}] {author}: {text}")
 
-                for reply in msg.get("replies", [])[1:]:
+                for reply in msg.get("replies", []):
                     rts = reply["date_time"].strftime("%Y-%m-%d %H:%M:%S UTC")
                     rauthor = reply.get("author") or "Unknown"
                     rtext = reply.get("text", "")
