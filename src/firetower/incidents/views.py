@@ -359,7 +359,7 @@ class SyncActionItemsView(generics.GenericAPIView):
     def get_queryset(self) -> QuerySet[Incident]:
         return Incident.objects.all()
 
-    def _get_incident(self) -> Incident:
+    def get_object(self) -> Incident:
         numeric_id = parse_incident_id(self.kwargs["incident_id"])
         queryset = filter_visible_to_user(self.get_queryset(), self.request.user)
         obj = get_object_or_404(queryset, id=numeric_id)
@@ -367,7 +367,7 @@ class SyncActionItemsView(generics.GenericAPIView):
         return obj
 
     def post(self, request: Request, incident_id: str) -> Response:
-        incident = self._get_incident()
+        incident = self.get_object()
 
         try:
             stats = sync_action_items_from_linear(incident, force=True)
