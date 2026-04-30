@@ -125,16 +125,14 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             )
         return
 
-    genai = GenAIService.from_settings()
-    if genai:
-        try:
-            timeline = genai.generate_timeline(
-                messages, incident_summary=incident.title
-            )
+    try:
+        genai = GenAIService.from_settings()
+        if genai:
+            timeline = genai.generate_timeline(messages, incident_summary=incident.title)
             if timeline:
                 notion.add_timeline_to_page(page_id, timeline)
-        except Exception:
-            logger.exception("Failed to add AI timeline to Notion page %s", page_id)
+    except Exception:
+        logger.exception("Failed to add AI timeline to Notion page %s", page_id)
 
     if notion_page_created:
         try:
