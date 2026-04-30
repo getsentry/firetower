@@ -457,7 +457,8 @@ def _create_linear_parent_issue(incident: Incident) -> None:
         linear_service = LinearService()
         title = f"[{incident.incident_number}] {incident.title}"
         description = (
-            "This is a relational ticket for incident tracking. "
+            "Relate action items to this ticket to have them tracked by Firetower. "
+            "Child issues or other relations (related, blocking, etc.) will all work. "
             "Do not place metadata here — use Firetower for that."
         )
         project_id = settings.LINEAR.get("PROJECT_ID") or None

@@ -96,7 +96,6 @@ class ConfigFile:
     firetower_base_url: str
     django_secret_key: str
     sentry_dsn: str
-    firetower_base_url: str
     salt_key: str
     notion: NotionConfig | None = None
     log_level: str = "INFO"
