@@ -37,39 +37,43 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                     defaults={"url": ""},
                 )
             )
-            if not db_record_created and notion_link.url:
-                page_id = _extract_notion_page_id(notion_link.url)
-                if not page_id:
-                    try:
-                        client.chat_postMessage(
-                            channel=channel_id,
-                            text="Could not parse existing Notion page ID from stored URL.",
-                        )
-                    except Exception:
-                        logger.exception(
-                            "Failed to post Notion page ID error to channel %s",
-                            channel_id,
-                        )
-                    return
-                page_url = notion_link.url
-                update_slack = True
-            else:
-                base_url = settings.FIRETOWER_BASE_URL
-                incident_url = f"{base_url}/{incident.incident_number}"
-                captain_email = incident.captain.email if incident.captain else None
-                page = notion.create_postmortem_page(
-                    incident_number=incident.incident_number,
-                    incident_title=incident.title,
-                    incident_url=incident_url,
-                    incident_date=incident.created_at,
-                    severity=incident.severity,
-                    captain_email=captain_email,
-                )
-                page_id = page["id"]
-                page_url = page["url"]
-                notion_link.url = page_url
-                notion_link.save(update_fields=["url"])
-                notion_page_created = True
+            existing_url = notion_link.url
+
+        # Notion API calls happen outside the transaction to avoid holding the
+        # SELECT FOR UPDATE lock while making slow external requests.
+        if not db_record_created and existing_url:
+            page_id = _extract_notion_page_id(existing_url)
+            if not page_id:
+                try:
+                    client.chat_postMessage(
+                        channel=channel_id,
+                        text="Could not parse existing Notion page ID from stored URL.",
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to post Notion page ID error to channel %s",
+                        channel_id,
+                    )
+                return
+            page_url = existing_url
+            update_slack = True
+        else:
+            base_url = settings.FIRETOWER_BASE_URL
+            incident_url = f"{base_url}/{incident.incident_number}"
+            captain_email = incident.captain.email if incident.captain else None
+            page = notion.create_postmortem_page(
+                incident_number=incident.incident_number,
+                incident_title=incident.title,
+                incident_url=incident_url,
+                incident_date=incident.created_at,
+                severity=incident.severity,
+                captain_email=captain_email,
+            )
+            page_id = page["id"]
+            page_url = page["url"]
+            notion_link.url = page_url
+            notion_link.save(update_fields=["url"])
+            notion_page_created = True
     except Exception:
         logger.exception(
             "Failed to create Notion postmortem page for %s",
