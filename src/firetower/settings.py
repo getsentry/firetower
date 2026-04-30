@@ -254,6 +254,16 @@ STATUSPAGE: StatuspageSettings | None = (
 )
 
 FIRETOWER_BASE_URL = config.firetower_base_url
+
+NOTION: dict | None = (
+    {
+        "INTEGRATION_TOKEN": config.notion.integration_token,
+        "DATABASE_ID": config.notion.database_id,
+        "TEMPLATE_MARKDOWN": config.notion.template_markdown,
+    }
+    if config.notion
+    else None
+)
 HOOKS_ENABLED = config.hooks_enabled
 
 # PagerDuty Integration Configuration
@@ -328,6 +338,8 @@ statsd.constant_tags = [
 ]
 
 # Logging configuration
+_log_level = os.environ.get("DJANGO_LOG_LEVEL", config.log_level)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -345,12 +357,12 @@ LOGGING = {
     },
     "root": {
         "handlers": ["console"],
-        "level": "INFO",
+        "level": _log_level,
     },
     "loggers": {
         "firetower": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": _log_level,
             "propagate": False,
         },
     },

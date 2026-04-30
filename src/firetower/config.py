@@ -50,6 +50,13 @@ class SlackConfig:
 
 
 @deserialize
+class NotionConfig:
+    integration_token: str
+    database_id: str
+    template_markdown: str = ""
+
+
+@deserialize
 class StatuspageConfig:
     api_key: str
     page_id: str
@@ -79,6 +86,8 @@ class ConfigFile:
     django_secret_key: str
     sentry_dsn: str
     firetower_base_url: str
+    notion: NotionConfig | None = None
+    log_level: str = "INFO"
     hooks_enabled: bool = (
         False  # TODO: remove after hooks migration is complete and always enable
     )
@@ -139,6 +148,7 @@ class DummyConfigFile(ConfigFile):
             iap_audience="",
         )
         self.datadog = None
+        self.notion = None
         self.pagerduty = None
         self.statuspage = None
         self.project_key = ""
@@ -146,4 +156,5 @@ class DummyConfigFile(ConfigFile):
         self.sentry_dsn = ""
         self.region_grouping: list[list[str]] = []
         self.firetower_base_url = ""
+        self.log_level = "INFO"
         self.hooks_enabled = False

@@ -7,6 +7,7 @@ and retrieve user profile information (name, avatar).
 
 import logging
 from typing import Any
+from urllib.parse import urlparse
 
 from django.conf import settings
 from slack_sdk import WebClient
@@ -17,6 +18,14 @@ logger = logging.getLogger(__name__)
 
 def escape_slack_text(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def is_slack_url(url: str) -> bool:
+    try:
+        host = urlparse(url).hostname or ""
+        return host == "slack.com" or host.endswith(".slack.com")
+    except Exception:
+        return False
 
 
 class SlackService:
@@ -325,9 +334,78 @@ class SlackService:
                 "is_bot": is_bot,
             }
 
-        except SlackApiError as e:
+        except Exception as e:
             logger.error(
                 f"Error fetching Slack user info: {e}",
                 extra={"slack_user_id": slack_user_id},
             )
             return None
+
+    def get_channel_history(self, channel_id: str) -> list[dict[str, Any]]:
+        """Return all messages from a channel, paginating automatically."""
+        if not self.client:
+            return []
+        messages: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            kwargs: dict[str, Any] = {"channel": channel_id, "limit": 999}
+            if cursor:
+                kwargs["cursor"] = cursor
+            try:
+                response = self.client.conversations_history(**kwargs)
+            except Exception:
+                logger.exception("Failed to fetch history for channel %s", channel_id)
+                break
+            if not response.get("ok"):
+                logger.error(
+                    "conversations_history returned not-ok for channel %s", channel_id
+                )
+                break
+            messages.extend(response.get("messages", []))
+            metadata: dict[str, Any] = response.get("response_metadata") or {}
+            cursor = metadata.get("next_cursor") or None
+            if not response.get("has_more") or not cursor:
+                break
+        return messages
+
+    def get_thread_replies(
+        self, channel_id: str, thread_ts: str
+    ) -> list[dict[str, Any]]:
+        """Return all non-parent human replies for a thread, paginating automatically."""
+        if not self.client:
+            return []
+        replies: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "channel": channel_id,
+                "ts": thread_ts,
+                "limit": 999,
+            }
+            if cursor:
+                kwargs["cursor"] = cursor
+            try:
+                response = self.client.conversations_replies(**kwargs)
+            except Exception:
+                logger.exception("Failed to fetch replies for thread %s", thread_ts)
+                break
+            if not response.get("ok"):
+                logger.error(
+                    "conversations_replies returned not-ok for thread %s", thread_ts
+                )
+                break
+            raw_messages: list[dict[str, Any]] = response.get("messages") or []
+            replies.extend(
+                msg_dict
+                for msg_dict in raw_messages
+                if msg_dict.get("ts")
+                and msg_dict.get("type") == "message"
+                and msg_dict["ts"] != thread_ts
+                and msg_dict.get("user")
+                and not msg_dict.get("bot_id")
+            )
+            reply_metadata: dict[str, Any] = response.get("response_metadata") or {}
+            cursor = reply_metadata.get("next_cursor") or None
+            if not response.get("has_more") or not cursor:
+                break
+        return replies

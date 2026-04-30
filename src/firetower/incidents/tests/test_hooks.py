@@ -340,8 +340,9 @@ class TestOnIncidentCreated:
 
 @pytest.mark.django_db
 class TestOnStatusChanged:
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_status_update_message(self, mock_slack):
+    def test_posts_status_update_message(self, mock_slack, mock_dump_async):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = Incident.objects.create(
@@ -372,6 +373,72 @@ class TestOnStatusChanged:
         on_status_changed(incident, IncidentStatus.ACTIVE)
 
         mock_slack.post_message.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "status",
+        [IncidentStatus.MITIGATED, IncidentStatus.DONE, IncidentStatus.POSTMORTEM],
+    )
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_triggers_dump_on_resolved_statuses(
+        self, mock_slack, mock_bolt, mock_dump_async, status
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_client = MagicMock()
+        mock_bolt.return_value.client = mock_client
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=status,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_status_changed(incident, IncidentStatus.ACTIVE)
+
+        mock_dump_async.assert_called_once_with(mock_client, "C12345", incident)
+
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_trigger_dump_on_other_statuses(self, mock_slack, mock_dump_async):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELLED):
+            incident = Incident.objects.create(
+                title="Test",
+                severity=IncidentSeverity.P1,
+                status=status,
+            )
+            ExternalLink.objects.create(
+                incident=incident,
+                type=ExternalLinkType.SLACK,
+                url="https://slack.com/archives/C12345",
+            )
+            on_status_changed(incident, IncidentStatus.ACTIVE)
+
+        mock_dump_async.assert_not_called()
+
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_trigger_dump_without_slack_link(
+        self, mock_slack, mock_dump_async
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = None
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.POSTMORTEM,
+        )
+
+        on_status_changed(incident, IncidentStatus.ACTIVE)
+
+        mock_dump_async.assert_not_called()
 
 
 @pytest.mark.django_db
