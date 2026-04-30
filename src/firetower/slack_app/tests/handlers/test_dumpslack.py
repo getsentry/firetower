@@ -470,6 +470,9 @@ class TestTriggerSlackDump:
                 mock_notion_link,
                 True,
             )
+            mock_el.objects.select_for_update.return_value.get.return_value = (
+                mock_notion_link
+            )
             _trigger_slack_dump(client, "C123", mock_incident)
 
         assert client.chat_postMessage.call_count == 1
@@ -504,6 +507,9 @@ class TestTriggerSlackDump:
             mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
                 mock_notion_link,
                 True,
+            )
+            mock_el.objects.select_for_update.return_value.get.return_value = (
+                mock_notion_link
             )
             _trigger_slack_dump(client, "C123", mock_incident)
 

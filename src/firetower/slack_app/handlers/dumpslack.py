@@ -71,8 +71,22 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             )
             page_id = page["id"]
             page_url = page["url"]
-            notion_link.url = page_url
-            notion_link.save(update_fields=["url"])
+            # Re-acquire lock before saving to detect concurrent callers that
+            # also saw url="" and raced to create a page. The loser exits here;
+            # the winner's URL and apply_template call stand.
+            with transaction.atomic():
+                notion_link = ExternalLink.objects.select_for_update().get(
+                    incident=incident,
+                    type=ExternalLinkType.NOTION,
+                )
+                if notion_link.url:
+                    logger.warning(
+                        "Race condition: concurrent call already created Notion page for %s",
+                        incident.incident_number,
+                    )
+                    return
+                notion_link.url = page_url
+                notion_link.save(update_fields=["url"])
             notion_page_created = True
     except Exception:
         logger.exception(
