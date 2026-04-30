@@ -257,8 +257,6 @@ STATUSPAGE: StatuspageSettings | None = (
     else None
 )
 
-FIRETOWER_BASE_URL = config.firetower_base_url
-
 NOTION: dict | None = (
     {
         "INTEGRATION_TOKEN": config.notion.integration_token,
