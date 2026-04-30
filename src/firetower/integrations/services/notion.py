@@ -478,15 +478,17 @@ def _parse_timestamps_to_rich_text(text: str) -> list[dict[str, Any]]:
         time_str = match.group(2) or match.group(4)
         if len(time_str) == 5:
             time_str += ":00"
-        rich_text.append(
-            {
-                "type": "mention",
-                "mention": {
-                    "type": "date",
-                    "date": {"start": f"{date_str}T{time_str}Z"},
-                },
-            }
-        )
+        iso = f"{date_str}T{time_str}Z"
+        try:
+            datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ")
+            rich_text.append(
+                {
+                    "type": "mention",
+                    "mention": {"type": "date", "date": {"start": iso}},
+                }
+            )
+        except ValueError:
+            rich_text.append({"type": "text", "text": {"content": match.group(0)}})
         last_end = match.end()
     if last_end < len(text):
         rich_text.append({"type": "text", "text": {"content": text[last_end:]}})

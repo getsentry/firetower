@@ -37,6 +37,12 @@ class TestParseTimestampsToRichText:
             "mention": {"type": "date", "date": {"start": "2024-01-15T14:30:00Z"}},
         }
 
+    def test_out_of_range_timestamp_returned_as_plain_text(self):
+        result = _parse_timestamps_to_rich_text("[2025-13-40 25:99 UTC]")
+        assert result == [
+            {"type": "text", "text": {"content": "[2025-13-40 25:99 UTC]"}}
+        ]
+
     def test_empty_string(self):
         result = _parse_timestamps_to_rich_text("")
         assert result == [{"type": "text", "text": {"content": ""}}]
