@@ -69,11 +69,15 @@ def _coerce_region_grouping(raw: list[Any]) -> list[list[str]]:
 # Global project settings
 PROJECT_KEY = config.project_key
 REGION_GROUPING = _coerce_region_grouping(config.region_grouping)
+FIRETOWER_BASE_URL = config.firetower_base_url
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 SECRET_KEY = config.django_secret_key
+
+# Used by django-fernet-encrypted-fields to encrypt sensitive DB fields (e.g. OAuth tokens).
+SALT_KEY = config.salt_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_is_dev()
@@ -253,8 +257,6 @@ STATUSPAGE: StatuspageSettings | None = (
     else None
 )
 
-FIRETOWER_BASE_URL = config.firetower_base_url
-
 NOTION: dict | None = (
     {
         "INTEGRATION_TOKEN": config.notion.integration_token,
@@ -287,6 +289,22 @@ PAGERDUTY = (
     }
     if config.pagerduty
     else None
+)
+
+# Linear Integration Configuration
+LINEAR = (
+    {
+        "CLIENT_ID": config.linear.client_id,
+        "CLIENT_SECRET": config.linear.client_secret,
+        "TEAM_ID": config.linear.team_id,
+        "PROJECT_ID": config.linear.project_id,
+    }
+    if config.linear
+    else {}
+)
+
+ACTION_ITEM_SYNC_THROTTLE_SECONDS = (
+    int(config.linear.action_item_sync_throttle_seconds) if config.linear else 300
 )
 
 # Django REST Framework Configuration

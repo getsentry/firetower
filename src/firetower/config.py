@@ -69,6 +69,15 @@ class StatuspageConfig:
 
 
 @deserialize
+class LinearConfig:
+    client_id: str
+    client_secret: str
+    action_item_sync_throttle_seconds: int
+    team_id: str = ""
+    project_id: str = ""
+
+
+@deserialize
 class AuthConfig:
     iap_enabled: bool
     iap_audience: str | None
@@ -83,14 +92,16 @@ class ConfigFile:
     postgres: PostgresConfig
     datadog: DatadogConfig | None
     slack: SlackConfig
+    linear: LinearConfig | None
     auth: AuthConfig
     pagerduty: PagerDutyConfig | None
     statuspage: StatuspageConfig | None
 
     project_key: str
+    firetower_base_url: str
     django_secret_key: str
     sentry_dsn: str
-    firetower_base_url: str
+    salt_key: str
     notion: NotionConfig | None = None
     genai: GenAIConfig | None = None
     log_level: str = "INFO"
@@ -153,15 +164,17 @@ class DummyConfigFile(ConfigFile):
             iap_enabled=False,
             iap_audience="",
         )
+        self.linear = None
         self.datadog = None
         self.notion = None
         self.genai = None
         self.pagerduty = None
         self.statuspage = None
         self.project_key = ""
+        self.firetower_base_url = ""
         self.django_secret_key = ""
+        self.salt_key = ""
         self.sentry_dsn = ""
         self.region_grouping: list[list[str]] = []
-        self.firetower_base_url = ""
         self.log_level = "INFO"
         self.hooks_enabled = False

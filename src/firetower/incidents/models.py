@@ -184,6 +184,8 @@ class Incident(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     participants_last_synced_at = models.DateTimeField(null=True, blank=True)
+    action_items_last_synced_at = models.DateTimeField(null=True, blank=True)
+    linear_parent_issue_id = models.CharField(max_length=255, null=True, blank=True)
 
     # Milestone timestamps (for postmortem)
     total_downtime = models.IntegerField(
@@ -324,6 +326,55 @@ class Incident(models.Model):
 
     def __str__(self) -> str:
         return f"{self.incident_number}: {self.title}"
+
+
+class ActionItemStatus(models.TextChoices):
+    TODO = "Todo", "Todo"
+    IN_PROGRESS = "In Progress", "In Progress"
+    DONE = "Done", "Done"
+    CANCELLED = "Cancelled", "Cancelled"
+
+
+class ActionItemRelationType(models.TextChoices):
+    CHILD = "child", "Child"
+    RELATED = "related", "Related"
+    BLOCKED_BY = "blocked_by", "Blocked By"
+    BLOCKS = "blocks", "Blocks"
+    DUPLICATE = "duplicate", "Duplicate"
+
+
+class ActionItem(models.Model):
+    incident = models.ForeignKey(
+        "Incident", on_delete=models.CASCADE, related_name="action_items"
+    )
+    linear_issue_id = models.CharField(max_length=255)
+    linear_identifier = models.CharField(max_length=25)
+    title = models.CharField(max_length=500)
+    status = models.CharField(
+        max_length=20, choices=ActionItemStatus.choices, default=ActionItemStatus.TODO
+    )
+    relation_type = models.CharField(
+        max_length=20,
+        choices=ActionItemRelationType.choices,
+        default=ActionItemRelationType.CHILD,
+    )
+    assignee = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="action_items",
+    )
+    url = models.URLField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        unique_together = [("incident", "linear_issue_id")]
+
+    def __str__(self) -> str:
+        return f"{self.linear_identifier}: {self.title}"
 
 
 class ExternalLink(models.Model):
