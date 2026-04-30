@@ -455,9 +455,9 @@ def _message_to_bullet(msg: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-# Matches [YYYY-MM-DD HH:MM UTC] or [YYYY-MM-DD HH:MM:SS UTC] (brackets optional)
+# Matches [YYYY-MM-DD HH:MM UTC] or [YYYY-MM-DD HH:MM:SS UTC] — brackets required and balanced.
 _TIMESTAMP_RE = re.compile(
-    r"\[?(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)\s+UTC\]?"
+    r"\[(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)\s+UTC\]"
 )
 
 
@@ -492,8 +492,8 @@ def _parse_timestamps_to_rich_text(text: str) -> list[dict[str, Any]]:
 
 def _convert_markdown_to_notion_blocks(markdown_text: str) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
-    for line in markdown_text.split("\n"):
-        line = line.strip()
+    for raw_line in markdown_text.split("\n"):
+        line = raw_line.strip()
         if not line:
             continue
         if line.startswith("## "):

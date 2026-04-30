@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from firetower.integrations.services.genai import _detect_location
+from firetower.integrations.services.genai import GenAIService, _detect_location
 from firetower.integrations.services.notion import (
     NotionService,
     _convert_markdown_to_notion_blocks,
@@ -29,10 +29,10 @@ class TestParseTimestampsToRichText:
         result = _parse_timestamps_to_rich_text("[2024-01-15 14:30:45 UTC] event")
         assert result[0]["mention"]["date"]["start"] == "2024-01-15T14:30:45Z"
 
-    def test_unbracketed_timestamp(self):
+    def test_unbracketed_timestamp_returned_as_plain_text(self):
+        # Unbracketed timestamps are not converted — brackets must be balanced.
         result = _parse_timestamps_to_rich_text("Started: 2024-01-15 14:30 UTC")
-        assert result[0] == {"type": "text", "text": {"content": "Started: "}}
-        assert result[1]["type"] == "mention"
+        assert result == [{"type": "text", "text": {"content": "Started: 2024-01-15 14:30 UTC"}}]
 
     def test_empty_string(self):
         result = _parse_timestamps_to_rich_text("")
@@ -172,8 +172,6 @@ class TestGenAIService:
     @pytest.fixture
     def genai_service(self):
         with patch("firetower.integrations.services.genai.GenAIService.__init__", return_value=None):
-            from firetower.integrations.services.genai import GenAIService
-
             svc = GenAIService.__new__(GenAIService)
             svc._model = "gemini-2.5-flash"
             svc._client = MagicMock()
