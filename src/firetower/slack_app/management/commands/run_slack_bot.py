@@ -1,6 +1,8 @@
 import logging
 import os
+import signal
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
@@ -11,6 +13,23 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from firetower.slack_app.bolt import get_bolt_app
 
 logger = logging.getLogger(__name__)
+
+_shutdown = threading.Event()
+
+
+def _on_close(close_status_code: int, close_msg: str | None) -> None:
+    logger.warning(
+        "Slack WebSocket connection closed (code=%s): %s", close_status_code, close_msg
+    )
+
+
+def _on_error(error: Exception) -> None:
+    logger.error("Slack WebSocket error: %s", error)
+
+
+def _handle_shutdown(signum: int, frame: Any) -> None:
+    logger.info("Received signal %d, shutting down", signum)
+    _shutdown.set()
 
 
 class _HealthHandler(BaseHTTPRequestHandler):
@@ -35,7 +54,18 @@ class Command(BaseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
         _start_health_server()
+        signal.signal(signal.SIGTERM, _handle_shutdown)
+        signal.signal(signal.SIGINT, _handle_shutdown)
         app_token = settings.SLACK["APP_TOKEN"]
-        handler = SocketModeHandler(app=get_bolt_app(), app_token=app_token)
-        logger.info("Starting Slack bot in Socket Mode")
-        handler.start()
+        while not _shutdown.is_set():
+            try:
+                handler = SocketModeHandler(app=get_bolt_app(), app_token=app_token)
+                handler.client.on_close_listeners.append(_on_close)
+                handler.client.on_error_listeners.append(_on_error)
+                logger.info("Starting Slack bot in Socket Mode")
+                handler.start()
+            except Exception as e:
+                if _shutdown.is_set():
+                    break
+                logger.error("Slack bot crashed: %s, restarting in 5s", e)
+                time.sleep(5)
