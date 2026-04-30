@@ -11,6 +11,7 @@ from django.db import transaction
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.integrations.services.genai import GenAIService
 from firetower.integrations.services.notion import NotionService
 from firetower.integrations.services.slack import SlackService, is_slack_url
 from firetower.slack_app.handlers.utils import get_incident_from_channel
@@ -123,6 +124,17 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                 "Failed to post template failure message to channel %s", channel_id
             )
         return
+
+    try:
+        genai = GenAIService.from_settings()
+        if genai:
+            timeline = genai.generate_timeline(
+                messages, incident_summary=incident.title
+            )
+            if timeline:
+                notion.add_timeline_to_page(page_id, timeline)
+    except Exception:
+        logger.exception("Failed to add AI timeline to Notion page %s", page_id)
 
     if notion_page_created:
         try:

@@ -264,6 +264,13 @@ NOTION: dict | None = (
     if config.notion
     else None
 )
+GENAI: dict | None = (
+    {
+        "MODEL": config.genai.model,
+    }
+    if config.genai
+    else None
+)
 HOOKS_ENABLED = config.hooks_enabled
 
 # PagerDuty Integration Configuration
