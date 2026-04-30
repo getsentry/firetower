@@ -7,7 +7,11 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType, UserProfile
-from firetower.incidents.hooks import _create_linear_parent_issue, on_title_changed
+from firetower.incidents.hooks import (
+    _create_linear_parent_issue,
+    on_title_changed,
+    on_visibility_changed,
+)
 from firetower.incidents.models import (
     ActionItem,
     ActionItemRelationType,
@@ -746,6 +750,117 @@ class TestTitleChangeLinearSync:
 
         with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
             on_title_changed(incident)
+
+        MockLinearService.return_value.update_issue.assert_not_called()
+
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_redacts_title_for_private_incident(self, MockLinearService):
+        mock_service = MockLinearService.return_value
+        mock_service.update_issue.return_value = True
+
+        incident = Incident.objects.create(
+            title="Secret Outage",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="linear-issue-id",
+            is_private=True,
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_title_changed(incident)
+
+        mock_service.update_issue.assert_called_once_with(
+            "linear-issue-id",
+            title=f"[{incident.incident_number}] Private Incident",
+        )
+
+
+@pytest.mark.django_db
+class TestCreateLinearParentIssuePrivacy:
+    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks.settings")
+    def test_creates_with_redacted_title_for_private_incident(
+        self, mock_settings, MockLinearService
+    ):
+        mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
+        mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+
+        mock_service = MockLinearService.return_value
+        mock_service.create_issue.return_value = {
+            "id": "linear-issue-id",
+            "identifier": "ENG-100",
+            "url": "https://linear.app/t/ENG-100",
+        }
+        mock_service.create_attachment.return_value = True
+
+        incident = Incident.objects.create(
+            title="Secret Outage",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        _create_linear_parent_issue(incident)
+
+        call_args = mock_service.create_issue.call_args
+        assert call_args[0][0] == f"[{incident.incident_number}] Private Incident"
+
+
+@pytest.mark.django_db
+class TestVisibilityChangeLinearSync:
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_redacts_title_when_made_private(self, MockLinearService):
+        mock_service = MockLinearService.return_value
+        mock_service.update_issue.return_value = True
+
+        incident = Incident.objects.create(
+            title="Visible Outage",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="linear-issue-id",
+            is_private=True,
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_visibility_changed(incident)
+
+        mock_service.update_issue.assert_called_once_with(
+            "linear-issue-id",
+            title=f"[{incident.incident_number}] Private Incident",
+        )
+
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_restores_title_when_made_public(self, MockLinearService):
+        mock_service = MockLinearService.return_value
+        mock_service.update_issue.return_value = True
+
+        incident = Incident.objects.create(
+            title="Now Public Outage",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="linear-issue-id",
+            is_private=False,
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_visibility_changed(incident)
+
+        mock_service.update_issue.assert_called_once_with(
+            "linear-issue-id",
+            title=f"[{incident.incident_number}] Now Public Outage",
+        )
+
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_skips_when_no_parent_issue(self, MockLinearService):
+        incident = Incident.objects.create(
+            title="Test",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_visibility_changed(incident)
 
         MockLinearService.return_value.update_issue.assert_not_called()
 
