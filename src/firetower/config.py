@@ -50,6 +50,11 @@ class SlackConfig:
 
 
 @deserialize
+class GenAIConfig:
+    model: str = "gemini-2.5-flash"
+
+
+@deserialize
 class NotionConfig:
     integration_token: str
     database_id: str
@@ -87,6 +92,7 @@ class ConfigFile:
     sentry_dsn: str
     firetower_base_url: str
     notion: NotionConfig | None = None
+    genai: GenAIConfig | None = None
     log_level: str = "INFO"
     hooks_enabled: bool = (
         False  # TODO: remove after hooks migration is complete and always enable
@@ -149,6 +155,7 @@ class DummyConfigFile(ConfigFile):
         )
         self.datadog = None
         self.notion = None
+        self.genai = None
         self.pagerduty = None
         self.statuspage = None
         self.project_key = ""
