@@ -373,22 +373,31 @@ class TestIsSlackUrl:
 
 
 class TestDownloadImage:
+    def _mock_session(self, response=None, side_effect=None):
+        mock_session = MagicMock()
+        if side_effect is not None:
+            mock_session.get.side_effect = side_effect
+        else:
+            mock_session.get.return_value = response
+        return mock_session
+
     def test_downloads_external_image_without_auth(self):
         mock_response = MagicMock()
         mock_response.content = b"PNG_DATA"
         mock_response.headers = {"content-type": "image/png"}
         mock_response.raise_for_status = MagicMock()
+        mock_session = self._mock_session(response=mock_response)
 
         with patch(
-            "firetower.slack_app.handlers.dumpslack.requests.get",
-            return_value=mock_response,
-        ) as mock_get:
+            "firetower.slack_app.handlers.dumpslack.requests.Session",
+            return_value=mock_session,
+        ):
             result = _download_image(
                 "https://p.datadoghq.com/img/graph.png", "xoxb-token"
             )
 
         assert result == (b"PNG_DATA", "image/png")
-        call_headers = mock_get.call_args.kwargs["headers"]
+        call_headers = mock_session.get.call_args.kwargs["headers"]
         assert "Authorization" not in call_headers
 
     def test_adds_slack_bearer_token_for_slack_urls(self):
@@ -396,22 +405,25 @@ class TestDownloadImage:
         mock_response.content = b"IMG"
         mock_response.headers = {"content-type": "image/jpeg"}
         mock_response.raise_for_status = MagicMock()
+        mock_session = self._mock_session(response=mock_response)
 
         with patch(
-            "firetower.slack_app.handlers.dumpslack.requests.get",
-            return_value=mock_response,
-        ) as mock_get:
+            "firetower.slack_app.handlers.dumpslack.requests.Session",
+            return_value=mock_session,
+        ):
             _download_image(
                 "https://files.slack.com/files-pri/T1/img.jpg", "xoxb-token"
             )
 
-        call_headers = mock_get.call_args.kwargs["headers"]
+        call_headers = mock_session.get.call_args.kwargs["headers"]
         assert call_headers["Authorization"] == "Bearer xoxb-token"
 
     def test_returns_none_on_request_failure(self):
+        mock_session = self._mock_session(side_effect=Exception("timeout"))
+
         with patch(
-            "firetower.slack_app.handlers.dumpslack.requests.get",
-            side_effect=Exception("timeout"),
+            "firetower.slack_app.handlers.dumpslack.requests.Session",
+            return_value=mock_session,
         ):
             result = _download_image("https://example.com/img.png", "token")
 
@@ -422,10 +434,11 @@ class TestDownloadImage:
         mock_response.content = b"<html>"
         mock_response.headers = {"content-type": "text/html"}
         mock_response.raise_for_status = MagicMock()
+        mock_session = self._mock_session(response=mock_response)
 
         with patch(
-            "firetower.slack_app.handlers.dumpslack.requests.get",
-            return_value=mock_response,
+            "firetower.slack_app.handlers.dumpslack.requests.Session",
+            return_value=mock_session,
         ):
             result = _download_image("https://example.com/page", "token")
 
