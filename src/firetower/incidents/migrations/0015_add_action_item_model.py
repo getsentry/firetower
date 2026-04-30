@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("linear_issue_id", models.CharField(max_length=255, unique=True)),
+                ("linear_issue_id", models.CharField(max_length=255)),
                 ("linear_identifier", models.CharField(max_length=25)),
                 ("title", models.CharField(max_length=500)),
                 (
@@ -88,6 +88,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 "ordering": ["created_at"],
+                "unique_together": {("incident", "linear_issue_id")},
             },
         ),
     ]
