@@ -170,6 +170,5 @@ class DummyConfigFile(ConfigFile):
         self.salt_key = ""
         self.sentry_dsn = ""
         self.region_grouping: list[list[str]] = []
-        self.firetower_base_url = ""
         self.log_level = "INFO"
         self.hooks_enabled = False
