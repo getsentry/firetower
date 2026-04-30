@@ -457,8 +457,13 @@ def _message_to_bullet(msg: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-# Matches [YYYY-MM-DD HH:MM UTC] or [YYYY-MM-DD HH:MM:SS UTC] — brackets required and balanced.
-_TIMESTAMP_RE = re.compile(r"\[(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)\s+UTC\]")
+# Matches [YYYY-MM-DD HH:MM UTC] (groups 1,2) or bare YYYY-MM-DD HH:MM UTC (groups 3,4).
+# The negative lookbehind/lookahead prevents the bare form from double-matching bracketed ones.
+_TIMESTAMP_RE = re.compile(
+    r"\[(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)\s+UTC\]"
+    r"|"
+    r"(?<!\[)(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)\s+UTC(?!\s*\])"
+)
 
 
 def _parse_timestamps_to_rich_text(text: str) -> list[dict[str, Any]]:
@@ -469,8 +474,8 @@ def _parse_timestamps_to_rich_text(text: str) -> list[dict[str, Any]]:
             rich_text.append(
                 {"type": "text", "text": {"content": text[last_end : match.start()]}}
             )
-        date_str = match.group(1)
-        time_str = match.group(2)
+        date_str = match.group(1) or match.group(3)
+        time_str = match.group(2) or match.group(4)
         if len(time_str) == 5:
             time_str += ":00"
         rich_text.append(

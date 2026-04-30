@@ -29,12 +29,13 @@ class TestParseTimestampsToRichText:
         result = _parse_timestamps_to_rich_text("[2024-01-15 14:30:45 UTC] event")
         assert result[0]["mention"]["date"]["start"] == "2024-01-15T14:30:45Z"
 
-    def test_unbracketed_timestamp_returned_as_plain_text(self):
-        # Unbracketed timestamps are not converted — brackets must be balanced.
+    def test_unbracketed_timestamp_converted(self):
         result = _parse_timestamps_to_rich_text("Started: 2024-01-15 14:30 UTC")
-        assert result == [
-            {"type": "text", "text": {"content": "Started: 2024-01-15 14:30 UTC"}}
-        ]
+        assert result[0] == {"type": "text", "text": {"content": "Started: "}}
+        assert result[1] == {
+            "type": "mention",
+            "mention": {"type": "date", "date": {"start": "2024-01-15T14:30:00Z"}},
+        }
 
     def test_empty_string(self):
         result = _parse_timestamps_to_rich_text("")
