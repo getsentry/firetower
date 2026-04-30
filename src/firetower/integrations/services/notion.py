@@ -391,13 +391,14 @@ class NotionService:
                 )
                 is None
             ):
-                logger.warning(
-                    "Appending timeline block batch %d-%d to Notion page %s failed after retries; "
-                    "those blocks will be absent from the AI timeline.",
-                    i,
-                    min(i + _BLOCK_CHILD_LIMIT, len(timeline_blocks)) - 1,
-                    page_id,
+                msg = (
+                    f"Appending timeline block batch {i}-"
+                    f"{min(i + _BLOCK_CHILD_LIMIT, len(timeline_blocks)) - 1} "
+                    f"to Notion page {page_id} failed after retries; "
+                    "those blocks will be absent from the AI timeline."
                 )
+                logger.warning(msg)
+                sentry_sdk.capture_message(msg, level="warning")
 
     def _append_children(
         self,
