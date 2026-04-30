@@ -350,6 +350,8 @@ def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
             def _rebuild_auth(prepared_request: Any, response: Any) -> None:
                 if is_slack_url(prepared_request.url):
                     prepared_request.headers["Authorization"] = f"Bearer {slack_token}"
+                else:
+                    prepared_request.headers.pop("Authorization", None)
 
             session.rebuild_auth = _rebuild_auth  # type: ignore[method-assign]
         resp = session.get(url, headers=headers, timeout=30.0)
