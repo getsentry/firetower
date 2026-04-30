@@ -227,6 +227,22 @@ class TestGenAIService:
         result = genai_service.generate_timeline(self._make_messages())
         assert result is None
 
+    def test_handles_curly_braces_in_messages(self, genai_service):
+        genai_service._client.models.generate_content.return_value = MagicMock(
+            text="## Timeline\n- [2024-01-15 14:00 UTC] - event"
+        )
+        messages = [
+            {
+                "author": "a@sentry.io",
+                "date_time": datetime(2024, 1, 15, 14, 0, tzinfo=UTC),
+                "text": '{"error": "timeout", "code": 500}',
+                "replies": [],
+                "images": [],
+            }
+        ]
+        result = genai_service.generate_timeline(messages)
+        assert result is not None
+
     def test_returns_none_on_exception(self, genai_service):
         genai_service._client.models.generate_content.side_effect = RuntimeError(
             "API down"

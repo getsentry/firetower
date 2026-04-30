@@ -10,12 +10,13 @@ _METADATA_HEADERS = {"Metadata-Flavor": "Google"}
 _METADATA_TIMEOUT = 1.0
 _DEFAULT_LOCATION = "us-central1"
 
-_TIMELINE_PROMPT = """\
+_TIMELINE_PROMPT_PREFIX = """\
 You are an expert incident analyst. Based on the following Slack channel messages \
 from an incident response, create a concise timeline of key events.
 
-{context}Slack Channel Messages:
-{messages_text}
+"""
+
+_TIMELINE_PROMPT_SUFFIX = """
 
 Please generate a timeline that:
 1. Identifies key events and milestones (started, detected, investigation steps, \
@@ -42,8 +43,7 @@ Your response MUST follow this exact format:
 - Mitigation: [YYYY-MM-DD HH:MM UTC]
 - Resolution: [YYYY-MM-DD HH:MM UTC]
 
-If a timestamp is unknown or not applicable, use "N/A" instead of a timestamp.\
-"""
+If a timestamp is unknown or not applicable, use "N/A" instead of a timestamp."""
 
 
 def _detect_location() -> str:
@@ -116,9 +116,12 @@ class GenAIService:
             context = (
                 f"Incident Summary: {incident_summary}\n\n" if incident_summary else ""
             )
-            prompt = _TIMELINE_PROMPT.format(
-                context=context,
-                messages_text="\n".join(formatted),
+            prompt = (
+                _TIMELINE_PROMPT_PREFIX
+                + context
+                + "Slack Channel Messages:\n"
+                + "\n".join(formatted)
+                + _TIMELINE_PROMPT_SUFFIX
             )
 
             response = self._client.models.generate_content(
