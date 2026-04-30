@@ -469,11 +469,13 @@ _TIMESTAMP_RE = re.compile(
 def _parse_timestamps_to_rich_text(text: str) -> list[dict[str, Any]]:
     rich_text: list[dict[str, Any]] = []
     last_end = 0
+
+    def _text_block(content: str) -> dict[str, Any]:
+        return {"type": "text", "text": {"content": content[:_NOTION_RICH_TEXT_LIMIT]}}
+
     for match in _TIMESTAMP_RE.finditer(text):
         if match.start() > last_end:
-            rich_text.append(
-                {"type": "text", "text": {"content": text[last_end : match.start()]}}
-            )
+            rich_text.append(_text_block(text[last_end : match.start()]))
         date_str = match.group(1) or match.group(3)
         time_str = match.group(2) or match.group(4)
         if len(time_str) == 5:
@@ -488,12 +490,12 @@ def _parse_timestamps_to_rich_text(text: str) -> list[dict[str, Any]]:
                 }
             )
         except ValueError:
-            rich_text.append({"type": "text", "text": {"content": match.group(0)}})
+            rich_text.append(_text_block(match.group(0)))
         last_end = match.end()
     if last_end < len(text):
-        rich_text.append({"type": "text", "text": {"content": text[last_end:]}})
+        rich_text.append(_text_block(text[last_end:]))
     if not rich_text:
-        rich_text = [{"type": "text", "text": {"content": text}}]
+        rich_text = [_text_block(text)]
     return rich_text
 
 
