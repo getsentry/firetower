@@ -385,9 +385,19 @@ class NotionService:
         toggle_id = response["results"][0]["id"]
         timeline_blocks = _convert_markdown_to_notion_blocks(timeline_markdown)
         for i in range(0, len(timeline_blocks), _BLOCK_CHILD_LIMIT):
-            self._append_children(
-                toggle_id, timeline_blocks[i : i + _BLOCK_CHILD_LIMIT]
-            )
+            if (
+                self._append_children(
+                    toggle_id, timeline_blocks[i : i + _BLOCK_CHILD_LIMIT]
+                )
+                is None
+            ):
+                logger.warning(
+                    "Appending timeline block batch %d-%d to Notion page %s failed after retries; "
+                    "those blocks will be absent from the AI timeline.",
+                    i,
+                    min(i + _BLOCK_CHILD_LIMIT, len(timeline_blocks)) - 1,
+                    page_id,
+                )
 
     def _append_children(
         self,
