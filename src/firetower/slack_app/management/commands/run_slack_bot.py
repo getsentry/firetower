@@ -65,11 +65,19 @@ class Command(BaseCommand):
         while not _shutdown.is_set():
             try:
                 handler = SocketModeHandler(app=get_bolt_app(), app_token=app_token)
+                # Each SocketModeHandler creates a fresh SocketModeClient with
+                # empty listener lists, so appending here won't accumulate.
                 handler.client.on_close_listeners.append(_on_close)
                 handler.client.on_error_listeners.append(_on_error)
                 _state["handler"] = handler
                 logger.info("Starting Slack bot in Socket Mode")
-                handler.start()
+                # Use connect() instead of start() so the thread isn't blocked
+                # forever — start() calls Event().wait() which prevents SIGTERM
+                # from triggering a graceful shutdown.
+                handler.connect()
+                _shutdown.wait()
+                logger.info("Shutdown requested, disconnecting handler")
+                handler.close()
             except Exception as e:
                 if _shutdown.is_set():
                     break
