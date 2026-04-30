@@ -343,7 +343,16 @@ def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
     if is_slack_url(url):
         headers["Authorization"] = f"Bearer {slack_token}"
     try:
-        resp = requests.get(url, headers=headers, timeout=30.0)
+        session = requests.Session()
+        if slack_token and is_slack_url(url):
+            # requests strips Authorization on redirect by default; re-add it for
+            # Slack-to-Slack redirects so files-pri URLs don't land on an HTML login page.
+            def _rebuild_auth(prepared_request: Any, response: Any) -> None:
+                if is_slack_url(prepared_request.url):
+                    prepared_request.headers["Authorization"] = f"Bearer {slack_token}"
+
+            session.rebuild_auth = _rebuild_auth  # type: ignore[method-assign]
+        resp = session.get(url, headers=headers, timeout=30.0)
         resp.raise_for_status()
         content_type = (
             resp.headers.get("content-type", "image/png").split(";")[0].strip()
