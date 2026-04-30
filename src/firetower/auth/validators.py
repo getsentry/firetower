@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from google.auth import exceptions as google_auth_exceptions
@@ -45,7 +45,7 @@ class IAPTokenValidator:
             if decoded_token.get("iss") != self.IAP_ISSUER:
                 raise ValueError(f"Invalid issuer: {decoded_token.get('iss')}")
 
-            return decoded_token
+            return cast(dict[Any, Any], decoded_token)
 
         except (ValueError, google_auth_exceptions.GoogleAuthError) as e:
             raise ValueError(f"Invalid IAP token: {str(e)}")
