@@ -385,7 +385,9 @@ class NotionService:
         toggle_id = response["results"][0]["id"]
         timeline_blocks = _convert_markdown_to_notion_blocks(timeline_markdown)
         for i in range(0, len(timeline_blocks), _BLOCK_CHILD_LIMIT):
-            self._append_children(toggle_id, timeline_blocks[i : i + _BLOCK_CHILD_LIMIT])
+            self._append_children(
+                toggle_id, timeline_blocks[i : i + _BLOCK_CHILD_LIMIT]
+            )
 
     def _append_children(
         self,
@@ -456,9 +458,7 @@ def _message_to_bullet(msg: dict[str, Any]) -> dict[str, Any]:
 
 
 # Matches [YYYY-MM-DD HH:MM UTC] or [YYYY-MM-DD HH:MM:SS UTC] — brackets required and balanced.
-_TIMESTAMP_RE = re.compile(
-    r"\[(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)\s+UTC\]"
-)
+_TIMESTAMP_RE = re.compile(r"\[(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)\s+UTC\]")
 
 
 def _parse_timestamps_to_rich_text(text: str) -> list[dict[str, Any]]:

@@ -61,7 +61,10 @@ def _detect_location() -> str:
         resp.raise_for_status()
         return resp.text.strip().split("/")[-1]
     except Exception:
-        logger.debug("Could not detect GCP region from metadata server; using %s", _DEFAULT_LOCATION)
+        logger.debug(
+            "Could not detect GCP region from metadata server; using %s",
+            _DEFAULT_LOCATION,
+        )
         return _DEFAULT_LOCATION
 
 
@@ -116,7 +119,9 @@ class GenAIService:
                     rtext = reply.get("text", "")
                     formatted.append(f"  -> [{rts}] {rauthor}: {rtext}")
 
-            context = f"Incident Summary: {incident_summary}\n\n" if incident_summary else ""
+            context = (
+                f"Incident Summary: {incident_summary}\n\n" if incident_summary else ""
+            )
             prompt = _TIMELINE_PROMPT.format(
                 context=context,
                 messages_text="\n".join(formatted),

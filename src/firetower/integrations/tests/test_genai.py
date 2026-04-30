@@ -32,7 +32,9 @@ class TestParseTimestampsToRichText:
     def test_unbracketed_timestamp_returned_as_plain_text(self):
         # Unbracketed timestamps are not converted — brackets must be balanced.
         result = _parse_timestamps_to_rich_text("Started: 2024-01-15 14:30 UTC")
-        assert result == [{"type": "text", "text": {"content": "Started: 2024-01-15 14:30 UTC"}}]
+        assert result == [
+            {"type": "text", "text": {"content": "Started: 2024-01-15 14:30 UTC"}}
+        ]
 
     def test_empty_string(self):
         result = _parse_timestamps_to_rich_text("")
@@ -112,7 +114,9 @@ class TestAddTimelineToPage:
             "results": [{"id": toggle_id}]
         }
 
-        notion.add_timeline_to_page("page-id", "## Timeline\n- [2024-01-15 14:30 UTC] - event")
+        notion.add_timeline_to_page(
+            "page-id", "## Timeline\n- [2024-01-15 14:30 UTC] - event"
+        )
 
         calls = notion.client.blocks.children.append.call_args_list
         assert len(calls) == 2
@@ -151,7 +155,9 @@ class TestDetectLocation:
     def test_parses_region_from_metadata_server(self):
         mock_resp = MagicMock()
         mock_resp.text = "projects/123456789/regions/us-east1"
-        with patch("firetower.integrations.services.genai.requests.get", return_value=mock_resp):
+        with patch(
+            "firetower.integrations.services.genai.requests.get", return_value=mock_resp
+        ):
             assert _detect_location() == "us-east1"
 
     def test_falls_back_to_default_when_metadata_unavailable(self):
@@ -164,14 +170,19 @@ class TestDetectLocation:
     def test_falls_back_on_non_200(self):
         mock_resp = MagicMock()
         mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError
-        with patch("firetower.integrations.services.genai.requests.get", return_value=mock_resp):
+        with patch(
+            "firetower.integrations.services.genai.requests.get", return_value=mock_resp
+        ):
             assert _detect_location() == "us-central1"
 
 
 class TestGenAIService:
     @pytest.fixture
     def genai_service(self):
-        with patch("firetower.integrations.services.genai.GenAIService.__init__", return_value=None):
+        with patch(
+            "firetower.integrations.services.genai.GenAIService.__init__",
+            return_value=None,
+        ):
             svc = GenAIService.__new__(GenAIService)
             svc._model = "gemini-2.5-flash"
             svc._client = MagicMock()
@@ -203,18 +214,26 @@ class TestGenAIService:
         genai_service._client.models.generate_content.assert_not_called()
 
     def test_returns_none_on_empty_response(self, genai_service):
-        genai_service._client.models.generate_content.return_value = MagicMock(text=None)
+        genai_service._client.models.generate_content.return_value = MagicMock(
+            text=None
+        )
         result = genai_service.generate_timeline(self._make_messages())
         assert result is None
 
     def test_returns_none_on_exception(self, genai_service):
-        genai_service._client.models.generate_content.side_effect = RuntimeError("API down")
+        genai_service._client.models.generate_content.side_effect = RuntimeError(
+            "API down"
+        )
         result = genai_service.generate_timeline(self._make_messages())
         assert result is None
 
     def test_includes_incident_summary_in_prompt(self, genai_service):
-        genai_service._client.models.generate_content.return_value = MagicMock(text="timeline")
-        genai_service.generate_timeline(self._make_messages(), incident_summary="DB outage")
+        genai_service._client.models.generate_content.return_value = MagicMock(
+            text="timeline"
+        )
+        genai_service.generate_timeline(
+            self._make_messages(), incident_summary="DB outage"
+        )
         call_args = genai_service._client.models.generate_content.call_args
         assert "DB outage" in call_args.kwargs["contents"]
 
@@ -227,14 +246,24 @@ class TestGenAIService:
                 "text": "parent",
                 "replies": [
                     # index 0 is parent duplicate - should be skipped
-                    {"author": "a@sentry.io", "date_time": datetime(2024, 1, 15, 14, 0, tzinfo=UTC), "text": "parent"},
-                    {"author": "b@sentry.io", "date_time": datetime(2024, 1, 15, 14, 1, tzinfo=UTC), "text": "reply"},
+                    {
+                        "author": "a@sentry.io",
+                        "date_time": datetime(2024, 1, 15, 14, 0, tzinfo=UTC),
+                        "text": "parent",
+                    },
+                    {
+                        "author": "b@sentry.io",
+                        "date_time": datetime(2024, 1, 15, 14, 1, tzinfo=UTC),
+                        "text": "reply",
+                    },
                 ],
                 "images": [],
             }
         ]
         genai_service.generate_timeline(messages)
-        contents = genai_service._client.models.generate_content.call_args.kwargs["contents"]
+        contents = genai_service._client.models.generate_content.call_args.kwargs[
+            "contents"
+        ]
         assert "reply" in contents
         # parent text appears once (as the main message), not twice
         assert contents.count("parent") == 1
