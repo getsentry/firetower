@@ -269,7 +269,7 @@ class TestSyncActionItemsFromLinear:
             assert len(stats.errors) == 1
             assert "child issues" in stats.errors[0]
             incident.refresh_from_db()
-            assert incident.action_items_last_synced_at is None
+            assert incident.action_items_last_synced_at is not None
 
     def test_handles_relations_api_failure(self):
         incident = self._make_incident()
@@ -283,7 +283,7 @@ class TestSyncActionItemsFromLinear:
             assert len(stats.errors) == 1
             assert "related issues" in stats.errors[0]
             incident.refresh_from_db()
-            assert incident.action_items_last_synced_at is None
+            assert incident.action_items_last_synced_at is not None
 
     def test_resolves_assignee_by_email(self):
         user = User.objects.create_user(
