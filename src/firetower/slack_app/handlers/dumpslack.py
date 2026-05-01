@@ -174,7 +174,7 @@ def _backfill_milestones(incident: Any, timeline_md: str) -> None:
     if fields_to_update:
         try:
             incident.save(update_fields=fields_to_update)
-            logger.info(
+            logger.debug(
                 "Backfilled milestone fields %s for incident %s",
                 fields_to_update,
                 incident.incident_number,
