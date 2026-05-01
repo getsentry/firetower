@@ -416,3 +416,20 @@ class TestAutoComputeDowntime:
         assert serializer.is_valid(), serializer.errors
         updated = serializer.save()
         assert updated.total_downtime == 180
+
+    def test_no_auto_compute_when_recovered_before_started(self):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+            time_started=datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+        )
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"time_recovered": "2026-01-01T10:00:00Z"},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        updated = serializer.save()
+        assert updated.total_downtime is None
