@@ -433,3 +433,22 @@ class TestAutoComputeDowntime:
         assert serializer.is_valid(), serializer.errors
         updated = serializer.save()
         assert updated.total_downtime is None
+
+    def test_unrelated_update_preserves_manual_downtime(self):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+            time_started=datetime(2026, 1, 1, 10, 0, tzinfo=UTC),
+            time_recovered=datetime(2026, 1, 1, 11, 30, tzinfo=UTC),
+            total_downtime=45,
+        )
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"title": "Updated Title"},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        updated = serializer.save()
+        assert updated.total_downtime == 45

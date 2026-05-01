@@ -459,6 +459,11 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
     def _auto_compute_downtime(self, instance: Incident, validated_data: dict) -> None:
         if "total_downtime" in validated_data:
             return
+        if (
+            "time_started" not in validated_data
+            and "time_recovered" not in validated_data
+        ):
+            return
         if instance.time_started and instance.time_recovered:
             delta = instance.time_recovered - instance.time_started
             if delta.total_seconds() < 0:
