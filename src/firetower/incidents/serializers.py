@@ -456,6 +456,21 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
         return value
 
+    def _auto_compute_downtime(self, instance: Incident, validated_data: dict) -> None:
+        if "total_downtime" in validated_data:
+            return
+        if (
+            "time_started" not in validated_data
+            and "time_recovered" not in validated_data
+        ):
+            return
+        if instance.time_started and instance.time_recovered:
+            delta = instance.time_recovered - instance.time_started
+            if delta.total_seconds() < 0:
+                return
+            instance.total_downtime = int(delta.total_seconds() / 60)
+            instance.save(update_fields=["total_downtime"])
+
     def create(self, validated_data: dict) -> Incident:
         """Create incident with external links and tags"""
         external_links_data = validated_data.pop("external_links", None)
@@ -509,6 +524,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                 type=TagType.IMPACT_TYPE,
             )
             incident.impact_type_tags.set(tags)
+
+        self._auto_compute_downtime(incident, validated_data)
 
         # Runs synchronously — Slack API calls may add latency to the response.
         # Consider deferring to a background task if this becomes a problem.
@@ -593,6 +610,8 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                 type=TagType.IMPACT_TYPE,
             )
             instance.impact_type_tags.set(tags)
+
+        self._auto_compute_downtime(instance, validated_data)
 
         if settings.HOOKS_ENABLED:
             if instance.title != old_title:

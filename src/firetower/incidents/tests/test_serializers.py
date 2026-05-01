@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -305,3 +306,149 @@ class TestIncidentWriteSerializerHooks:
         msg = mock_slack.post_message.call_args[0][1]
         assert "Active" in msg
         assert "Mitigated" in msg
+
+
+@pytest.mark.django_db
+class TestAutoComputeDowntime:
+    @pytest.fixture(autouse=True)
+    def disable_hooks(self, settings):
+        settings.HOOKS_ENABLED = False
+
+    def setup_method(self):
+        self.captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+        )
+        self.reporter = User.objects.create_user(
+            username="reporter@example.com",
+            email="reporter@example.com",
+        )
+
+    def _base_data(self, **overrides):
+        data = {
+            "title": "Test",
+            "severity": "P1",
+            "captain": "captain@example.com",
+            "reporter": "reporter@example.com",
+        }
+        data.update(overrides)
+        return data
+
+    def test_update_computes_downtime_when_both_milestones_set(self):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+            time_started=datetime(2026, 1, 1, 10, 0, tzinfo=UTC),
+        )
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"time_recovered": "2026-01-01T11:30:00Z"},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        updated = serializer.save()
+        assert updated.total_downtime == 90
+
+    def test_update_does_not_override_explicit_downtime(self):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+            time_started=datetime(2026, 1, 1, 10, 0, tzinfo=UTC),
+        )
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={
+                "time_recovered": "2026-01-01T11:30:00Z",
+                "total_downtime": 45,
+            },
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        updated = serializer.save()
+        assert updated.total_downtime == 45
+
+    def test_update_no_downtime_when_only_one_milestone(self):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"time_started": "2026-01-01T10:00:00Z"},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        updated = serializer.save()
+        assert updated.total_downtime is None
+
+    def test_create_computes_downtime_when_both_milestones_provided(self):
+        serializer = IncidentWriteSerializer(
+            data=self._base_data(
+                time_started="2026-01-01T10:00:00Z",
+                time_recovered="2026-01-01T12:15:00Z",
+            )
+        )
+        assert serializer.is_valid(), serializer.errors
+        incident = serializer.save()
+        assert incident.total_downtime == 135
+
+    def test_update_computes_when_started_already_exists(self):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+            time_started=datetime(2026, 1, 1, 10, 0, tzinfo=UTC),
+            time_recovered=datetime(2026, 1, 1, 11, 0, tzinfo=UTC),
+            total_downtime=60,
+        )
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"time_recovered": "2026-01-01T13:00:00Z"},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        updated = serializer.save()
+        assert updated.total_downtime == 180
+
+    def test_no_auto_compute_when_recovered_before_started(self):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+            time_started=datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+        )
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"time_recovered": "2026-01-01T10:00:00Z"},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        updated = serializer.save()
+        assert updated.total_downtime is None
+
+    def test_unrelated_update_preserves_manual_downtime(self):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+            time_started=datetime(2026, 1, 1, 10, 0, tzinfo=UTC),
+            time_recovered=datetime(2026, 1, 1, 11, 30, tzinfo=UTC),
+            total_downtime=45,
+        )
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"title": "Updated Title"},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        updated = serializer.save()
+        assert updated.total_downtime == 45
