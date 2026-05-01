@@ -11,7 +11,7 @@ from django.db import transaction
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType
-from firetower.integrations.services.genai import GenAIService
+from firetower.integrations.services.genai import GenAIService, parse_key_timestamps
 from firetower.integrations.services.notion import NotionService
 from firetower.integrations.services.slack import SlackService, is_slack_url
 from firetower.slack_app.handlers.utils import get_incident_from_channel
@@ -133,6 +133,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             )
             if timeline:
                 notion.add_timeline_to_page(page_id, timeline)
+                _backfill_milestones(incident, timeline)
     except Exception:
         logger.exception("Failed to add AI timeline to Notion page %s", page_id)
 
@@ -157,6 +158,32 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             channel_id,
             page_url,
         )
+
+
+def _backfill_milestones(incident: Any, timeline_md: str) -> None:
+    timestamps = parse_key_timestamps(timeline_md)
+    if not timestamps:
+        return
+
+    fields_to_update: list[str] = []
+    for field, value in timestamps.items():
+        if getattr(incident, field, None) is None:
+            setattr(incident, field, value)
+            fields_to_update.append(field)
+
+    if fields_to_update:
+        try:
+            incident.save(update_fields=fields_to_update)
+            logger.debug(
+                "Backfilled milestone fields %s for incident %s",
+                fields_to_update,
+                incident.incident_number,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to save milestone timestamps for incident %s",
+                incident.incident_number,
+            )
 
 
 def trigger_slack_dump_async(client: Any, channel_id: str, incident: Any) -> None:
