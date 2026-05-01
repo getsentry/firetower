@@ -456,6 +456,14 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
         return value
 
+    def _auto_compute_downtime(self, instance: Incident, validated_data: dict) -> None:
+        if "total_downtime" in validated_data:
+            return
+        if instance.time_started and instance.time_recovered:
+            delta = instance.time_recovered - instance.time_started
+            instance.total_downtime = int(delta.total_seconds() / 60)
+            instance.save(update_fields=["total_downtime"])
+
     def create(self, validated_data: dict) -> Incident:
         """Create incident with external links and tags"""
         external_links_data = validated_data.pop("external_links", None)
@@ -515,6 +523,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         if settings.HOOKS_ENABLED:
             on_incident_created(incident)
 
+        self._auto_compute_downtime(incident, validated_data)
         return incident
 
     def update(self, instance: Incident, validated_data: dict) -> Incident:
@@ -606,6 +615,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             if instance.is_private != old_is_private:
                 on_visibility_changed(instance)
 
+        self._auto_compute_downtime(instance, validated_data)
         return instance
 
 
