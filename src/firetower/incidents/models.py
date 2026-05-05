@@ -86,6 +86,7 @@ class ExternalLinkType(models.TextChoices):
     PAGERDUTY = "PAGERDUTY", "PagerDuty"
     STATUSPAGE = "STATUSPAGE", "Statuspage"
     NOTION = "NOTION", "Notion"
+    NOTION_TROUBLESHOOTING = "NOTION_TROUBLESHOOTING", "Notion Troubleshooting"
     LINEAR = "LINEAR", "Linear"
 
 
@@ -336,7 +337,7 @@ class ExternalLink(models.Model):
     incident = models.ForeignKey(
         "Incident", on_delete=models.CASCADE, related_name="external_links"
     )
-    type = models.CharField(max_length=20, choices=ExternalLinkType.choices)
+    type = models.CharField(max_length=30, choices=ExternalLinkType.choices)
     url = models.URLField()
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -45,6 +45,10 @@ database_id = ""
 template_markdown = """
 # Your postmortem template in Markdown here
 """
+troubleshooting_database_id = ""
+troubleshooting_template_markdown = """
+# Your troubleshooting template in Markdown here
+"""
 
 [statuspage]
 api_key = ""

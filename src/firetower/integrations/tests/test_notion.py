@@ -21,6 +21,19 @@ def notion():
     return svc
 
 
+@pytest.fixture
+def notion_with_troubleshooting():
+    svc = NotionService(
+        integration_token="test-key",
+        database_id="db-id",
+        template_markdown="# Template\n\nSome content.",
+        troubleshooting_database_id="ts-db-id",
+        troubleshooting_template_markdown="# Troubleshooting\n\nSymptoms | Hypothesis | Actions",
+    )
+    svc.client = MagicMock()
+    return svc
+
+
 class TestGetUsers:
     @pytest.fixture(autouse=True)
     def clear_users_cache(self):
@@ -627,3 +640,113 @@ class TestApplyTemplate:
 
         warning_args = [call[0][0] for call in mock_logger.warning.call_args_list]
         assert any("absent from the Notion dump" in msg for msg in warning_args)
+
+
+class TestCreateTroubleshootingPage:
+    def test_creates_page_with_correct_properties(self, notion_with_troubleshooting):
+        notion_with_troubleshooting.client.pages.create.return_value = {
+            "id": "page-123",
+            "url": "https://notion.so/page-123",
+        }
+
+        with patch.object(
+            notion_with_troubleshooting, "_send_markdown", return_value=True
+        ):
+            result = notion_with_troubleshooting.create_troubleshooting_page(
+                "INC-2001", "https://firetower.example.com/INC-2001"
+            )
+
+        assert result["url"] == "https://notion.so/page-123"
+        call_kwargs = notion_with_troubleshooting.client.pages.create.call_args.kwargs
+        assert call_kwargs["parent"] == {"database_id": "ts-db-id"}
+        props = call_kwargs["properties"]
+        assert props["Name"]["title"][0]["text"]["content"] == (
+            "[INC-2001] Clinical Troubleshooting Doc"
+        )
+        assert props["Incident"]["select"]["name"] == "INC-2001"
+        assert props["Jira"]["url"] == "https://firetower.example.com/INC-2001"
+
+    def test_applies_template_markdown(self, notion_with_troubleshooting):
+        notion_with_troubleshooting.client.pages.create.return_value = {
+            "id": "page-123",
+            "url": "https://notion.so/page-123",
+        }
+
+        with patch.object(
+            notion_with_troubleshooting, "_send_markdown", return_value=True
+        ) as mock_md:
+            notion_with_troubleshooting.create_troubleshooting_page(
+                "INC-2001", "https://firetower.example.com/INC-2001"
+            )
+
+        mock_md.assert_called_once_with(
+            "page-123",
+            "# Troubleshooting\n\nSymptoms | Hypothesis | Actions",
+        )
+
+    def test_skips_template_when_not_configured(self, notion):
+        notion.troubleshooting_database_id = "ts-db-id"
+        notion.client.pages.create.return_value = {
+            "id": "page-123",
+            "url": "https://notion.so/page-123",
+        }
+
+        with patch.object(notion, "_send_markdown") as mock_md:
+            notion.create_troubleshooting_page(
+                "INC-2001", "https://firetower.example.com/INC-2001"
+            )
+
+        mock_md.assert_not_called()
+
+    def test_raises_when_database_id_not_configured(self, notion):
+        with pytest.raises(ValueError, match="not configured"):
+            notion.create_troubleshooting_page(
+                "INC-2001", "https://firetower.example.com/INC-2001"
+            )
+
+    def test_logs_error_when_template_fails(self, notion_with_troubleshooting):
+        notion_with_troubleshooting.client.pages.create.return_value = {
+            "id": "page-123",
+            "url": "https://notion.so/page-123",
+        }
+
+        with (
+            patch.object(
+                notion_with_troubleshooting, "_send_markdown", return_value=False
+            ),
+            patch("firetower.integrations.services.notion.logger") as mock_logger,
+        ):
+            result = notion_with_troubleshooting.create_troubleshooting_page(
+                "INC-2001", "https://firetower.example.com/INC-2001"
+            )
+
+        assert result["id"] == "page-123"
+        error_args = [call[0][0] for call in mock_logger.error.call_args_list]
+        assert any("troubleshooting template" in msg for msg in error_args)
+
+
+class TestIsTroubleshootingConfigured:
+    def test_true_when_configured(self, settings):
+        settings.NOTION = {
+            "INTEGRATION_TOKEN": "token",
+            "TROUBLESHOOTING_DATABASE_ID": "db-id",
+        }
+        assert NotionService.is_troubleshooting_configured() is True
+
+    def test_false_when_no_token(self, settings):
+        settings.NOTION = {
+            "INTEGRATION_TOKEN": "",
+            "TROUBLESHOOTING_DATABASE_ID": "db-id",
+        }
+        assert NotionService.is_troubleshooting_configured() is False
+
+    def test_false_when_no_database_id(self, settings):
+        settings.NOTION = {
+            "INTEGRATION_TOKEN": "token",
+            "TROUBLESHOOTING_DATABASE_ID": "",
+        }
+        assert NotionService.is_troubleshooting_configured() is False
+
+    def test_false_when_notion_not_configured(self, settings):
+        settings.NOTION = None
+        assert NotionService.is_troubleshooting_configured() is False
