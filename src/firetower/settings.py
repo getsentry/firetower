@@ -402,8 +402,8 @@ Q_CLUSTER = {
     "name": "firetower",
     "orm": "default",
     "workers": 4,
-    "timeout": 60,
-    "retry": 120,
+    "timeout": 180,
+    "retry": 210,
     "queue_limit": 50,
     "bulk": 10,
 }
