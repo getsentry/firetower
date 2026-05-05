@@ -441,6 +441,22 @@ def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
 
 def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
     try:
+        if incident.is_private:
+            logger.info(
+                "Skipping troubleshooting doc for private incident %s", incident.id
+            )
+            try:
+                _slack_service.post_message(
+                    channel_id,
+                    "Troubleshooting doc creation skipped due to private incident.",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to post troubleshooting skip message for incident %s",
+                    incident.id,
+                )
+            return
+
         if not NotionService.is_troubleshooting_configured():
             logger.info(
                 "Notion troubleshooting not configured, skipping for incident %s",
@@ -448,8 +464,12 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
             )
             return
 
-        notion = NotionService.from_settings()
+        notion = NotionService.for_troubleshooting()
         if not notion:
+            logger.warning(
+                "NotionService.for_troubleshooting() returned None for incident %s",
+                incident.id,
+            )
             return
 
         with transaction.atomic():

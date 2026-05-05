@@ -68,6 +68,26 @@ class NotionService:
             ),
         )
 
+    @classmethod
+    def for_troubleshooting(cls) -> "NotionService | None":
+        from django.conf import settings  # noqa: PLC0415
+
+        config = settings.NOTION
+        if (
+            not config
+            or not config.get("INTEGRATION_TOKEN")
+            or not config.get("TROUBLESHOOTING_DATABASE_ID")
+        ):
+            return None
+        return cls(
+            integration_token=config["INTEGRATION_TOKEN"],
+            database_id=config.get("DATABASE_ID", ""),
+            troubleshooting_database_id=config["TROUBLESHOOTING_DATABASE_ID"],
+            troubleshooting_template_markdown=config.get(
+                "TROUBLESHOOTING_TEMPLATE_MARKDOWN", ""
+            ),
+        )
+
     def __init__(
         self,
         integration_token: str,

@@ -2066,6 +2066,31 @@ class TestOnIncidentCreatedDatadog:
 class TestCreateTroubleshootingDoc:
     @patch("firetower.incidents.hooks.NotionService")
     @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_for_private_incident(self, mock_slack, mock_notion_cls):
+        incident = Incident.objects.create(
+            title="Sensitive",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        _create_troubleshooting_doc(incident, "C99999")
+
+        mock_notion_cls.is_troubleshooting_configured.assert_not_called()
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
+        ).exists()
+
+        skip_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if c[0][0] == "C99999"
+            and c[0][1]
+            == "Troubleshooting doc creation skipped due to private incident."
+        ]
+        assert len(skip_calls) == 1
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
     def test_creates_doc_and_posts_to_slack(
         self, mock_slack, mock_notion_cls, settings
     ):
@@ -2076,7 +2101,7 @@ class TestCreateTroubleshootingDoc:
             "id": "page-123",
             "url": "https://notion.so/page-123",
         }
-        mock_notion_cls.from_settings.return_value = mock_service
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
 
         incident = Incident.objects.create(
             title="Production is down",
@@ -2121,7 +2146,7 @@ class TestCreateTroubleshootingDoc:
 
         _create_troubleshooting_doc(incident, "C99999")
 
-        mock_notion_cls.from_settings.assert_not_called()
+        mock_notion_cls.for_troubleshooting.assert_not_called()
         assert not ExternalLink.objects.filter(
             incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
         ).exists()
@@ -2132,7 +2157,7 @@ class TestCreateTroubleshootingDoc:
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
         mock_notion_cls.is_troubleshooting_configured.return_value = True
         mock_service = MagicMock()
-        mock_notion_cls.from_settings.return_value = mock_service
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
 
         incident = Incident.objects.create(
             title="Test",
@@ -2164,7 +2189,7 @@ class TestCreateTroubleshootingDoc:
             "id": "page-456",
             "url": "https://notion.so/page-456",
         }
-        mock_notion_cls.from_settings.return_value = mock_service
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
 
         incident = Incident.objects.create(
             title="Test",
@@ -2193,7 +2218,7 @@ class TestCreateTroubleshootingDoc:
         mock_notion_cls.is_troubleshooting_configured.return_value = True
         mock_service = MagicMock()
         mock_service.create_troubleshooting_page.return_value = {"id": "page-123"}
-        mock_notion_cls.from_settings.return_value = mock_service
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
 
         incident = Incident.objects.create(
             title="Test",
@@ -2213,7 +2238,7 @@ class TestCreateTroubleshootingDoc:
         mock_notion_cls.is_troubleshooting_configured.return_value = True
         mock_service = MagicMock()
         mock_service.create_troubleshooting_page.side_effect = RuntimeError("boom")
-        mock_notion_cls.from_settings.return_value = mock_service
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
 
         incident = Incident.objects.create(
             title="Test",
@@ -2234,7 +2259,7 @@ class TestCreateTroubleshootingDoc:
             "id": "page-123",
             "url": "https://notion.so/page-123",
         }
-        mock_notion_cls.from_settings.return_value = mock_service
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
 
         def add_bookmark_side_effect(channel_id, name, url):
             if name == "Troubleshooting Doc":

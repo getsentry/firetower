@@ -4,15 +4,26 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('incidents', '0014_add_total_downtime'),
+        ("incidents", "0014_add_total_downtime"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='externallink',
-            name='type',
-            field=models.CharField(choices=[('SLACK', 'Slack'), ('JIRA', 'Jira'), ('DATADOG', 'Datadog'), ('PAGERDUTY', 'PagerDuty'), ('STATUSPAGE', 'Statuspage'), ('NOTION', 'Notion'), ('NOTION_TROUBLESHOOTING', 'Notion Troubleshooting'), ('LINEAR', 'Linear')], max_length=30),
+            model_name="externallink",
+            name="type",
+            field=models.CharField(
+                choices=[
+                    ("SLACK", "Slack"),
+                    ("JIRA", "Jira"),
+                    ("DATADOG", "Datadog"),
+                    ("PAGERDUTY", "PagerDuty"),
+                    ("STATUSPAGE", "Statuspage"),
+                    ("NOTION", "Notion"),
+                    ("NOTION_TROUBLESHOOTING", "Notion Troubleshooting"),
+                    ("LINEAR", "Linear"),
+                ],
+                max_length=30,
+            ),
         ),
     ]

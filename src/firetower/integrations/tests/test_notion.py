@@ -750,3 +750,42 @@ class TestIsTroubleshootingConfigured:
     def test_false_when_notion_not_configured(self, settings):
         settings.NOTION = None
         assert NotionService.is_troubleshooting_configured() is False
+
+
+class TestForTroubleshooting:
+    def test_returns_service_when_configured(self, settings):
+        settings.NOTION = {
+            "INTEGRATION_TOKEN": "token",
+            "TROUBLESHOOTING_DATABASE_ID": "ts-db-id",
+            "TROUBLESHOOTING_TEMPLATE_MARKDOWN": "# Template",
+        }
+        svc = NotionService.for_troubleshooting()
+        assert svc is not None
+        assert svc.troubleshooting_database_id == "ts-db-id"
+        assert svc.troubleshooting_template_markdown == "# Template"
+
+    def test_works_without_postmortem_database_id(self, settings):
+        settings.NOTION = {
+            "INTEGRATION_TOKEN": "token",
+            "TROUBLESHOOTING_DATABASE_ID": "ts-db-id",
+        }
+        svc = NotionService.for_troubleshooting()
+        assert svc is not None
+        assert svc.database_id == ""
+
+    def test_returns_none_when_no_token(self, settings):
+        settings.NOTION = {
+            "INTEGRATION_TOKEN": "",
+            "TROUBLESHOOTING_DATABASE_ID": "ts-db-id",
+        }
+        assert NotionService.for_troubleshooting() is None
+
+    def test_returns_none_when_no_troubleshooting_db(self, settings):
+        settings.NOTION = {
+            "INTEGRATION_TOKEN": "token",
+        }
+        assert NotionService.for_troubleshooting() is None
+
+    def test_returns_none_when_notion_not_configured(self, settings):
+        settings.NOTION = None
+        assert NotionService.for_troubleshooting() is None
