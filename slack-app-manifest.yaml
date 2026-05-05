@@ -8,7 +8,11 @@ features:
     always_online: true
   slash_commands:
     - command: /ft # test: /ft-test
-      description: Manage incidents - use /ft help for usage # test: /ft-test
+      description: Manage incidents - use /ft help for usage
+      usage_hint: "[command] [args...]"
+      should_escape: false
+    - command: /inc # test: /testinc
+      description: Manage incidents - use /inc help for usage
       usage_hint: "[command] [args...]"
       should_escape: false
 oauth_config:
