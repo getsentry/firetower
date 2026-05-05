@@ -330,19 +330,20 @@ DJK8S_READINESS_PROBES = [
     "djk8s.probes.DatabaseProbe",
 ]
 
-# Initialize Datadog statsd
-initialize(
-    statsd_host=os.environ.get("DATADOG_STATSD_HOST", "localhost"),
-    statsd_port=int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
-    api_key=config.datadog.api_key if config.datadog else None,
-    app_key=config.datadog.app_key if config.datadog else None,
-    statsd_namespace="firetower",
-)
-statsd.constant_tags = [
-    f"env:{'production' if os.environ.get('DJANGO_ENV') == 'prod' else 'test'}",
-    "service:firetower",
-    f"version:{os.environ.get('K_REVISION', 'unknown')}",
-]
+# Initialize Datadog statsd (only when DD agent is available)
+if os.environ.get("DD_API_KEY"):
+    initialize(
+        statsd_host=os.environ.get("DATADOG_STATSD_HOST", "localhost"),
+        statsd_port=int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
+        api_key=config.datadog.api_key if config.datadog else None,
+        app_key=config.datadog.app_key if config.datadog else None,
+        statsd_namespace="firetower",
+    )
+    statsd.constant_tags = [
+        f"env:{'production' if os.environ.get('DJANGO_ENV') == 'prod' else 'test'}",
+        "service:firetower",
+        f"version:{os.environ.get('K_REVISION', 'unknown')}",
+    ]
 
 # Logging configuration
 _log_level = os.environ.get("DJANGO_LOG_LEVEL", config.log_level)
