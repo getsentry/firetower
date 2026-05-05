@@ -335,8 +335,8 @@ if os.environ.get("DD_API_KEY"):
     initialize(
         statsd_host=os.environ.get("DATADOG_STATSD_HOST", "localhost"),
         statsd_port=int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
-        api_key=config.datadog.api_key if config.datadog else None,
-        app_key=config.datadog.app_key if config.datadog else None,
+        api_key=os.environ.get("DD_API_KEY"),
+        app_key=os.environ.get("DD_APP_KEY"),
         statsd_namespace="firetower",
     )
     statsd.constant_tags = [

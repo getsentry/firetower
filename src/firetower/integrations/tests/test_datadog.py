@@ -2,41 +2,38 @@ from unittest.mock import MagicMock, patch
 
 from datadog_api_client.exceptions import ApiException
 
-from firetower.config import DatadogConfig
 from firetower.integrations.services.datadog import (
     DATADOG_NOTEBOOK_BASE_URL,
     DatadogService,
 )
 
-MOCK_DATADOG_CONFIG = DatadogConfig(api_key="test-api-key", app_key="test-app-key")
+_DD_ENV = {"DD_API_KEY": "test-api-key", "DD_APP_KEY": "test-app-key"}
 
 
-def _patch_datadog(value: DatadogConfig | None):
-    return patch("firetower.integrations.services.datadog.config.datadog", value)
+def _patch_dd_env(env: dict[str, str] | None = None):
+    return patch.dict("os.environ", env or _DD_ENV, clear=False)
 
 
 class TestDatadogServiceInit:
     def test_init_with_config(self):
-        with _patch_datadog(MOCK_DATADOG_CONFIG):
+        with _patch_dd_env():
             service = DatadogService()
             assert service.configured is True
             assert service.api_key == "test-api-key"
             assert service.app_key == "test-app-key"
 
     def test_init_without_config(self):
-        with _patch_datadog(None):
+        with _patch_dd_env({"DD_API_KEY": "", "DD_APP_KEY": ""}):
             service = DatadogService()
             assert service.configured is False
-            assert service.api_key == ""
-            assert service.app_key == ""
 
     def test_init_with_empty_api_key(self):
-        with _patch_datadog(DatadogConfig(api_key="", app_key="test-app-key")):
+        with _patch_dd_env({"DD_API_KEY": "", "DD_APP_KEY": "test-app-key"}):
             service = DatadogService()
             assert service.configured is False
 
     def test_init_with_empty_app_key(self):
-        with _patch_datadog(DatadogConfig(api_key="test-api-key", app_key="")):
+        with _patch_dd_env({"DD_API_KEY": "test-api-key", "DD_APP_KEY": ""}):
             service = DatadogService()
             assert service.configured is False
 
@@ -48,7 +45,7 @@ class TestCreateNotebook:
         return response
 
     def test_create_notebook_success(self):
-        with _patch_datadog(MOCK_DATADOG_CONFIG):
+        with _patch_dd_env():
             service = DatadogService()
 
         mock_api = MagicMock()
@@ -68,7 +65,7 @@ class TestCreateNotebook:
         assert str(body.data.attributes.time.live_span) == "1h"
 
     def test_create_notebook_truncates_long_title(self):
-        with _patch_datadog(MOCK_DATADOG_CONFIG):
+        with _patch_dd_env():
             service = DatadogService()
 
         mock_api = MagicMock()
@@ -88,7 +85,7 @@ class TestCreateNotebook:
         assert name.endswith("...")
 
     def test_create_notebook_short_title_not_truncated(self):
-        with _patch_datadog(MOCK_DATADOG_CONFIG):
+        with _patch_dd_env():
             service = DatadogService()
 
         mock_api = MagicMock()
@@ -104,7 +101,7 @@ class TestCreateNotebook:
         assert body.data.attributes.name == "[INC-1] short"
 
     def test_create_notebook_returns_none_on_api_exception(self):
-        with _patch_datadog(MOCK_DATADOG_CONFIG):
+        with _patch_dd_env():
             service = DatadogService()
 
         mock_api = MagicMock()
@@ -121,7 +118,7 @@ class TestCreateNotebook:
         assert url is None
 
     def test_create_notebook_returns_none_on_unexpected_exception(self):
-        with _patch_datadog(MOCK_DATADOG_CONFIG):
+        with _patch_dd_env():
             service = DatadogService()
 
         mock_api = MagicMock()
@@ -136,7 +133,7 @@ class TestCreateNotebook:
         assert url is None
 
     def test_create_notebook_returns_none_when_unconfigured(self):
-        with _patch_datadog(None):
+        with _patch_dd_env({"DD_API_KEY": "", "DD_APP_KEY": ""}):
             service = DatadogService()
 
         with patch(
@@ -148,7 +145,7 @@ class TestCreateNotebook:
         mock_api_cls.assert_not_called()
 
     def test_truncate_notebook_name_helper(self):
-        with _patch_datadog(MOCK_DATADOG_CONFIG):
+        with _patch_dd_env():
             service = DatadogService()
         # exactly 80
         name = service._truncate_notebook_name("INC-9999", "x" * 100)

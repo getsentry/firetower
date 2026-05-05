@@ -1,4 +1,5 @@
 import logging
+import os
 
 from datadog_api_client import ApiClient, Configuration
 from datadog_api_client.exceptions import ApiException
@@ -12,8 +13,6 @@ from datadog_api_client.v1.model.notebook_global_time import NotebookGlobalTime
 from datadog_api_client.v1.model.notebook_resource_type import NotebookResourceType
 from datadog_api_client.v1.model.widget_live_span import WidgetLiveSpan
 
-from firetower.settings import config
-
 logger = logging.getLogger(__name__)
 
 DATADOG_NOTEBOOK_BASE_URL = "https://app.datadoghq.com/notebook"
@@ -24,16 +23,8 @@ REQUEST_TIMEOUT_SECONDS = 15
 
 class DatadogService:
     def __init__(self) -> None:
-        datadog_config = config.datadog
-        if not datadog_config:
-            self.api_key = ""
-            self.app_key = ""
-            self.configured = False
-            logger.warning("DatadogService initialized without configuration")
-            return
-
-        self.api_key = datadog_config.api_key
-        self.app_key = datadog_config.app_key
+        self.api_key = os.environ.get("DD_API_KEY", "")
+        self.app_key = os.environ.get("DD_APP_KEY", "")
         self.configured = bool(self.api_key and self.app_key)
 
         if not self.configured:
