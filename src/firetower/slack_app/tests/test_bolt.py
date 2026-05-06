@@ -155,6 +155,18 @@ class TestRouting:
             assert mock_handler.call_args[1]["new_subject"] == "New Title Here"
 
     @patch("firetower.slack_app.bolt.statsd")
+    def test_title_alias_routes_to_subject(self, mock_statsd, incident):
+        ack = MagicMock()
+        respond = MagicMock()
+        body = {"text": "title New Title Here", "channel_id": CHANNEL_ID}
+        command = {"command": "/inc"}
+
+        with patch("firetower.slack_app.bolt.handle_subject_command") as mock_handler:
+            handle_command(ack=ack, body=body, command=command, respond=respond)
+            mock_handler.assert_called_once()
+            assert mock_handler.call_args[1]["new_subject"] == "New Title Here"
+
+    @patch("firetower.slack_app.bolt.statsd")
     def test_subject_no_arg_shows_usage(self, mock_statsd, incident):
         ack = MagicMock()
         respond = MagicMock()
