@@ -2179,16 +2179,10 @@ class TestCreateTroubleshootingDoc:
 
     @patch("firetower.incidents.hooks.NotionService")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_retries_when_link_exists_with_empty_url(
-        self, mock_slack, mock_notion_cls, settings
-    ):
+    def test_skips_when_placeholder_exists(self, mock_slack, mock_notion_cls, settings):
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
         mock_notion_cls.is_troubleshooting_configured.return_value = True
         mock_service = MagicMock()
-        mock_service.create_troubleshooting_page.return_value = {
-            "id": "page-456",
-            "url": "https://notion.so/page-456",
-        }
         mock_notion_cls.for_troubleshooting.return_value = mock_service
 
         incident = Incident.objects.create(
@@ -2203,11 +2197,7 @@ class TestCreateTroubleshootingDoc:
 
         _create_troubleshooting_doc(incident, "C99999")
 
-        mock_service.create_troubleshooting_page.assert_called_once()
-        link = ExternalLink.objects.get(
-            incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
-        )
-        assert link.url == "https://notion.so/page-456"
+        mock_service.create_troubleshooting_page.assert_not_called()
 
     @patch("firetower.incidents.hooks.NotionService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -2233,7 +2223,9 @@ class TestCreateTroubleshootingDoc:
 
     @patch("firetower.incidents.hooks.NotionService")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_api_error_does_not_break_hook(self, mock_slack, mock_notion_cls, settings):
+    def test_api_error_cleans_up_placeholder(
+        self, mock_slack, mock_notion_cls, settings
+    ):
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
         mock_notion_cls.is_troubleshooting_configured.return_value = True
         mock_service = MagicMock()
@@ -2246,6 +2238,10 @@ class TestCreateTroubleshootingDoc:
         )
 
         _create_troubleshooting_doc(incident, "C99999")
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
+        ).exists()
 
     @patch("firetower.incidents.hooks.NotionService")
     @patch("firetower.incidents.hooks._slack_service")

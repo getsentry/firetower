@@ -478,11 +478,17 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
                 type=ExternalLinkType.NOTION_TROUBLESHOOTING,
                 defaults={"url": ""},
             )
-            if not created and link.url:
-                logger.info(
-                    "Incident %s already has a troubleshooting doc, skipping",
-                    incident.id,
-                )
+            if not created:
+                if link.url:
+                    logger.info(
+                        "Incident %s already has a troubleshooting doc, skipping",
+                        incident.id,
+                    )
+                else:
+                    logger.info(
+                        "Incident %s troubleshooting doc creation already in progress, skipping",
+                        incident.id,
+                    )
                 return
 
         # Notion API calls happen outside the transaction to avoid holding the
@@ -540,6 +546,11 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
         logger.exception(
             "Failed to create troubleshooting doc for incident %s", incident.id
         )
+        ExternalLink.objects.filter(
+            incident=incident,
+            type=ExternalLinkType.NOTION_TROUBLESHOOTING,
+            url="",
+        ).delete()
 
 
 def on_incident_created(incident: Incident) -> None:
