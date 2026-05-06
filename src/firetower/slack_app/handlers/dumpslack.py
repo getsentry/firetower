@@ -6,6 +6,7 @@ from typing import Any
 
 import requests
 import sentry_sdk
+from datadog import statsd
 from django.conf import settings
 from django.db import transaction
 
@@ -197,6 +198,10 @@ def trigger_slack_dump_async(client: Any, channel_id: str, incident: Any) -> Non
 
         try:
             _trigger_slack_dump(client, channel_id, incident)
+        except Exception:
+            logger.exception("Background dumpslack failed for incident %s", incident.id)
+            statsd.increment("slack_app.commands.failed", tags=["subcommand:dumpslack"])
+            sentry_sdk.capture_exception()
         finally:
             connection.close()
 
