@@ -10,8 +10,8 @@ from django.conf import settings
 from django.db import transaction
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
-from firetower.incidents.models import ExternalLink, ExternalLinkType
-from firetower.integrations.services.genai import GenAIService
+from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
+from firetower.integrations.services.genai import GenAIService, parse_key_timestamps
 from firetower.integrations.services.notion import NotionService
 from firetower.integrations.services.slack import SlackService, is_slack_url
 from firetower.slack_app.handlers.utils import get_incident_from_channel
@@ -133,6 +133,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             )
             if timeline:
                 notion.add_timeline_to_page(page_id, timeline)
+                _backfill_milestones(incident, timeline)
     except Exception:
         logger.exception("Failed to add AI timeline to Notion page %s", page_id)
 
@@ -156,6 +157,37 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             "Failed to post completion message to channel %s for page %s",
             channel_id,
             page_url,
+        )
+
+
+def _backfill_milestones(incident: Any, timeline_md: str) -> None:
+    timestamps = parse_key_timestamps(timeline_md)
+    if not timestamps:
+        return
+
+    fields_updated: list[str] = []
+    for field, value in timestamps.items():
+        try:
+            # Atomic conditional update: only set the field if it is still NULL
+            # in the database, avoiding a TOCTOU race with user-set values.
+            updated = Incident.objects.filter(
+                pk=incident.pk,
+                **{f"{field}__isnull": True},
+            ).update(**{field: value})
+            if updated:
+                fields_updated.append(field)
+        except Exception:
+            logger.exception(
+                "Failed to backfill %s for incident %s",
+                field,
+                incident.incident_number,
+            )
+
+    if fields_updated:
+        logger.debug(
+            "Backfilled milestone fields %s for incident %s",
+            fields_updated,
+            incident.incident_number,
         )
 
 
