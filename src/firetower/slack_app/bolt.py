@@ -73,6 +73,8 @@ def get_bolt_app() -> App:
         _bolt_app = App(token=settings.SLACK["BOT_TOKEN"])
         _bolt_app.command("/ft")(handle_command)
         _bolt_app.command("/ft-test")(handle_command)
+        _bolt_app.command("/inc")(handle_command)
+        _bolt_app.command("/testinc")(handle_command)
         _register_views(_bolt_app)
     return _bolt_app
 
