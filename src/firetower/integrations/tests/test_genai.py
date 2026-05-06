@@ -365,3 +365,15 @@ class TestParseKeyTimestamps:
             "time_started": datetime(2024, 1, 15, 14, 0, tzinfo=UTC),
             "time_detected": datetime(2024, 1, 15, 14, 5, tzinfo=UTC),
         }
+
+    def test_normalizes_variable_whitespace_in_timestamps(self):
+        md = (
+            "## Key Timestamps\n"
+            "- Started: [2024-01-15  14:00UTC]\n"
+            "- Detected: [2024-01-15 14:05  UTC]\n"
+        )
+        result = parse_key_timestamps(md)
+        assert result == {
+            "time_started": datetime(2024, 1, 15, 14, 0, tzinfo=UTC),
+            "time_detected": datetime(2024, 1, 15, 14, 5, tzinfo=UTC),
+        }

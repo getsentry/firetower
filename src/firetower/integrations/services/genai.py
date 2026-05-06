@@ -102,7 +102,7 @@ def parse_key_timestamps(timeline_md: str) -> dict[str, datetime]:
         field = _KEY_TIMESTAMPS_LABEL_MAP.get(label)
         if not field:
             continue
-        raw_ts = match.group(2).strip()
+        raw_ts = " ".join(match.group(2).replace("UTC", " UTC").split())
         for fmt in ("%Y-%m-%d %H:%M:%S UTC", "%Y-%m-%d %H:%M UTC"):
             try:
                 results[field] = datetime.strptime(raw_ts, fmt).replace(tzinfo=UTC)

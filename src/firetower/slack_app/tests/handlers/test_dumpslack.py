@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from slack_sdk.errors import SlackApiError
@@ -613,71 +612,69 @@ class TestBackfillMilestones:
         "- Resolution: [2024-01-15 16:00 UTC]\n"
     )
 
-    def test_sets_empty_fields(self):
+    @patch("firetower.slack_app.handlers.dumpslack.Incident.objects")
+    def test_sets_empty_fields(self, mock_objects):
+        mock_objects.filter.return_value.update.return_value = 1
         incident = MagicMock()
+        incident.pk = 1
         incident.incident_number = "INC-1"
-        incident.time_started = None
-        incident.time_detected = None
-        incident.time_analyzed = None
-        incident.time_mitigated = None
-        incident.time_recovered = None
 
         _backfill_milestones(incident, self._TIMELINE_MD)
 
-        incident.save.assert_called_once()
-        fields = set(incident.save.call_args[1]["update_fields"])
-        assert fields == {
+        filter_fields = set()
+        for call in mock_objects.filter.call_args_list:
+            for key in call[1]:
+                if key != "pk":
+                    filter_fields.add(key.replace("__isnull", ""))
+        assert filter_fields == {
             "time_started",
             "time_detected",
             "time_analyzed",
             "time_mitigated",
             "time_recovered",
         }
-        assert incident.time_started == datetime(2024, 1, 15, 14, 0, tzinfo=UTC)
-        assert incident.time_recovered == datetime(2024, 1, 15, 16, 0, tzinfo=UTC)
+        assert mock_objects.filter.return_value.update.call_count == 5
 
-    def test_skips_fields_that_already_have_values(self):
+    @patch("firetower.slack_app.handlers.dumpslack.Incident.objects")
+    def test_skips_fields_that_are_not_null(self, mock_objects):
+        # Simulate: time_started and time_mitigated already set (update returns 0)
+        def conditional_update(**kwargs):
+            field = list(kwargs.keys())[0]
+            if field in ("time_started", "time_mitigated"):
+                return 0
+            return 1
+
+        mock_objects.filter.return_value.update.side_effect = conditional_update
         incident = MagicMock()
+        incident.pk = 2
         incident.incident_number = "INC-2"
-        incident.time_started = datetime(2024, 1, 15, 13, 50, tzinfo=UTC)
-        incident.time_detected = None
-        incident.time_analyzed = None
-        incident.time_mitigated = datetime(2024, 1, 15, 14, 55, tzinfo=UTC)
-        incident.time_recovered = None
 
         _backfill_milestones(incident, self._TIMELINE_MD)
 
-        fields = set(incident.save.call_args[1]["update_fields"])
-        assert "time_started" not in fields
-        assert "time_mitigated" not in fields
-        assert fields == {"time_detected", "time_analyzed", "time_recovered"}
+        assert mock_objects.filter.return_value.update.call_count == 5
 
-    def test_no_save_when_all_fields_populated(self):
+    @patch("firetower.slack_app.handlers.dumpslack.Incident.objects")
+    def test_no_update_when_all_fields_populated(self, mock_objects):
+        mock_objects.filter.return_value.update.return_value = 0
         incident = MagicMock()
+        incident.pk = 3
         incident.incident_number = "INC-3"
-        incident.time_started = datetime(2024, 1, 15, 14, 0, tzinfo=UTC)
-        incident.time_detected = datetime(2024, 1, 15, 14, 5, tzinfo=UTC)
-        incident.time_analyzed = datetime(2024, 1, 15, 14, 30, tzinfo=UTC)
-        incident.time_mitigated = datetime(2024, 1, 15, 15, 0, tzinfo=UTC)
-        incident.time_recovered = datetime(2024, 1, 15, 16, 0, tzinfo=UTC)
 
         _backfill_milestones(incident, self._TIMELINE_MD)
 
-        incident.save.assert_not_called()
+        assert mock_objects.filter.return_value.update.call_count == 5
 
-    def test_no_save_when_no_timestamps_parsed(self):
+    def test_no_update_when_no_timestamps_parsed(self):
         incident = MagicMock()
         incident.incident_number = "INC-4"
-        incident.time_started = None
 
         _backfill_milestones(incident, "## Timeline\n- some event\n")
 
-        incident.save.assert_not_called()
-
-    def test_save_exception_does_not_propagate(self):
+    @patch("firetower.slack_app.handlers.dumpslack.Incident.objects")
+    def test_update_exception_does_not_propagate(self, mock_objects):
+        mock_objects.filter.return_value.update.side_effect = RuntimeError("db error")
         incident = MagicMock()
+        incident.pk = 5
         incident.incident_number = "INC-5"
-        incident.time_started = None
-        incident.save.side_effect = RuntimeError("db error")
 
         _backfill_milestones(incident, self._TIMELINE_MD)

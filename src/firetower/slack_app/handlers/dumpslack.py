@@ -10,7 +10,7 @@ from django.conf import settings
 from django.db import transaction
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
-from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
 from firetower.integrations.services.genai import GenAIService, parse_key_timestamps
 from firetower.integrations.services.notion import NotionService
 from firetower.integrations.services.slack import SlackService, is_slack_url
@@ -165,25 +165,30 @@ def _backfill_milestones(incident: Any, timeline_md: str) -> None:
     if not timestamps:
         return
 
-    fields_to_update: list[str] = []
+    fields_updated: list[str] = []
     for field, value in timestamps.items():
-        if getattr(incident, field, None) is None:
-            setattr(incident, field, value)
-            fields_to_update.append(field)
-
-    if fields_to_update:
         try:
-            incident.save(update_fields=fields_to_update)
-            logger.debug(
-                "Backfilled milestone fields %s for incident %s",
-                fields_to_update,
-                incident.incident_number,
-            )
+            # Atomic conditional update: only set the field if it is still NULL
+            # in the database, avoiding a TOCTOU race with user-set values.
+            updated = Incident.objects.filter(
+                pk=incident.pk,
+                **{f"{field}__isnull": True},
+            ).update(**{field: value})
+            if updated:
+                fields_updated.append(field)
         except Exception:
             logger.exception(
-                "Failed to save milestone timestamps for incident %s",
+                "Failed to backfill %s for incident %s",
+                field,
                 incident.incident_number,
             )
+
+    if fields_updated:
+        logger.debug(
+            "Backfilled milestone fields %s for incident %s",
+            fields_updated,
+            incident.incident_number,
+        )
 
 
 def trigger_slack_dump_async(client: Any, channel_id: str, incident: Any) -> None:
