@@ -485,18 +485,35 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
                 )
                 return
 
-            incident_url = _build_incident_url(incident)
-            page = notion.create_troubleshooting_page(
-                incident.incident_number, incident_url
+        # Notion API calls happen outside the transaction to avoid holding the
+        # SELECT FOR UPDATE lock while making slow external requests.
+        incident_url = _build_incident_url(incident)
+        page = notion.create_troubleshooting_page(
+            incident.incident_number, incident_url
+        )
+        if not page or not page.get("url"):
+            logger.error(
+                "Troubleshooting doc creation returned no URL for incident %s",
+                incident.id,
             )
-            if not page or not page.get("url"):
-                logger.error(
-                    "Troubleshooting doc creation returned no URL for incident %s",
-                    incident.id,
-                )
-                link.delete()
-                return
+            ExternalLink.objects.filter(
+                incident=incident,
+                type=ExternalLinkType.NOTION_TROUBLESHOOTING,
+                url="",
+            ).delete()
+            return
 
+        with transaction.atomic():
+            link = ExternalLink.objects.select_for_update().get(
+                incident=incident,
+                type=ExternalLinkType.NOTION_TROUBLESHOOTING,
+            )
+            if link.url:
+                logger.warning(
+                    "Race condition: concurrent call already created troubleshooting doc for %s",
+                    incident.incident_number,
+                )
+                return
             link.url = page["url"]
             link.save(update_fields=["url"])
 
