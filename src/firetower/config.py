@@ -21,12 +21,6 @@ class PostgresConfig:
 
 
 @deserialize
-class DatadogConfig:
-    api_key: str
-    app_key: str
-
-
-@deserialize
 class EscalationPolicy:
     id: str
     integration_key: str | None = None
@@ -81,7 +75,6 @@ class ConfigFile:
     """
 
     postgres: PostgresConfig
-    datadog: DatadogConfig | None
     slack: SlackConfig
     auth: AuthConfig
     pagerduty: PagerDutyConfig | None
@@ -153,7 +146,6 @@ class DummyConfigFile(ConfigFile):
             iap_enabled=False,
             iap_audience="",
         )
-        self.datadog = None
         self.notion = None
         self.genai = None
         self.pagerduty = None
