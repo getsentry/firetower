@@ -354,7 +354,13 @@ def handle_new_incident_submission(
         client.chat_postMessage(channel=slack_user_id, text=dm_message)
 
         invoking_channel = view.get("private_metadata", "")
-        if invoking_channel and not is_private and invoking_channel != slack_user_id:
+        feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
+        if (
+            invoking_channel
+            and not is_private
+            and invoking_channel != slack_user_id
+            and invoking_channel != feed_channel_id
+        ):
             channel_message = (
                 f"A {incident.severity} incident has been created.\n"
                 f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
