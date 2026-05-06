@@ -18,6 +18,7 @@ const ExternalLinksSchema = z.object({
   pagerduty: z.string().optional(),
   statuspage: z.string().optional(),
   notion: z.string().optional(),
+  notion_troubleshooting: z.string().optional(),
   linear: z.string().optional(),
 });
 
