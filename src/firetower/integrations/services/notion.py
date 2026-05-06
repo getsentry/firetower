@@ -37,6 +37,17 @@ class NotionService:
         )
 
     @classmethod
+    def is_troubleshooting_configured(cls) -> bool:
+        from django.conf import settings  # noqa: PLC0415
+
+        config = settings.NOTION
+        return bool(
+            config
+            and config.get("INTEGRATION_TOKEN")
+            and config.get("TROUBLESHOOTING_DATABASE_ID")
+        )
+
+    @classmethod
     def from_settings(cls) -> "NotionService | None":
         from django.conf import settings  # noqa: PLC0415
 
@@ -51,10 +62,39 @@ class NotionService:
             integration_token=config["INTEGRATION_TOKEN"],
             database_id=config["DATABASE_ID"],
             template_markdown=config.get("TEMPLATE_MARKDOWN", ""),
+            troubleshooting_database_id=config.get("TROUBLESHOOTING_DATABASE_ID", ""),
+            troubleshooting_template_markdown=config.get(
+                "TROUBLESHOOTING_TEMPLATE_MARKDOWN", ""
+            ),
+        )
+
+    @classmethod
+    def for_troubleshooting(cls) -> "NotionService | None":
+        from django.conf import settings  # noqa: PLC0415
+
+        config = settings.NOTION
+        if (
+            not config
+            or not config.get("INTEGRATION_TOKEN")
+            or not config.get("TROUBLESHOOTING_DATABASE_ID")
+        ):
+            return None
+        return cls(
+            integration_token=config["INTEGRATION_TOKEN"],
+            database_id=config.get("DATABASE_ID", ""),
+            troubleshooting_database_id=config["TROUBLESHOOTING_DATABASE_ID"],
+            troubleshooting_template_markdown=config.get(
+                "TROUBLESHOOTING_TEMPLATE_MARKDOWN", ""
+            ),
         )
 
     def __init__(
-        self, integration_token: str, database_id: str, template_markdown: str = ""
+        self,
+        integration_token: str,
+        database_id: str,
+        template_markdown: str = "",
+        troubleshooting_database_id: str = "",
+        troubleshooting_template_markdown: str = "",
     ) -> None:
         self.client: Client = Client(
             auth=integration_token, notion_version=_MARKDOWN_NOTION_VERSION
@@ -62,6 +102,8 @@ class NotionService:
         self._integration_token = integration_token
         self.database_id = database_id
         self.template_markdown = template_markdown
+        self.troubleshooting_database_id = troubleshooting_database_id
+        self.troubleshooting_template_markdown = troubleshooting_template_markdown
         self._users: dict[str, dict[str, str]] | None = None
 
     def get_users(self) -> dict[str, dict[str, str]]:
@@ -151,6 +193,51 @@ class NotionService:
                 properties=properties,
             ),
         )
+
+    def create_troubleshooting_page(
+        self,
+        incident_number: str,
+        incident_url: str,
+    ) -> dict[str, Any]:
+        if not self.troubleshooting_database_id:
+            raise ValueError("Troubleshooting database ID is not configured")
+
+        properties: dict[str, Any] = {
+            "Name": {
+                "title": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": f"[{incident_number}] Clinical Troubleshooting Doc"
+                        },
+                    }
+                ]
+            },
+            "Incident": {"select": {"name": incident_number}},
+            "Jira": {"url": incident_url},
+        }
+
+        logger.debug(
+            "Creating troubleshooting doc with database_id=%r",
+            self.troubleshooting_database_id,
+        )
+        page = cast(
+            dict[str, Any],
+            self.client.pages.create(
+                parent={"database_id": self.troubleshooting_database_id},
+                properties=properties,
+            ),
+        )
+
+        if self.troubleshooting_template_markdown:
+            if not self._send_markdown(
+                page["id"], self.troubleshooting_template_markdown
+            ):
+                logger.error(
+                    "Failed to apply troubleshooting template to page %s", page["id"]
+                )
+
+        return page
 
     def apply_template(
         self,

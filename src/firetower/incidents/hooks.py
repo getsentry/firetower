@@ -18,6 +18,7 @@ from firetower.integrations.services import (
     PagerDutyService,
     SlackService,
 )
+from firetower.integrations.services.notion import NotionService
 from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
@@ -438,6 +439,120 @@ def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
         )
 
 
+def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
+    try:
+        if incident.is_private:
+            logger.info(
+                "Skipping troubleshooting doc for private incident %s", incident.id
+            )
+            try:
+                _slack_service.post_message(
+                    channel_id,
+                    "Troubleshooting doc creation skipped due to private incident.",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to post troubleshooting skip message for incident %s",
+                    incident.id,
+                )
+            return
+
+        if not NotionService.is_troubleshooting_configured():
+            logger.info(
+                "Notion troubleshooting not configured, skipping for incident %s",
+                incident.id,
+            )
+            return
+
+        notion = NotionService.for_troubleshooting()
+        if not notion:
+            logger.warning(
+                "NotionService.for_troubleshooting() returned None for incident %s",
+                incident.id,
+            )
+            return
+
+        with transaction.atomic():
+            link, created = ExternalLink.objects.select_for_update().get_or_create(
+                incident=incident,
+                type=ExternalLinkType.NOTION_TROUBLESHOOTING,
+                defaults={"url": ""},
+            )
+            if not created:
+                if link.url:
+                    logger.info(
+                        "Incident %s already has a troubleshooting doc, skipping",
+                        incident.id,
+                    )
+                else:
+                    logger.info(
+                        "Incident %s troubleshooting doc creation already in progress, skipping",
+                        incident.id,
+                    )
+                return
+
+        # Notion API calls happen outside the transaction to avoid holding the
+        # SELECT FOR UPDATE lock while making slow external requests.
+        incident_url = _build_incident_url(incident)
+        page = notion.create_troubleshooting_page(
+            incident.incident_number, incident_url
+        )
+        if not page or not page.get("url"):
+            logger.error(
+                "Troubleshooting doc creation returned no URL for incident %s",
+                incident.id,
+            )
+            ExternalLink.objects.filter(
+                incident=incident,
+                type=ExternalLinkType.NOTION_TROUBLESHOOTING,
+                url="",
+            ).delete()
+            return
+
+        with transaction.atomic():
+            link = ExternalLink.objects.select_for_update().get(
+                incident=incident,
+                type=ExternalLinkType.NOTION_TROUBLESHOOTING,
+            )
+            if link.url:
+                logger.warning(
+                    "Race condition: concurrent call already created troubleshooting doc for %s",
+                    incident.incident_number,
+                )
+                return
+            link.url = page["url"]
+            link.save(update_fields=["url"])
+
+        try:
+            _slack_service.add_bookmark(channel_id, "Troubleshooting Doc", page["url"])
+        except Exception:
+            logger.exception(
+                "Failed to add troubleshooting doc bookmark for incident %s",
+                incident.id,
+            )
+        try:
+            _slack_service.post_message(
+                channel_id,
+                f"A <{page['url']}|Clinical Troubleshooting document> has been created. "
+                "Please use this to keep track of Symptoms, Hypothesis, and Actions "
+                "as you're investigating this incident.",
+            )
+        except Exception:
+            logger.exception(
+                "Failed to post troubleshooting doc message for incident %s",
+                incident.id,
+            )
+    except Exception:
+        logger.exception(
+            "Failed to create troubleshooting doc for incident %s", incident.id
+        )
+        ExternalLink.objects.filter(
+            incident=incident,
+            type=ExternalLinkType.NOTION_TROUBLESHOOTING,
+            url="",
+        ).delete()
+
+
 def on_incident_created(incident: Incident) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
@@ -519,6 +634,7 @@ def on_incident_created(incident: Incident) -> None:
                 )
 
         _create_datadog_notebook(incident, channel_id)
+        _create_troubleshooting_doc(incident, channel_id)
 
         ic_mention = ""
         if incident.captain:

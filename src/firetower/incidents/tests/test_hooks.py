@@ -8,6 +8,7 @@ from firetower.incidents.hooks import (
     _build_channel_name,
     _build_channel_topic,
     _create_status_channel,
+    _create_troubleshooting_doc,
     _invite_oncall_users,
     _page_if_needed,
     on_captain_changed,
@@ -2059,3 +2060,248 @@ class TestOnIncidentCreatedDatadog:
             if c[0][1] == "Datadog Notebook"
         ]
         assert len(bookmark_calls) == 1
+
+
+@pytest.mark.django_db
+class TestCreateTroubleshootingDoc:
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_for_private_incident(self, mock_slack, mock_notion_cls):
+        incident = Incident.objects.create(
+            title="Sensitive",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        _create_troubleshooting_doc(incident, "C99999")
+
+        mock_notion_cls.is_troubleshooting_configured.assert_not_called()
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
+        ).exists()
+
+        skip_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if c[0][0] == "C99999"
+            and c[0][1]
+            == "Troubleshooting doc creation skipped due to private incident."
+        ]
+        assert len(skip_calls) == 1
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_creates_doc_and_posts_to_slack(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_troubleshooting_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_troubleshooting_page.return_value = {
+            "id": "page-123",
+            "url": "https://notion.so/page-123",
+        }
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_troubleshooting_doc(incident, "C99999")
+
+        mock_service.create_troubleshooting_page.assert_called_once_with(
+            incident.incident_number,
+            f"https://firetower.example.com/{incident.incident_number}",
+        )
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
+        )
+        assert link.url == "https://notion.so/page-123"
+
+        bookmark_calls = [
+            c
+            for c in mock_slack.add_bookmark.call_args_list
+            if c[0][1] == "Troubleshooting Doc"
+        ]
+        assert len(bookmark_calls) == 1
+        assert bookmark_calls[0][0][2] == "https://notion.so/page-123"
+
+        message_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "Clinical Troubleshooting document" in c[0][1]
+        ]
+        assert len(message_calls) == 1
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_when_not_configured(self, mock_slack, mock_notion_cls):
+        mock_notion_cls.is_troubleshooting_configured.return_value = False
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_troubleshooting_doc(incident, "C99999")
+
+        mock_notion_cls.for_troubleshooting.assert_not_called()
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
+        ).exists()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_idempotent_when_link_exists(self, mock_slack, mock_notion_cls, settings):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_troubleshooting_configured.return_value = True
+        mock_service = MagicMock()
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.NOTION_TROUBLESHOOTING,
+            url="https://notion.so/existing",
+        )
+
+        _create_troubleshooting_doc(incident, "C99999")
+
+        mock_service.create_troubleshooting_page.assert_not_called()
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
+        )
+        assert link.url == "https://notion.so/existing"
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_when_placeholder_exists(self, mock_slack, mock_notion_cls, settings):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_troubleshooting_configured.return_value = True
+        mock_service = MagicMock()
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.NOTION_TROUBLESHOOTING,
+            url="",
+        )
+
+        _create_troubleshooting_doc(incident, "C99999")
+
+        mock_service.create_troubleshooting_page.assert_not_called()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_deletes_placeholder_when_api_returns_no_url(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_troubleshooting_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_troubleshooting_page.return_value = {"id": "page-123"}
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_troubleshooting_doc(incident, "C99999")
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
+        ).exists()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_api_error_cleans_up_placeholder(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_troubleshooting_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_troubleshooting_page.side_effect = RuntimeError("boom")
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_troubleshooting_doc(incident, "C99999")
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION_TROUBLESHOOTING
+        ).exists()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_bookmark_failure_does_not_block_message(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_troubleshooting_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_troubleshooting_page.return_value = {
+            "id": "page-123",
+            "url": "https://notion.so/page-123",
+        }
+        mock_notion_cls.for_troubleshooting.return_value = mock_service
+
+        def add_bookmark_side_effect(channel_id, name, url):
+            if name == "Troubleshooting Doc":
+                raise RuntimeError("bookmark boom")
+            return None
+
+        mock_slack.add_bookmark.side_effect = add_bookmark_side_effect
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_troubleshooting_doc(incident, "C99999")
+
+        message_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "Clinical Troubleshooting document" in c[0][1]
+        ]
+        assert len(message_calls) == 1
+
+
+@pytest.mark.django_db
+class TestOnIncidentCreatedTroubleshootingDoc:
+    @patch("firetower.incidents.hooks._create_troubleshooting_doc")
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_creates_troubleshooting_doc(
+        self,
+        mock_slack,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+        mock_create_ts,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        mock_create_ts.assert_called_once_with(incident, "C99999")

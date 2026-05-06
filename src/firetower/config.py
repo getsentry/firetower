@@ -53,6 +53,8 @@ class NotionConfig:
     integration_token: str
     database_id: str
     template_markdown: str = ""
+    troubleshooting_database_id: str = ""
+    troubleshooting_template_markdown: str = ""
 
 
 @deserialize

@@ -260,6 +260,8 @@ NOTION: dict | None = (
         "INTEGRATION_TOKEN": config.notion.integration_token,
         "DATABASE_ID": config.notion.database_id,
         "TEMPLATE_MARKDOWN": config.notion.template_markdown,
+        "TROUBLESHOOTING_DATABASE_ID": config.notion.troubleshooting_database_id,
+        "TROUBLESHOOTING_TEMPLATE_MARKDOWN": config.notion.troubleshooting_template_markdown,
     }
     if config.notion
     else None

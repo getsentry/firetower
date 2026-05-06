@@ -19,6 +19,10 @@ const linkConfigs = {
     label: 'Postmortem document',
     icon: '/notion.svg',
   },
+  notion_troubleshooting: {
+    label: 'Troubleshooting document',
+    icon: '/notion.svg',
+  },
   pagerduty: {
     label: 'PagerDuty',
     icon: '/pagerduty.svg',
