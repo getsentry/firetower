@@ -47,8 +47,34 @@ PAGING_POLICIES: dict[str, PolicyConfig] = {
 PD_SUMMARY_MAX_LENGTH = 1024
 
 
-def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
-    if incident.severity not in PAGEABLE_SEVERITIES:
+@dataclass
+class ChannelSetupContext:
+    """Primitive-arg context shared by normal and fallback incident channel setup."""
+
+    channel_id: str
+    channel_name: str
+    title: str
+    severity: str
+    is_private: bool
+    captain_slack_id: str | None = None
+    captain_name: str | None = None
+    reporter_slack_id: str | None = None
+    description: str | None = None
+    incident_url: str | None = None
+    incident_number: str | None = None
+
+
+def page_for_channel(
+    severity: str,
+    dedup_prefix: str,
+    title: str,
+    slack_service: SlackService,
+    *,
+    links: list[dict[str, str]] | None = None,
+    channel_id: str | None = None,
+) -> None:
+    """Trigger PD pages for pageable severities. No DB access."""
+    if severity not in PAGEABLE_SEVERITIES:
         return
 
     pd_config = settings.PAGERDUTY
@@ -58,11 +84,6 @@ def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
     escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
 
     pd_service = None
-
-    links = [{"href": _build_incident_url(incident), "text": "View in Firetower"}]
-    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
-    if slack_link and slack_link.url:
-        links.append({"href": slack_link.url, "text": "Slack Channel"})
 
     for policy_name, policy_info in PAGING_POLICIES.items():
         policy = escalation_policies.get(policy_name)
@@ -84,22 +105,43 @@ def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
                 logger.exception("Failed to initialize PagerDutyService")
                 return
 
-        dedup_key = f"firetower-{incident.incident_number}-{policy_name}"
+        dedup_key = f"firetower-{dedup_prefix}-{policy_name}"
         page_label = policy_info.page_label
-        summary = f"[{page_label}] [{incident.severity}] {incident.incident_number}: {incident.title}"
+        summary = f"[{page_label}] [{severity}] {dedup_prefix}: {title}"
         summary = summary[:PD_SUMMARY_MAX_LENGTH]
 
         try:
             success = pd_service.trigger_incident(
-                summary, dedup_key, integration_key, links=links
+                summary, dedup_key, integration_key, links=links or []
             )
             if not success and channel_id:
-                _slack_service.post_message(
+                slack_service.post_message(
                     channel_id,
                     f":warning: Failed to page {page_label} via PagerDuty. Please manually escalate if needed.",
                 )
         except Exception:
-            logger.exception(f"Failed to page {policy_name} for incident {incident.id}")
+            logger.exception("Failed to page %s for %s", policy_name, dedup_prefix)
+
+
+def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
+    links: list[dict[str, str]] = [
+        {"href": _build_incident_url(incident), "text": "View in Firetower"}
+    ]
+    if channel_id:
+        links.append(
+            {
+                "href": _slack_service.build_channel_url(channel_id),
+                "text": "Slack Channel",
+            }
+        )
+    page_for_channel(
+        incident.severity,
+        incident.incident_number,
+        incident.title,
+        _slack_service,
+        links=links,
+        channel_id=channel_id,
+    )
 
 
 def _build_channel_name(incident: Incident) -> str:
@@ -188,8 +230,11 @@ def _oncall_role_label(
     return policy_label
 
 
-def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
-    if incident.severity not in PAGEABLE_SEVERITIES:
+def _invite_oncall_to_channel(
+    severity: str, channel_id: str, slack_service: SlackService
+) -> None:
+    """Invite on-call users to a channel. No DB access."""
+    if severity not in PAGEABLE_SEVERITIES:
         return
 
     pd_config = settings.PAGERDUTY
@@ -237,7 +282,9 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
             oncall_users = pd_service.get_oncall_users(policy_id)
         except Exception:
             logger.exception(
-                f"Failed to fetch oncall users from {policy_name} for incident {incident.id}"
+                "Failed to fetch oncall users from %s for channel %s",
+                policy_name,
+                channel_id,
             )
             continue
 
@@ -249,7 +296,7 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
             if not email:
                 continue
             try:
-                slack_profile = _slack_service.get_user_profile_by_email(email)
+                slack_profile = slack_service.get_user_profile_by_email(email)
             except Exception:
                 logger.exception(f"Failed to look up Slack user for {email}")
                 continue
@@ -274,69 +321,74 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
     if users_to_invite:
         invite_ids = [slack_user_id for slack_user_id, _ in users_to_invite]
         try:
-            _slack_service.invite_to_channel(channel_id, invite_ids)
+            slack_service.invite_to_channel(channel_id, invite_ids)
         except Exception:
-            logger.exception(
-                f"Failed to invite oncall users to channel {channel_id} for incident {incident.id}"
-            )
+            logger.exception("Failed to invite oncall users to channel %s", channel_id)
 
     if role_entries:
         role_entries.sort(key=lambda entry: (entry[0], entry[1]))
         message = "\n".join(line for _, _, line in role_entries)
         try:
-            _slack_service.post_message(channel_id, message)
+            slack_service.post_message(channel_id, message)
         except Exception:
             logger.exception(
-                f"Failed to post oncall role message for incident {incident.id}"
+                "Failed to post oncall role message in channel %s", channel_id
             )
 
 
-def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
-    if incident.severity not in PAGEABLE_SEVERITIES:
+def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
+    _invite_oncall_to_channel(incident.severity, channel_id, _slack_service)
+
+
+def _create_status_channel_for_context(
+    ctx: ChannelSetupContext, slack_service: SlackService
+) -> None:
+    """Create a companion status channel. No DB access."""
+    if ctx.severity not in PAGEABLE_SEVERITIES:
         return
 
-    if incident.is_private:
+    if ctx.is_private:
         return
 
-    status_channel_name = f"{incident.incident_number.lower()}-status"
+    status_channel_name = f"{ctx.channel_name}-status"
     try:
-        status_channel_id = _slack_service.create_channel(
+        status_channel_id = slack_service.create_channel(
             status_channel_name, is_private=False
         )
     except Exception:
-        logger.exception(f"Failed to create status channel for incident {incident.id}")
+        logger.exception("Failed to create status channel %s", status_channel_name)
         return
 
     if not status_channel_id:
         logger.info(
-            f"Status channel {status_channel_name} already exists or could not be created"
+            "Status channel %s already exists or could not be created",
+            status_channel_name,
         )
         return
 
-    incident_url = _build_incident_url(incident)
-    try:
-        _slack_service.post_message(
-            status_channel_id,
-            f"This is the status channel for *{incident.incident_number}*.\n"
-            f"For detailed incident information, see <{incident_url}|{incident.incident_number} in Firetower>.\n"
-            f"For incident response coordination, join <#{main_channel_id}>.",
+    label = ctx.incident_number or ctx.channel_name
+    message_lines = [f"This is the status channel for *{label}*."]
+    if ctx.incident_url and ctx.incident_number:
+        message_lines.append(
+            f"For detailed incident information, see "
+            f"<{ctx.incident_url}|{ctx.incident_number} in Firetower>."
         )
+    message_lines.append(
+        f"For incident response coordination, join <#{ctx.channel_id}>."
+    )
+    try:
+        slack_service.post_message(status_channel_id, "\n".join(message_lines))
     except Exception:
         logger.exception(
-            f"Failed to post initial message in status channel for incident {incident.id}"
+            "Failed to post initial message in status channel %s",
+            status_channel_name,
         )
 
     users_to_invite: list[str] = []
-
-    if incident.captain:
-        captain_slack_id = _get_slack_user_id(incident.captain)
-        if captain_slack_id:
-            users_to_invite.append(captain_slack_id)
-
-    if incident.reporter:
-        reporter_slack_id = _get_slack_user_id(incident.reporter)
-        if reporter_slack_id and reporter_slack_id not in users_to_invite:
-            users_to_invite.append(reporter_slack_id)
+    if ctx.captain_slack_id:
+        users_to_invite.append(ctx.captain_slack_id)
+    if ctx.reporter_slack_id and ctx.reporter_slack_id not in users_to_invite:
+        users_to_invite.append(ctx.reporter_slack_id)
 
     always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
     for uid in always_invited:
@@ -345,21 +397,41 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
 
     if users_to_invite:
         try:
-            _slack_service.invite_to_channel(status_channel_id, users_to_invite)
+            slack_service.invite_to_channel(status_channel_id, users_to_invite)
         except Exception:
             logger.exception(
-                f"Failed to invite users to status channel for incident {incident.id}"
+                "Failed to invite users to status channel %s",
+                status_channel_name,
             )
 
     try:
-        _slack_service.post_message(
-            main_channel_id,
+        slack_service.post_message(
+            ctx.channel_id,
             f"<#{status_channel_id}> has been created for status updates.",
         )
     except Exception:
-        logger.exception(
-            f"Failed to post status channel link in main channel for incident {incident.id}"
-        )
+        logger.exception("Failed to post status channel link in %s", ctx.channel_name)
+
+
+def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
+    captain_slack_id = (
+        _get_slack_user_id(incident.captain) if incident.captain else None
+    )
+    reporter_slack_id = (
+        _get_slack_user_id(incident.reporter) if incident.reporter else None
+    )
+    ctx = ChannelSetupContext(
+        channel_id=main_channel_id,
+        channel_name=incident.incident_number.lower(),
+        title=incident.title,
+        severity=incident.severity,
+        is_private=incident.is_private,
+        captain_slack_id=captain_slack_id,
+        reporter_slack_id=reporter_slack_id,
+        incident_url=_build_incident_url(incident),
+        incident_number=incident.incident_number,
+    )
+    _create_status_channel_for_context(ctx, _slack_service)
 
 
 def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
@@ -553,6 +625,170 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
         ).delete()
 
 
+def decorate_incident_channel(
+    ctx: ChannelSetupContext,
+    slack_service: SlackService,
+    *,
+    skip_datadog: bool = False,
+    skip_notion: bool = False,
+) -> None:
+    """
+    Shared channel setup called by both the normal and fallback creation paths.
+
+    When adding a new channel decoration step, add it here so both paths get it.
+    The normal path passes skip_datadog=True and skip_notion=True because it
+    handles those with DB-dedup logic before calling this function.
+    """
+    guide_message = settings.SLACK.get("INCIDENT_GUIDE_MESSAGE", "")
+    if guide_message:
+        try:
+            slack_service.post_message(ctx.channel_id, guide_message)
+        except Exception:
+            logger.exception("Failed to post guide message in %s", ctx.channel_name)
+
+    if not skip_datadog:
+        if ctx.is_private:
+            try:
+                slack_service.post_message(
+                    ctx.channel_id,
+                    "Datadog notebook creation skipped due to private incident.",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to post Datadog skip message in %s", ctx.channel_name
+                )
+        else:
+            try:
+                dd_service = DatadogService()
+                if dd_service.configured:
+                    notebook_url = dd_service.create_notebook(
+                        ctx.channel_name, ctx.title
+                    )
+                    if notebook_url:
+                        slack_service.add_bookmark(
+                            ctx.channel_id, "Datadog Notebook", notebook_url
+                        )
+                        slack_service.post_message(
+                            ctx.channel_id,
+                            f"Datadog notebook created: {notebook_url}",
+                        )
+            except Exception:
+                logger.exception(
+                    "Failed to create Datadog notebook for %s", ctx.channel_name
+                )
+
+    if not skip_notion:
+        if ctx.is_private:
+            try:
+                slack_service.post_message(
+                    ctx.channel_id,
+                    "Troubleshooting doc creation skipped due to private incident.",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to post troubleshooting skip message in %s",
+                    ctx.channel_name,
+                )
+        else:
+            try:
+                if NotionService.is_troubleshooting_configured():
+                    notion = NotionService.for_troubleshooting()
+                    if notion:
+                        page = notion.create_troubleshooting_page(
+                            ctx.channel_name, ctx.incident_url or ""
+                        )
+                        if page and page.get("url"):
+                            slack_service.add_bookmark(
+                                ctx.channel_id,
+                                "Troubleshooting Doc",
+                                page["url"],
+                            )
+                            slack_service.post_message(
+                                ctx.channel_id,
+                                f"A <{page['url']}|Clinical Troubleshooting document> "
+                                "has been created. Please use this to keep track of "
+                                "Symptoms, Hypothesis, and Actions as you're "
+                                "investigating this incident.",
+                            )
+            except Exception:
+                logger.exception(
+                    "Failed to create troubleshooting doc for %s",
+                    ctx.channel_name,
+                )
+
+    if ctx.captain_slack_id:
+        try:
+            slack_service.post_message(
+                ctx.channel_id,
+                f"Incident Captain: <@{ctx.captain_slack_id}>",
+            )
+        except Exception:
+            logger.exception("Failed to post IC mention in %s", ctx.channel_name)
+    elif ctx.captain_name:
+        try:
+            slack_service.post_message(
+                ctx.channel_id,
+                f"Incident Captain: {escape_slack_text(ctx.captain_name)}",
+            )
+        except Exception:
+            logger.exception("Failed to post IC mention in %s", ctx.channel_name)
+
+    if ctx.description:
+        try:
+            slack_service.post_message(
+                ctx.channel_id,
+                f"*Incident Description:*\n{escape_slack_text(ctx.description)}",
+            )
+        except Exception:
+            logger.exception("Failed to post description in %s", ctx.channel_name)
+
+    ids_to_invite: list[str] = []
+    if ctx.captain_slack_id:
+        ids_to_invite.append(ctx.captain_slack_id)
+    if ctx.reporter_slack_id and ctx.reporter_slack_id not in ids_to_invite:
+        ids_to_invite.append(ctx.reporter_slack_id)
+    always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
+    for uid in always_invited:
+        if uid not in ids_to_invite:
+            ids_to_invite.append(uid)
+    if ids_to_invite:
+        try:
+            slack_service.invite_to_channel(ctx.channel_id, ids_to_invite)
+        except Exception:
+            logger.exception("Failed to invite users to %s", ctx.channel_name)
+
+    try:
+        _invite_oncall_to_channel(ctx.severity, ctx.channel_id, slack_service)
+    except Exception:
+        logger.exception("Failed to invite oncall users to %s", ctx.channel_name)
+
+    try:
+        _create_status_channel_for_context(ctx, slack_service)
+    except Exception:
+        logger.exception("Failed to create status channel for %s", ctx.channel_name)
+
+    feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
+    if feed_channel_id and not ctx.is_private:
+        try:
+            if ctx.incident_url and ctx.incident_number:
+                feed_message = (
+                    f"A {ctx.severity} incident has been created.\n"
+                    f"<{ctx.incident_url}|{ctx.incident_number} "
+                    f"{escape_slack_text(ctx.title)}>"
+                    f"\n\nFor those involved, please join <#{ctx.channel_id}>"
+                )
+            else:
+                feed_message = (
+                    f"A {ctx.severity} incident has been created "
+                    "(degraded mode).\n"
+                    f"{escape_slack_text(ctx.title)}"
+                    f"\n\nFor those involved, please join <#{ctx.channel_id}>"
+                )
+            slack_service.post_message(feed_channel_id, feed_message)
+        except Exception:
+            logger.exception("Failed to post to feed channel for %s", ctx.channel_name)
+
+
 def on_incident_created(incident: Incident) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
@@ -624,96 +860,33 @@ def on_incident_created(incident: Incident) -> None:
         except Exception:
             logger.exception(f"Failed to add bookmark for incident {incident.id}")
 
-        guide_message = settings.SLACK.get("INCIDENT_GUIDE_MESSAGE", "")
-        if guide_message:
-            try:
-                _slack_service.post_message(channel_id, guide_message)
-            except Exception:
-                logger.exception(
-                    f"Failed to post guide message for incident {incident.id}"
-                )
-
         _create_datadog_notebook(incident, channel_id)
         _create_troubleshooting_doc(incident, channel_id)
 
-        ic_mention = ""
-        if incident.captain:
-            if captain_slack_id:
-                ic_mention = f"Incident Captain: <@{captain_slack_id}>"
-            else:
-                captain_name = escape_slack_text(
-                    incident.captain.get_full_name() or incident.captain.username
-                )
-                ic_mention = f"Incident Captain: {captain_name}"
+        captain_name = None
+        if incident.captain and not captain_slack_id:
+            captain_name = incident.captain.get_full_name() or incident.captain.username
 
-        if ic_mention:
-            try:
-                _slack_service.post_message(channel_id, ic_mention)
-            except Exception:
-                logger.exception(
-                    f"Failed to post IC mention for incident {incident.id}"
-                )
+        reporter_slack_id = (
+            _get_slack_user_id(incident.reporter) if incident.reporter else None
+        )
 
-        if incident.description:
-            try:
-                _slack_service.post_message(
-                    channel_id,
-                    f"*Incident Description:*\n{escape_slack_text(incident.description)}",
-                )
-            except Exception:
-                logger.exception(
-                    f"Failed to post description for incident {incident.id}"
-                )
-
-        ids_to_invite: list[str] = []
-        if captain_slack_id:
-            ids_to_invite.append(captain_slack_id)
-
-        if incident.reporter:
-            reporter_slack_id = _get_slack_user_id(incident.reporter)
-            if reporter_slack_id and reporter_slack_id not in ids_to_invite:
-                ids_to_invite.append(reporter_slack_id)
-
-        always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
-        for uid in always_invited:
-            if uid not in ids_to_invite:
-                ids_to_invite.append(uid)
-
-        if ids_to_invite:
-            try:
-                _slack_service.invite_to_channel(channel_id, ids_to_invite)
-            except Exception:
-                logger.exception(
-                    f"Failed to invite users to channel {channel_id} for incident {incident.id}"
-                )
-
-        try:
-            _invite_oncall_users(incident, channel_id)
-        except Exception:
-            logger.exception(
-                f"Failed to invite oncall users for incident {incident.id}"
-            )
-
-        try:
-            _create_status_channel(incident, channel_id)
-        except Exception:
-            logger.exception(
-                f"Failed to create status channel for incident {incident.id}"
-            )
-
-        feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
-        if feed_channel_id and not incident.is_private:
-            feed_message = (
-                f"A {incident.severity} incident has been created.\n"
-                f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
-                f"\n\nFor those involved, please join <#{channel_id}>"
-            )
-            try:
-                _slack_service.post_message(feed_channel_id, feed_message)
-            except Exception:
-                logger.exception(
-                    f"Failed to post feed channel message for incident {incident.id}"
-                )
+        ctx = ChannelSetupContext(
+            channel_id=channel_id,
+            channel_name=incident.incident_number.lower(),
+            title=incident.title,
+            severity=incident.severity,
+            is_private=incident.is_private,
+            captain_slack_id=captain_slack_id,
+            captain_name=captain_name,
+            reporter_slack_id=reporter_slack_id,
+            description=incident.description,
+            incident_url=incident_url,
+            incident_number=incident.incident_number,
+        )
+        decorate_incident_channel(
+            ctx, _slack_service, skip_datadog=True, skip_notion=True
+        )
 
 
 def on_status_changed(incident: Incident, old_status: str) -> None:
