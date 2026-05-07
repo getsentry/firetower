@@ -284,6 +284,21 @@ class SlackService:
             )
             return None
 
+    def pin_message(self, channel_id: str, message_ts: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot pin message - Slack client not initialized")
+            return False
+
+        try:
+            logger.info(f"Pinning message in channel {channel_id}")
+            self.client.pins_add(channel=channel_id, timestamp=message_ts)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error pinning message: {e}", extra={"channel_id": channel_id}
+            )
+            return False
+
     def add_bookmark(self, channel_id: str, title: str, link: str) -> bool:
         if not self.client:
             logger.warning("Cannot add bookmark - Slack client not initialized")
