@@ -58,6 +58,7 @@ KNOWN_SUBCOMMANDS = {
     "sev",
     "setseverity",
     "subject",
+    "title",
     "update",
     "edit",
     "captain",
@@ -139,7 +140,7 @@ def handle_command(
                 handle_severity_command(ack, body, command, respond, new_severity=args)
         elif subcommand in ("update", "edit"):
             handle_update_command(ack, body, command, respond)
-        elif subcommand == "subject":
+        elif subcommand in ("subject", "title"):
             if not args:
                 ack()
                 cmd = command.get("command", "/ft")
