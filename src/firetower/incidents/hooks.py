@@ -64,7 +64,12 @@ def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
     if slack_link and slack_link.url:
         links.append({"href": slack_link.url, "text": "Slack Channel"})
 
-    for policy_name, policy_info in PAGING_POLICIES.items():
+    policies_to_page = (
+        {"IMOC": PAGING_POLICIES["IMOC"]} if incident.is_private else PAGING_POLICIES
+    )
+    title = "Private Incident" if incident.is_private else incident.title
+
+    for policy_name, policy_info in policies_to_page.items():
         policy = escalation_policies.get(policy_name)
         if not policy:
             logger.info(f"No {policy_name} escalation policy configured, skipping page")
@@ -86,7 +91,9 @@ def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
 
         dedup_key = f"firetower-{incident.incident_number}-{policy_name}"
         page_label = policy_info.page_label
-        summary = f"[{page_label}] [{incident.severity}] {incident.incident_number}: {incident.title}"
+        summary = (
+            f"[{page_label}] [{incident.severity}] {incident.incident_number}: {title}"
+        )
         summary = summary[:PD_SUMMARY_MAX_LENGTH]
 
         try:
@@ -207,7 +214,13 @@ def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
     role_entries: list[tuple[int, int, str]] = []
     users_to_invite: list[tuple[str, str]] = []
 
-    for policy_index, (policy_name, policy_info) in enumerate(PAGING_POLICIES.items()):
+    policies_to_invite = (
+        {"IMOC": PAGING_POLICIES["IMOC"]} if incident.is_private else PAGING_POLICIES
+    )
+
+    for policy_index, (policy_name, policy_info) in enumerate(
+        policies_to_invite.items()
+    ):
         policy_label = policy_info.label
         max_level = policy_info.max_level
         policy = escalation_policies.get(policy_name)
