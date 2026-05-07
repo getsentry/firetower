@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -863,6 +864,33 @@ def _linear_issue_title(incident: Incident) -> str:
     return f"[{incident.incident_number}] {incident.title}"
 
 
+LINEAR_PARENT_DESCRIPTION = (
+    "Relate action items to this ticket to have them tracked by Firetower. "
+    "Child issues or other relations (related, blocking, etc.) will all work. "
+    "Do not update title or captain here, use Firetower for that."
+)
+
+
+MAX_CLAIM_ATTEMPTS = 5
+
+
+def _claim_linear_issue(
+    linear_service: LinearService,
+    incident: Incident,
+    team_id: str,
+    project_id: str | None,
+) -> dict[str, Any] | None:
+    identifier = incident.incident_number
+
+    for _ in range(MAX_CLAIM_ATTEMPTS):
+        issue = linear_service.get_issue(identifier)
+        if issue:
+            return issue
+        linear_service.create_issue("Placeholder", "", team_id, project_id)
+
+    return None
+
+
 def _create_linear_parent_issue(incident: Incident) -> None:
     team_id = settings.LINEAR.get("TEAM_ID")
     if not team_id:
@@ -879,19 +907,23 @@ def _create_linear_parent_issue(incident: Incident) -> None:
 
     try:
         linear_service = LinearService()
-        title = _linear_issue_title(incident)
-        description = (
-            "Relate action items to this ticket to have them tracked by Firetower. "
-            "Child issues or other relations (related, blocking, etc.) will all work. "
-            "Do not update title or captain here, use Firetower for that."
-        )
         project_id = settings.LINEAR.get("PROJECT_ID") or None
 
-        issue = linear_service.create_issue(title, description, team_id, project_id)
+        issue = _claim_linear_issue(linear_service, incident, team_id, project_id)
         if not issue:
             linear_link.delete()
-            logger.warning(f"Failed to create Linear issue for incident {incident.id}")
+            logger.warning(f"Failed to claim Linear issue for incident {incident.id}")
             return
+
+        title = _linear_issue_title(incident)
+        states = linear_service.get_workflow_states(team_id)
+        started_state_id = states.get("started") if states else None
+        linear_service.update_issue(
+            issue["id"],
+            title=title,
+            description=LINEAR_PARENT_DESCRIPTION,
+            state_id=started_state_id,
+        )
 
         linear_link.url = issue["url"]
         linear_link.save(update_fields=["url"])

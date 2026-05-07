@@ -168,12 +168,32 @@ class LinearService:
             "relation_type": relation_type,
         }
 
+    def get_issue(self, identifier: str) -> dict[str, Any] | None:
+        query = f"""
+        query($id: String!) {{
+            issue(id: $id) {{
+                {ISSUE_FIELDS}
+            }}
+        }}
+        """
+        data = self._graphql(query, {"id": identifier})
+        if not data or not data.get("issue"):
+            return None
+        issue = data["issue"]
+        return {
+            "id": issue["id"],
+            "identifier": issue["identifier"],
+            "title": issue["title"],
+            "url": issue["url"],
+        }
+
     def create_issue(
         self,
         title: str,
         description: str,
         team_id: str,
         project_id: str | None = None,
+        state_id: str | None = None,
     ) -> dict[str, Any] | None:
         mutation = """
         mutation($input: IssueCreateInput!) {
@@ -194,6 +214,8 @@ class LinearService:
         }
         if project_id:
             input_data["projectId"] = project_id
+        if state_id:
+            input_data["stateId"] = state_id
 
         data = self._graphql(mutation, {"input": input_data})
         if not data:
@@ -236,6 +258,7 @@ class LinearService:
         self,
         issue_id: str,
         title: str | None = None,
+        description: str | None = None,
         state_id: str | None = None,
     ) -> bool:
         mutation = """
@@ -248,6 +271,8 @@ class LinearService:
         input_data: dict[str, Any] = {}
         if title is not None:
             input_data["title"] = title
+        if description is not None:
+            input_data["description"] = description
         if state_id is not None:
             input_data["stateId"] = state_id
 
