@@ -186,6 +186,21 @@ class SlackService:
             )
             return None
 
+    def rename_channel(self, channel_id: str, name: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot rename channel - Slack client not initialized")
+            return False
+
+        try:
+            self.client.conversations_rename(channel=channel_id, name=name)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error renaming channel: {e}",
+                extra={"channel_id": channel_id, "new_name": name},
+            )
+            return False
+
     def set_channel_topic(self, channel_id: str, topic: str) -> bool:
         if not self.client:
             logger.warning("Cannot set topic - Slack client not initialized")

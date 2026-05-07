@@ -7,10 +7,8 @@ from django.conf import settings
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.hooks import _build_channel_topic
 from firetower.incidents.models import (
-    INCIDENT_ID_START,
     ExternalLink,
     ExternalLinkType,
-    IncidentCounter,
     IncidentSeverity,
 )
 from firetower.incidents.serializers import IncidentWriteSerializer
@@ -21,14 +19,6 @@ logger = logging.getLogger(__name__)
 _slack_service = SlackService()
 
 _DEFAULT_SEVERITY = IncidentSeverity.P3
-
-
-def _peek_next_incident_id() -> int:
-    try:
-        counter = IncidentCounter.objects.get(pk=1)
-        return counter.next_id
-    except IncidentCounter.DoesNotExist:
-        return INCIDENT_ID_START
 
 
 def _expected_channel_name(incident_id: int) -> str:
@@ -219,24 +209,6 @@ def handle_backfill_command(ack: Any, body: dict, command: dict, respond: Any) -
         )
         return
 
-    channel_info = _slack_service.get_channel_info(channel_id)
-    if not channel_info:
-        respond(
-            f"Could not fetch info for channel <#{channel_id}>. Is the bot a member?"
-        )
-        return
-
-    channel_name = channel_info["name"]
-    next_id = _peek_next_incident_id()
-    expected_name = _expected_channel_name(next_id)
-
-    if channel_name != expected_name:
-        respond(
-            f"Channel name `{channel_name}` does not match the next expected "
-            f"incident channel `{expected_name}`. Please rename the channel first."
-        )
-        return
-
     existing_link = ExternalLink.objects.filter(
         type=ExternalLinkType.SLACK,
         url__endswith=f"/archives/{channel_id}",
@@ -378,26 +350,6 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
         )
         return
 
-    actual_channel_name = _expected_channel_name(incident.id)
-    channel_info = _slack_service.get_channel_info(channel_id)
-    if channel_info and channel_info["name"] != actual_channel_name:
-        logger.error(
-            "Backfill channel name mismatch after creation: channel=%s expected=%s incident=%s",
-            channel_info["name"],
-            actual_channel_name,
-            incident.id,
-        )
-        client.chat_postMessage(
-            channel=slack_user_id,
-            text=(
-                f"The incident was created as {incident.incident_number}, but the channel "
-                f"name `{channel_info['name']}` no longer matches `{actual_channel_name}`. "
-                f"Another incident may have been created concurrently. Please verify and "
-                f"rename the channel if needed."
-            ),
-        )
-        return
-
     joined = _slack_service.join_channel(channel_id)
     if not joined:
         base_url = settings.FIRETOWER_BASE_URL
@@ -411,6 +363,18 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
             ),
         )
         return
+
+    expected_name = _expected_channel_name(incident.id)
+    channel_info = _slack_service.get_channel_info(channel_id)
+    if channel_info and channel_info["name"] != expected_name:
+        renamed = _slack_service.rename_channel(channel_id, expected_name)
+        if not renamed:
+            logger.warning(
+                "Failed to rename channel %s to %s for incident %s",
+                channel_id,
+                expected_name,
+                incident.id,
+            )
 
     _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
     base_url = settings.FIRETOWER_BASE_URL
