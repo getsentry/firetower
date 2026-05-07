@@ -643,18 +643,19 @@ class TestLinearService:
 class TestCreateLinearParentIssueHook:
     @patch("firetower.incidents.hooks.LinearService")
     @patch("firetower.incidents.hooks.settings")
-    def test_creates_parent_issue_and_attachment(
-        self, mock_settings, MockLinearService
-    ):
+    def test_claims_precreated_issue(self, mock_settings, MockLinearService):
         mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
         mock_service = MockLinearService.return_value
-        mock_service.create_issue.return_value = {
+        mock_service.get_issue.return_value = {
             "id": "linear-issue-id",
-            "identifier": "ENG-100",
-            "url": "https://linear.app/t/ENG-100",
+            "identifier": "INC-100",
+            "title": "Placeholder",
+            "url": "https://linear.app/t/INC-100",
         }
+        mock_service.get_workflow_states.return_value = {"started": "started-id"}
+        mock_service.update_issue.return_value = True
         mock_service.create_attachment.return_value = True
 
         incident = Incident.objects.create(
@@ -671,12 +672,53 @@ class TestCreateLinearParentIssueHook:
         linear_link = ExternalLink.objects.get(
             incident=incident, type=ExternalLinkType.LINEAR
         )
-        assert linear_link.url == "https://linear.app/t/ENG-100"
+        assert linear_link.url == "https://linear.app/t/INC-100"
 
+        mock_service.create_issue.assert_not_called()
+        mock_service.update_issue.assert_called_once()
         mock_service.create_attachment.assert_called_once_with(
             "linear-issue-id",
             f"https://firetower.example.com/{incident.incident_number}",
             f"Firetower: {incident.incident_number}",
+        )
+
+    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks.settings")
+    def test_creates_placeholder_when_not_precreated(
+        self, mock_settings, MockLinearService
+    ):
+        mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
+        mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+
+        mock_service = MockLinearService.return_value
+        issue_data = {
+            "id": "linear-issue-id",
+            "identifier": "INC-100",
+            "title": "Placeholder",
+            "url": "https://linear.app/t/INC-100",
+        }
+        mock_service.get_issue.side_effect = [None, issue_data]
+        mock_service.create_issue.return_value = {
+            "id": "placeholder-id",
+            "identifier": "INC-99",
+            "url": "https://linear.app/t/INC-99",
+        }
+        mock_service.get_workflow_states.return_value = {"started": "started-id"}
+        mock_service.update_issue.return_value = True
+        mock_service.create_attachment.return_value = True
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_linear_parent_issue(incident)
+
+        incident.refresh_from_db()
+        assert incident.linear_parent_issue_id == "linear-issue-id"
+        mock_service.create_issue.assert_called_once_with(
+            "Placeholder", "", "team-1", None
         )
 
     @patch("firetower.incidents.hooks.settings")
@@ -697,11 +739,12 @@ class TestCreateLinearParentIssueHook:
 
     @patch("firetower.incidents.hooks.LinearService")
     @patch("firetower.incidents.hooks.settings")
-    def test_cleans_up_on_failure(self, mock_settings, MockLinearService):
+    def test_cleans_up_on_claim_failure(self, mock_settings, MockLinearService):
         mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
         mock_service = MockLinearService.return_value
+        mock_service.get_issue.return_value = None
         mock_service.create_issue.return_value = None
 
         incident = Incident.objects.create(
@@ -735,7 +778,7 @@ class TestCreateLinearParentIssueHook:
 
         _create_linear_parent_issue(incident)
 
-        MockLinearService.return_value.create_issue.assert_not_called()
+        MockLinearService.return_value.get_issue.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -806,11 +849,14 @@ class TestCreateLinearParentIssuePrivacy:
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
         mock_service = MockLinearService.return_value
-        mock_service.create_issue.return_value = {
+        mock_service.get_issue.return_value = {
             "id": "linear-issue-id",
-            "identifier": "ENG-100",
-            "url": "https://linear.app/t/ENG-100",
+            "identifier": "INC-100",
+            "title": "Placeholder",
+            "url": "https://linear.app/t/INC-100",
         }
+        mock_service.get_workflow_states.return_value = {"started": "started-id"}
+        mock_service.update_issue.return_value = True
         mock_service.create_attachment.return_value = True
 
         incident = Incident.objects.create(
@@ -822,8 +868,8 @@ class TestCreateLinearParentIssuePrivacy:
 
         _create_linear_parent_issue(incident)
 
-        call_args = mock_service.create_issue.call_args
-        assert call_args[0][0] == f"[{incident.incident_number}] Private Incident"
+        call_args = mock_service.update_issue.call_args
+        assert call_args[1]["title"] == f"[{incident.incident_number}] Private Incident"
 
 
 @pytest.mark.django_db
