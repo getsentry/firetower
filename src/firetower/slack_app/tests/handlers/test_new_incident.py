@@ -226,12 +226,67 @@ class TestNewIncidentSubmission:
         settings.HOOKS_ENABLED = True
 
     @pytest.mark.usefixtures("_enable_hooks")
+    @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
+    @patch(
+        "firetower.incidents.serializers.on_incident_created",
+        side_effect=RuntimeError("db is down"),
+    )
+    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
+    def test_save_failure_creates_fallback_channel(
+        self, mock_get_user, mock_hook, mock_fallback
+    ):
+        mock_get_user.return_value = self.user
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "Test Incident"}},
+                    "severity_block": {
+                        "severity": {
+                            "selected_option": {"value": "P1"},
+                        }
+                    },
+                    "description_block": {"description": {"value": "Description"}},
+                    "impact_summary_block": {
+                        "impact_summary": {"value": "Users affected"}
+                    },
+                    "captain_block": {"captain_select": {"selected_user": "U_CAP"}},
+                    "private_block": {"is_private": {"selected_options": []}},
+                    "impact_type_block": {"impact_type_tags": {"selected_options": []}},
+                    "affected_service_block": {
+                        "affected_service_tags": {"selected_options": []}
+                    },
+                    "affected_region_block": {
+                        "affected_region_tags": {"selected_options": []}
+                    },
+                }
+            }
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        mock_fallback.assert_called_once()
+        call_args = mock_fallback.call_args
+        assert call_args[0][0] is client
+        assert call_args[0][1] == "U_TEST"
+        form_data = call_args[0][2]
+        assert form_data["title"] == "Test Incident"
+        assert form_data["severity"] == "P1"
+        assert form_data["description"] == "Description"
+        assert form_data["captain_slack_id"] == "U_CAP"
+        assert form_data["is_private"] is False
+
+    @pytest.mark.usefixtures("_enable_hooks")
+    @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
     @patch(
         "firetower.incidents.serializers.on_incident_created",
         side_effect=RuntimeError("boom"),
     )
     @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
-    def test_save_failure_sends_error_dm(self, mock_get_user, mock_hook):
+    def test_save_failure_sends_error_dm(self, mock_get_user, mock_hook, mock_fallback):
         mock_get_user.return_value = self.user
 
         ack = MagicMock()
@@ -255,10 +310,7 @@ class TestNewIncidentSubmission:
         handle_new_incident_submission(ack, body, view, client)
 
         ack.assert_called_once_with()
-        client.chat_postMessage.assert_called_once()
-        msg = client.chat_postMessage.call_args[1]["text"]
-        assert "Something went wrong" in msg
-        assert "Slack channel manually" in msg
+        mock_fallback.assert_called_once()
 
 
 @pytest.mark.django_db

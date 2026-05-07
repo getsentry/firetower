@@ -280,6 +280,7 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
     # PagerDuty paging (only for P0/P1)
     if severity in _FALLBACK_PAGEABLE_SEVERITIES:
         try:
+            from firetower.incidents.hooks import PAGING_POLICIES  # noqa: PLC0415
             from firetower.integrations.services import (  # noqa: PLC0415
                 PagerDutyService,
             )
@@ -665,14 +666,18 @@ def handle_new_incident_submission(
         incident = serializer.save()
     except Exception:
         logger.exception("Failed to create incident from Slack modal")
-        client.chat_postMessage(
-            channel=slack_user_id,
-            text=(
-                "Something went wrong creating your incident. "
-                "Please create a Slack channel manually for incident coordination "
-                "and let #team-sre know."
-            ),
-        )
+        form_data = {
+            "title": title,
+            "severity": severity,
+            "description": description,
+            "impact_summary": impact_summary,
+            "captain_slack_id": captain_slack_id,
+            "is_private": is_private,
+            "impact_type_tags": impact_type_tags,
+            "affected_service_tags": affected_service_tags,
+            "affected_region_tags": affected_region_tags,
+        }
+        _create_fallback_channel(client, slack_user_id, form_data)
         return
 
     try:
