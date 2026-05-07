@@ -120,7 +120,7 @@ def page_for_channel(
                     f":warning: Failed to page {page_label} via PagerDuty. Please manually escalate if needed.",
                 )
         except Exception:
-            logger.exception("Failed to page %s for %s", policy_name, dedup_prefix)
+            logger.exception(f"Failed to page {policy_name} for {dedup_prefix}")
 
 
 def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
@@ -282,9 +282,7 @@ def _invite_oncall_to_channel(
             oncall_users = pd_service.get_oncall_users(policy_id)
         except Exception:
             logger.exception(
-                "Failed to fetch oncall users from %s for channel %s",
-                policy_name,
-                channel_id,
+                f"Failed to fetch oncall users from {policy_name} for channel {channel_id}"
             )
             continue
 
@@ -323,7 +321,7 @@ def _invite_oncall_to_channel(
         try:
             slack_service.invite_to_channel(channel_id, invite_ids)
         except Exception:
-            logger.exception("Failed to invite oncall users to channel %s", channel_id)
+            logger.exception(f"Failed to invite oncall users to channel {channel_id}")
 
     if role_entries:
         role_entries.sort(key=lambda entry: (entry[0], entry[1]))
@@ -332,7 +330,7 @@ def _invite_oncall_to_channel(
             slack_service.post_message(channel_id, message)
         except Exception:
             logger.exception(
-                "Failed to post oncall role message in channel %s", channel_id
+                f"Failed to post oncall role message in channel {channel_id}"
             )
 
 
@@ -356,13 +354,12 @@ def _create_status_channel_for_context(
             status_channel_name, is_private=False
         )
     except Exception:
-        logger.exception("Failed to create status channel %s", status_channel_name)
+        logger.exception(f"Failed to create status channel {status_channel_name}")
         return
 
     if not status_channel_id:
         logger.info(
-            "Status channel %s already exists or could not be created",
-            status_channel_name,
+            f"Status channel {status_channel_name} already exists or could not be created"
         )
         return
 
@@ -380,8 +377,7 @@ def _create_status_channel_for_context(
         slack_service.post_message(status_channel_id, "\n".join(message_lines))
     except Exception:
         logger.exception(
-            "Failed to post initial message in status channel %s",
-            status_channel_name,
+            f"Failed to post initial message in status channel {status_channel_name}"
         )
 
     users_to_invite: list[str] = []
@@ -400,8 +396,7 @@ def _create_status_channel_for_context(
             slack_service.invite_to_channel(status_channel_id, users_to_invite)
         except Exception:
             logger.exception(
-                "Failed to invite users to status channel %s",
-                status_channel_name,
+                f"Failed to invite users to status channel {status_channel_name}"
             )
 
     try:
@@ -410,7 +405,7 @@ def _create_status_channel_for_context(
             f"<#{status_channel_id}> has been created for status updates.",
         )
     except Exception:
-        logger.exception("Failed to post status channel link in %s", ctx.channel_name)
+        logger.exception(f"Failed to post status channel link in {ctx.channel_name}")
 
 
 def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
@@ -644,7 +639,7 @@ def decorate_incident_channel(
         try:
             slack_service.post_message(ctx.channel_id, guide_message)
         except Exception:
-            logger.exception("Failed to post guide message in %s", ctx.channel_name)
+            logger.exception(f"Failed to post guide message in {ctx.channel_name}")
 
     if not skip_datadog:
         if ctx.is_private:
@@ -655,7 +650,7 @@ def decorate_incident_channel(
                 )
             except Exception:
                 logger.exception(
-                    "Failed to post Datadog skip message in %s", ctx.channel_name
+                    f"Failed to post Datadog skip message in {ctx.channel_name}"
                 )
         else:
             try:
@@ -674,7 +669,7 @@ def decorate_incident_channel(
                         )
             except Exception:
                 logger.exception(
-                    "Failed to create Datadog notebook for %s", ctx.channel_name
+                    f"Failed to create Datadog notebook for {ctx.channel_name}"
                 )
 
     if not skip_notion:
@@ -686,8 +681,7 @@ def decorate_incident_channel(
                 )
             except Exception:
                 logger.exception(
-                    "Failed to post troubleshooting skip message in %s",
-                    ctx.channel_name,
+                    f"Failed to post troubleshooting skip message in {ctx.channel_name}"
                 )
         else:
             try:
@@ -712,8 +706,7 @@ def decorate_incident_channel(
                             )
             except Exception:
                 logger.exception(
-                    "Failed to create troubleshooting doc for %s",
-                    ctx.channel_name,
+                    f"Failed to create troubleshooting doc for {ctx.channel_name}"
                 )
 
     if ctx.captain_slack_id:
@@ -723,7 +716,7 @@ def decorate_incident_channel(
                 f"Incident Captain: <@{ctx.captain_slack_id}>",
             )
         except Exception:
-            logger.exception("Failed to post IC mention in %s", ctx.channel_name)
+            logger.exception(f"Failed to post IC mention in {ctx.channel_name}")
     elif ctx.captain_name:
         try:
             slack_service.post_message(
@@ -731,7 +724,7 @@ def decorate_incident_channel(
                 f"Incident Captain: {escape_slack_text(ctx.captain_name)}",
             )
         except Exception:
-            logger.exception("Failed to post IC mention in %s", ctx.channel_name)
+            logger.exception(f"Failed to post IC mention in {ctx.channel_name}")
 
     if ctx.description:
         try:
@@ -740,7 +733,7 @@ def decorate_incident_channel(
                 f"*Incident Description:*\n{escape_slack_text(ctx.description)}",
             )
         except Exception:
-            logger.exception("Failed to post description in %s", ctx.channel_name)
+            logger.exception(f"Failed to post description in {ctx.channel_name}")
 
     ids_to_invite: list[str] = []
     if ctx.captain_slack_id:
@@ -755,17 +748,17 @@ def decorate_incident_channel(
         try:
             slack_service.invite_to_channel(ctx.channel_id, ids_to_invite)
         except Exception:
-            logger.exception("Failed to invite users to %s", ctx.channel_name)
+            logger.exception(f"Failed to invite users to {ctx.channel_name}")
 
     try:
         _invite_oncall_to_channel(ctx.severity, ctx.channel_id, slack_service)
     except Exception:
-        logger.exception("Failed to invite oncall users to %s", ctx.channel_name)
+        logger.exception(f"Failed to invite oncall users to {ctx.channel_name}")
 
     try:
         _create_status_channel_for_context(ctx, slack_service)
     except Exception:
-        logger.exception("Failed to create status channel for %s", ctx.channel_name)
+        logger.exception(f"Failed to create status channel for {ctx.channel_name}")
 
     feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
     if feed_channel_id and not ctx.is_private:
@@ -786,7 +779,7 @@ def decorate_incident_channel(
                 )
             slack_service.post_message(feed_channel_id, feed_message)
         except Exception:
-            logger.exception("Failed to post to feed channel for %s", ctx.channel_name)
+            logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
 
 
 def on_incident_created(incident: Incident) -> None:
