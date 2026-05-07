@@ -162,22 +162,6 @@ def _build_backfill_modal(channel_id: str, user_id: str = "") -> dict:
             },
             "label": {"type": "plain_text", "text": "Affected Region"},
         },
-        {
-            "type": "input",
-            "block_id": "private_block",
-            "optional": True,
-            "element": {
-                "type": "checkboxes",
-                "action_id": "is_private",
-                "options": [
-                    {
-                        "text": {"type": "plain_text", "text": "Private incident"},
-                        "value": "private",
-                    }
-                ],
-            },
-            "label": {"type": "plain_text", "text": "Visibility"},
-        },
     ]
 
     modal = {
@@ -288,12 +272,6 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
         values.get("captain_block", {}).get("captain_select", {}).get("selected_user")
     )
 
-    private_selections = (
-        values.get("private_block", {}).get("is_private", {}).get("selected_options")
-        or []
-    )
-    is_private = any(opt.get("value") == "private" for opt in private_selections)
-
     if not title:
         ack(
             response_action="errors",
@@ -321,6 +299,8 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
             captain_email = captain_user.email
 
     channel_url = _slack_service.build_channel_url(channel_id)
+    channel_info = _slack_service.get_channel_info(channel_id)
+    is_private = bool(channel_info and channel_info.get("is_private"))
 
     data: dict[str, Any] = {
         "title": title,
@@ -373,7 +353,6 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
         return
 
     expected_name = _expected_channel_name(incident.id)
-    channel_info = _slack_service.get_channel_info(channel_id)
     if channel_info and channel_info["name"] != expected_name:
         renamed = _slack_service.rename_channel(channel_id, expected_name)
         if not renamed:

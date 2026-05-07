@@ -211,7 +211,6 @@ class TestBackfillSubmission:
                     },
                     "description_block": {"description": {"value": "Backfill desc"}},
                     "impact_summary_block": {"impact_summary": {"value": ""}},
-                    "private_block": {"is_private": {"selected_options": []}},
                 }
             },
         }
