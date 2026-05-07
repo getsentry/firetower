@@ -300,6 +300,7 @@ LINEAR = (
         "CLIENT_SECRET": config.linear.client_secret,
         "TEAM_ID": config.linear.team_id,
         "PROJECT_ID": config.linear.project_id,
+        "SYNC_IDENTIFIERS": config.linear.sync_identifiers,
     }
     if config.linear
     else {}

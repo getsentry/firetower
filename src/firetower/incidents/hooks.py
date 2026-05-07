@@ -892,7 +892,7 @@ def _claim_linear_issue(
 
 
 def _create_linear_parent_issue(incident: Incident) -> None:
-    team_id = settings.LINEAR.get("TEAM_ID")
+    team_id = str(settings.LINEAR.get("TEAM_ID", ""))
     if not team_id:
         return
 
@@ -907,7 +907,7 @@ def _create_linear_parent_issue(incident: Incident) -> None:
 
     try:
         linear_service = LinearService()
-        project_id = settings.LINEAR.get("PROJECT_ID") or None
+        project_id = str(settings.LINEAR.get("PROJECT_ID", "")) or None
         sync_identifiers = settings.LINEAR.get("SYNC_IDENTIFIERS", False)
         title = _linear_issue_title(incident)
 

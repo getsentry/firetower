@@ -644,7 +644,11 @@ class TestCreateLinearParentIssueHook:
     @patch("firetower.incidents.hooks.LinearService")
     @patch("firetower.incidents.hooks.settings")
     def test_claims_precreated_issue(self, mock_settings, MockLinearService):
-        mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "",
+            "SYNC_IDENTIFIERS": True,
+        }
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
         mock_service = MockLinearService.return_value
@@ -687,7 +691,11 @@ class TestCreateLinearParentIssueHook:
     def test_creates_placeholder_when_not_precreated(
         self, mock_settings, MockLinearService
     ):
-        mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "",
+            "SYNC_IDENTIFIERS": True,
+        }
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
         mock_service = MockLinearService.return_value
@@ -740,7 +748,11 @@ class TestCreateLinearParentIssueHook:
     @patch("firetower.incidents.hooks.LinearService")
     @patch("firetower.incidents.hooks.settings")
     def test_cleans_up_on_claim_failure(self, mock_settings, MockLinearService):
-        mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "",
+            "SYNC_IDENTIFIERS": True,
+        }
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
         mock_service = MockLinearService.return_value
@@ -779,6 +791,45 @@ class TestCreateLinearParentIssueHook:
         _create_linear_parent_issue(incident)
 
         MockLinearService.return_value.get_issue.assert_not_called()
+
+    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks.settings")
+    def test_creates_new_issue_when_sync_identifiers_disabled(
+        self, mock_settings, MockLinearService
+    ):
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "proj-1",
+            "SYNC_IDENTIFIERS": False,
+        }
+        mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+
+        mock_service = MockLinearService.return_value
+        mock_service.create_issue.return_value = {
+            "id": "new-issue-id",
+            "identifier": "ENG-200",
+            "url": "https://linear.app/t/ENG-200",
+        }
+        mock_service.create_attachment.return_value = True
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_linear_parent_issue(incident)
+
+        incident.refresh_from_db()
+        assert incident.linear_parent_issue_id == "new-issue-id"
+
+        linear_link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.LINEAR
+        )
+        assert linear_link.url == "https://linear.app/t/ENG-200"
+
+        mock_service.get_issue.assert_not_called()
+        mock_service.create_issue.assert_called_once()
 
 
 @pytest.mark.django_db
@@ -845,7 +896,11 @@ class TestCreateLinearParentIssuePrivacy:
     def test_creates_with_redacted_title_for_private_incident(
         self, mock_settings, MockLinearService
     ):
-        mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "",
+            "SYNC_IDENTIFIERS": True,
+        }
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
         mock_service = MockLinearService.return_value
