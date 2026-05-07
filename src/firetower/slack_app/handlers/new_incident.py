@@ -360,6 +360,7 @@ def handle_new_incident_submission(
             and not is_private
             and invoking_channel != slack_user_id
             and invoking_channel != feed_channel_id
+            and not invoking_channel.startswith("D")  # skip DM channels
         ):
             channel_message = (
                 f"A {incident.severity} incident has been created.\n"
