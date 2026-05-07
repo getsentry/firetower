@@ -74,18 +74,33 @@ def _setup_channel_for_incident(
                 expected_name,
                 incident.id,
             )
-            client.chat_postMessage(
-                channel=channel_id,
-                text=(
-                    f"The bot could not rename this channel to `{expected_name}`. "
-                    f"Please rename the channel manually."
-                ),
-            )
+            try:
+                client.chat_postMessage(
+                    channel=channel_id,
+                    text=(
+                        f"The bot could not rename this channel to `{expected_name}`. "
+                        f"Please rename the channel manually."
+                    ),
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to post rename failure message for incident %s",
+                    incident.id,
+                )
 
-    _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
+    try:
+        _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
+    except Exception:
+        logger.exception(
+            "Failed to set channel topic for backfill incident %s", incident.id
+        )
+
     base_url = settings.FIRETOWER_BASE_URL
     incident_url = f"{base_url}/{incident.incident_number}"
-    _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
+    try:
+        _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
+    except Exception:
+        logger.exception("Failed to add bookmark for backfill incident %s", incident.id)
 
     try:
         sync_incident_participants_from_slack(incident, force=True)
@@ -94,10 +109,16 @@ def _setup_channel_for_incident(
             "Failed to sync participants for backfill incident %s", incident.id
         )
 
-    client.chat_postMessage(
-        channel=notify_user_id,
-        text=f"Channel setup complete for {incident.incident_number}: <#{channel_id}>",
-    )
+    try:
+        client.chat_postMessage(
+            channel=notify_user_id,
+            text=f"Channel setup complete for {incident.incident_number}: <#{channel_id}>",
+        )
+    except Exception:
+        logger.exception(
+            "Failed to send setup complete message for backfill incident %s",
+            incident.id,
+        )
 
 
 def handle_backfill_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
