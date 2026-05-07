@@ -52,15 +52,21 @@ def _setup_channel_for_incident(
     if not joined:
         base_url = settings.FIRETOWER_BASE_URL
         incident_url = f"{base_url}/{incident.incident_number}"
-        client.chat_postMessage(
-            channel=notify_user_id,
-            text=(
-                f"Incident: {incident_url}\n"
-                f"The bot could not join <#{channel_id}>. "
-                f"Please invite the Firetower bot to the channel, "
-                f"then run `/ft backfill` again to retry setup."
-            ),
-        )
+        try:
+            client.chat_postMessage(
+                channel=notify_user_id,
+                text=(
+                    f"Incident: {incident_url}\n"
+                    f"The bot could not join <#{channel_id}>. "
+                    f"Please invite the Firetower bot to the channel, "
+                    f"then run `/ft backfill` again to retry setup."
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "Failed to notify user about join failure for backfill incident %s",
+                incident.id,
+            )
         return
 
     expected_name = build_channel_name(incident)
