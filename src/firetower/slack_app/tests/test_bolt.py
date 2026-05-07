@@ -11,7 +11,7 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
 )
-from firetower.slack_app.bolt import handle_command
+from firetower.slack_app.bolt import _with_metrics, handle_command
 
 CHANNEL_ID = "C_TEST_CHANNEL"
 
@@ -203,3 +203,48 @@ class TestRouting:
         with patch("firetower.slack_app.bolt.handle_dumpslack_command") as mock_handler:
             handle_command(ack=ack, body=body, command=command, respond=respond)
             mock_handler.assert_called_once()
+
+
+class TestWithMetrics:
+    @patch("firetower.slack_app.bolt.statsd")
+    def test_emits_completed_on_success(self, mock_statsd):
+        handler = MagicMock(return_value="ok")
+        wrapped = _with_metrics("test_modal")(handler)
+
+        result = wrapped("arg1", key="val")
+
+        assert result == "ok"
+        handler.assert_called_once_with("arg1", key="val")
+        mock_statsd.increment.assert_any_call(
+            "slack_app.views.submitted", tags=["callback_id:test_modal"]
+        )
+        mock_statsd.increment.assert_any_call(
+            "slack_app.views.completed", tags=["callback_id:test_modal"]
+        )
+        failed_calls = [
+            c
+            for c in mock_statsd.increment.call_args_list
+            if c[0][0] == "slack_app.views.failed"
+        ]
+        assert failed_calls == []
+
+    @patch("firetower.slack_app.bolt.statsd")
+    def test_emits_failed_on_error(self, mock_statsd):
+        handler = MagicMock(side_effect=RuntimeError("db gone"))
+        wrapped = _with_metrics("new_incident_modal")(handler)
+
+        with pytest.raises(RuntimeError):
+            wrapped()
+
+        mock_statsd.increment.assert_any_call(
+            "slack_app.views.submitted", tags=["callback_id:new_incident_modal"]
+        )
+        mock_statsd.increment.assert_any_call(
+            "slack_app.views.failed", tags=["callback_id:new_incident_modal"]
+        )
+        completed_calls = [
+            c
+            for c in mock_statsd.increment.call_args_list
+            if c[0][0] == "slack_app.views.completed"
+        ]
+        assert completed_calls == []
