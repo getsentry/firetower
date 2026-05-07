@@ -5,12 +5,12 @@ from django.contrib.auth.models import User
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
-    _build_channel_name,
-    _build_channel_topic,
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_users,
     _page_if_needed,
+    build_channel_name,
+    build_channel_topic,
     on_captain_changed,
     on_incident_created,
     on_severity_changed,
@@ -34,7 +34,7 @@ class TestBuildChannelName:
             title="Test",
             severity=IncidentSeverity.P1,
         )
-        assert _build_channel_name(incident) == incident.incident_number.lower()
+        assert build_channel_name(incident) == incident.incident_number.lower()
 
 
 @pytest.mark.django_db
@@ -56,7 +56,7 @@ class TestBuildChannelTopic:
             severity=IncidentSeverity.P1,
             captain=captain,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert topic.startswith("[P1] ")
         assert (
             f"|{incident.incident_number} Database connection pool exhausted>" in topic
@@ -75,7 +75,7 @@ class TestBuildChannelTopic:
             severity=IncidentSeverity.P1,
             captain=captain,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert "| IC: Jane Doe" in topic
 
     def test_format_without_captain(self):
@@ -83,7 +83,7 @@ class TestBuildChannelTopic:
             title="Test Incident",
             severity=IncidentSeverity.P2,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert topic.startswith("[P2] ")
         assert f"|{incident.incident_number} Test Incident>" in topic
         assert "IC:" not in topic
@@ -94,7 +94,7 @@ class TestBuildChannelTopic:
             title=long_title,
             severity=IncidentSeverity.P1,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert len(topic) <= 250
         assert "\u2026" in topic
 
@@ -106,7 +106,7 @@ class TestBuildChannelTopic:
             title=long_title,
             severity=IncidentSeverity.P1,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert len(topic) <= 250
         # The topic must be a well-formed Slack link — closing '>' must be present.
         assert ">" in topic
@@ -824,6 +824,29 @@ class TestPageIfNeeded:
         assert "PROD_ENG" in mock_pd.trigger_incident.call_args[0][1]
 
     @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_private_incident_pages_only_imoc(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+
+        incident = Incident.objects.create(
+            title="Sensitive issue",
+            severity=IncidentSeverity.P0,
+            is_private=True,
+        )
+
+        _page_if_needed(incident)
+
+        mock_pd.trigger_incident.assert_called_once()
+        summary = mock_pd.trigger_incident.call_args[0][0]
+        dedup_key = mock_pd.trigger_incident.call_args[0][1]
+        assert "IMOC" in dedup_key
+        assert "PROD_ENG" not in dedup_key
+        assert "Private Incident" in summary
+        assert "Sensitive issue" not in summary
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
     def test_pages_only_configured_policies(self, mock_pd_cls, settings):
         settings.PAGERDUTY = {
             "API_TOKEN": "test-token",
@@ -1093,6 +1116,32 @@ class TestInviteOncallUsers:
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_private_incident_invites_only_imoc(
+        self, mock_pd_cls, mock_slack, settings
+    ):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.return_value = [
+            {"email": "imoc@example.com", "escalation_level": 1},
+        ]
+        mock_slack.get_user_profile_by_email.return_value = {"slack_user_id": "U_IMOC"}
+
+        incident = Incident.objects.create(
+            title="Sensitive issue",
+            severity=IncidentSeverity.P0,
+            is_private=True,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        mock_pd.get_oncall_users.assert_called_once_with("PIMOC01")
+        mock_slack.invite_to_channel.assert_called_once_with("C99999", ["U_IMOC"])
+        message = mock_slack.post_message.call_args[0][1]
+        assert "On-Call Incident Manager: <@U_IMOC>" in message
+        assert "Prod Eng" not in message
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
     def test_imoc_excludes_oncalls_above_max_level(
         self, mock_pd_cls, mock_slack, settings
     ):
@@ -1354,7 +1403,7 @@ class TestInviteOncallUsers:
         on_incident_created(incident)
 
         mock_invite_oncall.assert_called_once_with(
-            incident.severity, "C99999", mock_slack
+            incident.severity, "C99999", mock_slack, is_private=False
         )
 
     @patch("firetower.incidents.hooks._slack_service")

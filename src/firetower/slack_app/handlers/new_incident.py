@@ -10,15 +10,18 @@ from firetower.incidents.hooks import (
     decorate_incident_channel,
     page_for_channel,
 )
-from firetower.incidents.models import IncidentSeverity, Tag, TagType
+from firetower.incidents.models import Tag, TagType
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.integrations.services import SlackService
 from firetower.integrations.services.slack import escape_slack_text
+from firetower.slack_app.handlers.utils import (
+    _DEFAULT_SEVERITY,
+    build_incident_form_blocks,
+    parse_incident_form_values,
+)
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
-
-_DEFAULT_SEVERITY = IncidentSeverity.P3
 
 
 def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -> None:
@@ -112,6 +115,7 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
             _slack_service,
             links=links,
             channel_id=channel_id,
+            is_private=is_private,
         )
     except Exception:
         logger.exception(
@@ -134,132 +138,7 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
 
 
 def _build_new_incident_modal(channel_id: str = "", user_id: str = "") -> dict:
-    severity_options = [
-        {
-            "text": {"type": "plain_text", "text": sev.label},
-            "value": sev.value,
-        }
-        for sev in IncidentSeverity
-    ]
-    default_option = {
-        "text": {"type": "plain_text", "text": _DEFAULT_SEVERITY.label},
-        "value": _DEFAULT_SEVERITY.value,
-    }
-
-    blocks = [
-        {
-            "type": "input",
-            "block_id": "captain_block",
-            "optional": True,
-            "element": {
-                "type": "users_select",
-                "action_id": "captain_select",
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "Select incident captain",
-                },
-                **({"initial_user": user_id} if user_id else {}),
-            },
-            "label": {"type": "plain_text", "text": "Incident Captain"},
-        },
-        {
-            "type": "input",
-            "block_id": "severity_block",
-            "element": {
-                "type": "static_select",
-                "action_id": "severity",
-                "placeholder": {"type": "plain_text", "text": "Select severity"},
-                "options": severity_options,
-                "initial_option": default_option,
-            },
-            "label": {"type": "plain_text", "text": "Severity"},
-        },
-        {
-            "type": "input",
-            "block_id": "title_block",
-            "element": {
-                "type": "plain_text_input",
-                "action_id": "title",
-                "placeholder": {"type": "plain_text", "text": "Brief incident title"},
-            },
-            "label": {"type": "plain_text", "text": "Title"},
-        },
-        {
-            "type": "input",
-            "block_id": "description_block",
-            "optional": True,
-            "element": {
-                "type": "plain_text_input",
-                "action_id": "description",
-                "multiline": True,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "What's happening?",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Description"},
-        },
-        {
-            "type": "input",
-            "block_id": "impact_summary_block",
-            "optional": True,
-            "element": {
-                "type": "plain_text_input",
-                "action_id": "impact_summary",
-                "multiline": True,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "What is the user/business impact?",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Impact Summary"},
-        },
-        {
-            "type": "input",
-            "block_id": "impact_type_block",
-            "optional": True,
-            "element": {
-                "type": "multi_external_select",
-                "action_id": "impact_type_tags",
-                "min_query_length": 0,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "Select impact types",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Impact Type"},
-        },
-        {
-            "type": "input",
-            "block_id": "affected_service_block",
-            "optional": True,
-            "element": {
-                "type": "multi_external_select",
-                "action_id": "affected_service_tags",
-                "min_query_length": 0,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "Select affected services",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Affected Service"},
-        },
-        {
-            "type": "input",
-            "block_id": "affected_region_block",
-            "optional": True,
-            "element": {
-                "type": "multi_external_select",
-                "action_id": "affected_region_tags",
-                "min_query_length": 0,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "Select affected regions",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Affected Region"},
-        },
-    ]
+    blocks = build_incident_form_blocks(user_id=user_id)
 
     blocks.append(
         {
@@ -280,7 +159,7 @@ def _build_new_incident_modal(channel_id: str = "", user_id: str = "") -> dict:
         }
     )
 
-    modal = {
+    modal: dict[str, Any] = {
         "type": "modal",
         "callback_id": "new_incident_modal",
         "title": {"type": "plain_text", "text": "New Incident"},
@@ -341,58 +220,16 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
 def handle_new_incident_submission(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
+    form = parse_incident_form_values(view)
+
     values = view.get("state", {}).get("values", {})
-
-    title = values.get("title_block", {}).get("title", {}).get("value", "").strip()
-    severity = (
-        values.get("severity_block", {})
-        .get("severity", {})
-        .get("selected_option", {})
-        .get("value", _DEFAULT_SEVERITY.value)
-    )
-    description = (
-        values.get("description_block", {}).get("description", {}).get("value") or ""
-    )
-    impact_summary = (
-        values.get("impact_summary_block", {}).get("impact_summary", {}).get("value")
-        or ""
-    )
-
-    impact_type_selections = (
-        values.get("impact_type_block", {})
-        .get("impact_type_tags", {})
-        .get("selected_options")
-        or []
-    )
-    impact_type_tags = [opt["value"] for opt in impact_type_selections]
-
-    affected_service_selections = (
-        values.get("affected_service_block", {})
-        .get("affected_service_tags", {})
-        .get("selected_options")
-        or []
-    )
-    affected_service_tags = [opt["value"] for opt in affected_service_selections]
-
-    affected_region_selections = (
-        values.get("affected_region_block", {})
-        .get("affected_region_tags", {})
-        .get("selected_options")
-        or []
-    )
-    affected_region_tags = [opt["value"] for opt in affected_region_selections]
-
-    captain_slack_id = (
-        values.get("captain_block", {}).get("captain_select", {}).get("selected_user")
-    )
-
     private_selections = (
         values.get("private_block", {}).get("is_private", {}).get("selected_options")
         or []
     )
     is_private = any(opt.get("value") == "private" for opt in private_selections)
 
-    if not title:
+    if not form["title"]:
         ack(
             response_action="errors",
             errors={"title_block": "This field is required."},
@@ -411,26 +248,26 @@ def handle_new_incident_submission(
         return
 
     captain_email = user.email
-    if captain_slack_id:
-        captain_user = get_or_create_user_from_slack_id(captain_slack_id)
+    if form["captain_slack_id"]:
+        captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
         if captain_user:
             captain_email = captain_user.email
 
-    data = {
-        "title": title,
-        "severity": severity,
-        "description": description,
-        "impact_summary": impact_summary,
+    data: dict[str, Any] = {
+        "title": form["title"],
+        "severity": form["severity"] or _DEFAULT_SEVERITY.value,
+        "description": form["description"],
+        "impact_summary": form["impact_summary"],
         "captain": captain_email,
         "reporter": user.email,
         "is_private": is_private,
     }
-    if impact_type_tags:
-        data["impact_type_tags"] = impact_type_tags
-    if affected_service_tags:
-        data["affected_service_tags"] = affected_service_tags
-    if affected_region_tags:
-        data["affected_region_tags"] = affected_region_tags
+    if form["impact_type_tags"]:
+        data["impact_type_tags"] = form["impact_type_tags"]
+    if form["affected_service_tags"]:
+        data["affected_service_tags"] = form["affected_service_tags"]
+    if form["affected_region_tags"]:
+        data["affected_region_tags"] = form["affected_region_tags"]
 
     serializer = IncidentWriteSerializer(data=data)
     if not serializer.is_valid():
@@ -446,15 +283,15 @@ def handle_new_incident_submission(
     except Exception:
         logger.exception("Failed to create incident from Slack modal")
         form_data = {
-            "title": title,
-            "severity": severity,
-            "description": description,
-            "impact_summary": impact_summary,
-            "captain_slack_id": captain_slack_id,
+            "title": form["title"],
+            "severity": form["severity"] or _DEFAULT_SEVERITY.value,
+            "description": form["description"],
+            "impact_summary": form["impact_summary"],
+            "captain_slack_id": form["captain_slack_id"],
             "is_private": is_private,
-            "impact_type_tags": impact_type_tags,
-            "affected_service_tags": affected_service_tags,
-            "affected_region_tags": affected_region_tags,
+            "impact_type_tags": form.get("impact_type_tags", []),
+            "affected_service_tags": form.get("affected_service_tags", []),
+            "affected_region_tags": form.get("affected_region_tags", []),
         }
         _create_fallback_channel(client, slack_user_id, form_data)
         return
@@ -482,6 +319,7 @@ def handle_new_incident_submission(
             and not is_private
             and invoking_channel != slack_user_id
             and invoking_channel != feed_channel_id
+            and not invoking_channel.startswith("D")  # skip DM channels
         ):
             channel_message = (
                 f"A {incident.severity} incident has been created.\n"

@@ -186,6 +186,21 @@ class SlackService:
             )
             return None
 
+    def rename_channel(self, channel_id: str, name: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot rename channel - Slack client not initialized")
+            return False
+
+        try:
+            self.client.conversations_rename(channel=channel_id, name=name)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error renaming channel: {e}",
+                extra={"channel_id": channel_id, "new_name": name},
+            )
+            return False
+
     def set_channel_topic(self, channel_id: str, topic: str) -> bool:
         if not self.client:
             logger.warning("Cannot set topic - Slack client not initialized")
@@ -305,6 +320,26 @@ class SlackService:
 
     def build_channel_url(self, channel_id: str) -> str:
         return f"https://{self.team_id}.slack.com/archives/{channel_id}"
+
+    def get_channel_info(self, channel_id: str) -> dict | None:
+        if not self.client:
+            logger.warning("Cannot fetch channel info - Slack client not initialized")
+            return None
+
+        try:
+            response = self.client.conversations_info(channel=channel_id)
+            channel: dict[str, Any] = response.get("channel", {})
+            return {
+                "id": channel.get("id", ""),
+                "name": channel.get("name", ""),
+                "is_private": channel.get("is_private", False),
+            }
+        except SlackApiError as e:
+            logger.error(
+                f"Error fetching channel info: {e}",
+                extra={"channel_id": channel_id},
+            )
+            return None
 
     def get_user_info(self, slack_user_id: str) -> dict | None:
         """

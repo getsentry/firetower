@@ -8,6 +8,7 @@ from typing import Any
 from datadog import statsd
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import close_old_connections, connection, transaction
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from firetower.slack_app.bolt import get_bolt_app
@@ -36,9 +37,22 @@ def _handle_shutdown(signum: int, frame: Any) -> None:
 class _HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self, *args: Any) -> None:
         handler = _state.get("handler")
-        connected = handler is not None and handler.client.is_connected()
-        statsd.gauge("slack_bot.websocket.connected", 1 if connected else 0)
-        self.send_response(200 if connected else 503)
+        ws_ok = handler is not None and handler.client.is_connected()
+        statsd.gauge("slack_app.websocket.connected", 1 if ws_ok else 0)
+
+        close_old_connections()
+        try:
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL statement_timeout = '2s'")
+                    cursor.execute("SELECT 1")
+            db_ok = True
+        except Exception:
+            db_ok = False
+        statsd.gauge("slack_app.db.connected", 1 if db_ok else 0)
+
+        healthy = ws_ok and db_ok
+        self.send_response(200 if healthy else 503)
         self.end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:

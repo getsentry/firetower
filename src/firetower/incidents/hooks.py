@@ -72,6 +72,7 @@ def page_for_channel(
     *,
     links: list[dict[str, str]] | None = None,
     channel_id: str | None = None,
+    is_private: bool = False,
 ) -> None:
     """Trigger PD pages for pageable severities. No DB access."""
     if severity not in PAGEABLE_SEVERITIES:
@@ -85,7 +86,12 @@ def page_for_channel(
 
     pd_service = None
 
-    for policy_name, policy_info in PAGING_POLICIES.items():
+    policies_to_page = (
+        {"IMOC": PAGING_POLICIES["IMOC"]} if is_private else PAGING_POLICIES
+    )
+    title = "Private Incident" if is_private else title
+
+    for policy_name, policy_info in policies_to_page.items():
         policy = escalation_policies.get(policy_name)
         if not policy:
             logger.info(f"No {policy_name} escalation policy configured, skipping page")
@@ -141,10 +147,11 @@ def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
         _slack_service,
         links=links,
         channel_id=channel_id,
+        is_private=incident.is_private,
     )
 
 
-def _build_channel_name(incident: Incident) -> str:
+def build_channel_name(incident: Incident) -> str:
     return incident.incident_number.lower()
 
 
@@ -156,9 +163,7 @@ def _get_slack_user_id(user: User) -> str | None:
     return profile.external_id if profile else None
 
 
-def _build_channel_topic(
-    incident: Incident, captain_slack_id: str | None = None
-) -> str:
+def build_channel_topic(incident: Incident, captain_slack_id: str | None = None) -> str:
     base_url = settings.FIRETOWER_BASE_URL
     incident_url = f"{base_url}/{incident.incident_number}"
 
@@ -231,7 +236,11 @@ def _oncall_role_label(
 
 
 def _invite_oncall_to_channel(
-    severity: str, channel_id: str, slack_service: SlackService
+    severity: str,
+    channel_id: str,
+    slack_service: SlackService,
+    *,
+    is_private: bool = False,
 ) -> None:
     """Invite on-call users to a channel. No DB access."""
     if severity not in PAGEABLE_SEVERITIES:
@@ -252,7 +261,13 @@ def _invite_oncall_to_channel(
     role_entries: list[tuple[int, int, str]] = []
     users_to_invite: list[tuple[str, str]] = []
 
-    for policy_index, (policy_name, policy_info) in enumerate(PAGING_POLICIES.items()):
+    policies_to_invite = (
+        {"IMOC": PAGING_POLICIES["IMOC"]} if is_private else PAGING_POLICIES
+    )
+
+    for policy_index, (policy_name, policy_info) in enumerate(
+        policies_to_invite.items()
+    ):
         policy_label = policy_info.label
         max_level = policy_info.max_level
         policy = escalation_policies.get(policy_name)
@@ -335,7 +350,9 @@ def _invite_oncall_to_channel(
 
 
 def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
-    _invite_oncall_to_channel(incident.severity, channel_id, _slack_service)
+    _invite_oncall_to_channel(
+        incident.severity, channel_id, _slack_service, is_private=incident.is_private
+    )
 
 
 def _create_status_channel_for_context(
@@ -751,7 +768,9 @@ def decorate_incident_channel(
             logger.exception(f"Failed to invite users to {ctx.channel_name}")
 
     try:
-        _invite_oncall_to_channel(ctx.severity, ctx.channel_id, slack_service)
+        _invite_oncall_to_channel(
+            ctx.severity, ctx.channel_id, slack_service, is_private=ctx.is_private
+        )
     except Exception:
         logger.exception(f"Failed to invite oncall users to {ctx.channel_name}")
 
@@ -806,7 +825,7 @@ def on_incident_created(incident: Incident) -> None:
     elif created and slack_link is not None:
         try:
             channel_id = _slack_service.create_channel(
-                _build_channel_name(incident), is_private=incident.is_private
+                build_channel_name(incident), is_private=incident.is_private
             )
             if not channel_id:
                 slack_link.delete()
@@ -841,7 +860,7 @@ def on_incident_created(incident: Incident) -> None:
 
         try:
             _slack_service.set_channel_topic(
-                channel_id, _build_channel_topic(incident, captain_slack_id)
+                channel_id, build_channel_topic(incident, captain_slack_id)
             )
         except Exception:
             logger.exception(f"Failed to set channel topic for incident {incident.id}")
@@ -917,7 +936,7 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
     try:
         channel_id = _get_channel_id(incident)
         if channel_id:
-            _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+            _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
             incident_url = _build_incident_url(incident)
             _slack_service.post_message(
                 channel_id,
@@ -964,7 +983,7 @@ def on_title_changed(incident: Incident) -> None:
         if not channel_id:
             return
 
-        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+        _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
     except Exception:
         logger.exception(f"Error in on_title_changed for incident {incident.id}")
 
@@ -993,7 +1012,7 @@ def on_captain_changed(incident: Incident) -> None:
         if not channel_id:
             return
 
-        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+        _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
 
         incident_url = _build_incident_url(incident)
         if incident.captain:

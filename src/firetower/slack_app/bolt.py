@@ -1,4 +1,6 @@
 import logging
+from collections.abc import Callable
+from functools import wraps
 from typing import Any
 
 from datadog import statsd
@@ -6,6 +8,10 @@ from django.conf import settings
 from django.db import close_old_connections
 from slack_bolt import App
 
+from firetower.slack_app.handlers.backfill_incident import (
+    handle_backfill_command,
+    handle_backfill_submission,
+)
 from firetower.slack_app.handlers.captain import (
     handle_captain_command,
     handle_captain_submission,
@@ -47,6 +53,7 @@ METRICS_PREFIX = "slack_app.commands"
 KNOWN_SUBCOMMANDS = {
     "help",
     "new",
+    "backfill",
     "mitigated",
     "mit",
     "resolved",
@@ -56,6 +63,7 @@ KNOWN_SUBCOMMANDS = {
     "sev",
     "setseverity",
     "subject",
+    "title",
     "update",
     "edit",
     "captain",
@@ -120,6 +128,8 @@ def handle_command(
     try:
         if subcommand == "new":
             handle_new_command(ack, body, command, respond)
+        elif subcommand == "backfill":
+            handle_backfill_command(ack, body, command, respond)
         elif subcommand in ("help", ""):
             handle_help_command(ack, command, respond)
         elif subcommand in ("mitigated", "mit"):
@@ -137,7 +147,7 @@ def handle_command(
                 handle_severity_command(ack, body, command, respond, new_severity=args)
         elif subcommand in ("update", "edit"):
             handle_update_command(ack, body, command, respond)
-        elif subcommand == "subject":
+        elif subcommand in ("subject", "title"):
             if not args:
                 ack()
                 cmd = command.get("command", "/ft")
@@ -163,17 +173,62 @@ def handle_command(
         raise
 
 
+def _with_metrics(callback_id: str) -> Callable[..., Callable[..., Any]]:
+    """Wrap a Bolt handler to emit submitted/completed/failed metrics."""
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            tags = [f"callback_id:{callback_id}"]
+            statsd.increment("slack_app.views.submitted", tags=tags)
+            try:
+                result = func(*args, **kwargs)
+                statsd.increment("slack_app.views.completed", tags=tags)
+                return result
+            except Exception:
+                logger.exception("View handler failed: %s", callback_id)
+                statsd.increment("slack_app.views.failed", tags=tags)
+                raise
+
+        return wrapper
+
+    return decorator
+
+
 def _register_views(app: App) -> None:
     """Register view handlers (modals, etc.) on the Bolt app."""
-    app.view("new_incident_modal")(handle_new_incident_submission)
-    app.view("update_incident_modal")(handle_update_incident_submission)
-    app.view("mitigated_incident_modal")(handle_mitigated_submission)
-    app.view("resolved_incident_modal")(handle_resolved_submission)
-    app.view("captain_incident_modal")(handle_captain_submission)
-    app.view("statuspage_modal")(handle_statuspage_submission)
-    app.action("component_impact_select")(handle_component_impact_select)
-    app.action("statuspage_reset_and_resolve")(handle_statuspage_reset_and_resolve)
-    app.action("statuspage_resolve_anyway")(handle_statuspage_resolve_anyway)
+    app.view("backfill_incident_modal")(
+        _with_metrics("backfill_incident_modal")(handle_backfill_submission)
+    )
+    app.view("new_incident_modal")(
+        _with_metrics("new_incident_modal")(handle_new_incident_submission)
+    )
+    app.view("update_incident_modal")(
+        _with_metrics("update_incident_modal")(handle_update_incident_submission)
+    )
+    app.view("mitigated_incident_modal")(
+        _with_metrics("mitigated_incident_modal")(handle_mitigated_submission)
+    )
+    app.view("resolved_incident_modal")(
+        _with_metrics("resolved_incident_modal")(handle_resolved_submission)
+    )
+    app.view("captain_incident_modal")(
+        _with_metrics("captain_incident_modal")(handle_captain_submission)
+    )
+    app.view("statuspage_modal")(
+        _with_metrics("statuspage_modal")(handle_statuspage_submission)
+    )
+    app.action("component_impact_select")(
+        _with_metrics("component_impact_select")(handle_component_impact_select)
+    )
+    app.action("statuspage_reset_and_resolve")(
+        _with_metrics("statuspage_reset_and_resolve")(
+            handle_statuspage_reset_and_resolve
+        )
+    )
+    app.action("statuspage_resolve_anyway")(
+        _with_metrics("statuspage_resolve_anyway")(handle_statuspage_resolve_anyway)
+    )
     for action_id in (
         "impact_type_tags",
         "affected_service_tags",
