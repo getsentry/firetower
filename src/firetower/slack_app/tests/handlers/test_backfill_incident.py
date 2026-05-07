@@ -114,20 +114,18 @@ class TestBackfillCommand:
         ack = MagicMock()
         body = {
             "trigger_id": "T12345",
-            "text": "backfill <#C_ARG|inc-2050>",
+            "text": "backfill <#CARG12345|inc-2050>",
             "channel_id": "C_OTHER",
             "user_id": "U_TEST",
         }
-        command = {"command": "/ft", "text": "backfill <#C_ARG|inc-2050>"}
+        command = {"command": "/ft", "text": "backfill <#CARG12345|inc-2050>"}
         respond = MagicMock()
 
-        with patch(
-            "firetower.slack_app.handlers.backfill_incident.get_bolt_app"
-        ) as mock_app:
+        with patch("firetower.slack_app.bolt.get_bolt_app") as mock_app:
             handle_backfill_command(ack, body, command, respond)
             mock_app.return_value.client.views_open.assert_called_once()
             view = mock_app.return_value.client.views_open.call_args[1]["view"]
-            assert view["private_metadata"] == "C_ARG"
+            assert view["private_metadata"] == "CARG12345"
 
     def test_no_channel_responds_with_usage(self):
         ack = MagicMock()
@@ -156,7 +154,7 @@ class TestBackfillSubmission:
             type=ExternalProfileType.SLACK,
             external_id="U_TEST",
         )
-        IncidentCounter.objects.create(pk=1, next_id=2050)
+        IncidentCounter.objects.update_or_create(pk=1, defaults={"next_id": 2050})
 
     def _build_view(self, channel_id="C_TEST", title="Test Backfill"):
         return {
@@ -310,18 +308,21 @@ class TestBackfillSubmission:
         )
         mock_slack_svc.join_channel.return_value = True
 
+        def channel_info_matching_incident(channel_id):
+            incident = Incident.objects.get(title="Test Backfill")
+            return {
+                "id": channel_id,
+                "name": f"inc-{incident.id}",
+                "is_private": False,
+            }
+
+        mock_slack_svc.get_channel_info.side_effect = channel_info_matching_incident
+
         ack = MagicMock()
         client = MagicMock()
         body = {"user": {"id": "U_TEST"}}
 
         handle_backfill_submission(ack, body, self._build_view(), client)
-
-        incident = Incident.objects.get(title="Test Backfill")
-        mock_slack_svc.get_channel_info.return_value = {
-            "id": "C_TEST",
-            "name": f"inc-{incident.id}",
-            "is_private": False,
-        }
 
         mock_slack_svc.rename_channel.assert_not_called()
 
