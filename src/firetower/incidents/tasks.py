@@ -1,5 +1,7 @@
 from logging import info
 
+from firetower.incidents.models import Incident
+
 SCHEDULES = {
     "schedule_demo": {
         "func": "firetower.incidents.tasks.schedule_demo",
@@ -11,4 +13,8 @@ SCHEDULES = {
 
 
 def schedule_demo() -> None:
-    info("hello world")
+    incident = Incident.objects.order_by("-created_at").first()
+    if incident:
+        info(f"Most recent incident: INC-{incident.id}: {incident.title}")
+    else:
+        info("No incidents found.")
