@@ -13,7 +13,6 @@ from firetower.incidents.models import (
 )
 from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.backfill_incident import (
-    _expected_channel_name,
     _parse_channel_id_from_args,
     handle_backfill_command,
     handle_backfill_submission,
@@ -32,16 +31,6 @@ class TestParseChannelIdFromArgs:
 
     def test_empty_string(self):
         assert _parse_channel_id_from_args("") is None
-
-
-class TestExpectedChannelName:
-    def test_formats_correctly(self, settings):
-        settings.PROJECT_KEY = "INC"
-        assert _expected_channel_name(2042) == "inc-2042"
-
-    def test_lowercase(self, settings):
-        settings.PROJECT_KEY = "FIRE"
-        assert _expected_channel_name(100) == "fire-100"
 
 
 @pytest.mark.django_db

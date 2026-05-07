@@ -5,7 +5,10 @@ from firetower.auth.models import ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import Incident, IncidentSeverity
 from firetower.incidents.serializers import IncidentWriteSerializer
-from firetower.slack_app.handlers.utils import get_incident_from_channel
+from firetower.slack_app.handlers.utils import (
+    get_incident_from_channel,
+    parse_incident_form_values,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -229,59 +232,17 @@ def handle_update_command(ack: Any, body: dict, command: dict, respond: Any) -> 
 def handle_update_incident_submission(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
-    values = view.get("state", {}).get("values", {})
+    form = parse_incident_form_values(view)
     channel_id = view.get("private_metadata", "")
 
-    title = values.get("title_block", {}).get("title", {}).get("value", "").strip()
-    severity = (
-        values.get("severity_block", {})
-        .get("severity", {})
-        .get("selected_option", {})
-        .get("value")
-    )
-    description = (
-        values.get("description_block", {}).get("description", {}).get("value") or ""
-    )
-    impact_summary = (
-        values.get("impact_summary_block", {}).get("impact_summary", {}).get("value")
-        or ""
-    )
-
-    impact_type_selections = (
-        values.get("impact_type_block", {})
-        .get("impact_type_tags", {})
-        .get("selected_options")
-        or []
-    )
-    impact_type_tags = [opt["value"] for opt in impact_type_selections]
-
-    affected_service_selections = (
-        values.get("affected_service_block", {})
-        .get("affected_service_tags", {})
-        .get("selected_options")
-        or []
-    )
-    affected_service_tags = [opt["value"] for opt in affected_service_selections]
-
-    affected_region_selections = (
-        values.get("affected_region_block", {})
-        .get("affected_region_tags", {})
-        .get("selected_options")
-        or []
-    )
-    affected_region_tags = [opt["value"] for opt in affected_region_selections]
-
-    captain_slack_id = (
-        values.get("captain_block", {}).get("captain_select", {}).get("selected_user")
-    )
-
+    values = view.get("state", {}).get("values", {})
     private_selections = (
         values.get("private_block", {}).get("is_private", {}).get("selected_options")
         or []
     )
     is_private = any(opt.get("value") == "private" for opt in private_selections)
 
-    if not title:
+    if not form["title"]:
         ack(
             response_action="errors",
             errors={"title_block": "This field is required."},
@@ -296,18 +257,18 @@ def handle_update_incident_submission(
         return
 
     data: dict[str, Any] = {
-        "title": title,
-        "severity": severity,
-        "description": description,
-        "impact_summary": impact_summary,
+        "title": form["title"],
+        "severity": form["severity"],
+        "description": form["description"],
+        "impact_summary": form["impact_summary"],
         "is_private": is_private,
-        "impact_type_tags": impact_type_tags,
-        "affected_service_tags": affected_service_tags,
-        "affected_region_tags": affected_region_tags,
+        "impact_type_tags": form["impact_type_tags"],
+        "affected_service_tags": form["affected_service_tags"],
+        "affected_region_tags": form["affected_region_tags"],
     }
 
-    if captain_slack_id:
-        captain_user = get_or_create_user_from_slack_id(captain_slack_id)
+    if form["captain_slack_id"]:
+        captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
         if captain_user:
             data["captain"] = captain_user.email
 
