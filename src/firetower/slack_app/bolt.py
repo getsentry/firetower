@@ -6,6 +6,10 @@ from django.conf import settings
 from django.db import close_old_connections
 from slack_bolt import App
 
+from firetower.slack_app.handlers.backfill_incident import (
+    handle_backfill_command,
+    handle_backfill_submission,
+)
 from firetower.slack_app.handlers.captain import (
     handle_captain_command,
     handle_captain_submission,
@@ -47,6 +51,7 @@ METRICS_PREFIX = "slack_app.commands"
 KNOWN_SUBCOMMANDS = {
     "help",
     "new",
+    "backfill",
     "mitigated",
     "mit",
     "resolved",
@@ -120,6 +125,8 @@ def handle_command(
     try:
         if subcommand == "new":
             handle_new_command(ack, body, command, respond)
+        elif subcommand == "backfill":
+            handle_backfill_command(ack, body, command, respond)
         elif subcommand in ("help", ""):
             handle_help_command(ack, command, respond)
         elif subcommand in ("mitigated", "mit"):
@@ -166,6 +173,7 @@ def handle_command(
 def _register_views(app: App) -> None:
     """Register view handlers (modals, etc.) on the Bolt app."""
     app.view("new_incident_modal")(handle_new_incident_submission)
+    app.view("backfill_incident_modal")(handle_backfill_submission)
     app.view("update_incident_modal")(handle_update_incident_submission)
     app.view("mitigated_incident_modal")(handle_mitigated_submission)
     app.view("resolved_incident_modal")(handle_resolved_submission)
