@@ -38,7 +38,7 @@ class _HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self, *args: Any) -> None:
         handler = _state.get("handler")
         ws_ok = handler is not None and handler.client.is_connected()
-        statsd.gauge("slack_bot.websocket.connected", 1 if ws_ok else 0)
+        statsd.gauge("slack_app.websocket.connected", 1 if ws_ok else 0)
 
         close_old_connections()
         try:
@@ -49,7 +49,7 @@ class _HealthHandler(BaseHTTPRequestHandler):
             db_ok = True
         except Exception:
             db_ok = False
-        statsd.gauge("slack_bot.db.connected", 1 if db_ok else 0)
+        statsd.gauge("slack_app.db.connected", 1 if db_ok else 0)
 
         healthy = ws_ok and db_ok
         self.send_response(200 if healthy else 503)
