@@ -342,6 +342,47 @@ class TestBackfillSubmission:
         "firetower.slack_app.handlers.backfill_incident.get_or_create_user_from_slack_id"
     )
     @patch("firetower.incidents.serializers.on_incident_created")
+    def test_rename_failure_posts_in_channel(
+        self, mock_hook, mock_get_user, mock_slack_svc, mock_sync
+    ):
+        mock_get_user.return_value = self.user
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://T0000.slack.com/archives/C_TEST"
+        )
+        mock_slack_svc.get_channel_info.return_value = {
+            "id": "C_TEST",
+            "name": "wrong-name",
+            "is_private": False,
+        }
+        mock_slack_svc.join_channel.return_value = True
+        mock_slack_svc.rename_channel.return_value = False
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+
+        handle_backfill_submission(ack, body, self._build_view(), client)
+
+        incident = Incident.objects.get(title="Test Backfill")
+        expected_name = f"inc-{incident.id}"
+        mock_slack_svc.rename_channel.assert_called_once_with("C_TEST", expected_name)
+        rename_msg_call = [
+            c
+            for c in client.chat_postMessage.call_args_list
+            if c[1].get("channel") == "C_TEST"
+            and "could not rename" in c[1].get("text", "")
+        ]
+        assert len(rename_msg_call) == 1
+        assert expected_name in rename_msg_call[0][1]["text"]
+
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.sync_incident_participants_from_slack"
+    )
+    @patch("firetower.slack_app.handlers.backfill_incident._slack_service")
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.get_or_create_user_from_slack_id"
+    )
+    @patch("firetower.incidents.serializers.on_incident_created")
     def test_skips_rename_when_name_already_matches(
         self, mock_hook, mock_get_user, mock_slack_svc, mock_sync
     ):

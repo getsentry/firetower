@@ -363,6 +363,13 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
                 expected_name,
                 incident.id,
             )
+            client.chat_postMessage(
+                channel=channel_id,
+                text=(
+                    f"The bot could not rename this channel to `{expected_name}`. "
+                    f"Please rename the channel manually."
+                ),
+            )
 
     _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
     base_url = settings.FIRETOWER_BASE_URL
