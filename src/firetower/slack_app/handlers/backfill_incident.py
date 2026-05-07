@@ -209,6 +209,14 @@ def handle_backfill_command(ack: Any, body: dict, command: dict, respond: Any) -
         )
         return
 
+    channel_info = _slack_service.get_channel_info(channel_id)
+    expected_prefix = f"{settings.PROJECT_KEY}-".lower()
+    if not channel_info or not channel_info["name"].startswith(expected_prefix):
+        respond(
+            f"Backfill is only allowed on incident channels (name must start with `{expected_prefix}`)."
+        )
+        return
+
     existing_link = ExternalLink.objects.filter(
         type=ExternalLinkType.SLACK,
         url__endswith=f"/archives/{channel_id}",
