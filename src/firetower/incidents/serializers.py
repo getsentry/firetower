@@ -527,9 +527,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
         self._auto_compute_downtime(incident, validated_data)
 
-        # Runs synchronously — Slack API calls may add latency to the response.
-        # Consider deferring to a background task if this becomes a problem.
-        if settings.HOOKS_ENABLED:
+        if settings.HOOKS_ENABLED and not self.context.get("skip_hooks"):
             on_incident_created(incident)
 
         return incident

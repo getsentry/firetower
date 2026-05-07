@@ -5,12 +5,12 @@ from django.contrib.auth.models import User
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
-    _build_channel_name,
-    _build_channel_topic,
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_users,
     _page_if_needed,
+    build_channel_name,
+    build_channel_topic,
     on_captain_changed,
     on_incident_created,
     on_severity_changed,
@@ -34,7 +34,7 @@ class TestBuildChannelName:
             title="Test",
             severity=IncidentSeverity.P1,
         )
-        assert _build_channel_name(incident) == incident.incident_number.lower()
+        assert build_channel_name(incident) == incident.incident_number.lower()
 
 
 @pytest.mark.django_db
@@ -56,7 +56,7 @@ class TestBuildChannelTopic:
             severity=IncidentSeverity.P1,
             captain=captain,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert topic.startswith("[P1] ")
         assert (
             f"|{incident.incident_number} Database connection pool exhausted>" in topic
@@ -75,7 +75,7 @@ class TestBuildChannelTopic:
             severity=IncidentSeverity.P1,
             captain=captain,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert "| IC: Jane Doe" in topic
 
     def test_format_without_captain(self):
@@ -83,7 +83,7 @@ class TestBuildChannelTopic:
             title="Test Incident",
             severity=IncidentSeverity.P2,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert topic.startswith("[P2] ")
         assert f"|{incident.incident_number} Test Incident>" in topic
         assert "IC:" not in topic
@@ -94,7 +94,7 @@ class TestBuildChannelTopic:
             title=long_title,
             severity=IncidentSeverity.P1,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert len(topic) <= 250
         assert "\u2026" in topic
 
@@ -106,7 +106,7 @@ class TestBuildChannelTopic:
             title=long_title,
             severity=IncidentSeverity.P1,
         )
-        topic = _build_channel_topic(incident)
+        topic = build_channel_topic(incident)
         assert len(topic) <= 250
         # The topic must be a well-formed Slack link — closing '>' must be present.
         assert ">" in topic
