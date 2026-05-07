@@ -209,7 +209,9 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
 
     channel_url = _slack_service.build_channel_url(channel_id)
     channel_info = _slack_service.get_channel_info(channel_id)
-    is_private = bool(channel_info and channel_info.get("is_private"))
+    # Default to private when channel info is unavailable to avoid leaking
+    # sensitive incident details if the Slack API call fails transiently.
+    is_private = channel_info.get("is_private", True) if channel_info else True
 
     data: dict[str, Any] = {
         "title": form["title"],
