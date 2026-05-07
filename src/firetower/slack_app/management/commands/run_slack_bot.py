@@ -8,7 +8,7 @@ from typing import Any
 from datadog import statsd
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db import close_old_connections, connection
+from django.db import close_old_connections, connection, transaction
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from firetower.slack_app.bolt import get_bolt_app
@@ -42,8 +42,10 @@ class _HealthHandler(BaseHTTPRequestHandler):
 
         close_old_connections()
         try:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT 1")
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute("SET LOCAL statement_timeout = '2s'")
+                    cursor.execute("SELECT 1")
             db_ok = True
         except Exception:
             db_ok = False
