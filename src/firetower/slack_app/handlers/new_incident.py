@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Any
 
 from django.conf import settings
@@ -13,6 +14,343 @@ logger = logging.getLogger(__name__)
 _slack_service = SlackService()
 
 _DEFAULT_SEVERITY = IncidentSeverity.P3
+
+_FALLBACK_PAGEABLE_SEVERITIES = {"P0", "P1"}
+
+
+def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -> None:
+    title = form_data["title"]
+    severity = form_data["severity"]
+    description = form_data.get("description", "")
+    impact_summary = form_data.get("impact_summary", "")
+    captain_slack_id = form_data.get("captain_slack_id")
+    is_private = form_data.get("is_private", False)
+    impact_type_tags = form_data.get("impact_type_tags", [])
+    affected_service_tags = form_data.get("affected_service_tags", [])
+    affected_region_tags = form_data.get("affected_region_tags", [])
+
+    channel_name = f"inc-{uuid.uuid4().hex[:8]}"
+
+    channel_id = _slack_service.create_channel(channel_name, is_private=is_private)
+    if not channel_id:
+        logger.error("Fallback channel creation failed for %s", channel_name)
+        client.chat_postMessage(
+            channel=slack_user_id,
+            text=(
+                "Something went wrong creating your incident. "
+                "Please create a Slack channel manually for incident coordination "
+                "and let #team-sre know."
+            ),
+        )
+        return
+
+    # Post and pin metadata for backfill
+    metadata_lines = [
+        "Incident Metadata (for backfill):",
+        f"Title: {title}",
+        f"Severity: {severity}",
+    ]
+    if description:
+        metadata_lines.append(f"Description: {description}")
+    if impact_summary:
+        metadata_lines.append(f"Impact Summary: {impact_summary}")
+    if captain_slack_id:
+        metadata_lines.append(f"Captain: <@{captain_slack_id}>")
+    metadata_lines.append(f"Reporter: <@{slack_user_id}>")
+    metadata_lines.append(f"Private: {'yes' if is_private else 'no'}")
+    if impact_type_tags:
+        metadata_lines.append(f"Impact Types: {', '.join(impact_type_tags)}")
+    if affected_service_tags:
+        metadata_lines.append(f"Affected Services: {', '.join(affected_service_tags)}")
+    if affected_region_tags:
+        metadata_lines.append(f"Affected Regions: {', '.join(affected_region_tags)}")
+
+    metadata_text = "\n".join(metadata_lines)
+    try:
+        ts = _slack_service.post_message_return_ts(channel_id, metadata_text)
+        if ts:
+            _slack_service.pin_message(channel_id, ts)
+    except Exception:
+        logger.exception(
+            "Failed to post/pin metadata in fallback channel %s", channel_name
+        )
+
+    try:
+        _slack_service.post_message(
+            channel_id,
+            ":warning: This channel was created in degraded mode (database unreachable). "
+            "The incident has NOT been recorded in Firetower. Details will need to be "
+            "backfilled once the database is restored.",
+        )
+    except Exception:
+        logger.exception("Failed to post warning in fallback channel %s", channel_name)
+
+    # Guide message
+    guide_message = settings.SLACK.get("INCIDENT_GUIDE_MESSAGE", "")
+    if guide_message:
+        try:
+            _slack_service.post_message(channel_id, guide_message)
+        except Exception:
+            logger.exception(
+                "Failed to post guide message in fallback channel %s", channel_name
+            )
+
+    # Invite captain, reporter, and always-invited users
+    ids_to_invite: list[str] = []
+    if captain_slack_id:
+        ids_to_invite.append(captain_slack_id)
+    if slack_user_id and slack_user_id not in ids_to_invite:
+        ids_to_invite.append(slack_user_id)
+
+    always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
+    for uid in always_invited:
+        if uid not in ids_to_invite:
+            ids_to_invite.append(uid)
+
+    if ids_to_invite:
+        try:
+            _slack_service.invite_to_channel(channel_id, ids_to_invite)
+        except Exception:
+            logger.exception(
+                "Failed to invite users to fallback channel %s", channel_name
+            )
+
+    # Datadog notebook (skip for private incidents)
+    if not is_private:
+        try:
+            from firetower.integrations.services import DatadogService  # noqa: PLC0415
+
+            dd_service = DatadogService()
+            if dd_service.configured:
+                notebook_url = dd_service.create_notebook(channel_name, title)
+                if notebook_url:
+                    _slack_service.add_bookmark(
+                        channel_id, "Datadog Notebook", notebook_url
+                    )
+                    _slack_service.post_message(
+                        channel_id, f"Datadog notebook created: {notebook_url}"
+                    )
+        except Exception:
+            logger.exception(
+                "Failed to create Datadog notebook for fallback channel %s",
+                channel_name,
+            )
+
+    # Notion troubleshooting doc (skip for private incidents)
+    if not is_private:
+        try:
+            from firetower.integrations.services.notion import (  # noqa: PLC0415
+                NotionService,
+            )
+
+            if NotionService.is_troubleshooting_configured():
+                notion = NotionService.for_troubleshooting()
+                if notion:
+                    page = notion.create_troubleshooting_page(channel_name, "")
+                    if page and page.get("url"):
+                        _slack_service.add_bookmark(
+                            channel_id, "Troubleshooting Doc", page["url"]
+                        )
+                        _slack_service.post_message(
+                            channel_id,
+                            f"A <{page['url']}|Clinical Troubleshooting document> has been created. "
+                            "Please use this to keep track of Symptoms, Hypothesis, and Actions "
+                            "as you're investigating this incident.",
+                        )
+        except Exception:
+            logger.exception(
+                "Failed to create troubleshooting doc for fallback channel %s",
+                channel_name,
+            )
+
+    # Status channel (skip for private, only for P0/P1)
+    if not is_private and severity in _FALLBACK_PAGEABLE_SEVERITIES:
+        try:
+            status_channel_name = f"{channel_name}-status"
+            status_channel_id = _slack_service.create_channel(
+                status_channel_name, is_private=False
+            )
+            if status_channel_id:
+                _slack_service.post_message(
+                    status_channel_id,
+                    f"This is the status channel for *{channel_name}*.\n"
+                    f"For incident response coordination, join <#{channel_id}>.",
+                )
+                status_invite_ids = list(ids_to_invite)
+                for uid in always_invited:
+                    if uid not in status_invite_ids:
+                        status_invite_ids.append(uid)
+                if status_invite_ids:
+                    _slack_service.invite_to_channel(
+                        status_channel_id, status_invite_ids
+                    )
+                _slack_service.post_message(
+                    channel_id,
+                    f"<#{status_channel_id}> has been created for status updates.",
+                )
+        except Exception:
+            logger.exception(
+                "Failed to create status channel for fallback channel %s",
+                channel_name,
+            )
+
+    # Invite oncall users (only for P0/P1)
+    if severity in _FALLBACK_PAGEABLE_SEVERITIES:
+        try:
+            from firetower.incidents.hooks import PAGING_POLICIES  # noqa: PLC0415
+            from firetower.integrations.services import (  # noqa: PLC0415
+                PagerDutyService,
+            )
+
+            pd_config = settings.PAGERDUTY
+            if pd_config:
+                escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
+                pd_service = None
+                role_entries: list[tuple[int, int, str]] = []
+                users_to_invite: list[tuple[str, str]] = []
+
+                for policy_index, (policy_name, policy_info) in enumerate(
+                    PAGING_POLICIES.items()
+                ):
+                    policy = escalation_policies.get(policy_name)
+                    if not policy:
+                        continue
+                    policy_id = policy.get("id")
+                    if not policy_id:
+                        continue
+
+                    if pd_service is None:
+                        pd_service = PagerDutyService()
+
+                    oncall_users = pd_service.get_oncall_users(policy_id)
+                    for oncall_user in oncall_users:
+                        email = oncall_user.get("email")
+                        escalation_level: int | None = oncall_user.get(
+                            "escalation_level"
+                        )
+                        if (
+                            escalation_level is not None
+                            and escalation_level > policy_info.max_level
+                        ):
+                            continue
+                        if not email:
+                            continue
+
+                        slack_profile = _slack_service.get_user_profile_by_email(email)
+                        if not slack_profile or not slack_profile.get("slack_user_id"):
+                            continue
+
+                        oncall_slack_id = slack_profile["slack_user_id"]
+                        label = policy_info.label
+                        if policy_name == "IMOC":
+                            role_label = policy_info.page_label
+                        elif escalation_level == 1:
+                            role_label = f"{label} (Primary)"
+                        elif escalation_level == 2:
+                            role_label = f"{label} (Secondary)"
+                        elif escalation_level is not None:
+                            role_label = f"{label} (Level {escalation_level})"
+                        else:
+                            role_label = label
+
+                        role_entries.append(
+                            (
+                                policy_index,
+                                escalation_level
+                                if escalation_level is not None
+                                else 999,
+                                f"{role_label}: <@{oncall_slack_id}>",
+                            )
+                        )
+                        users_to_invite.append((oncall_slack_id, email))
+
+                if users_to_invite:
+                    invite_ids = [sid for sid, _ in users_to_invite]
+                    _slack_service.invite_to_channel(channel_id, invite_ids)
+
+                if role_entries:
+                    role_entries.sort(key=lambda entry: (entry[0], entry[1]))
+                    message = "\n".join(line for _, _, line in role_entries)
+                    _slack_service.post_message(channel_id, message)
+        except Exception:
+            logger.exception(
+                "Failed to invite oncall users to fallback channel %s", channel_name
+            )
+
+    # PagerDuty paging (only for P0/P1)
+    if severity in _FALLBACK_PAGEABLE_SEVERITIES:
+        try:
+            from firetower.integrations.services import (  # noqa: PLC0415
+                PagerDutyService,
+            )
+
+            pd_config = settings.PAGERDUTY
+            if pd_config:
+                escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
+                pd_service = None
+                channel_url = _slack_service.build_channel_url(channel_id)
+                links = [{"href": channel_url, "text": "Slack Channel"}]
+
+                for policy_name, policy_info in PAGING_POLICIES.items():
+                    policy = escalation_policies.get(policy_name)
+                    if not policy:
+                        continue
+                    integration_key = policy.get("integration_key")
+                    if not integration_key:
+                        continue
+
+                    if pd_service is None:
+                        pd_service = PagerDutyService()
+
+                    dedup_key = f"firetower-{channel_name}-{policy_name}"
+                    page_label = policy_info.page_label
+                    summary = f"[{page_label}] [{severity}] {channel_name}: {title}"
+                    summary = summary[:1024]
+
+                    success = pd_service.trigger_incident(
+                        summary, dedup_key, integration_key, links=links
+                    )
+                    if not success:
+                        _slack_service.post_message(
+                            channel_id,
+                            f":warning: Failed to page {page_label} via PagerDuty. "
+                            "Please manually escalate if needed.",
+                        )
+        except Exception:
+            logger.exception(
+                "Failed to page PagerDuty for fallback channel %s", channel_name
+            )
+
+    # Post to feed channel (skip for private incidents)
+    feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
+    if feed_channel_id and not is_private:
+        try:
+            feed_message = (
+                f"A {severity} incident has been created (degraded mode).\n"
+                f"{escape_slack_text(title)}"
+                f"\n\nFor those involved, please join <#{channel_id}>"
+            )
+            _slack_service.post_message(feed_channel_id, feed_message)
+        except Exception:
+            logger.exception(
+                "Failed to post feed channel message for fallback channel %s",
+                channel_name,
+            )
+
+    # DM the user
+    try:
+        channel_url = _slack_service.build_channel_url(channel_id)
+        client.chat_postMessage(
+            channel=slack_user_id,
+            text=(
+                f"An incident channel has been created in degraded mode (database issue).\n"
+                f"Slack channel: <#{channel_id}>\n\n"
+                "The incident has NOT been recorded in Firetower and will need to be "
+                "backfilled once the database is restored."
+            ),
+        )
+    except Exception:
+        logger.exception("Failed to DM user about fallback channel %s", channel_name)
 
 
 def _build_new_incident_modal(channel_id: str = "", user_id: str = "") -> dict:

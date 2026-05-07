@@ -7,6 +7,7 @@ from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import Incident, IncidentSeverity, Tag, TagType
 from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.new_incident import (
+    _create_fallback_channel,
     handle_new_command,
     handle_new_incident_submission,
     handle_tag_options,
@@ -306,3 +307,38 @@ class TestTagOptions:
         options = ack.call_args[1]["options"]
         assert len(options) == 1
         assert options[0]["text"]["text"] == "us-east-1"
+
+
+class TestFallbackChannel:
+    def _base_form_data(self):
+        return {
+            "title": "DB is on fire",
+            "severity": "P1",
+            "description": "Everything is broken",
+            "impact_summary": "All users affected",
+            "captain_slack_id": "U_CAPTAIN",
+            "is_private": False,
+            "impact_type_tags": ["Degraded Service"],
+            "affected_service_tags": ["api"],
+            "affected_region_tags": ["us-east-1"],
+        }
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_creates_channel_with_uuid_name(self, mock_slack_svc):
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message_return_ts.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.post_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
+
+        # First create_channel call is the incident channel;
+        # a second call may happen for the status channel (P0/P1).
+        first_call = mock_slack_svc.create_channel.call_args_list[0]
+        channel_name = first_call[0][0]
+        assert channel_name.startswith("inc-")
+        assert len(channel_name) == 12  # "inc-" + 8 hex chars
