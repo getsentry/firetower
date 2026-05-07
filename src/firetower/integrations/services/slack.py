@@ -240,45 +240,32 @@ class SlackService:
 
     def post_message(
         self, channel_id: str, text: str, blocks: list[dict] | None = None
-    ) -> bool:
-        if not self.client:
-            logger.warning("Cannot post message - Slack client not initialized")
-            return False
-
-        try:
-            logger.info(f"Posting message to channel {channel_id}")
-            self.client.chat_postMessage(channel=channel_id, text=text, blocks=blocks)
-            return True
-        except SlackApiError as e:
-            if e.response.get("error") == "not_in_channel":
-                logger.info(f"Not in channel {channel_id}, joining and retrying post")
-                if self.join_channel(channel_id):
-                    try:
-                        self.client.chat_postMessage(
-                            channel=channel_id, text=text, blocks=blocks
-                        )
-                        return True
-                    except SlackApiError as retry_error:
-                        logger.error(
-                            f"Error posting message after joining channel: {retry_error}",
-                            extra={"channel_id": channel_id},
-                        )
-                        return False
-            logger.error(
-                f"Error posting message: {e}", extra={"channel_id": channel_id}
-            )
-            return False
-
-    def post_message_return_ts(self, channel_id: str, text: str) -> str | None:
+    ) -> str | None:
         if not self.client:
             logger.warning("Cannot post message - Slack client not initialized")
             return None
 
         try:
             logger.info(f"Posting message to channel {channel_id}")
-            response = self.client.chat_postMessage(channel=channel_id, text=text)
+            response = self.client.chat_postMessage(
+                channel=channel_id, text=text, blocks=blocks
+            )
             return response.get("ts")
         except SlackApiError as e:
+            if e.response.get("error") == "not_in_channel":
+                logger.info(f"Not in channel {channel_id}, joining and retrying post")
+                if self.join_channel(channel_id):
+                    try:
+                        response = self.client.chat_postMessage(
+                            channel=channel_id, text=text, blocks=blocks
+                        )
+                        return response.get("ts")
+                    except SlackApiError as retry_error:
+                        logger.error(
+                            f"Error posting message after joining channel: {retry_error}",
+                            extra={"channel_id": channel_id},
+                        )
+                        return None
             logger.error(
                 f"Error posting message: {e}", extra={"channel_id": channel_id}
             )

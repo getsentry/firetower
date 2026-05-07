@@ -67,7 +67,7 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
 
     metadata_text = "\n".join(metadata_lines)
     try:
-        ts = _slack_service.post_message_return_ts(channel_id, metadata_text)
+        ts = _slack_service.post_message(channel_id, metadata_text)
         if ts:
             _slack_service.pin_message(channel_id, ts)
     except Exception:

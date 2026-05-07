@@ -378,9 +378,8 @@ class TestFallbackChannel:
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
     def test_creates_channel_with_uuid_name(self, mock_slack_svc):
         mock_slack_svc.create_channel.return_value = "C_FALLBACK"
-        mock_slack_svc.post_message_return_ts.return_value = "1234.5678"
+        mock_slack_svc.post_message.return_value = "1234.5678"
         mock_slack_svc.pin_message.return_value = True
-        mock_slack_svc.post_message.return_value = True
         mock_slack_svc.build_channel_url.return_value = (
             "https://sentry.slack.com/archives/C_FALLBACK"
         )
@@ -398,9 +397,8 @@ class TestFallbackChannel:
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
     def test_posts_and_pins_metadata(self, mock_slack_svc):
         mock_slack_svc.create_channel.return_value = "C_FALLBACK"
-        mock_slack_svc.post_message_return_ts.return_value = "1234.5678"
+        mock_slack_svc.post_message.return_value = "1234.5678"
         mock_slack_svc.pin_message.return_value = True
-        mock_slack_svc.post_message.return_value = True
         mock_slack_svc.build_channel_url.return_value = (
             "https://sentry.slack.com/archives/C_FALLBACK"
         )
@@ -408,8 +406,8 @@ class TestFallbackChannel:
 
         _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
 
-        mock_slack_svc.post_message_return_ts.assert_called_once()
-        metadata_text = mock_slack_svc.post_message_return_ts.call_args[0][1]
+        first_call = mock_slack_svc.post_message.call_args_list[0]
+        metadata_text = first_call[0][1]
         assert "Title: DB is on fire" in metadata_text
         assert "Severity: P1" in metadata_text
         assert "Description: Everything is broken" in metadata_text
@@ -425,9 +423,8 @@ class TestFallbackChannel:
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
     def test_posts_degraded_mode_warning(self, mock_slack_svc):
         mock_slack_svc.create_channel.return_value = "C_FALLBACK"
-        mock_slack_svc.post_message_return_ts.return_value = "1234.5678"
+        mock_slack_svc.post_message.return_value = "1234.5678"
         mock_slack_svc.pin_message.return_value = True
-        mock_slack_svc.post_message.return_value = True
         mock_slack_svc.build_channel_url.return_value = (
             "https://sentry.slack.com/archives/C_FALLBACK"
         )
@@ -449,9 +446,8 @@ class TestFallbackChannel:
             "INCIDENT_GUIDE_MESSAGE": "Welcome to incident response!",
         }
         mock_slack_svc.create_channel.return_value = "C_FALLBACK"
-        mock_slack_svc.post_message_return_ts.return_value = "1234.5678"
+        mock_slack_svc.post_message.return_value = "1234.5678"
         mock_slack_svc.pin_message.return_value = True
-        mock_slack_svc.post_message.return_value = True
         mock_slack_svc.build_channel_url.return_value = (
             "https://sentry.slack.com/archives/C_FALLBACK"
         )
@@ -472,9 +468,8 @@ class TestFallbackChannel:
     ):
         settings.SLACK = {**settings.SLACK, "ALWAYS_INVITED_IDS": ["U_ALWAYS"]}
         mock_slack_svc.create_channel.return_value = "C_FALLBACK"
-        mock_slack_svc.post_message_return_ts.return_value = "1234.5678"
+        mock_slack_svc.post_message.return_value = "1234.5678"
         mock_slack_svc.pin_message.return_value = True
-        mock_slack_svc.post_message.return_value = True
         mock_slack_svc.build_channel_url.return_value = (
             "https://sentry.slack.com/archives/C_FALLBACK"
         )
@@ -489,9 +484,8 @@ class TestFallbackChannel:
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
     def test_dms_user_with_channel_link(self, mock_slack_svc):
         mock_slack_svc.create_channel.return_value = "C_FALLBACK"
-        mock_slack_svc.post_message_return_ts.return_value = "1234.5678"
+        mock_slack_svc.post_message.return_value = "1234.5678"
         mock_slack_svc.pin_message.return_value = True
-        mock_slack_svc.post_message.return_value = True
         mock_slack_svc.build_channel_url.return_value = (
             "https://sentry.slack.com/archives/C_FALLBACK"
         )
@@ -514,7 +508,7 @@ class TestFallbackChannel:
         client.chat_postMessage.assert_called_once()
         dm_text = client.chat_postMessage.call_args[1]["text"]
         assert "Slack channel manually" in dm_text
-        mock_slack_svc.post_message_return_ts.assert_not_called()
+        mock_slack_svc.post_message.assert_not_called()
 
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
     def test_private_incident_skips_feed_and_external_resources(
@@ -525,9 +519,8 @@ class TestFallbackChannel:
             "INCIDENT_FEED_CHANNEL_ID": "C_FEED",
         }
         mock_slack_svc.create_channel.return_value = "C_FALLBACK"
-        mock_slack_svc.post_message_return_ts.return_value = "1234.5678"
+        mock_slack_svc.post_message.return_value = "1234.5678"
         mock_slack_svc.pin_message.return_value = True
-        mock_slack_svc.post_message.return_value = True
         mock_slack_svc.build_channel_url.return_value = (
             "https://sentry.slack.com/archives/C_FALLBACK"
         )
@@ -553,9 +546,8 @@ class TestFallbackChannel:
             "INCIDENT_FEED_CHANNEL_ID": "C_FEED",
         }
         mock_slack_svc.create_channel.return_value = "C_FALLBACK"
-        mock_slack_svc.post_message_return_ts.return_value = "1234.5678"
+        mock_slack_svc.post_message.return_value = "1234.5678"
         mock_slack_svc.pin_message.return_value = True
-        mock_slack_svc.post_message.return_value = True
         mock_slack_svc.build_channel_url.return_value = (
             "https://sentry.slack.com/archives/C_FALLBACK"
         )
