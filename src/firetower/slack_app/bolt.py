@@ -3,6 +3,7 @@ from typing import Any
 
 from datadog import statsd
 from django.conf import settings
+from django.db import close_old_connections
 from slack_bolt import App
 
 from firetower.slack_app.handlers.captain import (
@@ -66,11 +67,24 @@ KNOWN_SUBCOMMANDS = {
 _bolt_app: App | None = None
 
 
+def _db_connection_middleware(next: Any) -> None:
+    """Close stale Django DB connections before each Slack handler.
+
+    In a long-running Socket Mode process Django's request middleware never
+    runs, so connections can become stale/broken after the PostgreSQL server
+    drops idle SSL sessions.  Calling close_old_connections() here mirrors
+    what Django's BaseHandler does on request_started.
+    """
+    close_old_connections()
+    next()
+
+
 def get_bolt_app() -> App:
     """Lazy-init to avoid an auth_test API call at import time."""
     global _bolt_app  # noqa: PLW0603
     if _bolt_app is None:
         _bolt_app = App(token=settings.SLACK["BOT_TOKEN"])
+        _bolt_app.use(_db_connection_middleware)
         _bolt_app.command("/ft")(handle_command)
         _bolt_app.command("/ft-test")(handle_command)
         _bolt_app.command("/inc")(handle_command)
