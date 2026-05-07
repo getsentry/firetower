@@ -352,10 +352,14 @@ class TestBackfillSubmission:
         mock_slack_svc.join_channel.return_value = True
 
         def channel_info_matching_incident(channel_id):
-            incident = Incident.objects.get(title="Test Backfill")
+            try:
+                incident = Incident.objects.get(title="Test Backfill")
+                name = f"inc-{incident.id}"
+            except Incident.DoesNotExist:
+                name = "inc-unknown"
             return {
                 "id": channel_id,
-                "name": f"inc-{incident.id}",
+                "name": name,
                 "is_private": False,
             }
 
