@@ -191,8 +191,8 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
             text=(
                 f"Backfill incident created: {incident_url}\n"
                 f"However, the bot could not join <#{channel_id}>. "
-                f"Please invite the Firetower bot to the channel, "
-                f"then run `/ft backfill` again from the channel to retry setup."
+                f"Please invite the Firetower bot to the channel and "
+                f"manually set the channel topic and bookmark."
             ),
         )
         return
