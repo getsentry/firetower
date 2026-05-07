@@ -102,7 +102,7 @@ def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
             logger.exception(f"Failed to page {policy_name} for incident {incident.id}")
 
 
-def _build_channel_name(incident: Incident) -> str:
+def build_channel_name(incident: Incident) -> str:
     return incident.incident_number.lower()
 
 
@@ -114,9 +114,7 @@ def _get_slack_user_id(user: User) -> str | None:
     return profile.external_id if profile else None
 
 
-def _build_channel_topic(
-    incident: Incident, captain_slack_id: str | None = None
-) -> str:
+def build_channel_topic(incident: Incident, captain_slack_id: str | None = None) -> str:
     base_url = settings.FIRETOWER_BASE_URL
     incident_url = f"{base_url}/{incident.incident_number}"
 
@@ -577,7 +575,7 @@ def on_incident_created(incident: Incident) -> None:
     elif created and slack_link is not None:
         try:
             channel_id = _slack_service.create_channel(
-                _build_channel_name(incident), is_private=incident.is_private
+                build_channel_name(incident), is_private=incident.is_private
             )
             if not channel_id:
                 slack_link.delete()
@@ -612,7 +610,7 @@ def on_incident_created(incident: Incident) -> None:
 
         try:
             _slack_service.set_channel_topic(
-                channel_id, _build_channel_topic(incident, captain_slack_id)
+                channel_id, build_channel_topic(incident, captain_slack_id)
             )
         except Exception:
             logger.exception(f"Failed to set channel topic for incident {incident.id}")
@@ -751,7 +749,7 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
     try:
         channel_id = _get_channel_id(incident)
         if channel_id:
-            _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+            _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
             incident_url = _build_incident_url(incident)
             _slack_service.post_message(
                 channel_id,
@@ -798,7 +796,7 @@ def on_title_changed(incident: Incident) -> None:
         if not channel_id:
             return
 
-        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+        _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
     except Exception:
         logger.exception(f"Error in on_title_changed for incident {incident.id}")
 
@@ -827,7 +825,7 @@ def on_captain_changed(incident: Incident) -> None:
         if not channel_id:
             return
 
-        _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+        _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
 
         incident_url = _build_incident_url(incident)
         if incident.captain:

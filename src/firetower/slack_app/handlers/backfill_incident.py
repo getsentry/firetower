@@ -5,7 +5,7 @@ from typing import Any
 from django.conf import settings
 
 from firetower.auth.services import get_or_create_user_from_slack_id
-from firetower.incidents.hooks import _build_channel_name, _build_channel_topic
+from firetower.incidents.hooks import build_channel_name, build_channel_topic
 from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
@@ -63,7 +63,7 @@ def _setup_channel_for_incident(
         )
         return
 
-    expected_name = _build_channel_name(incident)
+    expected_name = build_channel_name(incident)
     channel_info = _slack_service.get_channel_info(channel_id)
     if channel_info and channel_info["name"] != expected_name:
         renamed = _slack_service.rename_channel(channel_id, expected_name)
@@ -82,7 +82,7 @@ def _setup_channel_for_incident(
                 ),
             )
 
-    _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+    _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
     base_url = settings.FIRETOWER_BASE_URL
     incident_url = f"{base_url}/{incident.incident_number}"
     _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
