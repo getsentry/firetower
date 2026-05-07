@@ -353,6 +353,7 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
         return
 
     expected_name = _expected_channel_name(incident.id)
+    channel_info = _slack_service.get_channel_info(channel_id)
     if channel_info and channel_info["name"] != expected_name:
         renamed = _slack_service.rename_channel(channel_id, expected_name)
         if not renamed:
