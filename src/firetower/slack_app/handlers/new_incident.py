@@ -9,6 +9,7 @@ from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.integrations.services import SlackService
 from firetower.integrations.services.slack import escape_slack_text
 from firetower.slack_app.handlers.utils import (
+    _DEFAULT_SEVERITY,
     build_incident_form_blocks,
     parse_incident_form_values,
 )
@@ -135,7 +136,7 @@ def handle_new_incident_submission(
 
     data: dict[str, Any] = {
         "title": form["title"],
-        "severity": form["severity"],
+        "severity": form["severity"] or _DEFAULT_SEVERITY.value,
         "description": form["description"],
         "impact_summary": form["impact_summary"],
         "captain": captain_email,

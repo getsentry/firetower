@@ -157,12 +157,10 @@ def parse_incident_form_values(view: dict) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
 
     title = values.get("title_block", {}).get("title", {}).get("value", "").strip()
-    severity = (
-        values.get("severity_block", {})
-        .get("severity", {})
-        .get("selected_option", {})
-        .get("value", _DEFAULT_SEVERITY.value)
+    selected_option = (
+        values.get("severity_block", {}).get("severity", {}).get("selected_option")
     )
+    severity = selected_option.get("value") if selected_option else None
     description = (
         values.get("description_block", {}).get("description", {}).get("value") or ""
     )

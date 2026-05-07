@@ -258,7 +258,6 @@ def handle_update_incident_submission(
 
     data: dict[str, Any] = {
         "title": form["title"],
-        "severity": form["severity"],
         "description": form["description"],
         "impact_summary": form["impact_summary"],
         "is_private": is_private,
@@ -266,6 +265,8 @@ def handle_update_incident_submission(
         "affected_service_tags": form["affected_service_tags"],
         "affected_region_tags": form["affected_region_tags"],
     }
+    if form["severity"]:
+        data["severity"] = form["severity"]
 
     if form["captain_slack_id"]:
         captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
