@@ -45,6 +45,61 @@ def _build_backfill_modal(channel_id: str, user_id: str = "") -> dict:
     }
 
 
+def _setup_channel_for_incident(
+    incident: Any, channel_id: str, notify_user_id: str, client: Any
+) -> None:
+    joined = _slack_service.join_channel(channel_id)
+    if not joined:
+        base_url = settings.FIRETOWER_BASE_URL
+        incident_url = f"{base_url}/{incident.incident_number}"
+        client.chat_postMessage(
+            channel=notify_user_id,
+            text=(
+                f"Incident: {incident_url}\n"
+                f"The bot could not join <#{channel_id}>. "
+                f"Please invite the Firetower bot to the channel, "
+                f"then run `/ft backfill` again to retry setup."
+            ),
+        )
+        return
+
+    expected_name = _build_channel_name(incident)
+    channel_info = _slack_service.get_channel_info(channel_id)
+    if channel_info and channel_info["name"] != expected_name:
+        renamed = _slack_service.rename_channel(channel_id, expected_name)
+        if not renamed:
+            logger.warning(
+                "Failed to rename channel %s to %s for incident %s",
+                channel_id,
+                expected_name,
+                incident.id,
+            )
+            client.chat_postMessage(
+                channel=channel_id,
+                text=(
+                    f"The bot could not rename this channel to `{expected_name}`. "
+                    f"Please rename the channel manually."
+                ),
+            )
+
+    _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
+    base_url = settings.FIRETOWER_BASE_URL
+    incident_url = f"{base_url}/{incident.incident_number}"
+    _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
+
+    try:
+        sync_incident_participants_from_slack(incident, force=True)
+    except Exception:
+        logger.exception(
+            "Failed to sync participants for backfill incident %s", incident.id
+        )
+
+    client.chat_postMessage(
+        channel=notify_user_id,
+        text=f"Channel setup complete for {incident.incident_number}: <#{channel_id}>",
+    )
+
+
 def handle_backfill_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
     ack()
 
@@ -79,8 +134,17 @@ def handle_backfill_command(ack: Any, body: dict, command: dict, respond: Any) -
         .first()
     )
     if existing_link:
+        from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
+
+        slack_user_id = body.get("user_id", "")
         respond(
-            f"This channel is already linked to {existing_link.incident.incident_number}."
+            f"This channel is already linked to {existing_link.incident.incident_number}. Retrying channel setup..."
+        )
+        _setup_channel_for_incident(
+            existing_link.incident,
+            channel_id,
+            slack_user_id,
+            get_bolt_app().client,
         )
         return
 
@@ -183,53 +247,4 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
         )
         return
 
-    joined = _slack_service.join_channel(channel_id)
-    if not joined:
-        base_url = settings.FIRETOWER_BASE_URL
-        incident_url = f"{base_url}/{incident.incident_number}"
-        client.chat_postMessage(
-            channel=slack_user_id,
-            text=(
-                f"Backfill incident created: {incident_url}\n"
-                f"However, the bot could not join <#{channel_id}>. "
-                f"Please invite the Firetower bot to the channel and "
-                f"manually set the channel topic and bookmark."
-            ),
-        )
-        return
-
-    expected_name = _build_channel_name(incident)
-    channel_info = _slack_service.get_channel_info(channel_id)
-    if channel_info and channel_info["name"] != expected_name:
-        renamed = _slack_service.rename_channel(channel_id, expected_name)
-        if not renamed:
-            logger.warning(
-                "Failed to rename channel %s to %s for incident %s",
-                channel_id,
-                expected_name,
-                incident.id,
-            )
-            client.chat_postMessage(
-                channel=channel_id,
-                text=(
-                    f"The bot could not rename this channel to `{expected_name}`. "
-                    f"Please rename the channel manually."
-                ),
-            )
-
-    _slack_service.set_channel_topic(channel_id, _build_channel_topic(incident))
-    base_url = settings.FIRETOWER_BASE_URL
-    incident_url = f"{base_url}/{incident.incident_number}"
-    _slack_service.add_bookmark(channel_id, "Firetower Incident", incident_url)
-
-    try:
-        sync_incident_participants_from_slack(incident, force=True)
-    except Exception:
-        logger.exception(
-            "Failed to sync participants for backfill incident %s", incident.id
-        )
-
-    dm_message = (
-        f"Backfill incident created: {incident_url}\nSlack channel: <#{channel_id}>"
-    )
-    client.chat_postMessage(channel=slack_user_id, text=dm_message)
+    _setup_channel_for_incident(incident, channel_id, slack_user_id, client)

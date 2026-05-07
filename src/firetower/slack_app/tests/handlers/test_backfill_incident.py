@@ -106,13 +106,20 @@ class TestBackfillCommand:
         msg = respond.call_args[0][0]
         assert "only allowed on incident channels" in msg
 
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.sync_incident_participants_from_slack"
+    )
     @patch("firetower.slack_app.handlers.backfill_incident._slack_service")
-    def test_rejects_already_linked_channel(self, mock_slack_svc):
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    def test_retries_setup_on_already_linked_channel(
+        self, mock_get_bolt_app, mock_slack_svc, mock_sync
+    ):
         mock_slack_svc.get_channel_info.return_value = {
             "id": "C_EXISTING",
             "name": "inc-1234",
             "is_private": False,
         }
+        mock_slack_svc.join_channel.return_value = True
         user = User.objects.create_user(
             username="test@example.com", email="test@example.com"
         )
@@ -127,7 +134,7 @@ class TestBackfillCommand:
         )
 
         ack = MagicMock()
-        body = {"channel_id": "C_EXISTING"}
+        body = {"channel_id": "C_EXISTING", "user_id": "U_TEST"}
         command = {"command": "/ft", "text": "backfill"}
         respond = MagicMock()
 
@@ -136,6 +143,10 @@ class TestBackfillCommand:
         respond.assert_called_once()
         msg = respond.call_args[0][0]
         assert "already linked" in msg
+        assert "Retrying channel setup" in msg
+        mock_slack_svc.join_channel.assert_called_once_with("C_EXISTING")
+        mock_slack_svc.set_channel_topic.assert_called_once()
+        mock_slack_svc.add_bookmark.assert_called_once()
 
     @patch("firetower.slack_app.handlers.backfill_incident._slack_service")
     def test_channel_from_args(self, mock_slack_svc):
@@ -288,6 +299,7 @@ class TestBackfillSubmission:
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "could not join" in msg
+        assert "/ft backfill" in msg
 
     @patch(
         "firetower.slack_app.handlers.backfill_incident.sync_incident_participants_from_slack"
