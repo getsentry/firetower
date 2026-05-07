@@ -527,3 +527,25 @@ class TestSlackService:
         replies = service.get_thread_replies("C123", "1.0")
 
         assert replies == []
+
+    def test_post_message_return_ts_success(self):
+        service, mock_client = self._make_service()
+        mock_client.chat_postMessage.return_value = {"ts": "1234567890.123456"}
+        result = service.post_message_return_ts("C12345", "hello")
+        assert result == "1234567890.123456"
+        mock_client.chat_postMessage.assert_called_once_with(
+            channel="C12345", text="hello"
+        )
+
+    def test_post_message_return_ts_no_client(self):
+        mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}
+        with patch.object(settings, "SLACK", mock_slack_config):
+            service = SlackService()
+        assert service.post_message_return_ts("C12345", "hello") is None
+
+    def test_post_message_return_ts_api_error(self):
+        service, mock_client = self._make_service()
+        mock_response = MagicMock()
+        mock_client.chat_postMessage.side_effect = SlackApiError("error", mock_response)
+        assert service.post_message_return_ts("C12345", "hello") is None
+
