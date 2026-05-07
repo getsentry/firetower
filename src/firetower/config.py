@@ -71,6 +71,7 @@ class LinearConfig:
     action_item_sync_throttle_seconds: int
     team_id: str = ""
     project_id: str = ""
+    sync_identifiers: bool = False
 
 
 @deserialize

@@ -43,6 +43,8 @@ client_secret = ""
 action_item_sync_throttle_seconds = 300
 team_id = ""
 project_id = ""
+# When true, claim the Linear issue matching the incident number (e.g. INC-2160) instead of creating a new one.
+sync_identifiers = false
 
 [notion]
 integration_token = ""

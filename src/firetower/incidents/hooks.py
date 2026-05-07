@@ -908,22 +908,36 @@ def _create_linear_parent_issue(incident: Incident) -> None:
     try:
         linear_service = LinearService()
         project_id = settings.LINEAR.get("PROJECT_ID") or None
-
-        issue = _claim_linear_issue(linear_service, incident, team_id, project_id)
-        if not issue:
-            linear_link.delete()
-            logger.warning(f"Failed to claim Linear issue for incident {incident.id}")
-            return
-
+        sync_identifiers = settings.LINEAR.get("SYNC_IDENTIFIERS", False)
         title = _linear_issue_title(incident)
-        states = linear_service.get_workflow_states(team_id)
-        started_state_id = states.get("started") if states else None
-        linear_service.update_issue(
-            issue["id"],
-            title=title,
-            description=LINEAR_PARENT_DESCRIPTION,
-            state_id=started_state_id,
-        )
+
+        if sync_identifiers:
+            issue = _claim_linear_issue(linear_service, incident, team_id, project_id)
+            if not issue:
+                linear_link.delete()
+                logger.warning(
+                    f"Failed to claim Linear issue for incident {incident.id}"
+                )
+                return
+
+            states = linear_service.get_workflow_states(team_id)
+            started_state_id = states.get("started") if states else None
+            linear_service.update_issue(
+                issue["id"],
+                title=title,
+                description=LINEAR_PARENT_DESCRIPTION,
+                state_id=started_state_id,
+            )
+        else:
+            issue = linear_service.create_issue(
+                title, LINEAR_PARENT_DESCRIPTION, team_id, project_id
+            )
+            if not issue:
+                linear_link.delete()
+                logger.warning(
+                    f"Failed to create Linear issue for incident {incident.id}"
+                )
+                return
 
         linear_link.url = issue["url"]
         linear_link.save(update_fields=["url"])
