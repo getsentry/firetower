@@ -6,10 +6,10 @@ from typing import Any
 
 import requests
 import sentry_sdk
-from slack_sdk.errors import SlackApiError
 from datadog import statsd
 from django.conf import settings
 from django.db import transaction
+from slack_sdk.errors import SlackApiError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
