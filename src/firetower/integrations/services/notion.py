@@ -197,7 +197,7 @@ class NotionService:
     def create_troubleshooting_page(
         self,
         incident_number: str,
-        incident_url: str,
+        incident_url: str | None,
     ) -> dict[str, Any]:
         if not self.troubleshooting_database_id:
             raise ValueError("Troubleshooting database ID is not configured")
@@ -214,8 +214,9 @@ class NotionService:
                 ]
             },
             "Incident": {"select": {"name": incident_number}},
-            "Jira": {"url": incident_url},
         }
+        if incident_url:
+            properties["Jira"] = {"url": incident_url}
 
         logger.debug(
             "Creating troubleshooting doc with database_id=%r",

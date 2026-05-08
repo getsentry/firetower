@@ -281,7 +281,8 @@ class TestSlackService:
 
     def test_post_message_success(self):
         service, mock_client = self._make_service()
-        assert service.post_message("C12345", "hello") is True
+        mock_client.chat_postMessage.return_value = {"ts": "1111.2222"}
+        assert service.post_message("C12345", "hello") == "1111.2222"
         mock_client.chat_postMessage.assert_called_once_with(
             channel="C12345", text="hello", blocks=None
         )
@@ -289,7 +290,8 @@ class TestSlackService:
     def test_post_message_with_blocks(self):
         service, mock_client = self._make_service()
         blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": "hi"}}]
-        assert service.post_message("C12345", "hello", blocks=blocks) is True
+        mock_client.chat_postMessage.return_value = {"ts": "1111.2222"}
+        assert service.post_message("C12345", "hello", blocks=blocks) == "1111.2222"
         mock_client.chat_postMessage.assert_called_once_with(
             channel="C12345", text="hello", blocks=blocks
         )
@@ -298,23 +300,25 @@ class TestSlackService:
         mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}
         with patch.object(settings, "SLACK", mock_slack_config):
             service = SlackService()
-        assert service.post_message("C12345", "hello") is False
+        assert service.post_message("C12345", "hello") is None
 
     def test_post_message_api_error(self):
         service, mock_client = self._make_service()
         mock_response = MagicMock()
         mock_client.chat_postMessage.side_effect = SlackApiError("error", mock_response)
-        assert service.post_message("C12345", "hello") is False
+        assert service.post_message("C12345", "hello") is None
 
     def test_post_message_not_in_channel_join_and_retry_succeeds(self):
         service, mock_client = self._make_service()
         not_in_channel_response = MagicMock()
         not_in_channel_response.get.return_value = "not_in_channel"
+        retry_response = MagicMock()
+        retry_response.get.return_value = "3333.4444"
         mock_client.chat_postMessage.side_effect = [
             SlackApiError("not_in_channel", not_in_channel_response),
-            MagicMock(),
+            retry_response,
         ]
-        assert service.post_message("C12345", "hello") is True
+        assert service.post_message("C12345", "hello") == "3333.4444"
         mock_client.conversations_join.assert_called_once_with(channel="C12345")
         assert mock_client.chat_postMessage.call_count == 2
 
@@ -329,7 +333,7 @@ class TestSlackService:
         mock_client.conversations_join.side_effect = SlackApiError(
             "channel_not_found", join_error_response
         )
-        assert service.post_message("C12345", "hello") is False
+        assert service.post_message("C12345", "hello") is None
         mock_client.conversations_join.assert_called_once_with(channel="C12345")
         assert mock_client.chat_postMessage.call_count == 1
 
@@ -342,7 +346,7 @@ class TestSlackService:
             SlackApiError("not_in_channel", not_in_channel_response),
             SlackApiError("channel_not_found", retry_error_response),
         ]
-        assert service.post_message("C12345", "hello") is False
+        assert service.post_message("C12345", "hello") is None
         mock_client.conversations_join.assert_called_once_with(channel="C12345")
         assert mock_client.chat_postMessage.call_count == 2
 
@@ -567,3 +571,22 @@ class TestSlackService:
         replies = service.get_thread_replies("C123", "1.0")
 
         assert replies == []
+
+    def test_pin_message_success(self):
+        service, mock_client = self._make_service()
+        assert service.pin_message("C12345", "1234567890.123456") is True
+        mock_client.pins_add.assert_called_once_with(
+            channel="C12345", timestamp="1234567890.123456"
+        )
+
+    def test_pin_message_no_client(self):
+        mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}
+        with patch.object(settings, "SLACK", mock_slack_config):
+            service = SlackService()
+        assert service.pin_message("C12345", "1234567890.123456") is False
+
+    def test_pin_message_api_error(self):
+        service, mock_client = self._make_service()
+        mock_response = MagicMock()
+        mock_client.pins_add.side_effect = SlackApiError("error", mock_response)
+        assert service.pin_message("C12345", "1234567890.123456") is False

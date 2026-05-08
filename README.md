@@ -48,6 +48,42 @@ bun dev
 
 The dev server will be available at http://localhost:5173.
 
+### Local Slack App
+
+Firetower's Slack integration uses [Socket Mode](https://api.slack.com/apis/socket-mode), so no public URL or tunnel is needed for local development.
+
+#### 1. Create a Slack app
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) and choose **Create New App > From a manifest**.
+2. Select your development workspace.
+3. Paste the contents of `slack-app-manifest.yaml`, using the `# test:` values commented beside each field (e.g. name `Firetower Test`, command `/ft-test`).
+4. Install the app to your workspace when prompted.
+
+#### 2. Collect tokens
+
+From your app's settings page, grab two tokens and add them to `config.toml`:
+
+| Token | Where to find it | config.toml key |
+|---|---|---|
+| **Bot token** (`xoxb-...`) | OAuth & Permissions > Bot User OAuth Token | `slack.bot_token` |
+| **App-level token** (`xapp-...`) | Basic Information > App-Level Tokens (create one with the `connections:write` scope) | `slack.app_token` |
+
+Also set `slack.team_id` to your workspace's team ID (visible in the workspace URL or via the Slack API).
+
+#### 3. Configure a feed channel
+
+Create or choose a Slack channel for incident notifications and set its ID as `slack.incident_feed_channel_id` in `config.toml`. Invite the bot to that channel.
+
+#### 4. Run the bot
+
+With the database and backend already running:
+
+```sh
+uv run manage.py run_slack_bot
+```
+
+The bot connects via WebSocket and registers the `/ft-test` and `/testinc` slash commands. Type `/ft-test help` in Slack to verify.
+
 ## Development
 
 ### Running Tests

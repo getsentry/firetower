@@ -126,8 +126,8 @@ class TestOnIncidentCreated:
             email="reporter@example.com",
         )
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
     def test_creates_channel_and_link(
@@ -186,13 +186,14 @@ class TestOnIncidentCreated:
             incident=incident, type=ExternalLinkType.SLACK
         ).exists()
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
     def test_invites_captain_with_slack_profile(
-        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel, settings
     ):
+        settings.SLACK["ALWAYS_INVITED_IDS"] = []
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
 
@@ -251,8 +252,8 @@ class TestOnIncidentCreated:
         ]
         assert len(feed_calls) == 0
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
     def test_invites_always_invited_ids(
@@ -898,8 +899,8 @@ class TestOnIncidentCreatedPagerDuty:
 
         mock_page.assert_called_once_with(incident, channel_id="C99999")
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
     def test_pages_before_inviting_oncall_and_creating_status_channel(
@@ -1385,10 +1386,11 @@ class TestInviteOncallUsers:
         assert "U_USER1" in message
         assert "U_USER2" in message
 
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._slack_service")
     def test_on_incident_created_calls_invite_oncall(
-        self, mock_slack, mock_invite_oncall
+        self, mock_slack, mock_invite_oncall, mock_status_channel
     ):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
@@ -1400,7 +1402,9 @@ class TestInviteOncallUsers:
 
         on_incident_created(incident)
 
-        mock_invite_oncall.assert_called_once_with(incident, "C99999")
+        mock_invite_oncall.assert_called_once_with(
+            incident.severity, "C99999", mock_slack, is_private=False
+        )
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
@@ -1685,8 +1689,8 @@ class TestCreateStatusChannel:
 
 @pytest.mark.django_db
 class TestOnIncidentCreatedDatadog:
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -1738,8 +1742,8 @@ class TestOnIncidentCreatedDatadog:
         ]
         assert len(message_calls) == 1
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -1782,8 +1786,8 @@ class TestOnIncidentCreatedDatadog:
         ]
         assert len(bookmark_calls) == 0
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -1821,8 +1825,8 @@ class TestOnIncidentCreatedDatadog:
         ]
         assert len(bookmark_calls) == 0
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -1867,8 +1871,8 @@ class TestOnIncidentCreatedDatadog:
         ]
         assert len(notebook_msg_calls) == 0
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -1896,8 +1900,8 @@ class TestOnIncidentCreatedDatadog:
         # Slack channel was still created (the rest of the hook ran)
         mock_slack.create_channel.assert_called_once()
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -1934,8 +1938,8 @@ class TestOnIncidentCreatedDatadog:
         )
         assert link.url == "https://app.datadoghq.com/notebook/existing"
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -1977,8 +1981,8 @@ class TestOnIncidentCreatedDatadog:
         )
         assert link.url == "https://app.datadoghq.com/notebook/recovered"
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -2022,8 +2026,8 @@ class TestOnIncidentCreatedDatadog:
         ]
         assert len(bookmark_calls) == 0
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -2066,8 +2070,8 @@ class TestOnIncidentCreatedDatadog:
         ]
         assert len(notebook_msg_calls) == 1
 
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks.DatadogService")
     @patch("firetower.incidents.hooks._slack_service")
@@ -2331,8 +2335,8 @@ class TestCreateTroubleshootingDoc:
 @pytest.mark.django_db
 class TestOnIncidentCreatedTroubleshootingDoc:
     @patch("firetower.incidents.hooks._create_troubleshooting_doc")
-    @patch("firetower.incidents.hooks._create_status_channel")
-    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
     def test_creates_troubleshooting_doc(

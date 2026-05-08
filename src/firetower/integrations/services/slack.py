@@ -255,32 +255,49 @@ class SlackService:
 
     def post_message(
         self, channel_id: str, text: str, blocks: list[dict] | None = None
-    ) -> bool:
+    ) -> str | None:
         if not self.client:
             logger.warning("Cannot post message - Slack client not initialized")
-            return False
+            return None
 
         try:
             logger.info(f"Posting message to channel {channel_id}")
-            self.client.chat_postMessage(channel=channel_id, text=text, blocks=blocks)
-            return True
+            response = self.client.chat_postMessage(
+                channel=channel_id, text=text, blocks=blocks
+            )
+            return response.get("ts")
         except SlackApiError as e:
             if e.response.get("error") == "not_in_channel":
                 logger.info(f"Not in channel {channel_id}, joining and retrying post")
                 if self.join_channel(channel_id):
                     try:
-                        self.client.chat_postMessage(
+                        response = self.client.chat_postMessage(
                             channel=channel_id, text=text, blocks=blocks
                         )
-                        return True
+                        return response.get("ts")
                     except SlackApiError as retry_error:
                         logger.error(
                             f"Error posting message after joining channel: {retry_error}",
                             extra={"channel_id": channel_id},
                         )
-                        return False
+                        return None
             logger.error(
                 f"Error posting message: {e}", extra={"channel_id": channel_id}
+            )
+            return None
+
+    def pin_message(self, channel_id: str, message_ts: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot pin message - Slack client not initialized")
+            return False
+
+        try:
+            logger.info(f"Pinning message in channel {channel_id}")
+            self.client.pins_add(channel=channel_id, timestamp=message_ts)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error pinning message: {e}", extra={"channel_id": channel_id}
             )
             return False
 

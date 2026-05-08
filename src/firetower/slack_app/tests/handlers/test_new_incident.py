@@ -2,11 +2,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth.models import User
+from django.db import OperationalError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import Incident, IncidentSeverity, Tag, TagType
 from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.new_incident import (
+    _create_fallback_channel,
     handle_new_command,
     handle_new_incident_submission,
     handle_tag_options,
@@ -225,12 +227,113 @@ class TestNewIncidentSubmission:
         settings.HOOKS_ENABLED = True
 
     @pytest.mark.usefixtures("_enable_hooks")
+    @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
+    @patch(
+        "firetower.incidents.serializers.on_incident_created",
+        side_effect=OperationalError("db is down"),
+    )
+    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
+    def test_save_failure_creates_fallback_channel(
+        self, mock_get_user, mock_hook, mock_fallback
+    ):
+        mock_get_user.return_value = self.user
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "Test Incident"}},
+                    "severity_block": {
+                        "severity": {
+                            "selected_option": {"value": "P1"},
+                        }
+                    },
+                    "description_block": {"description": {"value": "Description"}},
+                    "impact_summary_block": {
+                        "impact_summary": {"value": "Users affected"}
+                    },
+                    "captain_block": {"captain_select": {"selected_user": "U_CAP"}},
+                    "private_block": {"is_private": {"selected_options": []}},
+                    "impact_type_block": {"impact_type_tags": {"selected_options": []}},
+                    "affected_service_block": {
+                        "affected_service_tags": {"selected_options": []}
+                    },
+                    "affected_region_block": {
+                        "affected_region_tags": {"selected_options": []}
+                    },
+                }
+            }
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        mock_fallback.assert_called_once()
+        call_args = mock_fallback.call_args
+        assert call_args[0][0] is client
+        assert call_args[0][1] == "U_TEST"
+        form_data = call_args[0][2]
+        assert form_data["title"] == "Test Incident"
+        assert form_data["severity"] == "P1"
+        assert form_data["description"] == "Description"
+        assert form_data["captain_slack_id"] == "U_CAP"
+        assert form_data["is_private"] is False
+
+    @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
+    @patch(
+        "firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id",
+        side_effect=OperationalError("db is down"),
+    )
+    def test_db_down_before_save_creates_fallback_channel(
+        self, mock_get_user, mock_fallback
+    ):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "DB Down Incident"}},
+                    "severity_block": {
+                        "severity": {
+                            "selected_option": {"value": "P0"},
+                        }
+                    },
+                    "description_block": {
+                        "description": {"value": "Everything is on fire"}
+                    },
+                    "impact_summary_block": {"impact_summary": {"value": "All users"}},
+                    "captain_block": {"captain_select": {"selected_user": None}},
+                    "private_block": {"is_private": {"selected_options": []}},
+                    "impact_type_block": {"impact_type_tags": {"selected_options": []}},
+                    "affected_service_block": {
+                        "affected_service_tags": {"selected_options": []}
+                    },
+                    "affected_region_block": {
+                        "affected_region_tags": {"selected_options": []}
+                    },
+                }
+            }
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        mock_fallback.assert_called_once()
+        form_data = mock_fallback.call_args[0][2]
+        assert form_data["title"] == "DB Down Incident"
+        assert form_data["severity"] == "P0"
+
+    @pytest.mark.usefixtures("_enable_hooks")
+    @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
     @patch(
         "firetower.incidents.serializers.on_incident_created",
         side_effect=RuntimeError("boom"),
     )
     @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
-    def test_save_failure_sends_error_dm(self, mock_get_user, mock_hook):
+    def test_non_db_save_failure_sends_dm_without_fallback(
+        self, mock_get_user, mock_hook, mock_fallback
+    ):
         mock_get_user.return_value = self.user
 
         ack = MagicMock()
@@ -254,10 +357,10 @@ class TestNewIncidentSubmission:
         handle_new_incident_submission(ack, body, view, client)
 
         ack.assert_called_once_with()
+        mock_fallback.assert_not_called()
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Something went wrong" in msg
-        assert "Slack channel manually" in msg
 
 
 @pytest.mark.django_db
@@ -306,3 +409,205 @@ class TestTagOptions:
         options = ack.call_args[1]["options"]
         assert len(options) == 1
         assert options[0]["text"]["text"] == "us-east-1"
+
+
+class TestFallbackChannel:
+    def _base_form_data(self):
+        return {
+            "title": "DB is on fire",
+            "severity": "P1",
+            "description": "Everything is broken",
+            "impact_summary": "All users affected",
+            "captain_slack_id": "U_CAPTAIN",
+            "is_private": False,
+            "impact_type_tags": ["Degraded Service"],
+            "affected_service_tags": ["api"],
+            "affected_region_tags": ["us-east-1"],
+        }
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_creates_channel_with_uuid_name(self, mock_slack_svc):
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
+
+        # First create_channel call is the incident channel;
+        # a second call may happen for the status channel (P0/P1).
+        first_call = mock_slack_svc.create_channel.call_args_list[0]
+        channel_name = first_call[0][0]
+        assert channel_name.startswith("inc-")
+        assert len(channel_name) == 12  # "inc-" + 8 hex chars
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_posts_and_pins_metadata(self, mock_slack_svc):
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
+
+        first_call = mock_slack_svc.post_message.call_args_list[0]
+        metadata_text = first_call[0][1]
+        assert "Title: DB is on fire" in metadata_text
+        assert "Severity: P1" in metadata_text
+        assert "Description: Everything is broken" in metadata_text
+        assert "Impact Summary: All users affected" in metadata_text
+        assert "Captain: <@U_CAPTAIN>" in metadata_text
+        assert "Reporter: <@U_REPORTER>" in metadata_text
+        assert "Private: no" in metadata_text
+        assert "Impact Types: Degraded Service" in metadata_text
+        assert "Affected Services: api" in metadata_text
+        assert "Affected Regions: us-east-1" in metadata_text
+        mock_slack_svc.pin_message.assert_called_once_with("C_FALLBACK", "1234.5678")
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_posts_degraded_mode_warning(self, mock_slack_svc):
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
+
+        warning_calls = [
+            c
+            for c in mock_slack_svc.post_message.call_args_list
+            if "degraded mode" in str(c)
+        ]
+        assert len(warning_calls) >= 1
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_posts_guide_message(self, mock_slack_svc, settings):
+        settings.SLACK = {
+            **settings.SLACK,
+            "INCIDENT_GUIDE_MESSAGE": "Welcome to incident response!",
+        }
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
+
+        guide_calls = [
+            c
+            for c in mock_slack_svc.post_message.call_args_list
+            if "Welcome to incident response!" in str(c)
+        ]
+        assert len(guide_calls) == 1
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_invites_captain_reporter_and_always_invited(
+        self, mock_slack_svc, settings
+    ):
+        settings.SLACK = {**settings.SLACK, "ALWAYS_INVITED_IDS": ["U_ALWAYS"]}
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
+
+        mock_slack_svc.invite_to_channel.assert_any_call(
+            "C_FALLBACK", ["U_CAPTAIN", "U_REPORTER", "U_ALWAYS"]
+        )
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_dms_user_with_channel_link(self, mock_slack_svc):
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
+
+        client.chat_postMessage.assert_called_once()
+        dm_text = client.chat_postMessage.call_args[1]["text"]
+        assert "degraded mode" in dm_text
+        assert "<#C_FALLBACK>" in dm_text
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_channel_creation_failure_sends_manual_dm(self, mock_slack_svc):
+        mock_slack_svc.create_channel.return_value = None
+        client = MagicMock()
+
+        _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
+
+        client.chat_postMessage.assert_called_once()
+        dm_text = client.chat_postMessage.call_args[1]["text"]
+        assert "Slack channel manually" in dm_text
+        mock_slack_svc.post_message.assert_not_called()
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_private_incident_skips_feed_and_external_resources(
+        self, mock_slack_svc, settings
+    ):
+        settings.SLACK = {
+            **settings.SLACK,
+            "INCIDENT_FEED_CHANNEL_ID": "C_FEED",
+        }
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        form_data = self._base_form_data()
+        form_data["is_private"] = True
+
+        _create_fallback_channel(client, "U_REPORTER", form_data)
+
+        # Only one create_channel call (the main channel, no status channel)
+        assert mock_slack_svc.create_channel.call_count == 1
+        # No feed channel message
+        feed_calls = [
+            c for c in mock_slack_svc.post_message.call_args_list if c[0][0] == "C_FEED"
+        ]
+        assert len(feed_calls) == 0
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_non_private_posts_to_feed_channel(self, mock_slack_svc, settings):
+        settings.SLACK = {
+            **settings.SLACK,
+            "INCIDENT_FEED_CHANNEL_ID": "C_FEED",
+        }
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        _create_fallback_channel(client, "U_REPORTER", self._base_form_data())
+
+        feed_calls = [
+            c for c in mock_slack_svc.post_message.call_args_list if c[0][0] == "C_FEED"
+        ]
+        assert len(feed_calls) == 1
+        assert "degraded mode" in feed_calls[0][0][1]
+        assert "DB is on fire" in feed_calls[0][0][1]
