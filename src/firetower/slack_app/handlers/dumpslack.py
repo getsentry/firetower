@@ -140,12 +140,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
 
     if notion_page_created:
         try:
-            client.bookmarks_add(
-                channel_id=channel_id,
-                title="Postmortem Doc",
-                type="link",
-                link=page_url,
-            )
+            slack_service.add_bookmark(channel_id, "Postmortem Doc", page_url)
         except Exception:
             logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
 

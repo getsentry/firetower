@@ -296,6 +296,22 @@ class SlackService:
             )
             return True
         except SlackApiError as e:
+            if e.response.get("error") == "not_in_channel":
+                logger.info(
+                    f"Not in channel {channel_id}, joining and retrying bookmark"
+                )
+                if self.join_channel(channel_id):
+                    try:
+                        self.client.bookmarks_add(
+                            channel_id=channel_id, title=title, type="link", link=link
+                        )
+                        return True
+                    except SlackApiError as retry_error:
+                        logger.error(
+                            f"Error adding bookmark after joining channel: {retry_error}",
+                            extra={"channel_id": channel_id},
+                        )
+                        return False
             logger.error(
                 f"Error adding bookmark: {e}", extra={"channel_id": channel_id}
             )
