@@ -139,8 +139,10 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         logger.exception("Failed to add AI timeline to Notion page %s", page_id)
 
     if notion_page_created:
-        if not slack_service.add_bookmark(channel_id, "Postmortem Doc", page_url):
-            logger.error("Failed to add Notion bookmark to channel %s", channel_id)
+        try:
+            slack_service.add_bookmark(channel_id, "Postmortem Doc", page_url)
+        except Exception:
+            logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
 
     try:
         client.chat_postMessage(
