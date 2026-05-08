@@ -872,9 +872,6 @@ def on_incident_created(incident: Incident) -> None:
         except Exception:
             logger.exception(f"Failed to add bookmark for incident {incident.id}")
 
-        _create_datadog_notebook(incident, channel_id)
-        _create_troubleshooting_doc(incident, channel_id)
-
         captain_name = None
         if incident.captain and not captain_slack_id:
             captain_name = incident.captain.get_full_name() or incident.captain.username
@@ -899,6 +896,11 @@ def on_incident_created(incident: Incident) -> None:
         decorate_incident_channel(
             ctx, _slack_service, skip_datadog=True, skip_notion=True
         )
+
+        # DB-dedup Datadog/Notion after shared decoration so the guide message
+        # appears first in the channel.
+        _create_datadog_notebook(incident, channel_id)
+        _create_troubleshooting_doc(incident, channel_id)
 
 
 def on_status_changed(incident: Incident, old_status: str) -> None:

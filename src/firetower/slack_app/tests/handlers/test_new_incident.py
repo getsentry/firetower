@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth.models import User
+from django.db import OperationalError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import Incident, IncidentSeverity, Tag, TagType
@@ -229,7 +230,7 @@ class TestNewIncidentSubmission:
     @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
     @patch(
         "firetower.incidents.serializers.on_incident_created",
-        side_effect=RuntimeError("db is down"),
+        side_effect=OperationalError("db is down"),
     )
     @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
     def test_save_failure_creates_fallback_channel(
@@ -286,7 +287,9 @@ class TestNewIncidentSubmission:
         side_effect=RuntimeError("boom"),
     )
     @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
-    def test_save_failure_sends_error_dm(self, mock_get_user, mock_hook, mock_fallback):
+    def test_non_db_save_failure_sends_dm_without_fallback(
+        self, mock_get_user, mock_hook, mock_fallback
+    ):
         mock_get_user.return_value = self.user
 
         ack = MagicMock()
@@ -310,7 +313,10 @@ class TestNewIncidentSubmission:
         handle_new_incident_submission(ack, body, view, client)
 
         ack.assert_called_once_with()
-        mock_fallback.assert_called_once()
+        mock_fallback.assert_not_called()
+        client.chat_postMessage.assert_called_once()
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "Something went wrong" in msg
 
 
 @pytest.mark.django_db

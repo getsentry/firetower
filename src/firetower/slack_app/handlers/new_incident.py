@@ -3,6 +3,7 @@ import uuid
 from typing import Any
 
 from django.conf import settings
+from django.db import OperationalError
 
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.hooks import (
@@ -280,8 +281,10 @@ def handle_new_incident_submission(
 
     try:
         incident = serializer.save()
-    except Exception:
-        logger.exception("Failed to create incident from Slack modal")
+    except OperationalError:
+        logger.exception(
+            "Database unreachable during incident creation from Slack modal"
+        )
         form_data = {
             "title": form["title"],
             "severity": form["severity"] or _DEFAULT_SEVERITY.value,
@@ -294,6 +297,13 @@ def handle_new_incident_submission(
             "affected_region_tags": form.get("affected_region_tags", []),
         }
         _create_fallback_channel(client, slack_user_id, form_data)
+        return
+    except Exception:
+        logger.exception("Failed to create incident from Slack modal")
+        client.chat_postMessage(
+            channel=slack_user_id,
+            text="Something went wrong creating your incident. Please try again or create the incident manually.",
+        )
         return
 
     try:
