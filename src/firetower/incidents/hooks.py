@@ -449,13 +449,10 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
 def _do_create_datadog_notebook(
     channel_name: str,
     title: str,
-    channel_id: str,
-    slack_service: SlackService,
 ) -> str | None:
-    """Create a Datadog notebook and post Slack side effects.
+    """Create a Datadog notebook via the API.
 
     Returns the notebook URL on success, None otherwise.
-    Raises on service-init or API failure so callers can handle cleanup.
     """
     service = DatadogService()
     if not service.configured:
@@ -469,6 +466,16 @@ def _do_create_datadog_notebook(
         logger.info("Datadog notebook creation returned no URL for %s", channel_name)
         return None
 
+    return notebook_url
+
+
+def _notify_datadog_notebook(
+    channel_id: str,
+    notebook_url: str,
+    channel_name: str,
+    slack_service: SlackService,
+) -> None:
+    """Post bookmark and message for a created Datadog notebook."""
     try:
         slack_service.add_bookmark(channel_id, "Datadog Notebook", notebook_url)
     except Exception:
@@ -480,8 +487,6 @@ def _do_create_datadog_notebook(
         )
     except Exception:
         logger.exception(f"Failed to post Datadog notebook message for {channel_name}")
-
-    return notebook_url
 
 
 def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
@@ -499,6 +504,7 @@ def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
                 )
             return
 
+        notebook_url: str | None = None
         with transaction.atomic():
             # Hold the row lock across the Datadog API call so concurrent runs
             # serialize and only one notebook is created. A placeholder row is
@@ -519,8 +525,6 @@ def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
             notebook_url = _do_create_datadog_notebook(
                 incident.incident_number,
                 incident.title,
-                channel_id,
-                _slack_service,
             )
             if not notebook_url:
                 link.delete()
@@ -528,6 +532,10 @@ def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
 
             link.url = notebook_url
             link.save(update_fields=["url"])
+
+        _notify_datadog_notebook(
+            channel_id, notebook_url, incident.incident_number, _slack_service
+        )
     except Exception:
         logger.exception(
             f"Failed to create Datadog notebook for incident {incident.id}"
@@ -695,9 +703,11 @@ def decorate_incident_channel(
                 )
         else:
             try:
-                _do_create_datadog_notebook(
-                    ctx.channel_name, ctx.title, ctx.channel_id, slack_service
-                )
+                notebook_url = _do_create_datadog_notebook(ctx.channel_name, ctx.title)
+                if notebook_url:
+                    _notify_datadog_notebook(
+                        ctx.channel_id, notebook_url, ctx.channel_name, slack_service
+                    )
             except Exception:
                 logger.exception(
                     f"Failed to create Datadog notebook for {ctx.channel_name}"
