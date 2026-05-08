@@ -11,7 +11,7 @@ from firetower.incidents.hooks import (
     decorate_incident_channel,
     page_for_channel,
 )
-from firetower.incidents.models import Tag, TagType
+from firetower.incidents.models import Incident, Tag, TagType
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.integrations.services import SlackService
 from firetower.integrations.services.slack import escape_slack_text
