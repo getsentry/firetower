@@ -585,7 +585,7 @@ requires-dist = [
     { name = "datadog", specifier = "==0.52.1" },
     { name = "datadog-api-client", specifier = "==2.54.0" },
     { name = "ddtrace", specifier = "==3.18.1" },
-    { name = "django", specifier = ">=5.2.13,<6" },
+    { name = "django", specifier = ">=5.2.14,<6" },
     { name = "django-cors-headers", specifier = ">=4.9.0" },
     { name = "django-kubernetes", specifier = ">=1.1.0" },
     { name = "djangorestframework", specifier = ">=3.15.2" },
