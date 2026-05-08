@@ -9,7 +9,6 @@ import sentry_sdk
 from datadog import statsd
 from django.conf import settings
 from django.db import transaction
-from slack_sdk.errors import SlackApiError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
@@ -140,27 +139,8 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         logger.exception("Failed to add AI timeline to Notion page %s", page_id)
 
     if notion_page_created:
-        try:
-            try:
-                client.bookmarks_add(
-                    channel_id=channel_id,
-                    title="Postmortem Doc",
-                    type="link",
-                    link=page_url,
-                )
-            except SlackApiError as e:
-                if e.response.get("error") == "not_in_channel":
-                    client.conversations_join(channel=channel_id)
-                    client.bookmarks_add(
-                        channel_id=channel_id,
-                        title="Postmortem Doc",
-                        type="link",
-                        link=page_url,
-                    )
-                else:
-                    raise
-        except Exception:
-            logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
+        if not slack_service.add_bookmark(channel_id, "Postmortem Doc", page_url):
+            logger.error("Failed to add Notion bookmark to channel %s", channel_id)
 
     try:
         client.chat_postMessage(
