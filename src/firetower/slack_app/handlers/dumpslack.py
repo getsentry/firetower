@@ -6,6 +6,7 @@ from typing import Any
 
 import requests
 import sentry_sdk
+from slack_sdk.errors import SlackApiError
 from datadog import statsd
 from django.conf import settings
 from django.db import transaction
@@ -140,12 +141,24 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
 
     if notion_page_created:
         try:
-            client.bookmarks_add(
-                channel_id=channel_id,
-                title="Postmortem Doc",
-                type="link",
-                link=page_url,
-            )
+            try:
+                client.bookmarks_add(
+                    channel_id=channel_id,
+                    title="Postmortem Doc",
+                    type="link",
+                    link=page_url,
+                )
+            except SlackApiError as e:
+                if e.response.get("error") == "not_in_channel":
+                    client.conversations_join(channel=channel_id)
+                    client.bookmarks_add(
+                        channel_id=channel_id,
+                        title="Postmortem Doc",
+                        type="link",
+                        link=page_url,
+                    )
+                else:
+                    raise
         except Exception:
             logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
 
