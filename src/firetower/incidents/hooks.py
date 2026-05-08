@@ -545,13 +545,10 @@ def _create_datadog_notebook(incident: Incident, channel_id: str) -> None:
 def _do_create_troubleshooting_doc(
     channel_name: str,
     incident_url: str | None,
-    channel_id: str,
-    slack_service: SlackService,
 ) -> dict | None:
-    """Create a Notion troubleshooting page and post Slack side effects.
+    """Create a Notion troubleshooting page via the API.
 
     Returns the Notion page dict on success, None otherwise.
-    Raises on service-init or API failure so callers can handle cleanup.
     """
     if not NotionService.is_troubleshooting_configured():
         logger.info(
@@ -573,8 +570,18 @@ def _do_create_troubleshooting_doc(
         )
         return None
 
+    return page
+
+
+def _notify_troubleshooting_doc(
+    channel_id: str,
+    page_url: str,
+    channel_name: str,
+    slack_service: SlackService,
+) -> None:
+    """Post bookmark and message for a created troubleshooting doc."""
     try:
-        slack_service.add_bookmark(channel_id, "Troubleshooting Doc", page["url"])
+        slack_service.add_bookmark(channel_id, "Troubleshooting Doc", page_url)
     except Exception:
         logger.exception(
             "Failed to add troubleshooting doc bookmark for %s", channel_name
@@ -582,7 +589,7 @@ def _do_create_troubleshooting_doc(
     try:
         slack_service.post_message(
             channel_id,
-            f"A <{page['url']}|Clinical Troubleshooting document> has been created. "
+            f"A <{page_url}|Clinical Troubleshooting document> has been created. "
             "Please use this to keep track of Symptoms, Hypothesis, and Actions "
             "as you're investigating this incident.",
         )
@@ -590,8 +597,6 @@ def _do_create_troubleshooting_doc(
         logger.exception(
             "Failed to post troubleshooting doc message for %s", channel_name
         )
-
-    return page
 
 
 def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
@@ -634,9 +639,7 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
         # Notion API calls happen outside the transaction to avoid holding the
         # SELECT FOR UPDATE lock while making slow external requests.
         incident_url = _build_incident_url(incident)
-        page = _do_create_troubleshooting_doc(
-            incident.incident_number, incident_url, channel_id, _slack_service
-        )
+        page = _do_create_troubleshooting_doc(incident.incident_number, incident_url)
         if not page:
             ExternalLink.objects.filter(
                 incident=incident,
@@ -658,6 +661,10 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
                 return
             link.url = page["url"]
             link.save(update_fields=["url"])
+
+        _notify_troubleshooting_doc(
+            channel_id, page["url"], incident.incident_number, _slack_service
+        )
     except Exception:
         logger.exception(
             "Failed to create troubleshooting doc for incident %s", incident.id
@@ -726,9 +733,16 @@ def decorate_incident_channel(
                 )
         else:
             try:
-                _do_create_troubleshooting_doc(
-                    ctx.channel_name, ctx.incident_url, ctx.channel_id, slack_service
+                page = _do_create_troubleshooting_doc(
+                    ctx.channel_name, ctx.incident_url
                 )
+                if page:
+                    _notify_troubleshooting_doc(
+                        ctx.channel_id,
+                        page["url"],
+                        ctx.channel_name,
+                        slack_service,
+                    )
             except Exception:
                 logger.exception(
                     f"Failed to create troubleshooting doc for {ctx.channel_name}"
