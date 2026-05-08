@@ -227,7 +227,6 @@ def _create_incident_via_db(
     handled (user notified), and lets OperationalError propagate so the
     caller can trigger the fallback channel.
     """
-    from firetower.incidents.models import Incident  # noqa: PLC0415
 
     user = get_or_create_user_from_slack_id(slack_user_id)
     if not user:
