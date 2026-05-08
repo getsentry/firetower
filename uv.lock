@@ -581,7 +581,7 @@ prod = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cryptography", specifier = ">=46.0.7" },
+    { name = "cryptography", specifier = ">=48.0.0" },
     { name = "datadog", specifier = "==0.52.1" },
     { name = "datadog-api-client", specifier = "==2.54.0" },
     { name = "ddtrace", specifier = "==3.18.1" },
