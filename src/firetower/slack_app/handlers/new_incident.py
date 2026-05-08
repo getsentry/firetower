@@ -36,7 +36,7 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
     affected_service_tags = form_data.get("affected_service_tags", [])
     affected_region_tags = form_data.get("affected_region_tags", [])
 
-    channel_name = f"inc-{uuid.uuid4().hex[:8]}"
+    channel_name = f"{settings.PROJECT_KEY.lower()}-{uuid.uuid4().hex[:8]}"
 
     channel_id = _slack_service.create_channel(channel_name, is_private=is_private)
     if not channel_id:

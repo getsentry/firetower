@@ -8,6 +8,13 @@ services:
     # TODO: These shouldn't be in frontend/ ?
     env_file: frontend/.env
 
+  slack-bot:
+    build: .
+    networks:
+      - firetower
+    env_file: frontend/.env
+    command: ["/app/entrypoint.sh", "slack-bot"]
+
   # Simulates the Global Load Balancer
   nginx:
     image: nginx:1.29.1
