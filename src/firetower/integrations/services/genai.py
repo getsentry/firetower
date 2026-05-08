@@ -72,7 +72,9 @@ def _detect_location() -> str:
 
 _KEY_TIMESTAMPS_LABEL_MAP = {
     "started": "time_started",
-    "detected": "time_detected",
+    # "detected" intentionally omitted: the AI infers detection time from
+    # channel creation, so it always equals time_started.  Skip until we
+    # have a real detection-time signal.
     "analyzed": "time_analyzed",
     "mitigation": "time_mitigated",
     "resolution": "time_recovered",

@@ -606,7 +606,6 @@ class TestBackfillMilestones:
     _TIMELINE_MD = (
         "## Key Timestamps\n"
         "- Started: [2024-01-15 14:00 UTC]\n"
-        "- Detected: [2024-01-15 14:05 UTC]\n"
         "- Analyzed: [2024-01-15 14:30 UTC]\n"
         "- Mitigation: [2024-01-15 15:00 UTC]\n"
         "- Resolution: [2024-01-15 16:00 UTC]\n"
@@ -628,12 +627,11 @@ class TestBackfillMilestones:
                     filter_fields.add(key.replace("__isnull", ""))
         assert filter_fields == {
             "time_started",
-            "time_detected",
             "time_analyzed",
             "time_mitigated",
             "time_recovered",
         }
-        assert mock_objects.filter.return_value.update.call_count == 5
+        assert mock_objects.filter.return_value.update.call_count == 4
 
     @patch("firetower.slack_app.handlers.dumpslack.Incident.objects")
     def test_skips_fields_that_are_not_null(self, mock_objects):
@@ -651,7 +649,7 @@ class TestBackfillMilestones:
 
         _backfill_milestones(incident, self._TIMELINE_MD)
 
-        assert mock_objects.filter.return_value.update.call_count == 5
+        assert mock_objects.filter.return_value.update.call_count == 4
 
     @patch("firetower.slack_app.handlers.dumpslack.Incident.objects")
     def test_no_update_when_all_fields_populated(self, mock_objects):
@@ -662,7 +660,7 @@ class TestBackfillMilestones:
 
         _backfill_milestones(incident, self._TIMELINE_MD)
 
-        assert mock_objects.filter.return_value.update.call_count == 5
+        assert mock_objects.filter.return_value.update.call_count == 4
 
     def test_no_update_when_no_timestamps_parsed(self):
         incident = MagicMock()
