@@ -218,35 +218,24 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
     )
 
 
-def handle_new_incident_submission(
-    ack: Any, body: dict, view: dict, client: Any
-) -> None:
-    form = parse_incident_form_values(view)
+def _create_incident_via_db(
+    form: dict, slack_user_id: str, is_private: bool, client: Any
+) -> "Incident | None":
+    """Run all DB-dependent work to create an incident.
 
-    values = view.get("state", {}).get("values", {})
-    private_selections = (
-        values.get("private_block", {}).get("is_private", {}).get("selected_options")
-        or []
-    )
-    is_private = any(opt.get("value") == "private" for opt in private_selections)
+    Returns the Incident on success, None if a non-DB error was already
+    handled (user notified), and lets OperationalError propagate so the
+    caller can trigger the fallback channel.
+    """
+    from firetower.incidents.models import Incident  # noqa: PLC0415
 
-    if not form["title"]:
-        ack(
-            response_action="errors",
-            errors={"title_block": "This field is required."},
-        )
-        return
-
-    ack()
-
-    slack_user_id = body.get("user", {}).get("id", "")
     user = get_or_create_user_from_slack_id(slack_user_id)
     if not user:
         client.chat_postMessage(
             channel=slack_user_id,
             text="Could not identify your Firetower account. Please try again or create the incident manually.",
         )
-        return
+        return None
 
     captain_email = user.email
     if form["captain_slack_id"]:
@@ -272,15 +261,41 @@ def handle_new_incident_submission(
 
     serializer = IncidentWriteSerializer(data=data)
     if not serializer.is_valid():
-        logger.error("Incident validation failed: %s", serializer.errors)
+        logger.error(f"Incident validation failed: {serializer.errors}")
         client.chat_postMessage(
             channel=slack_user_id,
             text="Something went wrong validating your incident. Please try again.",
         )
+        return None
+
+    return serializer.save()
+
+
+def handle_new_incident_submission(
+    ack: Any, body: dict, view: dict, client: Any
+) -> None:
+    form = parse_incident_form_values(view)
+
+    values = view.get("state", {}).get("values", {})
+    private_selections = (
+        values.get("private_block", {}).get("is_private", {}).get("selected_options")
+        or []
+    )
+    is_private = any(opt.get("value") == "private" for opt in private_selections)
+
+    if not form["title"]:
+        ack(
+            response_action="errors",
+            errors={"title_block": "This field is required."},
+        )
         return
 
+    ack()
+
+    slack_user_id = body.get("user", {}).get("id", "")
+
     try:
-        incident = serializer.save()
+        incident = _create_incident_via_db(form, slack_user_id, is_private, client)
     except OperationalError:
         logger.exception(
             "Database unreachable during incident creation from Slack modal"
@@ -304,6 +319,9 @@ def handle_new_incident_submission(
             channel=slack_user_id,
             text="Something went wrong creating your incident. Please try again or create the incident manually.",
         )
+        return
+
+    if incident is None:
         return
 
     try:

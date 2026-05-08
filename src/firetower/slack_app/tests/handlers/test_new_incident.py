@@ -280,6 +280,50 @@ class TestNewIncidentSubmission:
         assert form_data["captain_slack_id"] == "U_CAP"
         assert form_data["is_private"] is False
 
+    @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
+    @patch(
+        "firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id",
+        side_effect=OperationalError("db is down"),
+    )
+    def test_db_down_before_save_creates_fallback_channel(
+        self, mock_get_user, mock_fallback
+    ):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "DB Down Incident"}},
+                    "severity_block": {
+                        "severity": {
+                            "selected_option": {"value": "P0"},
+                        }
+                    },
+                    "description_block": {
+                        "description": {"value": "Everything is on fire"}
+                    },
+                    "impact_summary_block": {"impact_summary": {"value": "All users"}},
+                    "captain_block": {"captain_select": {"selected_user": None}},
+                    "private_block": {"is_private": {"selected_options": []}},
+                    "impact_type_block": {"impact_type_tags": {"selected_options": []}},
+                    "affected_service_block": {
+                        "affected_service_tags": {"selected_options": []}
+                    },
+                    "affected_region_block": {
+                        "affected_region_tags": {"selected_options": []}
+                    },
+                }
+            }
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        mock_fallback.assert_called_once()
+        form_data = mock_fallback.call_args[0][2]
+        assert form_data["title"] == "DB Down Incident"
+        assert form_data["severity"] == "P0"
+
     @pytest.mark.usefixtures("_enable_hooks")
     @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
     @patch(
