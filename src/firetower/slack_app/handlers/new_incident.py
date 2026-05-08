@@ -3,7 +3,7 @@ import uuid
 from typing import Any
 
 from django.conf import settings
-from django.db import OperationalError
+from django.db import InterfaceError, OperationalError
 
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.hooks import (
@@ -54,13 +54,13 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
     # Post and pin metadata for backfill
     metadata_lines = [
         "Incident Metadata (for backfill):",
-        f"Title: {title}",
+        f"Title: {escape_slack_text(title)}",
         f"Severity: {severity}",
     ]
     if description:
-        metadata_lines.append(f"Description: {description}")
+        metadata_lines.append(f"Description: {escape_slack_text(description)}")
     if impact_summary:
-        metadata_lines.append(f"Impact Summary: {impact_summary}")
+        metadata_lines.append(f"Impact Summary: {escape_slack_text(impact_summary)}")
     if captain_slack_id:
         metadata_lines.append(f"Captain: <@{captain_slack_id}>")
     metadata_lines.append(f"Reporter: <@{slack_user_id}>")
@@ -295,7 +295,7 @@ def handle_new_incident_submission(
 
     try:
         incident = _create_incident_via_db(form, slack_user_id, is_private, client)
-    except OperationalError:
+    except (OperationalError, InterfaceError):
         logger.exception(
             "Database unreachable during incident creation from Slack modal"
         )
