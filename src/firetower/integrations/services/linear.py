@@ -371,14 +371,20 @@ class LinearService:
 
         return issues
 
-    def get_related_issues(self, issue_id: str) -> list[dict[str, Any]] | None:
+    def _fetch_relations(
+        self,
+        issue_id: str,
+        field: str,
+        issue_key: str,
+        seen_ids: set[str],
+    ) -> list[dict[str, Any]] | None:
         query = f"""
         query($issueId: String!, $after: String) {{
             issue(id: $issueId) {{
-                relations(first: 50, after: $after) {{
+                {field}(first: 50, after: $after) {{
                     nodes {{
                         type
-                        relatedIssue {{
+                        {issue_key} {{
                             {ISSUE_FIELDS}
                         }}
                     }}
@@ -392,7 +398,6 @@ class LinearService:
         """
 
         issues: list[dict[str, Any]] = []
-        seen_ids: set[str] = set()
         cursor: str | None = None
         max_pages = 25
 
@@ -409,9 +414,9 @@ class LinearService:
             if not issue:
                 return None
 
-            relations = issue.get("relations", {})
+            relations = issue.get(field, {})
             for node in relations.get("nodes", []):
-                related_issue = node.get("relatedIssue")
+                related_issue = node.get(issue_key)
                 if not related_issue or "id" not in related_issue:
                     continue
                 if related_issue["id"] in seen_ids:
@@ -430,3 +435,16 @@ class LinearService:
                 break
 
         return issues
+
+    def get_related_issues(self, issue_id: str) -> list[dict[str, Any]] | None:
+        seen_ids: set[str] = set()
+
+        forward = self._fetch_relations(issue_id, "relations", "relatedIssue", seen_ids)
+        if forward is None:
+            return None
+
+        inverse = self._fetch_relations(issue_id, "inverseRelations", "issue", seen_ids)
+        if inverse is None:
+            return None
+
+        return forward + inverse
