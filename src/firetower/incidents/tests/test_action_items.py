@@ -398,7 +398,7 @@ class TestSyncActionItemsFromLinear:
                 "parent-issue-id", state_id="state-done"
             )
 
-    def test_does_not_reopen_parent_when_incomplete_items(self, settings):
+    def test_sets_parent_to_started_when_incomplete_items(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
         incident = self._make_incident()
 
@@ -417,12 +417,15 @@ class TestSyncActionItemsFromLinear:
             mock_service.get_related_issues.return_value = []
             mock_service.get_workflow_states.return_value = {
                 "completed": "state-done",
-                "backlog": "state-backlog",
+                "started": "state-started",
             }
+            mock_service.update_issue.return_value = True
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_not_called()
+            mock_service.update_issue.assert_called_once_with(
+                "parent-issue-id", state_id="state-started"
+            )
 
 
 @pytest.mark.django_db
