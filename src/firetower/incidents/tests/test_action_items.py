@@ -546,7 +546,7 @@ class TestLinearService:
             assert issues[1]["assignee_email"] == "dev@example.com"
 
     def test_get_related_issues_maps_relation_types(self):
-        mock_response = {
+        forward_response = {
             "issue": {
                 "relations": {
                     "nodes": [
@@ -577,6 +577,14 @@ class TestLinearService:
                 }
             }
         }
+        inverse_response = {
+            "issue": {
+                "inverseRelations": {
+                    "nodes": [],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+        }
 
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
             mock_settings.LINEAR = {
@@ -585,13 +593,131 @@ class TestLinearService:
             }
             service = LinearService()
 
-        with patch.object(service, "_graphql", return_value=mock_response):
+        with patch.object(
+            service, "_graphql", side_effect=[forward_response, inverse_response]
+        ):
             issues = service.get_related_issues("parent-id")
 
             assert issues is not None
             assert len(issues) == 2
             assert issues[0]["relation_type"] == "related"
             assert issues[1]["relation_type"] == "blocks"
+
+    def test_get_related_issues_includes_inverse_relations(self):
+        forward_response = {
+            "issue": {
+                "relations": {
+                    "nodes": [
+                        {
+                            "type": "related",
+                            "relatedIssue": {
+                                "id": "id-1",
+                                "identifier": "ENG-1",
+                                "title": "Forward relation",
+                                "url": "https://linear.app/t/ENG-1",
+                                "state": {"type": "unstarted"},
+                                "assignee": None,
+                            },
+                        },
+                    ],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+        }
+        inverse_response = {
+            "issue": {
+                "inverseRelations": {
+                    "nodes": [
+                        {
+                            "type": "related",
+                            "issue": {
+                                "id": "id-2",
+                                "identifier": "INF-100",
+                                "title": "Inverse relation",
+                                "url": "https://linear.app/t/INF-100",
+                                "state": {"type": "started"},
+                                "assignee": None,
+                            },
+                        },
+                    ],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+        }
+
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "test-id",
+                "CLIENT_SECRET": "test-secret",
+            }
+            service = LinearService()
+
+        with patch.object(
+            service, "_graphql", side_effect=[forward_response, inverse_response]
+        ):
+            issues = service.get_related_issues("parent-id")
+
+            assert issues is not None
+            assert len(issues) == 2
+            assert issues[0]["identifier"] == "ENG-1"
+            assert issues[1]["identifier"] == "INF-100"
+
+    def test_get_related_issues_deduplicates_across_directions(self):
+        forward_response = {
+            "issue": {
+                "relations": {
+                    "nodes": [
+                        {
+                            "type": "related",
+                            "relatedIssue": {
+                                "id": "id-1",
+                                "identifier": "ENG-1",
+                                "title": "Same issue",
+                                "url": "https://linear.app/t/ENG-1",
+                                "state": {"type": "unstarted"},
+                                "assignee": None,
+                            },
+                        },
+                    ],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+        }
+        inverse_response = {
+            "issue": {
+                "inverseRelations": {
+                    "nodes": [
+                        {
+                            "type": "related",
+                            "issue": {
+                                "id": "id-1",
+                                "identifier": "ENG-1",
+                                "title": "Same issue",
+                                "url": "https://linear.app/t/ENG-1",
+                                "state": {"type": "unstarted"},
+                                "assignee": None,
+                            },
+                        },
+                    ],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+        }
+
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "test-id",
+                "CLIENT_SECRET": "test-secret",
+            }
+            service = LinearService()
+
+        with patch.object(
+            service, "_graphql", side_effect=[forward_response, inverse_response]
+        ):
+            issues = service.get_related_issues("parent-id")
+
+            assert issues is not None
+            assert len(issues) == 1
 
     def test_update_issue(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
