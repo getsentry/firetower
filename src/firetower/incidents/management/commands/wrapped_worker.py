@@ -90,6 +90,7 @@ class Command(BaseCommand):
         if django_admin is None or django_admin == "":
             django_admin = "/app/.venv/bin/django-admin"
 
+        proc = None
         try:
             proc = subprocess.Popen(
                 [django_admin, "qcluster", "--settings", "firetower.settings"],
