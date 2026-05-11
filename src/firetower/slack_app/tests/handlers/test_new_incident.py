@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import OperationalError
 
@@ -441,8 +442,9 @@ class TestFallbackChannel:
         # a second call may happen for the status channel (P0/P1).
         first_call = mock_slack_svc.create_channel.call_args_list[0]
         channel_name = first_call[0][0]
-        assert channel_name.startswith("inc-")
-        assert len(channel_name) == 12  # "inc-" + 8 hex chars
+        prefix = f"{settings.PROJECT_KEY.lower()}-"
+        assert channel_name.startswith(prefix)
+        assert len(channel_name) == len(prefix) + 8  # prefix + 8 hex chars
 
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
     def test_posts_and_pins_metadata(self, mock_slack_svc):

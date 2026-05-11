@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import User
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
@@ -49,7 +50,7 @@ class TestBackfillSubcommandRouting:
     ):
         mock_slack_svc.get_channel_info.return_value = {
             "id": "C_TEST",
-            "name": "inc-2050",
+            "name": f"{settings.PROJECT_KEY.lower()}-2050",
             "is_private": False,
         }
         ack = MagicMock()
@@ -73,7 +74,7 @@ class TestBackfillCommand:
     def test_opens_modal(self, mock_slack_svc, mock_get_bolt_app):
         mock_slack_svc.get_channel_info.return_value = {
             "id": "C_TEST",
-            "name": "inc-2050",
+            "name": f"{settings.PROJECT_KEY.lower()}-2050",
             "is_private": False,
         }
         ack = MagicMock()
@@ -116,7 +117,7 @@ class TestBackfillCommand:
     ):
         mock_slack_svc.get_channel_info.return_value = {
             "id": "C_EXISTING",
-            "name": "inc-1234",
+            "name": f"{settings.PROJECT_KEY.lower()}-1234",
             "is_private": False,
         }
         mock_slack_svc.join_channel.return_value = True
@@ -152,17 +153,20 @@ class TestBackfillCommand:
     def test_channel_from_args(self, mock_slack_svc):
         mock_slack_svc.get_channel_info.return_value = {
             "id": "CARG12345",
-            "name": "inc-2050",
+            "name": f"{settings.PROJECT_KEY.lower()}-2050",
             "is_private": False,
         }
         ack = MagicMock()
         body = {
             "trigger_id": "T12345",
-            "text": "backfill <#CARG12345|inc-2050>",
+            "text": f"backfill <#CARG12345|{settings.PROJECT_KEY.lower()}-2050>",
             "channel_id": "C_OTHER",
             "user_id": "U_TEST",
         }
-        command = {"command": "/ft", "text": "backfill <#CARG12345|inc-2050>"}
+        command = {
+            "command": "/ft",
+            "text": f"backfill <#CARG12345|{settings.PROJECT_KEY.lower()}-2050>",
+        }
         respond = MagicMock()
 
         with patch("firetower.slack_app.bolt.get_bolt_app") as mock_app:
@@ -232,7 +236,7 @@ class TestBackfillSubmission:
         )
         mock_slack_svc.get_channel_info.return_value = {
             "id": "C_TEST",
-            "name": "inc-2050",
+            "name": f"{settings.PROJECT_KEY.lower()}-2050",
             "is_private": False,
         }
         mock_slack_svc.join_channel.return_value = True
@@ -274,7 +278,7 @@ class TestBackfillSubmission:
         )
         mock_slack_svc.get_channel_info.return_value = {
             "id": "C_TEST",
-            "name": "inc-2050",
+            "name": f"{settings.PROJECT_KEY.lower()}-2050",
             "is_private": False,
         }
         mock_slack_svc.join_channel.return_value = False
@@ -331,7 +335,7 @@ class TestBackfillSubmission:
         handle_backfill_submission(ack, body, self._build_view(), client)
 
         incident = Incident.objects.get(title="Test Backfill")
-        expected_name = f"inc-{incident.id}"
+        expected_name = incident.incident_number.lower()
         mock_slack_svc.rename_channel.assert_called_once_with("C_TEST", expected_name)
         mock_slack_svc.set_channel_topic.assert_called_once()
 
@@ -365,7 +369,7 @@ class TestBackfillSubmission:
         handle_backfill_submission(ack, body, self._build_view(), client)
 
         incident = Incident.objects.get(title="Test Backfill")
-        expected_name = f"inc-{incident.id}"
+        expected_name = incident.incident_number.lower()
         mock_slack_svc.rename_channel.assert_called_once_with("C_TEST", expected_name)
         rename_msg_call = [
             c
@@ -396,9 +400,9 @@ class TestBackfillSubmission:
         def channel_info_matching_incident(channel_id):
             try:
                 incident = Incident.objects.get(title="Test Backfill")
-                name = f"inc-{incident.id}"
+                name = incident.incident_number.lower()
             except Incident.DoesNotExist:
-                name = "inc-unknown"
+                name = f"{settings.PROJECT_KEY.lower()}-unknown"
             return {
                 "id": channel_id,
                 "name": name,
