@@ -335,7 +335,11 @@ def _invite_oncall_to_channel(
 
             label = _oncall_role_label(policy_name, policy_label, escalation_level)
             paged_suffix = (
-                " (paged)" if paged_policies and policy_name in paged_policies else ""
+                " (paged)"
+                if paged_policies
+                and policy_name in paged_policies
+                and escalation_level == 1
+                else ""
             )
             sort_level = escalation_level if escalation_level is not None else 999
             role_entries.append(

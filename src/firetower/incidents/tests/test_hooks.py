@@ -1781,7 +1781,8 @@ class TestInviteOncallUsers:
         message = mock_slack.post_message.call_args[0][1]
         assert "On-Call Incident Manager: <@U_IMOC> (paged)" in message
         assert "On-Call Prod Eng (Primary): <@U_PRIMARY> (paged)" in message
-        assert "On-Call Prod Eng (Secondary): <@U_SECONDARY> (paged)" in message
+        assert "On-Call Prod Eng (Secondary): <@U_SECONDARY>" in message
+        assert "(paged)" not in message.split("\n")[2]
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
