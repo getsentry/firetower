@@ -207,6 +207,14 @@ def _update_parent_issue_status(
             linear_service.update_issue(
                 incident.linear_parent_issue_id, state_id=completed_state_id
             )
+    else:
+        parent = linear_service.get_issue(incident.linear_parent_issue_id)
+        if parent and parent.get("state_type") == "completed":
+            started_state_id = states.get("started")
+            if started_state_id:
+                linear_service.update_issue(
+                    incident.linear_parent_issue_id, state_id=started_state_id
+                )
 
 
 def sync_action_items_from_linear(
