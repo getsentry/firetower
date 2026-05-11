@@ -301,13 +301,16 @@ def _invite_oncall_to_channel(
             )
             continue
 
+        oncall_users.sort(key=lambda u: u.get("escalation_level") or 999)
+        seen_emails: set[str] = set()
         for oncall_user in oncall_users:
             email = oncall_user.get("email")
             escalation_level: int | None = oncall_user.get("escalation_level")
             if escalation_level is not None and escalation_level > max_level:
                 continue
-            if not email:
+            if not email or email in seen_emails:
                 continue
+            seen_emails.add(email)
             try:
                 slack_profile = slack_service.get_user_profile_by_email(email)
             except Exception:

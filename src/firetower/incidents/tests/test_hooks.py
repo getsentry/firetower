@@ -1599,8 +1599,8 @@ class TestInviteOncallUsers:
         ]
         mock_slack.get_user_profile_by_email.side_effect = [
             {"slack_user_id": "U_IMOC"},
-            {"slack_user_id": "U_SEC"},
             {"slack_user_id": "U_PRI"},
+            {"slack_user_id": "U_SEC"},
         ]
 
         incident = Incident.objects.create(
@@ -1616,6 +1616,43 @@ class TestInviteOncallUsers:
             "On-Call Prod Eng (Primary): <@U_PRI>\n"
             "On-Call Prod Eng (Secondary): <@U_SEC>"
         )
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_duplicate_user_across_escalation_levels_deduped(
+        self, mock_pd_cls, mock_slack, settings
+    ):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.side_effect = [
+            [{"email": "imoc@example.com", "escalation_level": 1}],
+            [
+                {"email": "same@example.com", "escalation_level": 1},
+                {"email": "other@example.com", "escalation_level": 2},
+                {"email": "same@example.com", "escalation_level": 2},
+            ],
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            {"slack_user_id": "U_IMOC"},
+            {"slack_user_id": "U_SAME"},
+            {"slack_user_id": "U_OTHER"},
+        ]
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        message = mock_slack.post_message.call_args[0][1]
+        assert message == (
+            "On-Call Incident Manager: <@U_IMOC>\n"
+            "On-Call Prod Eng (Primary): <@U_SAME>\n"
+            "On-Call Prod Eng (Secondary): <@U_OTHER>"
+        )
+        invite_ids = mock_slack.invite_to_channel.call_args[0][1]
+        assert invite_ids == ["U_IMOC", "U_SAME", "U_OTHER"]
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
