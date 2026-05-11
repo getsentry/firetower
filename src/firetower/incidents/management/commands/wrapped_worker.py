@@ -121,6 +121,8 @@ class Command(BaseCommand):
                     break
                 _shutdown.wait(timeout=1)
         finally:
+            server.shutdown()
+            server.server_close()
             if proc.poll() is None:
                 proc.terminate()
                 try:
@@ -128,5 +130,3 @@ class Command(BaseCommand):
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     proc.wait()
-            server.shutdown()
-            server.server_close()
