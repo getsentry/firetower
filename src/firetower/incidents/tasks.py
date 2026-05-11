@@ -5,7 +5,7 @@ from firetower.incidents.models import Incident
 SCHEDULES = {
     "schedule_demo": {
         "func": "firetower.incidents.tasks.schedule_demo",
-        "schedule_type": "I",  # Minutes
+        "schedule_type": Schedule.MINUTES,  # Minutes
         "minutes": 5,
         "repeats": -1,  # repeat indefinitely
     },
