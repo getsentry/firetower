@@ -90,29 +90,29 @@ class Command(BaseCommand):
         if django_admin is None or django_admin == "":
             django_admin = "/app/.venv/bin/django-admin"
 
-        proc = subprocess.Popen(
-            [django_admin, "qcluster", "--settings", "firetower.settings"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-
-        def _pump_output() -> None:
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
-                if "cluster_name" not in _state:
-                    match = _CLUSTER_NAME_RE.search(line)
-                    if match:
-                        _state["cluster_name"] = match.group(1)
-                        logger.info("Detected cluster name: %s", match.group(1))
-
-        pump_thread = threading.Thread(target=_pump_output, daemon=True)
-        pump_thread.start()
-
         try:
+            proc = subprocess.Popen(
+                [django_admin, "qcluster", "--settings", "firetower.settings"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+
+            def _pump_output() -> None:
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+                    if "cluster_name" not in _state:
+                        match = _CLUSTER_NAME_RE.search(line)
+                        if match:
+                            _state["cluster_name"] = match.group(1)
+                            logger.info("Detected cluster name: %s", match.group(1))
+
+            pump_thread = threading.Thread(target=_pump_output, daemon=True)
+            pump_thread.start()
+
             while not _shutdown.is_set():
                 if proc.poll() is not None:
                     logger.warning(
