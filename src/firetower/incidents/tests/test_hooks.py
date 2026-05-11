@@ -1474,7 +1474,11 @@ class TestInviteOncallUsers:
         on_incident_created(incident)
 
         mock_invite_oncall.assert_called_once_with(
-            incident.severity, "C99999", mock_slack, is_private=False
+            incident.severity,
+            "C99999",
+            mock_slack,
+            is_private=False,
+            paged_policies=set(),
         )
 
     @patch("firetower.incidents.hooks._slack_service")
