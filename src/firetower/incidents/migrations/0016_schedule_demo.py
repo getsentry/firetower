@@ -19,7 +19,7 @@ def delete_schedule(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0014_add_total_downtime"),
+        ("incidents", "0015_add_notion_troubleshooting_link_type"),
         ("django_q", "0018_task_success_index"),
     ]
 
