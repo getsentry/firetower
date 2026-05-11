@@ -1096,7 +1096,9 @@ class TestOnSeverityChangedPagerDuty:
 
         on_severity_changed(incident, IncidentSeverity.P2)
 
-        mock_invite_oncall.assert_called_once_with(incident, "C12345")
+        mock_invite_oncall.assert_called_once_with(
+            incident, "C12345", paged_policies=mock_page.return_value
+        )
 
     @patch("firetower.incidents.hooks._invite_oncall_users")
     @patch("firetower.incidents.hooks._page_if_needed")
