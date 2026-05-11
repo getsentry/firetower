@@ -1158,10 +1158,8 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
 def on_title_changed(incident: Incident) -> None:
     try:
         channel_id = _get_channel_id(incident)
-        if not channel_id:
-            return
-
-        _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
+        if channel_id:
+            _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
     except Exception:
         logger.exception(f"Error in on_title_changed for incident {incident.id}")
 
