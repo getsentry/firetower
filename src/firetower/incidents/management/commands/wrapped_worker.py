@@ -37,10 +37,12 @@ class _HealthHandler(BaseHTTPRequestHandler):
             None,
         )
 
-        if target is not None and target.status in (Conf.IDLE, Conf.WORKING):
+        if target is None:
+            self._respond(503, cluster_name, "not found or still starting")
+        elif target.status in (Conf.IDLE, Conf.WORKING):
             self._respond(200, cluster_name, target.status)
         else:
-            status = target.status if target is not None else "not found"
+            status = target.status
             self._respond(500, cluster_name, status)
 
     def _respond(self, code: int, cluster_name: str, status: Any) -> None:
