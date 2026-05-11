@@ -187,7 +187,7 @@ COMPLETED_STATUSES = {ActionItemStatus.DONE, ActionItemStatus.CANCELLED}
 def _update_parent_issue_status(
     incident: Incident, linear_service: LinearService
 ) -> None:
-    team_id = settings.LINEAR.get("TEAM_ID")
+    team_id = str(settings.LINEAR.get("TEAM_ID", ""))
     if not team_id or not incident.linear_parent_issue_id:
         return
 

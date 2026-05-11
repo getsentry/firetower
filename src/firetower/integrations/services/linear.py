@@ -136,6 +136,10 @@ class LinearService:
 
                 response = self._make_graphql_request(query, variables, access_token)
 
+            if not response.ok:
+                logger.error(
+                    f"Linear API returned {response.status_code}: {response.text}"
+                )
             response.raise_for_status()
             data = response.json()
 
