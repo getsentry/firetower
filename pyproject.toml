@@ -42,6 +42,7 @@ dev = [
     "ty>=0.0.1a19",
     "django-stubs>=5.2.7",
     "django-stubs-ext>=5.2.7",
+    "blessed>=1.39.0",
 ]
 prod = [
     "granian>=2.6.0",

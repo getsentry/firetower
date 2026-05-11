@@ -406,4 +406,16 @@ Q_CLUSTER = {
     "retry": 210,
     "queue_limit": 50,
     "bulk": 10,
+    "cache": "qcache",
+}
+
+CACHE_TABLE = "django_q_cache"
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    },
+    "qcache": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": CACHE_TABLE,
+    },
 }
