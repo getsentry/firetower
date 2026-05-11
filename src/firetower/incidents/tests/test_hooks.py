@@ -868,15 +868,15 @@ class TestPageIfNeeded:
         assert "IMOC" in mock_pd.trigger_incident.call_args[0][1]
 
 
-class TestPageForChannelSlackNotification:
+class TestPageForChannelReturnValue:
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_posts_success_message_on_successful_page(self, mock_pd_cls, settings):
+    def test_returns_paged_policy_names(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
         mock_pd = mock_pd_cls.return_value
         mock_pd.trigger_incident.return_value = True
         mock_slack = MagicMock()
 
-        page_for_channel(
+        result = page_for_channel(
             IncidentSeverity.P0,
             "INC-100",
             "Major outage",
@@ -884,21 +884,16 @@ class TestPageForChannelSlackNotification:
             channel_id="C12345",
         )
 
-        success_calls = [
-            c for c in mock_slack.post_message.call_args_list if ":pager:" in c[0][1]
-        ]
-        assert len(success_calls) == 2
-        assert ":pager: Paged IMOC via PagerDuty." in success_calls[0][0][1]
-        assert ":pager: Paged PE On-Call via PagerDuty." in success_calls[1][0][1]
+        assert result == {"IMOC", "PROD_ENG"}
 
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_posts_failure_message_on_failed_page(self, mock_pd_cls, settings):
+    def test_returns_empty_set_on_failure(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
         mock_pd = mock_pd_cls.return_value
         mock_pd.trigger_incident.return_value = False
         mock_slack = MagicMock()
 
-        page_for_channel(
+        result = page_for_channel(
             IncidentSeverity.P0,
             "INC-100",
             "Major outage",
@@ -906,29 +901,39 @@ class TestPageForChannelSlackNotification:
             channel_id="C12345",
         )
 
-        warning_calls = [
-            c for c in mock_slack.post_message.call_args_list if ":warning:" in c[0][1]
-        ]
-        assert len(warning_calls) == 2
-        assert "Failed to page IMOC" in warning_calls[0][0][1]
-        assert "Failed to page PE On-Call" in warning_calls[1][0][1]
+        assert result == set()
 
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_no_slack_message_when_channel_id_is_none(self, mock_pd_cls, settings):
+    def test_returns_partial_set_on_mixed_results(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
         mock_pd = mock_pd_cls.return_value
-        mock_pd.trigger_incident.return_value = True
+        mock_pd.trigger_incident.side_effect = [True, False]
         mock_slack = MagicMock()
 
-        page_for_channel(
+        result = page_for_channel(
             IncidentSeverity.P0,
             "INC-100",
             "Major outage",
             mock_slack,
-            channel_id=None,
+            channel_id="C12345",
         )
 
-        mock_slack.post_message.assert_not_called()
+        assert result == {"IMOC"}
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_returns_empty_set_for_non_pageable_severity(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_slack = MagicMock()
+
+        result = page_for_channel(
+            IncidentSeverity.P3,
+            "INC-100",
+            "Minor issue",
+            mock_slack,
+        )
+
+        assert result == set()
+        mock_pd_cls.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -1743,6 +1748,94 @@ class TestInviteOncallUsers:
         mock_pd.get_oncall_users.assert_called_once_with("PPE001")
         message = mock_slack.post_message.call_args[0][1]
         assert message == "On-Call Prod Eng (Primary): <@U_PE>"
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_paged_policies_annotated_in_roster(
+        self, mock_pd_cls, mock_slack, settings
+    ):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.side_effect = [
+            [{"email": "imoc@example.com", "escalation_level": 1}],
+            [
+                {"email": "primary@example.com", "escalation_level": 1},
+                {"email": "secondary@example.com", "escalation_level": 2},
+            ],
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            {"slack_user_id": "U_IMOC"},
+            {"slack_user_id": "U_PRIMARY"},
+            {"slack_user_id": "U_SECONDARY"},
+        ]
+
+        incident = Incident.objects.create(
+            title="Major outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999", paged_policies={"IMOC", "PROD_ENG"})
+
+        message = mock_slack.post_message.call_args[0][1]
+        assert "On-Call Incident Manager: <@U_IMOC> (paged)" in message
+        assert "On-Call Prod Eng (Primary): <@U_PRIMARY> (paged)" in message
+        assert "On-Call Prod Eng (Secondary): <@U_SECONDARY> (paged)" in message
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_only_paged_policies_annotated(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.side_effect = [
+            [{"email": "imoc@example.com", "escalation_level": 1}],
+            [
+                {"email": "primary@example.com", "escalation_level": 1},
+            ],
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            {"slack_user_id": "U_IMOC"},
+            {"slack_user_id": "U_PRIMARY"},
+        ]
+
+        incident = Incident.objects.create(
+            title="Major outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999", paged_policies={"IMOC"})
+
+        message = mock_slack.post_message.call_args[0][1]
+        assert "On-Call Incident Manager: <@U_IMOC> (paged)" in message
+        assert "On-Call Prod Eng (Primary): <@U_PRIMARY>" in message
+        assert "(paged)" not in message.split("\n")[1]
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_no_annotation_when_paged_policies_none(
+        self, mock_pd_cls, mock_slack, settings
+    ):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.side_effect = [
+            [{"email": "imoc@example.com", "escalation_level": 1}],
+            [
+                {"email": "primary@example.com", "escalation_level": 1},
+            ],
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            {"slack_user_id": "U_IMOC"},
+            {"slack_user_id": "U_PRIMARY"},
+        ]
+
+        incident = Incident.objects.create(
+            title="Major outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        _invite_oncall_users(incident, "C99999")
+
+        message = mock_slack.post_message.call_args[0][1]
+        assert "(paged)" not in message
 
 
 @pytest.mark.django_db

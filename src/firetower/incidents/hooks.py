@@ -73,14 +73,19 @@ def page_for_channel(
     links: list[dict[str, str]] | None = None,
     channel_id: str | None = None,
     is_private: bool = False,
-) -> None:
-    """Trigger PD pages for pageable severities. No DB access."""
+) -> set[str]:
+    """Trigger PD pages for pageable severities. No DB access.
+
+    Returns the set of policy names that were successfully paged.
+    """
+    paged: set[str] = set()
+
     if severity not in PAGEABLE_SEVERITIES:
-        return
+        return paged
 
     pd_config = settings.PAGERDUTY
     if not pd_config:
-        return
+        return paged
 
     escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
 
@@ -109,7 +114,7 @@ def page_for_channel(
                 pd_service = PagerDutyService()
             except Exception:
                 logger.exception("Failed to initialize PagerDutyService")
-                return
+                return paged
 
         dedup_key = f"firetower-{dedup_prefix}-{policy_name}"
         page_label = policy_info.page_label
@@ -120,12 +125,9 @@ def page_for_channel(
             success = pd_service.trigger_incident(
                 summary, dedup_key, integration_key, links=links or []
             )
-            if success and channel_id:
-                slack_service.post_message(
-                    channel_id,
-                    f":pager: Paged {page_label} via PagerDuty.",
-                )
-            elif not success and channel_id:
+            if success:
+                paged.add(policy_name)
+            elif channel_id:
                 slack_service.post_message(
                     channel_id,
                     f":warning: Failed to page {page_label} via PagerDuty. Please manually escalate if needed.",
@@ -133,8 +135,10 @@ def page_for_channel(
         except Exception:
             logger.exception(f"Failed to page {policy_name} for {dedup_prefix}")
 
+    return paged
 
-def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
+
+def _page_if_needed(incident: Incident, channel_id: str | None = None) -> set[str]:
     links: list[dict[str, str]] = [
         {"href": _build_incident_url(incident), "text": "View in Firetower"}
     ]
@@ -145,7 +149,7 @@ def _page_if_needed(incident: Incident, channel_id: str | None = None) -> None:
                 "text": "Slack Channel",
             }
         )
-    page_for_channel(
+    return page_for_channel(
         incident.severity,
         incident.incident_number,
         incident.title,
@@ -246,6 +250,7 @@ def _invite_oncall_to_channel(
     slack_service: SlackService,
     *,
     is_private: bool = False,
+    paged_policies: set[str] | None = None,
 ) -> None:
     """Invite on-call users to a channel. No DB access."""
     if severity not in PAGEABLE_SEVERITIES:
@@ -329,12 +334,15 @@ def _invite_oncall_to_channel(
             slack_user_id = slack_profile["slack_user_id"]
 
             label = _oncall_role_label(policy_name, policy_label, escalation_level)
+            paged_suffix = (
+                " (paged)" if paged_policies and policy_name in paged_policies else ""
+            )
             sort_level = escalation_level if escalation_level is not None else 999
             role_entries.append(
                 (
                     policy_index,
                     sort_level,
-                    f"{label}: <@{slack_user_id}>",
+                    f"{label}: <@{slack_user_id}>{paged_suffix}",
                 )
             )
             users_to_invite.append((slack_user_id, email))
@@ -357,9 +365,17 @@ def _invite_oncall_to_channel(
             )
 
 
-def _invite_oncall_users(incident: Incident, channel_id: str) -> None:
+def _invite_oncall_users(
+    incident: Incident,
+    channel_id: str,
+    paged_policies: set[str] | None = None,
+) -> None:
     _invite_oncall_to_channel(
-        incident.severity, channel_id, _slack_service, is_private=incident.is_private
+        incident.severity,
+        channel_id,
+        _slack_service,
+        is_private=incident.is_private,
+        paged_policies=paged_policies,
     )
 
 
@@ -690,6 +706,7 @@ def decorate_incident_channel(
     *,
     skip_datadog: bool = False,
     skip_notion: bool = False,
+    paged_policies: set[str] | None = None,
 ) -> None:
     """
     Shared channel setup called by both the normal and fallback creation paths.
@@ -799,7 +816,11 @@ def decorate_incident_channel(
 
     try:
         _invite_oncall_to_channel(
-            ctx.severity, ctx.channel_id, slack_service, is_private=ctx.is_private
+            ctx.severity,
+            ctx.channel_id,
+            slack_service,
+            is_private=ctx.is_private,
+            paged_policies=paged_policies,
         )
     except Exception:
         logger.exception(f"Failed to invite oncall users to {ctx.channel_name}")
@@ -878,8 +899,9 @@ def on_incident_created(incident: Incident) -> None:
     # (already saved above), so the PD payload is complete even if channel_id
     # is None here; channel_id is only used to post a fallback warning back to
     # Slack if PD fails.
+    paged_policies: set[str] = set()
     try:
-        _page_if_needed(incident, channel_id=channel_id)
+        paged_policies = _page_if_needed(incident, channel_id=channel_id)
     except Exception:
         logger.exception(f"Failed to page for incident {incident.id}")
 
@@ -924,7 +946,11 @@ def on_incident_created(incident: Incident) -> None:
             incident_number=incident.incident_number,
         )
         decorate_incident_channel(
-            ctx, _slack_service, skip_datadog=True, skip_notion=True
+            ctx,
+            _slack_service,
+            skip_datadog=True,
+            skip_notion=True,
+            paged_policies=paged_policies,
         )
 
         # DB-dedup Datadog/Notion after shared decoration so the guide message
@@ -988,14 +1014,17 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
             logger.exception(f"Failed to get channel id for incident {incident.id}")
             channel_id = None
 
+        paged_policies: set[str] = set()
         try:
-            _page_if_needed(incident, channel_id=channel_id)
+            paged_policies = _page_if_needed(incident, channel_id=channel_id)
         except Exception:
             logger.exception(f"Failed to page for incident {incident.id}")
 
         if channel_id:
             try:
-                _invite_oncall_users(incident, channel_id)
+                _invite_oncall_users(
+                    incident, channel_id, paged_policies=paged_policies
+                )
             except Exception:
                 logger.exception(
                     f"Failed to invite oncall users for incident {incident.id}"
