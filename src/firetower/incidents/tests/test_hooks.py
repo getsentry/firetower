@@ -17,6 +17,7 @@ from firetower.incidents.hooks import (
     on_status_changed,
     on_title_changed,
     on_visibility_changed,
+    page_for_channel,
 )
 from firetower.incidents.models import (
     ExternalLink,
@@ -865,6 +866,69 @@ class TestPageIfNeeded:
 
         mock_pd.trigger_incident.assert_called_once()
         assert "IMOC" in mock_pd.trigger_incident.call_args[0][1]
+
+
+class TestPageForChannelSlackNotification:
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_posts_success_message_on_successful_page(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+        mock_slack = MagicMock()
+
+        page_for_channel(
+            IncidentSeverity.P0,
+            "INC-100",
+            "Major outage",
+            mock_slack,
+            channel_id="C12345",
+        )
+
+        success_calls = [
+            c for c in mock_slack.post_message.call_args_list if ":pager:" in c[0][1]
+        ]
+        assert len(success_calls) == 2
+        assert ":pager: Paged IMOC via PagerDuty." in success_calls[0][0][1]
+        assert ":pager: Paged PE On-Call via PagerDuty." in success_calls[1][0][1]
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_posts_failure_message_on_failed_page(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = False
+        mock_slack = MagicMock()
+
+        page_for_channel(
+            IncidentSeverity.P0,
+            "INC-100",
+            "Major outage",
+            mock_slack,
+            channel_id="C12345",
+        )
+
+        warning_calls = [
+            c for c in mock_slack.post_message.call_args_list if ":warning:" in c[0][1]
+        ]
+        assert len(warning_calls) == 2
+        assert "Failed to page IMOC" in warning_calls[0][0][1]
+        assert "Failed to page PE On-Call" in warning_calls[1][0][1]
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_no_slack_message_when_channel_id_is_none(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+        mock_slack = MagicMock()
+
+        page_for_channel(
+            IncidentSeverity.P0,
+            "INC-100",
+            "Major outage",
+            mock_slack,
+            channel_id=None,
+        )
+
+        mock_slack.post_message.assert_not_called()
 
 
 @pytest.mark.django_db

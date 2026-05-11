@@ -120,7 +120,12 @@ def page_for_channel(
             success = pd_service.trigger_incident(
                 summary, dedup_key, integration_key, links=links or []
             )
-            if not success and channel_id:
+            if success and channel_id:
+                slack_service.post_message(
+                    channel_id,
+                    f":pager: Paged {page_label} via PagerDuty.",
+                )
+            elif not success and channel_id:
                 slack_service.post_message(
                     channel_id,
                     f":warning: Failed to page {page_label} via PagerDuty. Please manually escalate if needed.",
