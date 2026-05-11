@@ -864,6 +864,21 @@ def _linear_issue_title(incident: Incident) -> str:
     return f"[{incident.incident_number}] {incident.title}"
 
 
+def _sync_linear_title(incident: Incident) -> None:
+    if not incident.linear_parent_issue_id:
+        return
+    try:
+        linear_service = LinearService()
+        linear_service.update_issue(
+            incident.linear_parent_issue_id,
+            title=_linear_issue_title(incident),
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to update Linear issue title for incident {incident.id}"
+        )
+
+
 LINEAR_PARENT_DESCRIPTION = (
     "Relate action items to this ticket to have them tracked by Firetower. "
     "Child issues or other relations (related, blocking, etc.) will all work. "
@@ -922,12 +937,15 @@ def _create_linear_parent_issue(incident: Incident) -> None:
 
             states = linear_service.get_workflow_states(team_id)
             started_state_id = states.get("started") if states else None
-            linear_service.update_issue(
+            if not linear_service.update_issue(
                 issue["id"],
                 title=title,
                 description=LINEAR_PARENT_DESCRIPTION,
                 state_id=started_state_id,
-            )
+            ):
+                logger.warning(
+                    f"Failed to update claimed Linear issue for incident {incident.id}"
+                )
         else:
             issue = linear_service.create_issue(
                 title, LINEAR_PARENT_DESCRIPTION, team_id, project_id
@@ -1163,17 +1181,7 @@ def on_title_changed(incident: Incident) -> None:
     except Exception:
         logger.exception(f"Error in on_title_changed for incident {incident.id}")
 
-    if incident.linear_parent_issue_id:
-        try:
-            linear_service = LinearService()
-            linear_service.update_issue(
-                incident.linear_parent_issue_id,
-                title=_linear_issue_title(incident),
-            )
-        except Exception:
-            logger.exception(
-                f"Failed to update Linear issue title for incident {incident.id}"
-            )
+    _sync_linear_title(incident)
 
 
 def on_visibility_changed(incident: Incident) -> None:
@@ -1191,17 +1199,7 @@ def on_visibility_changed(incident: Incident) -> None:
     except Exception:
         logger.exception(f"Error in on_visibility_changed for incident {incident.id}")
 
-    if incident.linear_parent_issue_id:
-        try:
-            linear_service = LinearService()
-            linear_service.update_issue(
-                incident.linear_parent_issue_id,
-                title=_linear_issue_title(incident),
-            )
-        except Exception:
-            logger.exception(
-                f"Failed to update Linear issue title for incident {incident.id}"
-            )
+    _sync_linear_title(incident)
 
 
 def on_captain_changed(incident: Incident) -> None:

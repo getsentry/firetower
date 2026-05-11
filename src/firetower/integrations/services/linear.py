@@ -79,7 +79,7 @@ class LinearService:
                 expires_at = timezone.now() + TOKEN_LIFETIME
 
             with transaction.atomic():
-                LinearOAuthToken.objects.all().delete()
+                LinearOAuthToken.objects.select_for_update().all().delete()
                 LinearOAuthToken.objects.create(
                     access_token=access_token,
                     expires_at=expires_at,
@@ -412,7 +412,9 @@ class LinearService:
             relations = issue.get("relations", {})
             for node in relations.get("nodes", []):
                 related_issue = node.get("relatedIssue")
-                if not related_issue or related_issue["id"] in seen_ids:
+                if not related_issue or "id" not in related_issue:
+                    continue
+                if related_issue["id"] in seen_ids:
                     continue
                 seen_ids.add(related_issue["id"])
 
