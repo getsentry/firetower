@@ -123,7 +123,7 @@ class Command(BaseCommand):
         finally:
             server.shutdown()
             server.server_close()
-            if proc.poll() is None:
+            if proc and proc.poll() is None:
                 proc.terminate()
                 try:
                     proc.wait(timeout=10)
