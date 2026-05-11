@@ -1,5 +1,7 @@
 from logging import info
 
+from django_q.tasks import Schedule
+
 from firetower.incidents.models import Incident
 
 SCHEDULES = {
