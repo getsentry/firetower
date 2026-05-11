@@ -189,7 +189,6 @@ class LinearService:
             "identifier": issue["identifier"],
             "title": issue["title"],
             "url": issue["url"],
-            "state_type": issue.get("state", {}).get("type", ""),
         }
 
     def create_issue(
