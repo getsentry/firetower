@@ -79,7 +79,13 @@ class LinearService:
                 expires_at = timezone.now() + TOKEN_LIFETIME
 
             with transaction.atomic():
-                LinearOAuthToken.objects.select_for_update().all().delete()
+                existing = list(LinearOAuthToken.objects.select_for_update().all())
+                if (
+                    existing
+                    and existing[0].expires_at > timezone.now() + TOKEN_REFRESH_BUFFER
+                ):
+                    return existing[0].access_token
+                LinearOAuthToken.objects.all().delete()
                 LinearOAuthToken.objects.create(
                     access_token=access_token,
                     expires_at=expires_at,
@@ -137,10 +143,9 @@ class LinearService:
                 response = self._make_graphql_request(query, variables, access_token)
 
             if not response.ok:
-                logger.error(
-                    f"Linear API returned {response.status_code}: {response.text}"
-                )
-            response.raise_for_status()
+                logger.error("Linear API returned %d", response.status_code)
+                return None
+
             data = response.json()
 
             if "errors" in data:
@@ -151,14 +156,14 @@ class LinearService:
                 return None
 
             return data.get("data")
-        except requests.RequestException as e:
-            logger.error(f"Linear API request failed: {e}")
+        except requests.RequestException:
+            logger.exception("Linear API request failed")
             return None
 
     def _parse_issue(
         self, issue: dict[str, Any], relation_type: str = "child"
     ) -> dict[str, Any]:
-        state_type = issue.get("state", {}).get("type", "")
+        state_type = (issue.get("state") or {}).get("type", "")
         status = LINEAR_STATE_TYPE_MAP.get(state_type, "Todo")
         assignee = issue.get("assignee") or {}
         return {
