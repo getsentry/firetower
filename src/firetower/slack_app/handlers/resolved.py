@@ -3,19 +3,17 @@ from typing import Any
 
 from firetower.auth.models import ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
-from firetower.incidents.models import IncidentSeverity, IncidentStatus
+from firetower.incidents.models import Incident, IncidentSeverity, IncidentStatus
 from firetower.incidents.serializers import IncidentWriteSerializer
-from firetower.slack_app.handlers.utils import get_incident_from_channel
+from firetower.slack_app.handlers.utils import (
+    get_incident_from_channel,
+    parse_incident_form_values,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def _build_resolved_modal(
-    incident_number: str,
-    channel_id: str,
-    current_severity: str,
-    captain_slack_id: str | None,
-) -> dict:
+def _build_resolved_modal(incident: Incident, channel_id: str) -> dict:
     severity_options = [
         {
             "text": {"type": "plain_text", "text": sev.label},
@@ -23,26 +21,96 @@ def _build_resolved_modal(
         }
         for sev in IncidentSeverity
     ]
-    initial_severity = next(
-        (opt for opt in severity_options if opt["value"] == current_severity),
-        next(
-            opt for opt in severity_options if opt["value"] == IncidentSeverity.P2.value
-        ),
-    )
+    current_severity = IncidentSeverity(incident.severity)
+    current_severity_option = {
+        "text": {"type": "plain_text", "text": current_severity.label},
+        "value": current_severity.value,
+    }
 
-    captain_element: dict = {
+    captain_element: dict[str, Any] = {
         "type": "users_select",
         "action_id": "captain_select",
         "placeholder": {"type": "plain_text", "text": "Select incident captain"},
     }
-    if captain_slack_id:
-        captain_element["initial_user"] = captain_slack_id
+    if incident.captain:
+        slack_profile = incident.captain.external_profiles.filter(
+            type=ExternalProfileType.SLACK
+        ).first()
+        if slack_profile:
+            captain_element["initial_user"] = slack_profile.external_id
+
+    title_element: dict[str, Any] = {
+        "type": "plain_text_input",
+        "action_id": "title",
+        "placeholder": {"type": "plain_text", "text": "Brief incident title"},
+        "initial_value": incident.title or "",
+    }
+
+    description_element: dict[str, Any] = {
+        "type": "plain_text_input",
+        "action_id": "description",
+        "multiline": True,
+        "placeholder": {"type": "plain_text", "text": "What's happening?"},
+    }
+    if incident.description:
+        description_element["initial_value"] = incident.description
+
+    impact_summary_element: dict[str, Any] = {
+        "type": "plain_text_input",
+        "action_id": "impact_summary",
+        "multiline": True,
+        "placeholder": {
+            "type": "plain_text",
+            "text": "What is the user/business impact?",
+        },
+    }
+    if incident.impact_summary:
+        impact_summary_element["initial_value"] = incident.impact_summary
+
+    impact_type_initial = [
+        {"text": {"type": "plain_text", "text": name}, "value": name}
+        for name in incident.impact_type_tag_names
+    ]
+    impact_type_element: dict[str, Any] = {
+        "type": "multi_external_select",
+        "action_id": "impact_type_tags",
+        "min_query_length": 0,
+        "placeholder": {"type": "plain_text", "text": "Select impact types"},
+    }
+    if impact_type_initial:
+        impact_type_element["initial_options"] = impact_type_initial
+
+    affected_service_initial = [
+        {"text": {"type": "plain_text", "text": name}, "value": name}
+        for name in incident.affected_service_tag_names
+    ]
+    affected_service_element: dict[str, Any] = {
+        "type": "multi_external_select",
+        "action_id": "affected_service_tags",
+        "min_query_length": 0,
+        "placeholder": {"type": "plain_text", "text": "Select affected services"},
+    }
+    if affected_service_initial:
+        affected_service_element["initial_options"] = affected_service_initial
+
+    affected_region_initial = [
+        {"text": {"type": "plain_text", "text": name}, "value": name}
+        for name in incident.affected_region_tag_names
+    ]
+    affected_region_element: dict[str, Any] = {
+        "type": "multi_external_select",
+        "action_id": "affected_region_tags",
+        "min_query_length": 0,
+        "placeholder": {"type": "plain_text", "text": "Select affected regions"},
+    }
+    if affected_region_initial:
+        affected_region_element["initial_options"] = affected_region_initial
 
     return {
         "type": "modal",
         "callback_id": "resolved_incident_modal",
         "private_metadata": channel_id,
-        "title": {"type": "plain_text", "text": incident_number},
+        "title": {"type": "plain_text", "text": incident.incident_number},
         "submit": {"type": "plain_text", "text": "Submit"},
         "close": {"type": "plain_text", "text": "Cancel"},
         "blocks": [
@@ -50,19 +118,8 @@ def _build_resolved_modal(
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "This incident has been contained! Please confirm the final severity and incident captain.",
+                    "text": "This incident has been contained! Please confirm the details below.",
                 },
-            },
-            {
-                "type": "input",
-                "block_id": "severity_block",
-                "element": {
-                    "type": "static_select",
-                    "action_id": "severity_select",
-                    "options": severity_options,
-                    "initial_option": initial_severity,
-                },
-                "label": {"type": "plain_text", "text": "Severity"},
             },
             {
                 "type": "input",
@@ -78,6 +135,58 @@ def _build_resolved_modal(
                         "text": "The incident captain is responsible for driving the postmortem.",
                     }
                 ],
+            },
+            {
+                "type": "input",
+                "block_id": "severity_block",
+                "element": {
+                    "type": "static_select",
+                    "action_id": "severity_select",
+                    "options": severity_options,
+                    "initial_option": current_severity_option,
+                },
+                "label": {"type": "plain_text", "text": "Severity"},
+            },
+            {
+                "type": "input",
+                "block_id": "title_block",
+                "element": title_element,
+                "label": {"type": "plain_text", "text": "Title"},
+            },
+            {
+                "type": "input",
+                "block_id": "description_block",
+                "optional": True,
+                "element": description_element,
+                "label": {"type": "plain_text", "text": "Description"},
+            },
+            {
+                "type": "input",
+                "block_id": "impact_summary_block",
+                "optional": True,
+                "element": impact_summary_element,
+                "label": {"type": "plain_text", "text": "Impact Summary"},
+            },
+            {
+                "type": "input",
+                "block_id": "impact_type_block",
+                "optional": True,
+                "element": impact_type_element,
+                "label": {"type": "plain_text", "text": "Impact Type"},
+            },
+            {
+                "type": "input",
+                "block_id": "affected_service_block",
+                "optional": True,
+                "element": affected_service_element,
+                "label": {"type": "plain_text", "text": "Affected Service"},
+            },
+            {
+                "type": "input",
+                "block_id": "affected_region_block",
+                "optional": True,
+                "element": affected_region_element,
+                "label": {"type": "plain_text", "text": "Affected Region"},
             },
         ],
     }
@@ -96,40 +205,29 @@ def handle_resolved_command(ack: Any, body: dict, command: dict, respond: Any) -
         respond("Could not open modal — missing trigger_id.")
         return
 
-    captain_slack_id = None
-    if incident.captain:
-        slack_profile = incident.captain.external_profiles.filter(
-            type=ExternalProfileType.SLACK
-        ).first()
-        if slack_profile:
-            captain_slack_id = slack_profile.external_id
-
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
     get_bolt_app().client.views_open(
         trigger_id=trigger_id,
-        view=_build_resolved_modal(
-            incident.incident_number,
-            channel_id,
-            incident.severity,
-            captain_slack_id,
-        ),
+        view=_build_resolved_modal(incident, channel_id),
     )
 
 
 def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
-    values = view.get("state", {}).get("values", {})
+    form = parse_incident_form_values(view)
     channel_id = view.get("private_metadata", "")
 
+    values = view.get("state", {}).get("values", {})
+
+    # The resolved modal uses "severity_select" as action_id (not "severity")
     severity = (
         values.get("severity_block", {})
         .get("severity_select", {})
         .get("selected_option", {})
         .get("value", "")
-    )
-    captain_slack_id = (
-        values.get("captain_block", {}).get("captain_select", {}).get("selected_user")
-    )
+    ) or form["severity"]
+
+    captain_slack_id = form["captain_slack_id"]
 
     if not captain_slack_id:
         ack(
@@ -165,6 +263,12 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
         "status": target_status,
         "severity": severity,
         "captain": captain_user.email,
+        "title": form["title"],
+        "description": form["description"],
+        "impact_summary": form["impact_summary"],
+        "impact_type_tags": form["impact_type_tags"],
+        "affected_service_tags": form["affected_service_tags"],
+        "affected_region_tags": form["affected_region_tags"],
     }
 
     serializer = IncidentWriteSerializer(instance=incident, data=data, partial=True)
