@@ -51,8 +51,7 @@ class _HealthHandler(BaseHTTPRequestHandler):
             db_ok = False
         statsd.gauge("slack_app.db.connected", 1 if db_ok else 0)
 
-        healthy = ws_ok and db_ok
-        self.send_response(200 if healthy else 503)
+        self.send_response(200 if ws_ok else 503)
         self.end_headers()
 
     def log_message(self, format: str, *args: Any) -> None:
