@@ -79,13 +79,7 @@ class LinearService:
                 expires_at = timezone.now() + TOKEN_LIFETIME
 
             with transaction.atomic():
-                existing = list(LinearOAuthToken.objects.select_for_update().all())
-                if (
-                    existing
-                    and existing[0].expires_at > timezone.now() + TOKEN_REFRESH_BUFFER
-                ):
-                    return existing[0].access_token
-                LinearOAuthToken.objects.all().delete()
+                LinearOAuthToken.objects.select_for_update().all().delete()
                 LinearOAuthToken.objects.create(
                     access_token=access_token,
                     expires_at=expires_at,
