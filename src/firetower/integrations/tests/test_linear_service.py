@@ -102,7 +102,8 @@ class TestRequestNewToken:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=30,
         )
-        mock_token_model.objects.update_or_create.assert_called_once()
+        mock_token_model.objects.all().delete.assert_called_once()
+        mock_token_model.objects.create.assert_called_once()
 
     @patch("firetower.integrations.services.linear.requests.post")
     def test_returns_none_on_request_error(self, mock_post, linear_service):

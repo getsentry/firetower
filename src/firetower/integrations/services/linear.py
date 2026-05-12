@@ -77,11 +77,10 @@ class LinearService:
             else:
                 expires_at = timezone.now() + TOKEN_LIFETIME
 
-            LinearOAuthToken.objects.update_or_create(
-                defaults={
-                    "access_token": access_token,
-                    "expires_at": expires_at,
-                }
+            LinearOAuthToken.objects.all().delete()
+            LinearOAuthToken.objects.create(
+                access_token=access_token,
+                expires_at=expires_at,
             )
 
             logger.info("Obtained new Linear OAuth token")
@@ -170,7 +169,7 @@ class LinearService:
             "relation_type": relation_type,
         }
 
-    def get_issue(self, identifier: str) -> dict[str, Any] | None:
+    def get_issue(self, issue_id: str) -> dict[str, Any] | None:
         query = f"""
         query($id: String!) {{
             issue(id: $id) {{
@@ -178,7 +177,7 @@ class LinearService:
             }}
         }}
         """
-        data = self._graphql(query, {"id": identifier})
+        data = self._graphql(query, {"id": issue_id})
         if not data or not data.get("issue"):
             return None
         issue = data["issue"]
