@@ -44,6 +44,7 @@ def datadog_log(f: NamedFunction) -> NamedFunction:
             logger.error(
                 f"Error while executing task '{task_name}': {e}", exc_info=True
             )
+            raise e
         else:
             statsd.increment("django_q.task.success", 1, tags)
 
