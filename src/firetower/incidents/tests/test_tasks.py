@@ -1,5 +1,7 @@
 from unittest.mock import call, patch
 
+import pytest
+
 from firetower.incidents.tasks import datadog_log
 
 
@@ -64,7 +66,8 @@ class TestDatadogLogStatsdIncrements:
 
         f.__name__ = "broken_task"
         wrapped = datadog_log(f)
-        wrapped()
+        with pytest.raises(ValueError):
+            wrapped()
 
         tags = ["task:broken_task"]
         assert mock_statsd.increment.call_args_list == [
@@ -79,7 +82,8 @@ class TestDatadogLogStatsdIncrements:
 
         f.__name__ = "failing_task"
         wrapped = datadog_log(f)
-        wrapped()
+        with pytest.raises(RuntimeError):
+            wrapped()
 
         success_calls = [
             c
@@ -89,11 +93,12 @@ class TestDatadogLogStatsdIncrements:
         assert success_calls == []
 
     @patch("firetower.incidents.tasks.statsd")
-    def test_swallows_exception_from_wrapped_function(self, mock_statsd):
+    def test_re_raises_exception_from_wrapped_function(self, mock_statsd):
         def f() -> None:
-            raise Exception("should not propagate")
+            raise ValueError("should propagate")
 
         f.__name__ = "raises"
         wrapped = datadog_log(f)
 
-        wrapped()
+        with pytest.raises(ValueError, match="should propagate"):
+            wrapped()
