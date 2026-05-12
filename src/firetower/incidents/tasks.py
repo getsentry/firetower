@@ -1,7 +1,6 @@
 import functools
 import logging
 import re
-from logging import info
 from typing import Protocol
 
 from datadog import statsd
@@ -55,6 +54,6 @@ def datadog_log(f: NamedFunction) -> NamedFunction:
 def schedule_demo() -> None:
     incident = Incident.objects.order_by("-created_at").first()
     if incident:
-        info(f"Most recent incident: INC-{incident.id}: {incident.title}")
+        logger.info(f"Most recent incident: INC-{incident.id}: {incident.title}")
     else:
-        info("No incidents found.")
+        logger.info("No incidents found.")
