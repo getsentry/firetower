@@ -76,11 +76,10 @@ class TestGetAccessToken:
 
 
 class TestRequestNewToken:
-    @patch("firetower.integrations.services.linear.transaction")
     @patch("firetower.integrations.services.linear.LinearOAuthToken")
     @patch("firetower.integrations.services.linear.requests.post")
     def test_stores_token_and_returns_access_token(
-        self, mock_post, mock_token_model, mock_transaction, linear_service
+        self, mock_post, mock_token_model, linear_service
     ):
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -103,8 +102,7 @@ class TestRequestNewToken:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=30,
         )
-        mock_token_model.objects.select_for_update.assert_called_once()
-        mock_token_model.objects.create.assert_called_once()
+        mock_token_model.objects.update_or_create.assert_called_once()
 
     @patch("firetower.integrations.services.linear.requests.post")
     def test_returns_none_on_request_error(self, mock_post, linear_service):

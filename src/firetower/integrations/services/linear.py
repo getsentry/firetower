@@ -4,7 +4,6 @@ from typing import Any
 
 import requests
 from django.conf import settings
-from django.db import transaction
 from django.utils import timezone
 
 from firetower.integrations.models import LinearOAuthToken
@@ -78,12 +77,12 @@ class LinearService:
             else:
                 expires_at = timezone.now() + TOKEN_LIFETIME
 
-            with transaction.atomic():
-                LinearOAuthToken.objects.select_for_update().all().delete()
-                LinearOAuthToken.objects.create(
-                    access_token=access_token,
-                    expires_at=expires_at,
-                )
+            LinearOAuthToken.objects.update_or_create(
+                defaults={
+                    "access_token": access_token,
+                    "expires_at": expires_at,
+                }
+            )
 
             logger.info("Obtained new Linear OAuth token")
             return access_token
