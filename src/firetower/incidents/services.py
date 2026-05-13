@@ -318,8 +318,8 @@ def sync_action_items_from_linear(
         )
         stats.deleted = deleted_count
 
-    incident.action_items_last_synced_at = timezone.now()
-    incident.save(update_fields=["action_items_last_synced_at"])
+        incident.action_items_last_synced_at = timezone.now()
+        incident.save(update_fields=["action_items_last_synced_at"])
 
     try:
         _update_parent_issue_status(incident, linear_service)
