@@ -28,7 +28,6 @@ root cause identification, mitigation, resolution)
 4. Excludes casual conversation and focuses on incident-relevant information
 5. Groups related activities when appropriate
 6. Highlights any identified root cause or contributing factors
-7. Itemize any thing that has been called out as an "action item"
 
 Keep the timeline concise but comprehensive, focusing on the most important events.
 
@@ -38,9 +37,6 @@ Your response MUST follow this exact format:
 - [YYYY-MM-DD HH:MM UTC] - Description of event
 - [YYYY-MM-DD HH:MM UTC] - Description of event
 (continue for all key events)
-
-## Action Items
-- <action items here>
 
 ## Key Timestamps
 - Started: [YYYY-MM-DD HH:MM UTC]
