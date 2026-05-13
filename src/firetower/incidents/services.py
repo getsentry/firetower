@@ -260,30 +260,54 @@ def sync_action_items_from_linear(
     logger.info(f"Syncing {len(all_issues)} Linear issues to incident {incident.id}")
 
     assignee_map = _resolve_assignees(all_issues)
+
+    existing = {ai.linear_issue_id: ai for ai in incident.action_items.all()}
+    to_create: list[ActionItem] = []
+    to_update: list[ActionItem] = []
     seen_linear_ids: set[str] = set()
+
+    update_fields = [
+        "linear_identifier",
+        "title",
+        "status",
+        "relation_type",
+        "assignee",
+        "url",
+    ]
 
     for issue in all_issues.values():
         seen_linear_ids.add(issue["id"])
-
         assignee = assignee_map.get(issue.get("assignee_email", ""))
 
-        _, created = ActionItem.objects.update_or_create(
-            incident=incident,
-            linear_issue_id=issue["id"],
-            defaults={
-                "linear_identifier": issue["identifier"],
-                "title": issue["title"],
-                "status": issue["status"],
-                "relation_type": issue["relation_type"],
-                "assignee": assignee,
-                "url": issue["url"],
-            },
-        )
-
-        if created:
-            stats.created += 1
+        if issue["id"] in existing:
+            ai = existing[issue["id"]]
+            ai.linear_identifier = issue["identifier"]
+            ai.title = issue["title"]
+            ai.status = issue["status"]
+            ai.relation_type = issue["relation_type"]
+            ai.assignee = assignee
+            ai.url = issue["url"]
+            to_update.append(ai)
         else:
-            stats.updated += 1
+            to_create.append(
+                ActionItem(
+                    incident=incident,
+                    linear_issue_id=issue["id"],
+                    linear_identifier=issue["identifier"],
+                    title=issue["title"],
+                    status=issue["status"],
+                    relation_type=issue["relation_type"],
+                    assignee=assignee,
+                    url=issue["url"],
+                )
+            )
+
+    if to_create:
+        ActionItem.objects.bulk_create(to_create)
+    if to_update:
+        ActionItem.objects.bulk_update(to_update, update_fields)
+    stats.created = len(to_create)
+    stats.updated = len(to_update)
 
     deleted_count, _ = (
         ActionItem.objects.filter(incident=incident)
