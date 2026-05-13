@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.utils import timezone
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
@@ -302,19 +303,20 @@ def sync_action_items_from_linear(
                 )
             )
 
-    if to_create:
-        ActionItem.objects.bulk_create(to_create)
-    if to_update:
-        ActionItem.objects.bulk_update(to_update, update_fields)
-    stats.created = len(to_create)
-    stats.updated = len(to_update)
+    with transaction.atomic():
+        if to_create:
+            ActionItem.objects.bulk_create(to_create)
+        if to_update:
+            ActionItem.objects.bulk_update(to_update, update_fields)
+        stats.created = len(to_create)
+        stats.updated = len(to_update)
 
-    deleted_count, _ = (
-        ActionItem.objects.filter(incident=incident)
-        .exclude(linear_issue_id__in=seen_linear_ids)
-        .delete()
-    )
-    stats.deleted = deleted_count
+        deleted_count, _ = (
+            ActionItem.objects.filter(incident=incident)
+            .exclude(linear_issue_id__in=seen_linear_ids)
+            .delete()
+        )
+        stats.deleted = deleted_count
 
     incident.action_items_last_synced_at = timezone.now()
     incident.save(update_fields=["action_items_last_synced_at"])
