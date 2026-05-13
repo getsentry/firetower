@@ -49,9 +49,9 @@ ISSUE_FIELDS = """
 
 class LinearService:
     def __init__(self) -> None:
-        linear_config = settings.LINEAR
-        self.client_id = linear_config.get("CLIENT_ID")
-        self.client_secret = linear_config.get("CLIENT_SECRET")
+        assert settings.LINEAR is not None
+        self.client_id = settings.LINEAR.get("CLIENT_ID")
+        self.client_secret = settings.LINEAR.get("CLIENT_SECRET")
         self._workflow_states_cache: dict[str, str] | None = None
 
     def _request_new_token(self) -> str | None:
