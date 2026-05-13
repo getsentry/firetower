@@ -8,6 +8,7 @@ from firetower.incidents.models import (
     Incident,
     IncidentStatus,
 )
+from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +20,10 @@ def _format_incident_line(incident: Incident, slack_url: str | None) -> str:
         if incident.captain
         else "unassigned"
     )
+    title = escape_slack_text(incident.title)
     parts = [
-        f"{incident.severity} {incident.incident_number}: {incident.title}",
-        f"Captain: {captain_name}",
+        f"{incident.severity} {incident.incident_number}: {title}",
+        f"Captain: {escape_slack_text(captain_name)}",
     ]
     if slack_url:
         parts.append(f"<{slack_url}|Slack>")

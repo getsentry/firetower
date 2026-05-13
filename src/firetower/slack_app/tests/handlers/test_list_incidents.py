@@ -277,3 +277,23 @@ class TestListCommand:
 
         text = respond.call_args[0][0]
         assert "Visible incident" in text
+
+    def test_title_with_special_chars_is_escaped(self, db):
+        inc = Incident(
+            title='<http://evil|click> & "fun"',
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+        )
+        inc.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        text = respond.call_args[0][0]
+        assert "<http://evil|click>" not in text
+        assert "&lt;http://evil|click&gt;" in text
+        assert "&amp;" in text
