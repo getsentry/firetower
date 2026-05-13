@@ -18,6 +18,7 @@ from firetower.slack_app.handlers.captain import (
 )
 from firetower.slack_app.handlers.dumpslack import handle_dumpslack_command
 from firetower.slack_app.handlers.help import handle_help_command
+from firetower.slack_app.handlers.list_incidents import handle_list_command
 from firetower.slack_app.handlers.mitigated import (
     handle_mitigated_command,
     handle_mitigated_submission,
@@ -59,6 +60,8 @@ KNOWN_SUBCOMMANDS = {
     "resolved",
     "fixed",
     "reopen",
+    "list",
+    "ls",
     "severity",
     "sev",
     "setseverity",
@@ -138,6 +141,8 @@ def handle_command(
             handle_resolved_command(ack, body, command, respond)
         elif subcommand == "reopen":
             handle_reopen_command(ack, body, command, respond)
+        elif subcommand in ("list", "ls"):
+            handle_list_command(ack, body, command, respond)
         elif subcommand in ("severity", "sev", "setseverity"):
             if not args:
                 ack()

@@ -10,6 +10,7 @@ def handle_help_command(ack: Any, command: dict, respond: Any) -> None:
         f"Available commands:\n"
         f"  `{cmd} help` - Show this help message\n"
         f"  `{cmd} new` - Create a new incident\n"
+        f"  `{cmd} list` - List active and mitigated incidents (alias: `{cmd} ls`)\n"
         f"  `{cmd} backfill` - Backfill an incident from a manually-created channel\n"
         f"  `{cmd} severity <P0-P4>` - Change incident severity (alias: `{cmd} sev`)\n"
         f"  `{cmd} subject <title>` - Change incident title (alias: `{cmd} title`)\n"
