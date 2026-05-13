@@ -147,10 +147,7 @@ class IncidentAdmin(admin.ModelAdmin):
         if error_count:
             message_parts.append(f"{error_count} failed")
 
-        if message_parts:
-            self.message_user(request, f"Action item sync: {', '.join(message_parts)}")
-        else:
-            self.message_user(request, "No incidents selected.")
+        self.message_user(request, f"Action item sync: {', '.join(message_parts)}")
 
     @admin.action(description="Clear all milestones")
     def clear_milestones(
