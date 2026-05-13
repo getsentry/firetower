@@ -294,7 +294,7 @@ PAGERDUTY = (
 )
 
 # Linear Integration Configuration
-LINEAR = (
+LINEAR: dict | None = (
     {
         "CLIENT_ID": config.linear.client_id,
         "CLIENT_SECRET": config.linear.client_secret,
@@ -303,7 +303,7 @@ LINEAR = (
         "SYNC_IDENTIFIERS": config.linear.sync_identifiers,
     }
     if config.linear
-    else {}
+    else None
 )
 
 ACTION_ITEM_SYNC_THROTTLE_SECONDS = (
