@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from django.contrib.auth.models import User
+from slack_sdk.errors import SlackApiError
 
 from firetower.incidents.models import (
     ExternalLink,
@@ -191,3 +192,88 @@ class TestListCommand:
         newer_pos = text.index("Newer incident")
         older_pos = text.index("Older incident")
         assert newer_pos < older_pos
+
+    def test_guest_user_rejected(self, db):
+        inc = Incident(
+            title="Visible incident",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        inc.save()
+
+        client = MagicMock()
+        client.users_info.return_value = {
+            "user": {"is_restricted": True, "is_ultra_restricted": False}
+        }
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY", "user_id": "U_GUEST"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond, client=client)
+
+        ack.assert_called_once()
+        assert "not available to guest users" in respond.call_args[0][0]
+
+    def test_single_channel_guest_rejected(self, db):
+        client = MagicMock()
+        client.users_info.return_value = {
+            "user": {"is_restricted": False, "is_ultra_restricted": True}
+        }
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY", "user_id": "U_GUEST"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond, client=client)
+
+        ack.assert_called_once()
+        assert "not available to guest users" in respond.call_args[0][0]
+
+    def test_non_guest_allowed(self, db):
+        inc = Incident(
+            title="Visible incident",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        inc.save()
+
+        client = MagicMock()
+        client.users_info.return_value = {
+            "user": {"is_restricted": False, "is_ultra_restricted": False}
+        }
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY", "user_id": "U_MEMBER"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond, client=client)
+
+        text = respond.call_args[0][0]
+        assert "Visible incident" in text
+
+    def test_slack_api_error_allows_through(self, db):
+        inc = Incident(
+            title="Visible incident",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        inc.save()
+
+        client = MagicMock()
+        client.users_info.side_effect = SlackApiError(
+            message="error", response={"ok": False, "error": "user_not_found"}
+        )
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY", "user_id": "U_UNKNOWN"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond, client=client)
+
+        text = respond.call_args[0][0]
+        assert "Visible incident" in text

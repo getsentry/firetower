@@ -1,10 +1,15 @@
+import logging
 from typing import Any
+
+from slack_sdk.errors import SlackApiError
 
 from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
     IncidentStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _format_incident_line(incident: Incident, slack_url: str | None) -> str:
@@ -23,8 +28,25 @@ def _format_incident_line(incident: Incident, slack_url: str | None) -> str:
     return " | ".join(parts)
 
 
-def handle_list_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
+def _is_slack_guest(client: Any, user_id: str) -> bool:
+    try:
+        response = client.users_info(user=user_id)
+        user = response.get("user", {})
+        return bool(user.get("is_restricted") or user.get("is_ultra_restricted"))
+    except SlackApiError:
+        logger.exception("Failed to fetch Slack user info for %s", user_id)
+        return False
+
+
+def handle_list_command(
+    ack: Any, body: dict, command: dict, respond: Any, client: Any = None
+) -> None:
     ack()
+
+    user_id = body.get("user_id", "")
+    if client and user_id and _is_slack_guest(client, user_id):
+        respond("This command is not available to guest users.")
+        return
 
     incidents = (
         Incident.objects.filter(

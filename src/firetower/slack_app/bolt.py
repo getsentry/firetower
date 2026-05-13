@@ -142,7 +142,7 @@ def handle_command(
         elif subcommand == "reopen":
             handle_reopen_command(ack, body, command, respond)
         elif subcommand in ("list", "ls"):
-            handle_list_command(ack, body, command, respond)
+            handle_list_command(ack, body, command, respond, client=client)
         elif subcommand in ("severity", "sev", "setseverity"):
             if not args:
                 ack()
