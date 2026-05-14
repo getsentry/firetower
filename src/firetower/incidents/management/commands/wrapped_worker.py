@@ -75,6 +75,10 @@ def _handle_shutdown(signum: int, frame: Any) -> None:
     _shutdown.set()
 
 
+def _check_binary(fpath: str) -> bool:
+    return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+
 class Command(BaseCommand):
     help = "Run a Q cluster subprocess wrapped with an HTTP health check server."
 
@@ -86,18 +90,39 @@ class Command(BaseCommand):
 
         server = _start_health_server()
 
+        env = os.environ.copy()
+        command: list[str] = []
+
+        ddtrace = shutil.which("ddtrace-run")
+        if ddtrace is None or ddtrace == "":
+            hardcoded_ddtrace = "/app/.venv/bin/ddtrace-run"
+            if not _check_binary(hardcoded_ddtrace):
+                logger.warning(
+                    "ddtrace-run could not be found. Datadog metrics may not work!"
+                )
+            else:
+                ddtrace = hardcoded_ddtrace
+        if ddtrace is not None and ddtrace != "":
+            command.append(ddtrace)
+
         django_admin = shutil.which("django-admin")
         if django_admin is None or django_admin == "":
             django_admin = "/app/.venv/bin/django-admin"
+            if not _check_binary(django_admin):
+                raise RuntimeError(
+                    f"Tried to load django-admin from {django_admin}, but it doesn't exist!"
+                )
+        command.append(django_admin)
 
         proc = None
         try:
             proc = subprocess.Popen(
-                [django_admin, "qcluster", "--settings", "firetower.settings"],
+                [*command, "qcluster", "--settings", "firetower.settings"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                env=env,
             )
 
             def _pump_output() -> None:
