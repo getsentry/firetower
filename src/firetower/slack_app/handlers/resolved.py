@@ -236,6 +236,13 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
         )
         return
 
+    if not form["title"]:
+        ack(
+            response_action="errors",
+            errors={"title_block": "This field is required."},
+        )
+        return
+
     ack()
 
     incident = get_incident_from_channel(channel_id)
