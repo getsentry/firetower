@@ -174,6 +174,7 @@ DATABASES = {
         "HOST": config.postgres.host,
         "USER": config.postgres.user,
         "PASSWORD": config.postgres.password,
+        "CONN_HEALTH_CHECKS": True,
     },
 }
 

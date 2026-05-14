@@ -218,8 +218,9 @@ class TestRouting:
 
 
 class TestWithMetrics:
+    @patch("firetower.slack_app.bolt.close_old_connections")
     @patch("firetower.slack_app.bolt.statsd")
-    def test_emits_completed_on_success(self, mock_statsd):
+    def test_emits_completed_on_success(self, mock_statsd, _mock_close):
         handler = MagicMock(return_value="ok")
         wrapped = _with_metrics("test_modal")(handler)
 
@@ -240,8 +241,9 @@ class TestWithMetrics:
         ]
         assert failed_calls == []
 
+    @patch("firetower.slack_app.bolt.close_old_connections")
     @patch("firetower.slack_app.bolt.statsd")
-    def test_emits_failed_on_error(self, mock_statsd):
+    def test_emits_failed_on_error(self, mock_statsd, _mock_close):
         handler = MagicMock(side_effect=RuntimeError("db gone"))
         wrapped = _with_metrics("new_incident_modal")(handler)
 
