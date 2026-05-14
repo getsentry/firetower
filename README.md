@@ -126,3 +126,87 @@ src/firetower/       # Django backend
 frontend/            # React frontend
 sdk/                 # Python SDK
 ```
+
+## Scheduled Tasks
+
+Scheduled tasks are stored as database objects and are managed via migrations.
+
+### Adding a Task
+
+First, define you task in the `SCHEDULES` map in `src/firetower/incidents/tasks.py`.
+
+Then, create a new migration referencing it:
+
+```python
+from django.db import migrations
+
+from firetower.incidents.tasks import SCHEDULES
+
+
+def create_schedule(apps, schema_editor):
+    Schedule = apps.get_model("django_q", "Schedule")
+    schedule_name = "[schedule name goes here]"
+    Schedule.objects.get_or_create(
+        name=schedule_name, defaults=SCHEDULES[schedule_name]
+    )
+
+
+def delete_schedule(apps, schema_editor):
+    Schedule = apps.get_model("django_q", "Schedule")
+    schedule_name = "schedule_demo"
+    Schedule.objects.filter(name=schedule_name).delete()
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("incidents", "[previous migration goes here]"),
+    ]
+
+    operations = [
+        migrations.RunPython(create_schedule, delete_schedule),
+    ]
+```
+
+### Removing a task
+
+First, generate the opposite of the migration used to add the schedule:
+
+```python
+from django.db import migrations
+
+from firetower.incidents.tasks import SCHEDULES
+
+
+def create_schedule(apps, schema_editor):
+    Schedule = apps.get_model("django_q", "Schedule")
+    schedule_name = "[schedule name goes here]"
+    Schedule.objects.get_or_create(
+        name=schedule_name, defaults=SCHEDULES[schedule_name]
+    )
+
+
+def delete_schedule(apps, schema_editor):
+    Schedule = apps.get_model("django_q", "Schedule")
+    schedule_name = "schedule_demo"
+    Schedule.objects.filter(name=schedule_name).delete()
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("incidents", "[previous migration goes here]"),
+    ]
+
+    operations = [
+        migrations.RunPython(delete_schedule, create_schedule),
+    ]
+```
+
+Once this migration has run everywhere, you can then remove the body from the `SCHEDULES` array, but keep the key since these are still referenced in legacy migrations!
+
+```python
+SCHEDULES = {
+    "schedule_demo": {
+        # Removed in <migration name>
+    },
+}
+```

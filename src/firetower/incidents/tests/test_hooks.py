@@ -275,6 +275,34 @@ class TestOnIncidentCreated:
             "C99999", ["U_SRE1", "U_SRE2"]
         )
 
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_private_incident_skips_always_invited_ids(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel, settings
+    ):
+        settings.SLACK["ALWAYS_INVITED_IDS"] = ["U_SRE1", "U_SRE2"]
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        ExternalProfile.objects.create(
+            user=self.captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAPTAIN",
+        )
+
+        incident = Incident.objects.create(
+            title="Private Incident",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            is_private=True,
+        )
+
+        on_incident_created(incident)
+
+        mock_slack.invite_to_channel.assert_called_once_with("C99999", ["U_CAPTAIN"])
+
     @patch("firetower.incidents.hooks._slack_service")
     def test_posts_guide_message(self, mock_slack, settings):
         settings.SLACK["INCIDENT_GUIDE_MESSAGE"] = "Here is the guide."

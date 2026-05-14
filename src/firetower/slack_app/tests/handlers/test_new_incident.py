@@ -365,8 +365,9 @@ class TestNewIncidentSubmission:
 
 
 @pytest.mark.django_db
+@patch("firetower.slack_app.handlers.new_incident.close_old_connections")
 class TestTagOptions:
-    def test_returns_matching_tags(self):
+    def test_returns_matching_tags(self, _mock_close):
         Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
         Tag.objects.create(name="us-west-2", type=TagType.AFFECTED_REGION)
         Tag.objects.create(name="eu-west-1", type=TagType.AFFECTED_REGION)
@@ -381,7 +382,7 @@ class TestTagOptions:
         names = {o["text"]["text"] for o in options}
         assert names == {"us-east-1", "us-west-2"}
 
-    def test_empty_query_returns_all(self):
+    def test_empty_query_returns_all(self, _mock_close):
         Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
         Tag.objects.create(name="eu-west-1", type=TagType.AFFECTED_REGION)
 
@@ -392,14 +393,14 @@ class TestTagOptions:
         options = ack.call_args[1]["options"]
         assert len(options) == 2
 
-    def test_unknown_action_id_returns_empty(self):
+    def test_unknown_action_id_returns_empty(self, _mock_close):
         ack = MagicMock()
         payload = {"action_id": "unknown_action", "value": ""}
         handle_tag_options(ack, payload)
 
         ack.assert_called_once_with(options=[])
 
-    def test_filters_by_tag_type(self):
+    def test_filters_by_tag_type(self, _mock_close):
         Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
         Tag.objects.create(name="api", type=TagType.AFFECTED_SERVICE)
 

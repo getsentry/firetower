@@ -3,7 +3,7 @@ import uuid
 from typing import Any
 
 from django.conf import settings
-from django.db import InterfaceError, OperationalError
+from django.db import InterfaceError, OperationalError, close_old_connections
 
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.hooks import (
@@ -181,6 +181,7 @@ ACTION_ID_TO_TAG_TYPE = {
 
 
 def handle_tag_options(ack: Any, payload: dict) -> None:
+    close_old_connections()
     action_id = payload.get("action_id", "")
     keyword = payload.get("value", "")
 

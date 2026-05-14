@@ -5,6 +5,7 @@ import pytest
 from firetower.slack_app.bolt import handle_command
 
 
+@patch("firetower.slack_app.bolt.close_old_connections")
 class TestHandleCommand:
     def _make_body(self, text="", command="/ft"):
         return {"text": text, "command": command}
@@ -13,7 +14,7 @@ class TestHandleCommand:
         return {"command": command, "text": text}
 
     @patch("firetower.slack_app.bolt.statsd")
-    def test_help_returns_help_text(self, mock_statsd):
+    def test_help_returns_help_text(self, mock_statsd, _mock_close):
         ack = MagicMock()
         respond = MagicMock()
         body = self._make_body(text="help")
@@ -28,7 +29,7 @@ class TestHandleCommand:
         assert "/ft help" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
-    def test_empty_text_returns_help(self, mock_statsd):
+    def test_empty_text_returns_help(self, mock_statsd, _mock_close):
         ack = MagicMock()
         respond = MagicMock()
         body = self._make_body(text="")
@@ -42,7 +43,7 @@ class TestHandleCommand:
         assert "Firetower Slack App" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
-    def test_unknown_subcommand_returns_error(self, mock_statsd):
+    def test_unknown_subcommand_returns_error(self, mock_statsd, _mock_close):
         ack = MagicMock()
         respond = MagicMock()
         body = self._make_body(text="unknown")
@@ -57,7 +58,7 @@ class TestHandleCommand:
         assert "/ft unknown" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
-    def test_help_uses_ft_test_command(self, mock_statsd):
+    def test_help_uses_ft_test_command(self, mock_statsd, _mock_close):
         ack = MagicMock()
         respond = MagicMock()
         body = self._make_body(text="help", command="/ft-test")
@@ -70,7 +71,7 @@ class TestHandleCommand:
         assert "/ft-test help" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
-    def test_emits_submitted_and_completed_metrics(self, mock_statsd):
+    def test_emits_submitted_and_completed_metrics(self, mock_statsd, _mock_close):
         ack = MagicMock()
         respond = MagicMock()
         body = self._make_body(text="help")
@@ -86,7 +87,7 @@ class TestHandleCommand:
         )
 
     @patch("firetower.slack_app.bolt.statsd")
-    def test_emits_failed_metric_on_error(self, mock_statsd):
+    def test_emits_failed_metric_on_error(self, mock_statsd, _mock_close):
         ack = MagicMock()
         respond = MagicMock(side_effect=RuntimeError("boom"))
         body = self._make_body(text="help")

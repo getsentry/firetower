@@ -808,10 +808,11 @@ def decorate_incident_channel(
         ids_to_invite.append(ctx.captain_slack_id)
     if ctx.reporter_slack_id and ctx.reporter_slack_id not in ids_to_invite:
         ids_to_invite.append(ctx.reporter_slack_id)
-    always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
-    for uid in always_invited:
-        if uid not in ids_to_invite:
-            ids_to_invite.append(uid)
+    if not ctx.is_private:
+        always_invited = settings.SLACK.get("ALWAYS_INVITED_IDS", [])
+        for uid in always_invited:
+            if uid not in ids_to_invite:
+                ids_to_invite.append(uid)
     if ids_to_invite:
         try:
             slack_service.invite_to_channel(ctx.channel_id, ids_to_invite)
