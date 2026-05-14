@@ -1,8 +1,8 @@
 We use uv for backend stuff: uv run pytest, uv run manage.py runserver, etc. Backend dependencies are managed in pyproject.toml with uv.lock as the lockfile.
 
-We use bun for frontend stuff: bun dev, bun test, bun run lint, bun run format, etc.
+We use pnpm for frontend stuff: pnpm dev, pnpm test, pnpm run lint, pnpm run format, etc.
 
-Make sure you do not use NODE_ENV=production when running bun test.
+Make sure you do not use NODE_ENV=production when running pnpm test.
 
 In the frontend, prefer using types that are defined alongside the tanstack query query options as zod schemas over redefining types locally.
 
