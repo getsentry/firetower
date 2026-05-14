@@ -274,6 +274,7 @@ def sync_action_items_from_linear(
         "relation_type",
         "assignee",
         "url",
+        "updated_at",
     ]
 
     for issue in all_issues.values():
@@ -288,6 +289,7 @@ def sync_action_items_from_linear(
             ai.relation_type = issue["relation_type"]
             ai.assignee = assignee
             ai.url = issue["url"]
+            ai.updated_at = timezone.now()
             to_update.append(ai)
         else:
             to_create.append(
