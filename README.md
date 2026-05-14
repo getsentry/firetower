@@ -7,7 +7,7 @@ An incident management platform for tracking, triaging, and resolving incidents.
 - **Backend**: Django 5.2, Django REST Framework, PostgreSQL
 - **Frontend**: React 19, TypeScript, TanStack Router/Query, Tailwind CSS, Radix UI
 - **SDK**: Python SDK with JWT auth for programmatic access
-- **Tooling**: uv (Python), Bun (JS), Docker Compose
+- **Tooling**: uv (Python), pnpm (JS), Docker Compose
 
 ## Getting Started
 
@@ -15,7 +15,7 @@ An incident management platform for tracking, triaging, and resolving incidents.
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
-- [Bun](https://bun.sh/)
+- [Node.js](https://nodejs.org/) 22+
 - [Docker](https://www.docker.com/)
 
 ### Database
@@ -42,8 +42,8 @@ The API will be available at http://localhost:8000.
 
 ```sh
 cd frontend
-bun install
-bun dev
+pnpm install
+pnpm dev
 ```
 
 The dev server will be available at http://localhost:5173.
@@ -94,7 +94,7 @@ uv run pytest
 
 # Frontend
 cd frontend
-bun test
+pnpm test
 ```
 
 ### Linting & Formatting

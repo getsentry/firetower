@@ -3,14 +3,14 @@ import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {createMemoryHistory, createRouter, RouterProvider} from '@tanstack/react-router';
 import {render, screen, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {beforeEach, describe, expect, it, vi} from 'bun:test';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {routeTree} from '../routeTree.gen';
 
 import type {CurrentUser} from './queries/currentUserQueryOptions';
 import type {PaginatedIncidents} from './queries/incidentsQueryOptions';
 
-const mockApiGet = vi.fn();
+const {mockApiGet} = vi.hoisted(() => ({mockApiGet: vi.fn()}));
 vi.mock('../api', () => ({
   Api: {
     get: mockApiGet,

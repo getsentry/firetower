@@ -20,14 +20,14 @@ RUN uv sync --group prod --no-dev --frozen --compile-bytecode --no-editable
 # Build Django-side static file bundle
 RUN uv run --no-sync manage.py collectstatic --no-input
 
-FROM oven/bun:1.2.22-alpine AS build_frontend
+FROM node:22-alpine AS build_frontend
 
 WORKDIR /app
-COPY frontend/bun.lock .
+COPY frontend/pnpm-lock.yaml .
+COPY frontend/pnpm-workspace.yaml .
 COPY frontend/package.json .
-RUN bun install --frozen-lockfile
+RUN corepack enable && pnpm install --frozen-lockfile
 
-COPY frontend/package.json .
 COPY frontend/tsconfig*.json ./
 COPY frontend/vite.config.ts .
 COPY frontend/index.html .
@@ -37,7 +37,7 @@ COPY frontend/src ./src/
 
 ENV VITE_API_URL="/api"
 
-RUN bun run build
+RUN pnpm run build
 
 FROM nginx:1.29.3-alpine3.22
 

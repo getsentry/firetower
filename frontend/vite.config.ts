@@ -23,4 +23,7 @@ export default defineConfig({
       api: path.resolve(__dirname, './src/api.ts'),
     },
   },
+  test: {
+    setupFiles: ['./utils/happydom.ts', './utils/testing-library.ts'],
+  },
 });

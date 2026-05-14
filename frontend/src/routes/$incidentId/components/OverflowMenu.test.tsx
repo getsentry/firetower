@@ -1,6 +1,6 @@
 import {render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {describe, expect, it, jest} from 'bun:test';
+import {describe, expect, it, vi} from 'vitest';
 
 import {OverflowMenu} from './OverflowMenu';
 
@@ -85,7 +85,7 @@ describe('OverflowMenu', () => {
 
   it('calls onToggleVisibility when confirmed', async () => {
     const user = userEvent.setup();
-    const onToggleVisibility = jest.fn(async () => {});
+    const onToggleVisibility = vi.fn(async () => {});
 
     render(<OverflowMenu isPrivate={false} onToggleVisibility={onToggleVisibility} />);
 
@@ -100,7 +100,7 @@ describe('OverflowMenu', () => {
 
   it('does not call onToggleVisibility when cancelled', async () => {
     const user = userEvent.setup();
-    const onToggleVisibility = jest.fn(async () => {});
+    const onToggleVisibility = vi.fn(async () => {});
 
     render(<OverflowMenu isPrivate={false} onToggleVisibility={onToggleVisibility} />);
 
@@ -150,8 +150,8 @@ describe('OverflowMenu', () => {
 
   it('handles errors gracefully', async () => {
     const user = userEvent.setup();
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const onToggleVisibility = jest.fn(async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onToggleVisibility = vi.fn(async () => {
       throw new Error('Toggle failed');
     });
 
