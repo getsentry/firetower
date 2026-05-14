@@ -45,8 +45,9 @@ class TestBackfillSubcommandRouting:
     @patch("firetower.slack_app.handlers.backfill_incident._slack_service")
     @patch("firetower.slack_app.bolt.get_bolt_app")
     @patch("firetower.slack_app.bolt.statsd")
+    @patch("firetower.slack_app.bolt.close_old_connections")
     def test_backfill_routes_correctly(
-        self, mock_statsd, mock_get_bolt_app, mock_slack_svc
+        self, _mock_close, mock_statsd, mock_get_bolt_app, mock_slack_svc
     ):
         mock_slack_svc.get_channel_info.return_value = {
             "id": "C_TEST",
