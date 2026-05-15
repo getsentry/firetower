@@ -30,7 +30,7 @@ from .models import (
     TagType,
     filter_visible_to_user,
 )
-from .permissions import IncidentPermission
+from .permissions import IncidentPermission, IncidentStatusPermission
 from .reporting_utils import (
     build_incidents_by_tag,
     compute_regions,
@@ -42,6 +42,7 @@ from .serializers import (
     IncidentListUISerializer,
     IncidentOrRedirectReadSerializer,
     IncidentReadSerializer,
+    IncidentStatusSerializer,
     IncidentWriteSerializer,
     TagCreateSerializer,
     TagSerializer,
@@ -262,6 +263,46 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
                 exc_info=True,
             )
 
+        return obj
+
+
+class IncidentStatusRetrieveAPIView(generics.RetrieveAPIView):
+    """
+    Service API for retrieving an incident's status only.
+
+    GET: Get incident status
+
+    Accepts incident_id in format: INC-2000
+
+    Access is granted if either:
+    - The user has normal read visibility to the incident (IncidentPermission), or
+    - The user has the `incidents.view_all_incident_statuses` permission
+      (IncidentStatusPermission), which grants status access to any incident
+      including private ones.
+    """
+
+    permission_classes = [IncidentPermission | IncidentStatusPermission]
+    serializer_class = IncidentStatusSerializer
+    lookup_field = "id"
+
+    def get_queryset(self) -> QuerySet[Incident]:
+        return Incident.objects.all()
+
+    def get_object(self) -> Incident:
+        incident_id = self.kwargs["incident_id"]
+        project_key = settings.PROJECT_KEY
+
+        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
+        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
+
+        if not match:
+            raise ValidationError(
+                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
+            )
+
+        numeric_id = int(match.group(1))
+        obj = get_object_or_404(self.get_queryset(), id=numeric_id)
+        self.check_object_permissions(self.request, obj)
         return obj
 
 

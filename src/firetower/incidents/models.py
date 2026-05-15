@@ -248,6 +248,12 @@ class Incident(models.Model):
             models.Index(fields=["status", "-created_at"]),
             models.Index(fields=["severity", "-created_at"]),
         ]
+        permissions = [
+            (
+                "view_all_incident_statuses",
+                "Can view status of all incidents, including private",
+            ),
+        ]
 
     @property
     def incident_number(self) -> str:
