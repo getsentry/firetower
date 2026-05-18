@@ -30,7 +30,7 @@ from .models import (
     TagType,
     filter_visible_to_user,
 )
-from .permissions import IncidentPermission
+from .permissions import IncidentPermission, IncidentStatusPermission
 from .reporting_utils import (
     build_incidents_by_tag,
     compute_regions,
@@ -283,6 +283,7 @@ class IncidentStatusRetrieveAPIView(generics.RetrieveAPIView):
     404 rather than 403 — returning 403 would leak whether the incident exists.
     """
 
+    permission_classes = [IncidentPermission | IncidentStatusPermission]
     serializer_class = IncidentStatusSerializer
     lookup_field = "id"
 
