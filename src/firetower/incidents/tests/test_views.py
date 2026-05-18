@@ -1553,8 +1553,11 @@ class TestIncidentStatusRetrieveAPIView:
         assert response.status_code == 200
         assert response.data["status"] == IncidentStatus.ACTIVE
 
-    def test_user_without_visibility_or_perm_is_denied(self):
-        """User who can't see a private incident and lacks the perm is denied."""
+    def test_user_without_visibility_or_perm_gets_404(self):
+        """User who can't see a private incident and lacks the perm gets 404.
+
+        Must be 404, not 403 — a 403 would leak that the incident exists.
+        """
         incident = Incident.objects.create(
             title="Other's Private",
             status=IncidentStatus.ACTIVE,
@@ -1566,7 +1569,7 @@ class TestIncidentStatusRetrieveAPIView:
         self.client.force_authenticate(user=self.user)
         response = self.client.get(f"/api/incidents/{incident.incident_number}/status/")
 
-        assert response.status_code == 403
+        assert response.status_code == 404
 
     def test_user_with_view_all_perm_can_read_private_status(self):
         """User without visibility but holding view_all_incident_statuses gets through."""
