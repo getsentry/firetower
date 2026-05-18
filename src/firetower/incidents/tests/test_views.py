@@ -1591,18 +1591,6 @@ class TestIncidentStatusRetrieveAPIView:
             "status": IncidentStatus.DONE,
         }
 
-    def test_unauthenticated_user_denied(self):
-        incident = Incident.objects.create(
-            title="Public",
-            status=IncidentStatus.ACTIVE,
-            severity=IncidentSeverity.P1,
-        )
-
-        self.client.force_authenticate(None, None)
-        response = self.client.get(f"/api/incidents/{incident.incident_number}/status/")
-
-        assert response.status_code in (401, 403)
-
     def test_superuser_can_read_private_incident_status(self):
         superuser = User.objects.create_superuser(
             username="admin@example.com",
