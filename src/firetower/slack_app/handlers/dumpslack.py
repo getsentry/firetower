@@ -231,7 +231,12 @@ def handle_dumpslack_command(
         return
 
     if incident.is_private:
-        respond("Postmortem doc generation is disabled for private incidents.")
+        respond(
+            "Postmortem doc generation is disabled for private incidents. "
+            "We are working on a better flow for private incidents, but for now, "
+            "please create a private postmortem document, share it with the "
+            "appropriate people, and link it in the Firetower incident description."
+        )
         return
 
     respond(
