@@ -1,8 +1,8 @@
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from firetower.incidents.tasks import datadog_log
+from firetower.incidents.tasks import datadog_log, schedule_demo
 
 
 class TestDatadogLogTaskName:
@@ -102,3 +102,40 @@ class TestDatadogLogStatsdIncrements:
 
         with pytest.raises(ValueError, match="should propagate"):
             wrapped()
+
+
+class TestScheduleDemoPrivateIncident:
+    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.Incident")
+    def test_masks_title_for_private_incident(self, mock_incident_cls, mock_statsd):
+        mock_incident = MagicMock()
+        mock_incident.id = 42
+        mock_incident.title = "Secret outage details"
+        mock_incident.is_private = True
+        mock_incident_cls.objects.order_by.return_value.first.return_value = (
+            mock_incident
+        )
+
+        with patch("firetower.incidents.tasks.logger") as mock_logger:
+            schedule_demo.__wrapped__()
+
+        logged = mock_logger.info.call_args[0][0]
+        assert "Private Incident" in logged
+        assert "Secret outage details" not in logged
+
+    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.Incident")
+    def test_shows_title_for_public_incident(self, mock_incident_cls, mock_statsd):
+        mock_incident = MagicMock()
+        mock_incident.id = 43
+        mock_incident.title = "Public outage"
+        mock_incident.is_private = False
+        mock_incident_cls.objects.order_by.return_value.first.return_value = (
+            mock_incident
+        )
+
+        with patch("firetower.incidents.tasks.logger") as mock_logger:
+            schedule_demo.__wrapped__()
+
+        logged = mock_logger.info.call_args[0][0]
+        assert "Public outage" in logged

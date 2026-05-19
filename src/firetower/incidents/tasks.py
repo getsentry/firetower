@@ -55,6 +55,7 @@ def datadog_log(f: NamedFunction) -> NamedFunction:
 def schedule_demo() -> None:
     incident = Incident.objects.order_by("-created_at").first()
     if incident:
-        logger.info(f"Most recent incident: INC-{incident.id}: {incident.title}")
+        title = "Private Incident" if incident.is_private else incident.title
+        logger.info(f"Most recent incident: INC-{incident.id}: {title}")
     else:
         logger.info("No incidents found.")
