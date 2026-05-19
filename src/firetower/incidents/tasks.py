@@ -49,7 +49,13 @@ def datadog_log(f: NamedFunction) -> NamedFunction:
             statsd.increment("django_q.task.success", 1, tags)
         finally:
             # TODO(taylor-osler-sentry): Figure out if/why this is necessary?
-            statsd.flush()
+            try:
+                statsd.flush()
+            except Exception as e:
+                logger.error(
+                    f"Error while flushing datadog metrics: {e}", exc_info=True
+                )
+                # Don't re-raise; it's more important we raise the inner exception, if present
 
     return wrapper
 
