@@ -30,7 +30,7 @@ from .models import (
     TagType,
     filter_visible_to_user,
 )
-from .permissions import IncidentPermission
+from .permissions import IncidentPermission, IncidentStatusPermission
 from .reporting_utils import (
     build_incidents_by_tag,
     compute_regions,
@@ -42,6 +42,7 @@ from .serializers import (
     IncidentListUISerializer,
     IncidentOrRedirectReadSerializer,
     IncidentReadSerializer,
+    IncidentStatusSerializer,
     IncidentWriteSerializer,
     TagCreateSerializer,
     TagSerializer,
@@ -263,6 +264,49 @@ class IncidentRetrieveUpdateAPIView(generics.RetrieveUpdateAPIView):
             )
 
         return obj
+
+
+class IncidentStatusRetrieveAPIView(generics.RetrieveAPIView):
+    """
+    Service API for retrieving an incident's status only.
+
+    GET: Get incident status
+
+    Accepts incident_id in format: INC-2000
+
+    Access is granted if either:
+    - The user has normal read visibility to the incident, or
+    - The user has the `incidents.view_all_incident_statuses` permission,
+      which grants status access to any incident including private ones.
+
+    Access is filtered at the queryset level so users without access receive
+    404 rather than 403 — returning 403 would leak whether the incident exists.
+    """
+
+    permission_classes = [IncidentPermission | IncidentStatusPermission]
+    serializer_class = IncidentStatusSerializer
+    lookup_field = "id"
+
+    def get_queryset(self) -> QuerySet[Incident]:
+        queryset = Incident.objects.all()
+        if not self.request.user.has_perm("incidents.view_all_incident_statuses"):
+            queryset = filter_visible_to_user(queryset, self.request.user)
+        return queryset
+
+    def get_object(self) -> Incident:
+        incident_id = self.kwargs["incident_id"]
+        project_key = settings.PROJECT_KEY
+
+        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
+        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
+
+        if not match:
+            raise ValidationError(
+                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
+            )
+
+        numeric_id = int(match.group(1))
+        return get_object_or_404(self.get_queryset(), id=numeric_id)
 
 
 class SyncIncidentParticipantsView(generics.GenericAPIView):

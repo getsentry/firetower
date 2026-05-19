@@ -220,6 +220,17 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
         return participants_list
 
 
+class IncidentStatusSerializer(serializers.ModelSerializer):
+    """Serializer that exposes only the incident's status."""
+
+    id = serializers.CharField(source="incident_number", read_only=True)
+
+    class Meta:
+        model = Incident
+        fields = ["id", "status"]
+        read_only_fields = ["id", "status"]
+
+
 class IncidentReadSerializer(serializers.ModelSerializer):
     """
     Serializer for reading incidents via the service API.
