@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
+    if incident.is_private:
+        return
+
     notion = NotionService.from_settings()
     if not notion:
         return
@@ -225,6 +228,10 @@ def handle_dumpslack_command(
     if not incident:
         cmd = command.get("command", "/ft")
         respond(f"No incident found for this channel. Use `{cmd} new` to create one.")
+        return
+
+    if incident.is_private:
+        respond("Postmortem doc generation is disabled for private incidents.")
         return
 
     respond(
