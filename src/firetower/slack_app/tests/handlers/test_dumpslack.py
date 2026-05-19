@@ -447,7 +447,7 @@ class TestDownloadImage:
 
 
 class TestTriggerSlackDump:
-    def test_skips_silently_for_private_incident(self):
+    def test_posts_guidance_and_skips_notion_for_private_incident(self):
         client = MagicMock()
         mock_incident = MagicMock()
         mock_incident.is_private = True
@@ -457,7 +457,10 @@ class TestTriggerSlackDump:
             _trigger_slack_dump(client, "C123", mock_incident)
 
         mock_notion.assert_not_called()
-        client.chat_postMessage.assert_not_called()
+        client.chat_postMessage.assert_called_once()
+        posted = client.chat_postMessage.call_args[1]["text"]
+        assert "private" in posted.lower()
+        assert "C123" == client.chat_postMessage.call_args[1]["channel"]
 
     def test_skips_silently_when_notion_not_configured(self):
         client = MagicMock()

@@ -20,8 +20,25 @@ from firetower.slack_app.handlers.utils import get_incident_from_channel
 logger = logging.getLogger(__name__)
 
 
+_PRIVATE_INCIDENT_PM_MESSAGE = (
+    "Postmortem doc generation is disabled for private incidents. "
+    "We are working on a better flow for private incidents, but for now, "
+    "please create a private postmortem document, share it with the "
+    "appropriate people, and link it in the Firetower incident description."
+)
+
+
 def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
     if incident.is_private:
+        try:
+            client.chat_postMessage(
+                channel=channel_id, text=_PRIVATE_INCIDENT_PM_MESSAGE
+            )
+        except Exception:
+            logger.exception(
+                "Failed to post private incident PM message to channel %s",
+                channel_id,
+            )
         return
 
     notion = NotionService.from_settings()
@@ -231,12 +248,7 @@ def handle_dumpslack_command(
         return
 
     if incident.is_private:
-        respond(
-            "Postmortem doc generation is disabled for private incidents. "
-            "We are working on a better flow for private incidents, but for now, "
-            "please create a private postmortem document, share it with the "
-            "appropriate people, and link it in the Firetower incident description."
-        )
+        respond(_PRIVATE_INCIDENT_PM_MESSAGE)
         return
 
     respond(
