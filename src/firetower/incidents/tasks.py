@@ -47,6 +47,9 @@ def datadog_log(f: NamedFunction) -> NamedFunction:
             raise e
         else:
             statsd.increment("django_q.task.success", 1, tags)
+        finally:
+            # TODO(taylor-osler-sentry): Figure out if/why this is necessary?
+            statsd.flush()
 
     return wrapper
 
