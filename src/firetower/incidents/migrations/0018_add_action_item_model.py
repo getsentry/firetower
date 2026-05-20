@@ -7,7 +7,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0015_add_notion_troubleshooting_link_type"),
+        ("incidents", "0017_alter_incident_options"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
