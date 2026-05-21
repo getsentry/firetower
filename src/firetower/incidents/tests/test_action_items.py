@@ -387,7 +387,7 @@ class TestSyncActionItemsFromLinear:
 
         with (
             patch(
-                "firetower.incidents.services.create_linear_parent_issue",
+                "firetower.incidents.hooks.create_linear_parent_issue",
                 side_effect=fake_create_parent,
             ) as mock_create_parent,
             patch("firetower.incidents.services._get_linear_service") as mock_get,

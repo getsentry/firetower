@@ -902,6 +902,7 @@ def _claim_linear_issue(
         issue = linear_service.get_issue(identifier)
         if issue:
             return issue
+        # Created issue may get a different identifier; discard it and retry lookup
         result = linear_service.create_issue("Placeholder", "", team_id, project_id)
         if not result:
             logger.warning(
