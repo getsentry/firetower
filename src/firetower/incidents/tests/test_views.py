@@ -8,6 +8,9 @@ from django.contrib.auth.models import Permission, User
 from rest_framework.test import APIClient
 
 from firetower.incidents.models import (
+    ActionItem,
+    ActionItemRelationType,
+    ActionItemStatus,
     ExternalLink,
     ExternalLinkType,
     Incident,
@@ -1622,5 +1625,104 @@ class TestIncidentStatusRetrieveAPIView:
         response = self.client.get(
             f"/api/incidents/{settings.PROJECT_KEY}-99999/status/"
         )
+
+        assert response.status_code == 404
+
+
+@pytest.mark.django_db
+class TestActionItemListView:
+    def setup_method(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test@example.com",
+            email="test@example.com",
+            password="testpass123",
+        )
+        self.incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+    def _url(self, incident_id: str) -> str:
+        return f"/api/ui/incidents/{incident_id}/action-items/"
+
+    def test_returns_action_items(self):
+        ActionItem.objects.create(
+            incident=self.incident,
+            linear_issue_id="id-1",
+            linear_identifier="ENG-1",
+            title="Fix the bug",
+            status=ActionItemStatus.TODO,
+            relation_type=ActionItemRelationType.CHILD,
+            url="https://linear.app/team/issue/ENG-1",
+        )
+        ActionItem.objects.create(
+            incident=self.incident,
+            linear_issue_id="id-2",
+            linear_identifier="ENG-2",
+            title="Write tests",
+            status=ActionItemStatus.IN_PROGRESS,
+            relation_type=ActionItemRelationType.RELATED,
+            url="https://linear.app/team/issue/ENG-2",
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self._url(self.incident.incident_number))
+
+        assert response.status_code == 200
+        assert len(response.data) == 2
+        item = response.data[0]
+        assert item["linear_identifier"] == "ENG-1"
+        assert item["title"] == "Fix the bug"
+        assert item["status"] == "Todo"
+        assert item["relation_type"] == "child"
+        assert item["url"] == "https://linear.app/team/issue/ENG-1"
+        assert "assignee_name" in item
+        assert "assignee_avatar_url" in item
+
+    def test_empty_list(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self._url(self.incident.incident_number))
+
+        assert response.status_code == 200
+        assert response.data == []
+
+    def test_nonexistent_incident_returns_404(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self._url(f"{settings.PROJECT_KEY}-99999"))
+
+        assert response.status_code == 404
+
+    def test_invalid_incident_id_format(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self._url("INVALID-123"))
+
+        assert response.status_code == 400
+
+    def test_private_incident_not_visible_to_non_member(self):
+        other_user = User.objects.create_user(
+            username="other@example.com",
+            email="other@example.com",
+            password="testpass123",
+        )
+        private_incident = Incident.objects.create(
+            title="Private Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.user,
+        )
+        ActionItem.objects.create(
+            incident=private_incident,
+            linear_issue_id="id-priv",
+            linear_identifier="ENG-99",
+            title="Secret task",
+            status=ActionItemStatus.TODO,
+            url="https://linear.app/team/issue/ENG-99",
+        )
+
+        self.client.force_authenticate(user=other_user)
+        response = self.client.get(self._url(private_incident.incident_number))
 
         assert response.status_code == 404

@@ -23,6 +23,7 @@ from .filters import (
     filter_by_tags,
 )
 from .models import (
+    ActionItem,
     Incident,
     IncidentOrRedirect,
     ServiceTier,
@@ -39,6 +40,7 @@ from .reporting_utils import (
     get_year_periods,
 )
 from .serializers import (
+    ActionItemSerializer,
     IncidentListUISerializer,
     IncidentOrRedirectReadSerializer,
     IncidentReadSerializer,
@@ -382,6 +384,34 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
 
 # View alias for sync endpoint
 sync_incident_participants = SyncIncidentParticipantsView.as_view()
+
+
+class ActionItemListView(generics.ListAPIView):
+    serializer_class = ActionItemSerializer
+    pagination_class = None
+
+    def get_queryset(self) -> QuerySet[ActionItem]:
+        incident_id = self.kwargs["incident_id"]
+        project_key = settings.PROJECT_KEY
+
+        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
+        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
+
+        if not match:
+            raise ValidationError(
+                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
+            )
+
+        numeric_id = int(match.group(1))
+        incident_qs = filter_visible_to_user(Incident.objects.all(), self.request.user)
+        get_object_or_404(incident_qs, id=numeric_id)
+
+        return ActionItem.objects.filter(incident_id=numeric_id).select_related(
+            "assignee__userprofile"
+        )
+
+
+action_item_list = ActionItemListView.as_view()
 
 
 class TagListCreateAPIView(generics.ListCreateAPIView):
