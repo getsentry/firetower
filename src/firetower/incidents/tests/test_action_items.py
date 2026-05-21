@@ -944,6 +944,7 @@ class TestCreateLinearParentIssueHook:
             title="Test Incident",
             status=IncidentStatus.ACTIVE,
             severity=IncidentSeverity.P1,
+            linear_parent_issue_id="existing-id",
         )
         ExternalLink.objects.create(
             incident=incident,
