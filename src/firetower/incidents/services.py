@@ -216,7 +216,7 @@ def sync_action_items_from_linear(
     stats = ActionItemsSyncStats()
 
     if not incident.linear_parent_issue_id:
-        # One-time backfill for incidents created before Linear integration
+        # Backfill for incidents created before Linear integration
         from firetower.incidents.hooks import (  # noqa: PLC0415
             create_linear_parent_issue,
         )
