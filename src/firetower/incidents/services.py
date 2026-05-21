@@ -216,8 +216,15 @@ def sync_action_items_from_linear(
     stats = ActionItemsSyncStats()
 
     if not incident.linear_parent_issue_id:
-        stats.skipped = True
-        return stats
+        from firetower.incidents.hooks import (  # noqa: PLC0415
+            _create_linear_parent_issue,
+        )
+
+        _create_linear_parent_issue(incident)
+        incident.refresh_from_db(fields=["linear_parent_issue_id"])
+        if not incident.linear_parent_issue_id:
+            stats.skipped = True
+            return stats
 
     if not force and incident.action_items_last_synced_at:
         time_since_sync = timezone.now() - incident.action_items_last_synced_at
