@@ -447,9 +447,24 @@ class TestDownloadImage:
 
 
 class TestTriggerSlackDump:
-    def test_skips_silently_when_notion_not_configured(self):
+    def test_posts_guidance_and_skips_notion_for_private_incident(self):
         client = MagicMock()
         mock_incident = MagicMock()
+        mock_incident.is_private = True
+        with patch(
+            "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+        ) as mock_notion:
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        mock_notion.assert_not_called()
+        client.chat_postMessage.assert_called_once()
+        posted = client.chat_postMessage.call_args[1]["text"]
+        assert "private" in posted.lower()
+        assert "C123" == client.chat_postMessage.call_args[1]["channel"]
+
+    def test_skips_silently_when_notion_not_configured(self):
+        client = MagicMock()
+        mock_incident = MagicMock(is_private=False)
         with patch(
             "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
             return_value=None,
@@ -460,7 +475,7 @@ class TestTriggerSlackDump:
 
     def test_posts_start_message_and_completion(self):
         client = MagicMock()
-        mock_incident = MagicMock()
+        mock_incident = MagicMock(is_private=False)
         mock_incident.captain = None
         mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
         mock_notion_link = MagicMock(url="")
@@ -498,7 +513,7 @@ class TestTriggerSlackDump:
         client.chat_postMessage.side_effect = SlackApiError(
             message="not_in_channel", response={"ok": False, "error": "not_in_channel"}
         )
-        mock_incident = MagicMock()
+        mock_incident = MagicMock(is_private=False)
         mock_incident.captain = None
         mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
         mock_notion_link = MagicMock(url="")
@@ -579,9 +594,32 @@ class TestHandleDumpslackCommand:
         ack.assert_called_once()
         assert "No incident" in respond.call_args[0][0]
 
-    def test_dispatches_async_dump(self):
+    def test_responds_when_private_incident(self):
         ack, body, command, client, respond, _ = self._make_args()
         mock_incident = MagicMock()
+        mock_incident.is_private = True
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.is_configured",
+                return_value=True,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack.get_incident_from_channel",
+                return_value=mock_incident,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async"
+            ) as mock_async,
+        ):
+            handle_dumpslack_command(ack, body, command, client, respond)
+
+        ack.assert_called_once()
+        assert "private" in respond.call_args[0][0].lower()
+        mock_async.assert_not_called()
+
+    def test_dispatches_async_dump(self):
+        ack, body, command, client, respond, _ = self._make_args()
+        mock_incident = MagicMock(is_private=False)
         with (
             patch(
                 "firetower.slack_app.handlers.dumpslack.NotionService.is_configured",

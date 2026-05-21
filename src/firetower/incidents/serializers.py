@@ -19,6 +19,7 @@ from .hooks import (
 )
 from .models import (
     USER_ADDABLE_TAG_TYPES,
+    ActionItem,
     ExternalLink,
     ExternalLinkType,
     Incident,
@@ -218,6 +219,17 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
                 seen_users.add(participant.id)
 
         return participants_list
+
+
+class IncidentStatusSerializer(serializers.ModelSerializer):
+    """Serializer that exposes only the incident's status."""
+
+    id = serializers.CharField(source="incident_number", read_only=True)
+
+    class Meta:
+        model = Incident
+        fields = ["id", "status"]
+        read_only_fields = ["id", "status"]
 
 
 class IncidentReadSerializer(serializers.ModelSerializer):
@@ -652,6 +664,33 @@ class TagCreateSerializer(serializers.ModelSerializer):
             return Tag.objects.create(**validated_data)
         except DjangoValidationError as e:
             raise serializers.ValidationError(e.message_dict)
+
+
+class ActionItemSerializer(serializers.ModelSerializer):
+    assignee_name = serializers.SerializerMethodField()
+    assignee_avatar_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ActionItem
+        fields = [
+            "linear_identifier",
+            "title",
+            "status",
+            "relation_type",
+            "assignee_name",
+            "assignee_avatar_url",
+            "url",
+        ]
+
+    def get_assignee_name(self, obj: ActionItem) -> str | None:
+        if obj.assignee:
+            return obj.assignee.get_full_name() or obj.assignee.username
+        return None
+
+    def get_assignee_avatar_url(self, obj: ActionItem) -> str | None:
+        if obj.assignee and hasattr(obj.assignee, "userprofile"):
+            return obj.assignee.userprofile.avatar_url or None
+        return None
 
 
 class IncidentOrRedirectReadSerializer(serializers.Serializer):

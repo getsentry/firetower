@@ -22,6 +22,20 @@ class IsAuthenticated(permissions.BasePermission):
         return request.user and request.user.is_authenticated
 
 
+class IncidentStatusPermission(permissions.BasePermission):
+    """
+    Permission for the incident status endpoint.
+
+    Requires the django-admin `incidents.view_all_incident_statuses` permission,
+    which grants access to the status of any incident (including private ones).
+    """
+
+    def has_permission(self, request: Request, view: "APIView") -> bool:
+        if not (request.user and request.user.is_authenticated):
+            return False
+        return request.user.has_perm("incidents.view_all_incident_statuses")
+
+
 class IncidentPermission(permissions.BasePermission):
     """
     Permission class for incident CRUD operations.

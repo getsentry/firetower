@@ -166,7 +166,7 @@ export function EditableTextField({
   // Update draft when value changes (e.g., after successful save)
   useEffect(() => {
     if (!isEditing) {
-      setDraftValue(value);
+      setDraftValue(value); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [value, isEditing]);
 

@@ -1,6 +1,6 @@
 import {render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {describe, expect, it, jest} from 'bun:test';
+import {describe, expect, it, vi} from 'vitest';
 
 import {EditableTags} from './EditableTags';
 
@@ -119,7 +119,7 @@ describe('EditableTags', () => {
 
   it('calls onSave when closed via escape', async () => {
     const user = userEvent.setup();
-    const onSave = jest.fn(async () => {});
+    const onSave = vi.fn(async () => {});
 
     render(
       <EditableTags
@@ -213,7 +213,7 @@ describe('EditableTags', () => {
 
   it('maintains alphabetical sort order throughout editing flow', async () => {
     const user = userEvent.setup();
-    const onSave = jest.fn(async () => {});
+    const onSave = vi.fn(async () => {});
     const unsortedSuggestions = ['Zebra', 'Mango', 'Apple', 'Banana'];
 
     // Start with unsorted tags

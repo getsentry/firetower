@@ -1,6 +1,6 @@
 import {render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {describe, expect, it, jest} from 'bun:test';
+import {describe, expect, it, vi} from 'vitest';
 import {z} from 'zod';
 
 import {EditableTextField} from './EditableTextField';
@@ -35,7 +35,7 @@ describe('EditableTextField', () => {
 
   it('calls onSave with new value when save button is clicked', async () => {
     const user = userEvent.setup();
-    const onSave = jest.fn(async () => {});
+    const onSave = vi.fn(async () => {});
 
     render(<EditableTextField value="Original" onSave={onSave} />);
 
@@ -114,7 +114,7 @@ describe('EditableTextField', () => {
 
   it('shows error message when save fails', async () => {
     const user = userEvent.setup();
-    const onSave = jest.fn(async () => {
+    const onSave = vi.fn(async () => {
       throw new Error('Save failed');
     });
 
@@ -159,7 +159,7 @@ describe('EditableTextField', () => {
 
   it('does not call onSave when value has not changed', async () => {
     const user = userEvent.setup();
-    const onSave = jest.fn(async () => {});
+    const onSave = vi.fn(async () => {});
 
     render(<EditableTextField value="Unchanged" onSave={onSave} />);
 
@@ -186,7 +186,7 @@ describe('EditableTextField', () => {
     const savePromise = new Promise<void>(resolve => {
       resolveSave = resolve;
     });
-    const onSave = jest.fn(async () => savePromise);
+    const onSave = vi.fn(async () => savePromise);
 
     render(<EditableTextField value="Test" onSave={onSave} />);
 

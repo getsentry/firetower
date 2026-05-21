@@ -1,6 +1,6 @@
 import {render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {describe, expect, it, jest} from 'bun:test';
+import {describe, expect, it, vi} from 'vitest';
 
 import {EditablePill} from './EditablePill';
 
@@ -49,7 +49,7 @@ describe('EditablePill', () => {
 
   it('calls onSave when different option is selected', async () => {
     const user = userEvent.setup();
-    const onSave = jest.fn(async () => {});
+    const onSave = vi.fn(async () => {});
 
     render(<EditablePill value="P1" options={SEVERITY_OPTIONS} onSave={onSave} />);
 
@@ -84,7 +84,7 @@ describe('EditablePill', () => {
 
   it('does not call onSave when same option is selected', async () => {
     const user = userEvent.setup();
-    const onSave = jest.fn(async () => {});
+    const onSave = vi.fn(async () => {});
 
     render(<EditablePill value="P1" options={SEVERITY_OPTIONS} onSave={onSave} />);
 
@@ -149,7 +149,7 @@ describe('EditablePill', () => {
     const savePromise = new Promise<void>(resolve => {
       resolveSave = resolve;
     });
-    const onSave = jest.fn(async () => savePromise);
+    const onSave = vi.fn(async () => savePromise);
 
     render(<EditablePill value="P1" options={SEVERITY_OPTIONS} onSave={onSave} />);
 
@@ -172,8 +172,8 @@ describe('EditablePill', () => {
 
   it('handles save errors gracefully', async () => {
     const user = userEvent.setup();
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const onSave = jest.fn(async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onSave = vi.fn(async () => {
       throw new Error('Save failed');
     });
 

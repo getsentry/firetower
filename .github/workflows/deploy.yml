@@ -91,6 +91,15 @@ jobs:
           region: us-west1
           image: ${{ env.BACKEND_IMAGE_REF }}
 
+      - name: deploy-test-async
+        if: ${{ inputs.environment == 'test' }}
+        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
+        with:
+          service: firetower-async-test
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: ${{ env.BACKEND_IMAGE_REF }}
+
       - name: deploy-prod-db-migration
         if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
         uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
@@ -117,6 +126,15 @@ jobs:
         uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
         with:
           service: firetower-slack-app
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: ${{ env.BACKEND_IMAGE_REF }}
+
+      - name: deploy-prod-async
+        if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
+        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
+        with:
+          service: firetower-async-prod
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           region: us-west1
           image: ${{ env.BACKEND_IMAGE_REF }}

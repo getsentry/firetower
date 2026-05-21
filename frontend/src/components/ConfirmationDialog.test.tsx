@@ -1,6 +1,6 @@
 import {render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {describe, expect, it, jest} from 'bun:test';
+import {describe, expect, it, vi} from 'vitest';
 
 import {ConfirmationDialog} from './ConfirmationDialog';
 
@@ -10,8 +10,8 @@ describe('ConfirmationDialog', () => {
     title: 'Confirm Action',
     message: 'Are you sure you want to proceed?',
     confirmLabel: 'Confirm',
-    onConfirm: jest.fn(),
-    onCancel: jest.fn(),
+    onConfirm: vi.fn(),
+    onCancel: vi.fn(),
   };
 
   it('renders nothing when closed', () => {
@@ -48,7 +48,7 @@ describe('ConfirmationDialog', () => {
 
   it('calls onConfirm when confirm button is clicked', async () => {
     const user = userEvent.setup();
-    const onConfirm = jest.fn();
+    const onConfirm = vi.fn();
 
     render(<ConfirmationDialog {...defaultProps} onConfirm={onConfirm} />);
 
@@ -59,7 +59,7 @@ describe('ConfirmationDialog', () => {
 
   it('calls onCancel when cancel button is clicked', async () => {
     const user = userEvent.setup();
-    const onCancel = jest.fn();
+    const onCancel = vi.fn();
 
     render(<ConfirmationDialog {...defaultProps} onCancel={onCancel} />);
 
@@ -70,7 +70,7 @@ describe('ConfirmationDialog', () => {
 
   it('calls onCancel when overlay is clicked', async () => {
     const user = userEvent.setup();
-    const onCancel = jest.fn();
+    const onCancel = vi.fn();
 
     render(<ConfirmationDialog {...defaultProps} onCancel={onCancel} />);
 
@@ -84,7 +84,7 @@ describe('ConfirmationDialog', () => {
 
   it('calls onCancel when Escape key is pressed', async () => {
     const user = userEvent.setup();
-    const onCancel = jest.fn();
+    const onCancel = vi.fn();
 
     render(<ConfirmationDialog {...defaultProps} onCancel={onCancel} />);
 
