@@ -866,7 +866,7 @@ def _linear_issue_title(incident: Incident) -> str:
 
 
 def _sync_linear_title(incident: Incident) -> None:
-    if not incident.linear_parent_issue_id:
+    if not settings.LINEAR or not incident.linear_parent_issue_id:
         return
     try:
         linear_service = LinearService()
@@ -926,7 +926,7 @@ def create_linear_parent_issue(incident: Incident) -> None:
         type=ExternalLinkType.LINEAR,
         defaults={"url": ""},
     )
-    if not created:
+    if not created and incident.linear_parent_issue_id:
         logger.info(f"Incident {incident.id} already has a Linear link, skipping")
         return
 
