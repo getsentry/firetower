@@ -292,17 +292,7 @@ class IncidentStatusRetrieveAPIView(generics.RetrieveAPIView):
 
     def get_object(self) -> Incident:
         incident_id = self.kwargs["incident_id"]
-        project_key = settings.PROJECT_KEY
-
-        incident_pattern = rf"^{re.escape(project_key)}-(\d+)$"
-        match = re.match(incident_pattern, incident_id, re.IGNORECASE)
-
-        if not match:
-            raise ValidationError(
-                f"Invalid incident ID format. Expected format: {project_key}-<number> (e.g., {project_key}-123)"
-            )
-
-        numeric_id = int(match.group(1))
+        numeric_id = parse_incident_id(incident_id)
         return get_object_or_404(self.get_queryset(), id=numeric_id)
 
 

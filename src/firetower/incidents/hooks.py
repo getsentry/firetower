@@ -902,12 +902,17 @@ def _claim_linear_issue(
         issue = linear_service.get_issue(identifier)
         if issue:
             return issue
-        linear_service.create_issue("Placeholder", "", team_id, project_id)
+        result = linear_service.create_issue("Placeholder", "", team_id, project_id)
+        if not result:
+            logger.warning(
+                f"Failed to create placeholder Linear issue for {identifier}"
+            )
+            return None
 
     return None
 
 
-def _create_linear_parent_issue(incident: Incident) -> None:
+def create_linear_parent_issue(incident: Incident) -> None:
     linear_config = settings.LINEAR
     if not linear_config:
         return
@@ -1091,7 +1096,7 @@ def on_incident_created(incident: Incident) -> None:
         _create_troubleshooting_doc(incident, channel_id)
 
     try:
-        _create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident)
     except Exception:
         logger.exception(
             f"Failed to create Linear parent issue for incident {incident.id}"

@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType, UserProfile
 from firetower.incidents.hooks import (
-    _create_linear_parent_issue,
+    create_linear_parent_issue,
     on_title_changed,
     on_visibility_changed,
 )
@@ -368,6 +368,40 @@ class TestSyncActionItemsFromLinear:
                 user=item.assignee, type=ExternalProfileType.LINEAR
             )
             assert profile.external_id == "linear-user-456"
+
+    def test_backfill_creates_parent_and_syncs(self, settings):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        children = [
+            _make_linear_issue(id="id-1", identifier="ENG-1", title="Task 1"),
+        ]
+
+        def fake_create_parent(inc):
+            inc.linear_parent_issue_id = "backfilled-parent-id"
+            inc.save(update_fields=["linear_parent_issue_id"])
+
+        with (
+            patch(
+                "firetower.incidents.services.create_linear_parent_issue",
+                side_effect=fake_create_parent,
+            ) as mock_create_parent,
+            patch("firetower.incidents.services._get_linear_service") as mock_get,
+        ):
+            mock_get.return_value.get_child_issues.return_value = children
+            mock_get.return_value.get_related_issues.return_value = []
+            mock_get.return_value.get_workflow_states.return_value = None
+
+            stats = sync_action_items_from_linear(incident, force=True)
+
+            mock_create_parent.assert_called_once_with(incident)
+            assert stats.skipped is False
+            assert stats.created == 1
+            assert incident.action_items.count() == 1
 
     def test_auto_completes_parent_when_all_done(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
@@ -797,7 +831,7 @@ class TestCreateLinearParentIssueHook:
             severity=IncidentSeverity.P1,
         )
 
-        _create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident)
 
         incident.refresh_from_db()
         assert incident.linear_parent_issue_id == "linear-issue-id"
@@ -850,7 +884,7 @@ class TestCreateLinearParentIssueHook:
             severity=IncidentSeverity.P1,
         )
 
-        _create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident)
 
         incident.refresh_from_db()
         assert incident.linear_parent_issue_id == "linear-issue-id"
@@ -868,7 +902,7 @@ class TestCreateLinearParentIssueHook:
             severity=IncidentSeverity.P1,
         )
 
-        _create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident)
 
         assert not ExternalLink.objects.filter(
             incident=incident, type=ExternalLinkType.LINEAR
@@ -894,7 +928,7 @@ class TestCreateLinearParentIssueHook:
             severity=IncidentSeverity.P1,
         )
 
-        _create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident)
 
         assert not ExternalLink.objects.filter(
             incident=incident, type=ExternalLinkType.LINEAR
@@ -917,7 +951,7 @@ class TestCreateLinearParentIssueHook:
             url="https://linear.app/existing",
         )
 
-        _create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident)
 
         MockLinearService.return_value.get_issue.assert_not_called()
 
@@ -947,7 +981,7 @@ class TestCreateLinearParentIssueHook:
             severity=IncidentSeverity.P1,
         )
 
-        _create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident)
 
         incident.refresh_from_db()
         assert incident.linear_parent_issue_id == "new-issue-id"
@@ -1050,7 +1084,7 @@ class TestCreateLinearParentIssuePrivacy:
             is_private=True,
         )
 
-        _create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident)
 
         call_args = mock_service.update_issue.call_args
         assert call_args[1]["title"] == f"[{incident.incident_number}] Private Incident"

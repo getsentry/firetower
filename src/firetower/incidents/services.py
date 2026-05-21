@@ -217,10 +217,10 @@ def sync_action_items_from_linear(
 
     if not incident.linear_parent_issue_id:
         from firetower.incidents.hooks import (  # noqa: PLC0415
-            _create_linear_parent_issue,
+            create_linear_parent_issue,
         )
 
-        _create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident)
         incident.refresh_from_db(fields=["linear_parent_issue_id"])
         if not incident.linear_parent_issue_id:
             stats.skipped = True
