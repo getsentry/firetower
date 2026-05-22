@@ -859,6 +859,27 @@ def decorate_incident_channel(
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
 
 
+def _resolve_linear_user_id(
+    user: User | None, linear_service: LinearService
+) -> str | None:
+    if not user:
+        return None
+    profile = ExternalProfile.objects.filter(
+        user=user, type=ExternalProfileType.LINEAR
+    ).first()
+    if profile:
+        return profile.external_id
+    linear_user = linear_service.get_user_by_email(user.email)
+    if not linear_user:
+        return None
+    ExternalProfile.objects.get_or_create(
+        user=user,
+        type=ExternalProfileType.LINEAR,
+        defaults={"external_id": linear_user["id"]},
+    )
+    return linear_user["id"]
+
+
 def _linear_issue_title(incident: Incident, sync_identifiers: bool = False) -> str:
     if incident.is_private:
         if sync_identifiers:
@@ -941,13 +962,7 @@ def create_linear_parent_issue(incident: Incident) -> None:
         sync_identifiers = linear_config.get("SYNC_IDENTIFIERS", False)
         title = _linear_issue_title(incident, sync_identifiers=sync_identifiers)
 
-        captain_linear_id = None
-        if incident.captain:
-            profile = ExternalProfile.objects.filter(
-                user=incident.captain, type=ExternalProfileType.LINEAR
-            ).first()
-            if profile:
-                captain_linear_id = profile.external_id
+        captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
 
         if sync_identifiers:
             issue = _claim_linear_issue(linear_service, incident, team_id, project_id)

@@ -188,6 +188,25 @@ class LinearService:
             "url": issue["url"],
         }
 
+    def get_user_by_email(self, email: str) -> dict[str, str] | None:
+        query = """
+        query($email: String!) {
+            users(filter: { email: { eq: $email } }) {
+                nodes {
+                    id
+                    email
+                }
+            }
+        }
+        """
+        data = self._graphql(query, {"email": email})
+        if not data:
+            return None
+        nodes = data.get("users", {}).get("nodes", [])
+        if not nodes:
+            return None
+        return {"id": nodes[0]["id"], "email": nodes[0]["email"]}
+
     def create_issue(
         self,
         title: str,

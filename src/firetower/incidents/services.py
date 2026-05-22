@@ -207,6 +207,17 @@ def _update_parent_issue_status(
         linear_service.update_issue(incident.linear_parent_issue_id, state_id=state_id)
 
 
+def _sync_parent_assignee(incident: Incident, linear_service: LinearService) -> None:
+    if not incident.linear_parent_issue_id:
+        return
+    from firetower.incidents.hooks import _resolve_linear_user_id  # noqa: PLC0415
+
+    captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
+    linear_service.update_issue(
+        incident.linear_parent_issue_id, assignee_id=captain_linear_id
+    )
+
+
 def sync_action_items_from_linear(
     incident: Incident, force: bool = False
 ) -> ActionItemsSyncStats:
@@ -333,6 +344,13 @@ def sync_action_items_from_linear(
     except Exception:
         logger.exception(
             f"Failed to update Linear parent issue status for incident {incident.id}"
+        )
+
+    try:
+        _sync_parent_assignee(incident, linear_service)
+    except Exception:
+        logger.exception(
+            f"Failed to sync Linear parent assignee for incident {incident.id}"
         )
 
     logger.info(
