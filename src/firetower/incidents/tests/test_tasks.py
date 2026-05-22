@@ -1,8 +1,21 @@
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+from django_q.models import Schedule
 
-from firetower.incidents.tasks import datadog_log, schedule_demo
+from firetower.incidents.models import (
+    ExternalLink,
+    ExternalLinkType,
+    Incident,
+    IncidentSeverity,
+    IncidentStatus,
+)
+from firetower.incidents.tasks import (
+    ARCHIVE_NOTICE,
+    archive_stale_channels,
+    datadog_log,
+    schedule_demo,
+)
 
 
 class TestDatadogLogTaskName:
@@ -139,3 +152,144 @@ class TestScheduleDemoPrivateIncident:
 
         logged = mock_logger.info.call_args[0][0]
         assert "Public outage" in logged
+
+
+@pytest.mark.django_db
+class TestArchiveStaleChannels:
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "status": IncidentStatus.DONE,
+            "severity": IncidentSeverity.P2,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def _make_link(self, incident, channel_id="C12345"):
+        return ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url=f"https://sentry.slack.com/archives/{channel_id}",
+        )
+
+    def test_archives_channel_with_no_history(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_EMPTY")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.parse_channel_id_from_url.return_value = "C_EMPTY"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_EMPTY",
+            "name": "inc-2000",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = []
+        mock_slack.archive_channel.return_value = True
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.post_message.assert_called_once_with("C_EMPTY", ARCHIVE_NOTICE)
+        mock_slack.archive_channel.assert_called_once_with("C_EMPTY")
+
+    def test_skips_channel_with_history(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_ACTIVE")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.parse_channel_id_from_url.return_value = "C_ACTIVE"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_ACTIVE",
+            "name": "inc-2001",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = [
+            {"type": "message", "text": "still here", "ts": "1.0"}
+        ]
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.post_message.assert_not_called()
+        mock_slack.archive_channel.assert_not_called()
+
+    def test_skips_already_archived_channel(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_ARCHIVED")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.parse_channel_id_from_url.return_value = "C_ARCHIVED"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_ARCHIVED",
+            "name": "inc-2002",
+            "is_private": False,
+            "is_archived": True,
+        }
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.get_channel_history.assert_not_called()
+        mock_slack.archive_channel.assert_not_called()
+
+    def test_skips_channel_on_api_error(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_ERROR")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.parse_channel_id_from_url.return_value = "C_ERROR"
+        mock_slack.get_channel_info.return_value = None
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.get_channel_history.assert_not_called()
+        mock_slack.archive_channel.assert_not_called()
+
+    def test_disables_schedule_when_no_client(self):
+        schedule = Schedule.objects.get(name="archive_stale_channels")
+        assert schedule.repeats == -1
+
+        mock_slack = MagicMock()
+        mock_slack.client = None
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        schedule.refresh_from_db()
+        assert schedule.repeats == 0
+
+    def test_continues_on_single_channel_exception(self):
+        inc1 = self._make_incident()
+        inc2 = self._make_incident()
+        self._make_link(inc1, "C_BAD")
+        self._make_link(inc2, "C_GOOD")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.parse_channel_id_from_url.side_effect = (
+            lambda url: "C_BAD" if "C_BAD" in url else "C_GOOD"
+        )
+        mock_slack.get_channel_info.side_effect = lambda cid: (
+            (_ for _ in ()).throw(Exception("boom"))
+            if cid == "C_BAD"
+            else {
+                "id": "C_GOOD",
+                "name": "inc-x",
+                "is_private": False,
+                "is_archived": False,
+            }
+        )
+        mock_slack.get_channel_history.return_value = []
+        mock_slack.archive_channel.return_value = True
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.archive_channel.assert_called_once_with("C_GOOD")

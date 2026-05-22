@@ -6,14 +6,20 @@ from typing import Protocol
 from datadog import statsd
 from django_q.tasks import Schedule
 
-from firetower.incidents.models import Incident
+from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
+from firetower.integrations.services.slack import SlackService
 
 SCHEDULES = {
     "schedule_demo": {
         "func": "firetower.incidents.tasks.schedule_demo",
-        "schedule_type": Schedule.MINUTES,  # Minutes
+        "schedule_type": Schedule.MINUTES,
         "minutes": 5,
-        "repeats": -1,  # repeat indefinitely
+        "repeats": -1,
+    },
+    "archive_stale_channels": {
+        "func": "firetower.incidents.tasks.archive_stale_channels",
+        "schedule_type": Schedule.DAILY,
+        "repeats": -1,
     },
 }
 
@@ -58,6 +64,80 @@ def datadog_log(f: NamedFunction) -> NamedFunction:
                 # Don't re-raise; it's more important we raise the inner exception, if present
 
     return wrapper
+
+
+ARCHIVE_NOTICE = (
+    "This channel is being archived by Firetower because all message history "
+    "has been removed by the workspace retention policy and there doesn't "
+    "appear to be any active discussions."
+)
+
+
+@datadog_log
+def archive_stale_channels() -> None:
+    slack = SlackService()
+    if not slack.client:
+        logger.error(
+            "Slack client not initialized -- disabling archive_stale_channels schedule"
+        )
+        Schedule.objects.filter(name="archive_stale_channels").update(repeats=0)
+        return
+
+    links = ExternalLink.objects.filter(type=ExternalLinkType.SLACK).select_related(
+        "incident"
+    )
+
+    scanned = 0
+    archived = 0
+    skipped = 0
+    errored = 0
+
+    for link in links:
+        scanned += 1
+        channel_id = slack.parse_channel_id_from_url(link.url)
+        if not channel_id:
+            skipped += 1
+            continue
+
+        try:
+            info = slack.get_channel_info(channel_id)
+            if info is None:
+                logger.warning(
+                    f"Could not fetch info for channel {channel_id} "
+                    f"(incident {link.incident.incident_number}), skipping"
+                )
+                skipped += 1
+                continue
+
+            if info.get("is_archived"):
+                skipped += 1
+                continue
+
+            messages = slack.get_channel_history(channel_id, limit=1)
+            if messages:
+                skipped += 1
+                continue
+
+            slack.post_message(channel_id, ARCHIVE_NOTICE)
+            if slack.archive_channel(channel_id):
+                archived += 1
+                logger.info(
+                    f"Archived stale channel {channel_id} "
+                    f"(incident {link.incident.incident_number})"
+                )
+            else:
+                errored += 1
+        except Exception:
+            errored += 1
+            logger.exception(
+                f"Error processing channel {channel_id} "
+                f"(incident {link.incident.incident_number})"
+            )
+
+    logger.info(
+        f"archive_stale_channels complete: "
+        f"scanned={scanned} archived={archived} skipped={skipped} errored={errored}"
+    )
 
 
 @datadog_log

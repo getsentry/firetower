@@ -590,3 +590,84 @@ class TestSlackService:
         mock_response = MagicMock()
         mock_client.pins_add.side_effect = SlackApiError("error", mock_response)
         assert service.pin_message("C12345", "1234567890.123456") is False
+
+    def test_archive_channel_success(self):
+        service, mock_client = self._make_service()
+        assert service.archive_channel("C12345") is True
+        mock_client.conversations_archive.assert_called_once_with(channel="C12345")
+
+    def test_archive_channel_no_client(self):
+        mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}
+        with patch.object(settings, "SLACK", mock_slack_config):
+            service = SlackService()
+        assert service.archive_channel("C12345") is False
+
+    def test_archive_channel_api_error(self):
+        service, mock_client = self._make_service()
+        mock_response = MagicMock()
+        mock_client.conversations_archive.side_effect = SlackApiError(
+            "error", mock_response
+        )
+        assert service.archive_channel("C12345") is False
+
+    def test_get_channel_history_with_limit(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [{"type": "message", "text": "hello", "ts": "1.0"}],
+        }
+
+        messages = service.get_channel_history("C123", limit=1)
+
+        assert len(messages) == 1
+        mock_client.conversations_history.assert_called_once_with(
+            channel="C123", limit=1
+        )
+
+    def test_get_channel_history_with_limit_no_pagination(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "has_more": True,
+            "messages": [{"type": "message", "text": "hello", "ts": "1.0"}],
+            "response_metadata": {"next_cursor": "cur1"},
+        }
+
+        messages = service.get_channel_history("C123", limit=1)
+
+        assert len(messages) == 1
+        assert mock_client.conversations_history.call_count == 1
+
+    def test_get_channel_history_with_limit_empty(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [],
+        }
+
+        messages = service.get_channel_history("C123", limit=1)
+
+        assert messages == []
+
+    def test_get_channel_history_with_limit_error(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.side_effect = Exception("timeout")
+
+        messages = service.get_channel_history("C123", limit=1)
+
+        assert messages == []
+
+    def test_get_channel_info_includes_is_archived(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_info.return_value = {
+            "channel": {
+                "id": "C12345",
+                "name": "inc-2000",
+                "is_private": False,
+                "is_archived": True,
+            }
+        }
+
+        info = service.get_channel_info("C12345")
+        assert info is not None
+        assert info["is_archived"] is True

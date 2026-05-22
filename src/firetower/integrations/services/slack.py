@@ -349,6 +349,7 @@ class SlackService:
                 "id": channel.get("id", ""),
                 "name": channel.get("name", ""),
                 "is_private": channel.get("is_private", False),
+                "is_archived": channel.get("is_archived", False),
             }
         except SlackApiError as e:
             logger.error(
@@ -409,10 +410,28 @@ class SlackService:
             )
             return None
 
-    def get_channel_history(self, channel_id: str) -> list[dict[str, Any]]:
-        """Return all messages from a channel, paginating automatically."""
+    def get_channel_history(
+        self, channel_id: str, limit: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Return messages from a channel. When *limit* is set, fetch at most
+        that many messages in a single API call (no pagination). When *limit*
+        is ``None``, paginate to retrieve all messages."""
         if not self.client:
             return []
+        if limit is not None:
+            try:
+                response = self.client.conversations_history(
+                    channel=channel_id, limit=limit
+                )
+            except Exception:
+                logger.exception("Failed to fetch history for channel %s", channel_id)
+                return []
+            if not response.get("ok"):
+                logger.error(
+                    "conversations_history returned not-ok for channel %s", channel_id
+                )
+                return []
+            return response.get("messages", [])
         messages: list[dict[str, Any]] = []
         cursor: str | None = None
         while True:
@@ -435,6 +454,22 @@ class SlackService:
             if not response.get("has_more") or not cursor:
                 break
         return messages
+
+    def archive_channel(self, channel_id: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot archive channel - Slack client not initialized")
+            return False
+
+        try:
+            logger.info(f"Archiving channel {channel_id}")
+            self.client.conversations_archive(channel=channel_id)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error archiving channel: {e}",
+                extra={"channel_id": channel_id},
+            )
+            return False
 
     def get_thread_replies(
         self, channel_id: str, thread_ts: str
