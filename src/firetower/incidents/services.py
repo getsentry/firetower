@@ -195,10 +195,7 @@ def _update_parent_issue_status(
         return
 
     statuses = list(incident.action_items.values_list("status", flat=True))
-    if not statuses:
-        return
-
-    all_complete = all(s in COMPLETED_STATUSES for s in statuses)
+    all_complete = not statuses or all(s in COMPLETED_STATUSES for s in statuses)
 
     states = linear_service.get_workflow_states(team_id)
     if not states:
@@ -210,14 +207,33 @@ def _update_parent_issue_status(
         linear_service.update_issue(incident.linear_parent_issue_id, state_id=state_id)
 
 
+def _sync_parent_assignee(incident: Incident, linear_service: LinearService) -> None:
+    if not incident.linear_parent_issue_id:
+        return
+    from firetower.incidents.hooks import _resolve_linear_user_id  # noqa: PLC0415
+
+    captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
+    linear_service.update_issue(
+        incident.linear_parent_issue_id, assignee_id=captain_linear_id
+    )
+
+
 def sync_action_items_from_linear(
     incident: Incident, force: bool = False
 ) -> ActionItemsSyncStats:
     stats = ActionItemsSyncStats()
 
     if not incident.linear_parent_issue_id:
-        stats.skipped = True
-        return stats
+        # Backfill for incidents created before Linear integration
+        from firetower.incidents.hooks import (  # noqa: PLC0415
+            create_linear_parent_issue,
+        )
+
+        create_linear_parent_issue(incident)
+        incident.refresh_from_db(fields=["linear_parent_issue_id"])
+        if not incident.linear_parent_issue_id:
+            stats.skipped = True
+            return stats
 
     if not force and incident.action_items_last_synced_at:
         time_since_sync = timezone.now() - incident.action_items_last_synced_at
@@ -328,6 +344,13 @@ def sync_action_items_from_linear(
     except Exception:
         logger.exception(
             f"Failed to update Linear parent issue status for incident {incident.id}"
+        )
+
+    try:
+        _sync_parent_assignee(incident, linear_service)
+    except Exception:
+        logger.exception(
+            f"Failed to sync Linear parent assignee for incident {incident.id}"
         )
 
     logger.info(

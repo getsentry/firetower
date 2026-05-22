@@ -384,3 +384,33 @@ class TestGetRelatedIssues:
             result = linear_service.get_related_issues("issue-1")
 
         assert len(result) == 1
+
+
+class TestGetUserByEmail:
+    def test_returns_user_when_found(self, linear_service):
+        mock_response = {
+            "users": {
+                "nodes": [
+                    {"id": "user-123", "email": "alice@example.com"},
+                ]
+            }
+        }
+
+        with patch.object(linear_service, "_graphql", return_value=mock_response):
+            result = linear_service.get_user_by_email("alice@example.com")
+
+        assert result == {"id": "user-123", "email": "alice@example.com"}
+
+    def test_returns_none_when_no_user_found(self, linear_service):
+        mock_response = {"users": {"nodes": []}}
+
+        with patch.object(linear_service, "_graphql", return_value=mock_response):
+            result = linear_service.get_user_by_email("nobody@example.com")
+
+        assert result is None
+
+    def test_returns_none_on_api_failure(self, linear_service):
+        with patch.object(linear_service, "_graphql", return_value=None):
+            result = linear_service.get_user_by_email("alice@example.com")
+
+        assert result is None
