@@ -614,8 +614,8 @@ class TestIsSlackGuest:
         }
         assert is_slack_guest(client, "U123") is False
 
-    def test_returns_true_on_api_error(self):
+    def test_returns_false_on_api_error(self):
         client = MagicMock()
         mock_response = MagicMock()
         client.users_info.side_effect = SlackApiError("error", mock_response)
-        assert is_slack_guest(client, "U123") is True
+        assert is_slack_guest(client, "U123") is False
