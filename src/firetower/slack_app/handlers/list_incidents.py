@@ -1,15 +1,13 @@
 import logging
 from typing import Any
 
-from slack_sdk.errors import SlackApiError
-
 from firetower.auth.models import ExternalProfileType
 from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
     IncidentStatus,
 )
-from firetower.integrations.services.slack import escape_slack_text
+from firetower.integrations.services.slack import escape_slack_text, is_slack_guest
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +18,7 @@ def _format_incident_line(
     if captain_slack_id:
         captain_display = f"<@{captain_slack_id}>"
     elif incident.captain:
-        captain_name = (
-            f"{incident.captain.first_name} {incident.captain.last_name}".strip()
-            or "unassigned"
-        )
+        captain_name = incident.captain.get_full_name() or incident.captain.username
         captain_display = escape_slack_text(captain_name)
     else:
         captain_display = "unassigned"
@@ -40,23 +35,13 @@ def _format_incident_line(
     return " | ".join(parts)
 
 
-def _is_slack_guest(client: Any, user_id: str) -> bool:
-    try:
-        response = client.users_info(user=user_id)
-        user = response.get("user", {})
-        return bool(user.get("is_restricted") or user.get("is_ultra_restricted"))
-    except SlackApiError:
-        logger.exception("Failed to fetch Slack user info for %s", user_id)
-        return False
-
-
 def handle_list_command(
     ack: Any, body: dict, command: dict, respond: Any, client: Any = None
 ) -> None:
     ack()
 
     user_id = body.get("user_id", "")
-    if client and user_id and _is_slack_guest(client, user_id):
+    if client and user_id and is_slack_guest(client, user_id):
         respond(
             "This command is not available to guest users.", response_type="ephemeral"
         )
@@ -81,7 +66,7 @@ def handle_list_command(
 
     captain_slack_ids: dict[int, str] = {}
     for inc in incidents:
-        if inc.captain_id and inc.captain_id not in captain_slack_ids:
+        if inc.captain_id and inc.captain and inc.captain_id not in captain_slack_ids:
             for profile in inc.captain.external_profiles.all():
                 if profile.type == ExternalProfileType.SLACK:
                     captain_slack_ids[inc.captain_id] = profile.external_id
@@ -98,7 +83,9 @@ def handle_list_command(
     if active:
         lines = [
             _format_incident_line(
-                i, slack_urls.get(i.id), captain_slack_ids.get(i.captain_id)
+                i,
+                slack_urls.get(i.id),
+                captain_slack_ids.get(i.captain_id) if i.captain_id else None,
             )
             for i in active
         ]
@@ -106,7 +93,9 @@ def handle_list_command(
     if mitigated:
         lines = [
             _format_incident_line(
-                i, slack_urls.get(i.id), captain_slack_ids.get(i.captain_id)
+                i,
+                slack_urls.get(i.id),
+                captain_slack_ids.get(i.captain_id) if i.captain_id else None,
             )
             for i in mitigated
         ]
