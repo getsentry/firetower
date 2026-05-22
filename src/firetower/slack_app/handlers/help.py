@@ -4,21 +4,41 @@ from typing import Any
 def handle_help_command(ack: Any, command: dict, respond: Any) -> None:
     ack()
     cmd = command.get("command", "/ft")
-    respond(
-        f"*Firetower Slack App*\n"
-        f"Usage: `{cmd} <command> [args]`\n\n"
-        f"Available commands:\n"
-        f"  `{cmd} help`             - Show this help message\n"
-        f"  `{cmd} new`              - Create a new incident\n"
-        f"  `{cmd} backfill`         - Backfill an incident from a manually-created channel\n"
-        f"  `{cmd} captain`          - Set incident captain (alias: `{cmd} ic`)\n"
-        f"  `{cmd} dumpslack`        - Update slack transcript in postmortem doc\n"
-        f"  `{cmd} list`             - List active and mitigated incidents (alias: `{cmd} ls`)\n"
-        f"  `{cmd} mitigated`        - Mark incident as mitigated (alias: `{cmd} mit`)\n"
-        f"  `{cmd} resolved`         - Mark incident as resolved (alias: `{cmd} fixed`)\n"
-        f"  `{cmd} reopen`           - Reopen an incident\n"
-        f"  `{cmd} severity <P0-P4>` - Change incident severity (alias: `{cmd} sev`)\n"
-        f"  `{cmd} statuspage`       - Create or update a statuspage post\n"
-        f"  `{cmd} subject <title>`  - Change incident title (alias: `{cmd} title`)\n"
-        f"  `{cmd} update`           - Interactively update incident metadata (alias: `{cmd} edit`)\n"
+    commands = [
+        (f"`{cmd} help`", "Show this help message"),
+        (f"`{cmd} new`", "Create a new incident"),
+        (f"`{cmd} backfill`", "Backfill from a manually-created channel"),
+        (f"`{cmd} captain`", f"Set incident captain (alias: `{cmd} ic`)"),
+        (f"`{cmd} dumpslack`", "Update slack transcript in postmortem doc"),
+        (f"`{cmd} list`", f"List active and mitigated incidents (alias: `{cmd} ls`)"),
+        (f"`{cmd} mitigated`", f"Mark incident as mitigated (alias: `{cmd} mit`)"),
+        (f"`{cmd} resolved`", f"Mark incident as resolved (alias: `{cmd} fixed`)"),
+        (f"`{cmd} reopen`", "Reopen an incident"),
+        (f"`{cmd} severity <P0-P4>`", f"Change incident severity (alias: `{cmd} sev`)"),
+        (f"`{cmd} statuspage`", "Create or update a statuspage post"),
+        (f"`{cmd} subject <title>`", f"Change incident title (alias: `{cmd} title`)"),
+        (f"`{cmd} update`", f"Interactively update metadata (alias: `{cmd} edit`)"),
+    ]
+    blocks: list[dict] = [
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": "Firetower Slack App"},
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"Usage: `{cmd} <command> [args]`",
+            },
+        },
+    ]
+    # section fields support max 10 items, so chunk into groups of 10 (5 rows)
+    fields = []
+    for name, desc in commands:
+        fields.append({"type": "mrkdwn", "text": name})
+        fields.append({"type": "mrkdwn", "text": desc})
+    blocks.extend(
+        {"type": "section", "fields": fields[i : i + 10]}
+        for i in range(0, len(fields), 10)
     )
+    respond(blocks=blocks)
