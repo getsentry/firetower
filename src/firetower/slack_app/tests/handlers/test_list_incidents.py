@@ -4,6 +4,7 @@ import pytest
 from django.contrib.auth.models import User
 from slack_sdk.errors import SlackApiError
 
+from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
@@ -26,6 +27,7 @@ class TestListCommand:
 
         ack.assert_called_once()
         assert "No active or mitigated incidents" in respond.call_args[0][0]
+        assert respond.call_args[1]["response_type"] == "ephemeral"
 
     def test_active_incidents_shown(self, db):
         captain = User.objects.create_user(
@@ -55,11 +57,44 @@ class TestListCommand:
         handle_list_command(ack, body, command, respond)
 
         text = respond.call_args[0][0]
+        assert respond.call_args[1]["response_type"] == "ephemeral"
         assert "*Active Incidents*" in text
         assert "P1" in text
         assert "DB is on fire" in text
         assert "Jane Doe" in text
+        assert f"<https://slack.com/archives/C_INC|{inc.incident_number}>" in text
         assert "<https://slack.com/archives/C_INC|Slack>" in text
+
+    def test_captain_shown_as_slack_mention(self, db):
+        captain = User.objects.create_user(
+            username="cap@example.com",
+            email="cap@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAP123",
+        )
+        inc = Incident(
+            title="Linked captain",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=captain,
+        )
+        inc.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        text = respond.call_args[0][0]
+        assert "Captain: <@U_CAP123>" in text
+        assert "Jane Doe" not in text
 
     def test_mitigated_incidents_shown(self, db):
         inc = Incident(
@@ -215,6 +250,7 @@ class TestListCommand:
 
         ack.assert_called_once()
         assert "not available to guest users" in respond.call_args[0][0]
+        assert respond.call_args[1]["response_type"] == "ephemeral"
 
     def test_single_channel_guest_rejected(self, db):
         client = MagicMock()

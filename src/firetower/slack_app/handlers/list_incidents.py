@@ -3,6 +3,7 @@ from typing import Any
 
 from slack_sdk.errors import SlackApiError
 
+from firetower.auth.models import ExternalProfileType
 from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
@@ -13,17 +14,28 @@ from firetower.integrations.services.slack import escape_slack_text
 logger = logging.getLogger(__name__)
 
 
-def _format_incident_line(incident: Incident, slack_url: str | None) -> str:
-    captain_name = (
-        f"{incident.captain.first_name} {incident.captain.last_name}".strip()
-        or "unassigned"
-        if incident.captain
-        else "unassigned"
-    )
+def _format_incident_line(
+    incident: Incident, slack_url: str | None, captain_slack_id: str | None
+) -> str:
+    if captain_slack_id:
+        captain_display = f"<@{captain_slack_id}>"
+    elif incident.captain:
+        captain_name = (
+            f"{incident.captain.first_name} {incident.captain.last_name}".strip()
+            or "unassigned"
+        )
+        captain_display = escape_slack_text(captain_name)
+    else:
+        captain_display = "unassigned"
+
     title = escape_slack_text(incident.title)
+    if slack_url:
+        incident_label = f"<{slack_url}|{incident.incident_number}>"
+    else:
+        incident_label = incident.incident_number
     parts = [
-        f"{incident.severity} {incident.incident_number}: {title}",
-        f"Captain: {escape_slack_text(captain_name)}",
+        f"{incident.severity} {incident_label}: {title}",
+        f"Captain: {captain_display}",
     ]
     if slack_url:
         parts.append(f"<{slack_url}|Slack>")
@@ -47,7 +59,9 @@ def handle_list_command(
 
     user_id = body.get("user_id", "")
     if client and user_id and _is_slack_guest(client, user_id):
-        respond("This command is not available to guest users.")
+        respond(
+            "This command is not available to guest users.", response_type="ephemeral"
+        )
         return
 
     incidents = (
@@ -56,7 +70,7 @@ def handle_list_command(
             is_private=False,
         )
         .select_related("captain")
-        .prefetch_related("external_links")
+        .prefetch_related("external_links", "captain__external_profiles")
         .order_by("-created_at")
     )
 
@@ -67,19 +81,37 @@ def handle_list_command(
                 slack_urls[inc.id] = link.url
                 break
 
+    captain_slack_ids: dict[int, str] = {}
+    for inc in incidents:
+        if inc.captain_id and inc.captain_id not in captain_slack_ids:
+            for profile in inc.captain.external_profiles.all():
+                if profile.type == ExternalProfileType.SLACK:
+                    captain_slack_ids[inc.captain_id] = profile.external_id
+                    break
+
     active = [i for i in incidents if i.status == IncidentStatus.ACTIVE]
     mitigated = [i for i in incidents if i.status == IncidentStatus.MITIGATED]
 
     if not active and not mitigated:
-        respond("No active or mitigated incidents.")
+        respond("No active or mitigated incidents.", response_type="ephemeral")
         return
 
     sections: list[str] = []
     if active:
-        lines = [_format_incident_line(i, slack_urls.get(i.id)) for i in active]
+        lines = [
+            _format_incident_line(
+                i, slack_urls.get(i.id), captain_slack_ids.get(i.captain_id)
+            )
+            for i in active
+        ]
         sections.append("*Active Incidents*\n" + "\n".join(lines))
     if mitigated:
-        lines = [_format_incident_line(i, slack_urls.get(i.id)) for i in mitigated]
+        lines = [
+            _format_incident_line(
+                i, slack_urls.get(i.id), captain_slack_ids.get(i.captain_id)
+            )
+            for i in mitigated
+        ]
         sections.append("*Mitigated Incidents*\n" + "\n".join(lines))
 
-    respond("\n\n".join(sections))
+    respond("\n\n".join(sections), response_type="ephemeral")
