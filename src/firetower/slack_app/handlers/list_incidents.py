@@ -37,8 +37,6 @@ def _format_incident_line(
         f"{incident.severity} {incident_label}: {title}",
         f"Captain: {captain_display}",
     ]
-    if slack_url:
-        parts.append(f"<{slack_url}|Slack>")
     return " | ".join(parts)
 
 

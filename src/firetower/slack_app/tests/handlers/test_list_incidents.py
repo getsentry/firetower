@@ -63,7 +63,6 @@ class TestListCommand:
         assert "DB is on fire" in text
         assert "Jane Doe" in text
         assert f"<https://slack.com/archives/C_INC|{inc.incident_number}>" in text
-        assert "<https://slack.com/archives/C_INC|Slack>" in text
 
     def test_captain_shown_as_slack_mention(self, db):
         captain = User.objects.create_user(
