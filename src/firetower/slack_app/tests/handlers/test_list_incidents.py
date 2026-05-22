@@ -62,7 +62,9 @@ class TestListCommand:
         assert "P1" in text
         assert "DB is on fire" in text
         assert "Jane Doe" in text
-        assert f"<https://slack.com/archives/C_INC|{inc.incident_number}>" in text
+        assert (
+            f"<https://slack.com/archives/C_INC|#{inc.incident_number.lower()}>" in text
+        )
 
     def test_captain_shown_as_slack_mention(self, db):
         captain = User.objects.create_user(
@@ -92,7 +94,7 @@ class TestListCommand:
         handle_list_command(ack, body, command, respond)
 
         text = respond.call_args[0][0]
-        assert "Captain: <@U_CAP123>" in text
+        assert "IC: <@U_CAP123>" in text
         assert "Jane Doe" not in text
 
     def test_mitigated_incidents_shown(self, db):

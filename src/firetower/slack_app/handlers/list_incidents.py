@@ -16,23 +16,19 @@ def _format_incident_line(
     incident: Incident, slack_url: str | None, captain_slack_id: str | None
 ) -> str:
     if captain_slack_id:
-        captain_display = f"<@{captain_slack_id}>"
+        ic_display = f"<@{captain_slack_id}>"
     elif incident.captain:
-        captain_name = incident.captain.get_full_name() or incident.captain.username
-        captain_display = escape_slack_text(captain_name)
+        ic_name = incident.captain.get_full_name() or incident.captain.username
+        ic_display = escape_slack_text(ic_name)
     else:
-        captain_display = "unassigned"
+        ic_display = "unassigned"
+
+    inc_tag = f"#{incident.incident_number.lower()}"
+    if slack_url:
+        inc_tag = f"<{slack_url}|{inc_tag}>"
 
     title = escape_slack_text(incident.title)
-    if slack_url:
-        incident_label = f"<{slack_url}|{incident.incident_number}>"
-    else:
-        incident_label = incident.incident_number
-    parts = [
-        f"{incident.severity} {incident_label}: {title}",
-        f"Captain: {captain_display}",
-    ]
-    return " | ".join(parts)
+    return f"{inc_tag} | [{incident.severity}] {title} | IC: {ic_display}"
 
 
 def handle_list_command(
