@@ -1,6 +1,7 @@
 import functools
 import logging
 import re
+import time
 from typing import Protocol
 
 from datadog import statsd
@@ -72,6 +73,8 @@ ARCHIVE_NOTICE = (
     "appear to be any active discussions."
 )
 
+ARCHIVE_CHANNEL_DELAY_SECONDS = 2
+
 
 @datadog_log
 def archive_stale_channels() -> None:
@@ -92,7 +95,10 @@ def archive_stale_channels() -> None:
     skipped = 0
     errored = 0
 
-    for link in links:
+    for i, link in enumerate(links):
+        if i > 0:
+            time.sleep(ARCHIVE_CHANNEL_DELAY_SECONDS)
+
         scanned += 1
         channel_id = slack.parse_channel_id_from_url(link.url)
         if not channel_id:
@@ -119,6 +125,14 @@ def archive_stale_channels() -> None:
                 continue
 
             notice_ts = slack.post_message(channel_id, ARCHIVE_NOTICE)
+            if not notice_ts:
+                logger.error(
+                    f"Failed to post archive notice to channel {channel_id} "
+                    f"(incident {link.incident.incident_number}), skipping archive"
+                )
+                errored += 1
+                continue
+
             if slack.archive_channel(channel_id):
                 archived += 1
                 logger.info(
@@ -126,8 +140,7 @@ def archive_stale_channels() -> None:
                     f"(incident {link.incident.incident_number})"
                 )
             else:
-                if notice_ts:
-                    slack.delete_message(channel_id, notice_ts)
+                slack.delete_message(channel_id, notice_ts)
                 errored += 1
         except Exception:
             errored += 1
