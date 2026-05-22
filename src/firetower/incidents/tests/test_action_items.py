@@ -955,6 +955,7 @@ class TestCreateLinearParentIssueHook:
         create_linear_parent_issue(incident)
 
         MockLinearService.return_value.get_issue.assert_not_called()
+        MockLinearService.return_value.create_issue.assert_not_called()
 
     @patch("firetower.incidents.hooks.LinearService")
     @patch("firetower.incidents.hooks.settings")
