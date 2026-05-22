@@ -50,9 +50,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
+  deploy-db-migration:
     needs: [build]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env_name: test
+            cloud_run_job: firetower-test-db-migration
+          - env_name: prod
+            cloud_run_job: firetower-prod-db-migration
     steps:
       - name: Checkout code
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -61,80 +69,78 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
-      - name: deploy-test-db-migration
-        if: ${{ inputs.environment == 'test' }}
+      - name: Run migration (${{ matrix.env_name }})
+        if: >-
+          (matrix.env_name == 'test' && inputs.environment == 'test') ||
+          (matrix.env_name == 'prod' && github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod'))
         uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
         with:
-          job: firetower-test-db-migration
+          job: ${{ matrix.cloud_run_job }}
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           region: us-west1
           image: ${{ env.BACKEND_IMAGE_REF }}
           wait: true
-      - name: deploy-test
-        if: ${{ inputs.environment == 'test' }}
-        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
-        with:
-          service: firetower-test
-          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
-          region: us-west1
-          # NOTE: we use flags here because the action does not natively support updating multiple containers.
-          flags: >
-            --container nginx --image "${{ env.STATIC_IMAGE_REF }}" --port 80
-            --container firetower-backend --image "${{ env.BACKEND_IMAGE_REF }}"
 
-      - name: deploy-test-slack-bot
-        if: ${{ inputs.environment == 'test' }}
+  deploy-test:
+    needs: [deploy-db-migration]
+    if: ${{ inputs.environment == 'test' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: firetower-test
+            flags: >-
+              --container nginx --image "${{ env.STATIC_IMAGE_REF }}" --port 80
+              --container firetower-backend --image "${{ env.BACKEND_IMAGE_REF }}"
+          - service: firetower-slack-app-test
+            flags: --image "${{ env.BACKEND_IMAGE_REF }}"
+          - service: firetower-async-test
+            flags: --image "${{ env.BACKEND_IMAGE_REF }}"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
+      - name: Deploy ${{ matrix.service }}
         uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
         with:
-          service: firetower-slack-app-test
+          service: ${{ matrix.service }}
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           region: us-west1
-          image: ${{ env.BACKEND_IMAGE_REF }}
+          flags: ${{ matrix.flags }}
 
-      - name: deploy-test-async
-        if: ${{ inputs.environment == 'test' }}
+  deploy-prod:
+    needs: [deploy-db-migration]
+    if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: firetower
+            flags: >-
+              --container nginx --image "${{ env.STATIC_IMAGE_REF }}" --port 80
+              --container firetower-backend --image "${{ env.BACKEND_IMAGE_REF }}"
+          - service: firetower-slack-app
+            flags: --image "${{ env.BACKEND_IMAGE_REF }}"
+          - service: firetower-async-prod
+            flags: --image "${{ env.BACKEND_IMAGE_REF }}"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
+      - name: Deploy ${{ matrix.service }}
         uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
         with:
-          service: firetower-async-test
+          service: ${{ matrix.service }}
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           region: us-west1
-          image: ${{ env.BACKEND_IMAGE_REF }}
-
-      - name: deploy-prod-db-migration
-        if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
-        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
-        with:
-          job: firetower-prod-db-migration
-          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
-          region: us-west1
-          image: ${{ env.BACKEND_IMAGE_REF }}
-          wait: true
-      - name: deploy-prod
-        if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
-        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
-        with:
-          service: firetower
-          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
-          region: us-west1
-          # NOTE: we use flags here because the action does not natively support updating multiple containers.
-          flags: >
-            --container nginx --image "${{ env.STATIC_IMAGE_REF }}" --port 80
-            --container firetower-backend --image "${{ env.BACKEND_IMAGE_REF }}"
-
-      - name: deploy-prod-slack-bot
-        if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
-        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
-        with:
-          service: firetower-slack-app
-          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
-          region: us-west1
-          image: ${{ env.BACKEND_IMAGE_REF }}
-
-      - name: deploy-prod-async
-        if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
-        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
-        with:
-          service: firetower-async-prod
-          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
-          region: us-west1
-          image: ${{ env.BACKEND_IMAGE_REF }}
+          flags: ${{ matrix.flags }}
