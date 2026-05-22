@@ -119,8 +119,8 @@ def archive_stale_channels() -> None:
                 skipped += 1
                 continue
 
-            messages = slack.get_channel_history(channel_id, limit=1)
-            if messages:
+            messages = slack.get_channel_history(channel_id, limit=5)
+            if any(not msg.get("bot_id") for msg in messages):
                 skipped += 1
                 continue
 
@@ -133,15 +133,24 @@ def archive_stale_channels() -> None:
                 errored += 1
                 continue
 
-            if slack.archive_channel(channel_id):
+            try:
+                if not slack.archive_channel(channel_id):
+                    raise RuntimeError(
+                        f"archive_channel returned False for {channel_id}"
+                    )
                 archived += 1
                 logger.info(
                     f"Archived stale channel {channel_id} "
                     f"(incident {link.incident.incident_number})"
                 )
-            else:
-                slack.delete_message(channel_id, notice_ts)
+            except Exception:
                 errored += 1
+                logger.exception(
+                    f"Failed to archive channel {channel_id} "
+                    f"(incident {link.incident.incident_number}), "
+                    f"deleting notice"
+                )
+                slack.delete_message(channel_id, notice_ts)
         except Exception:
             errored += 1
             logger.exception(

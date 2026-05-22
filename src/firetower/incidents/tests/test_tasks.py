@@ -199,7 +199,7 @@ class TestArchiveStaleChannels:
         mock_slack.post_message.assert_called_once_with("C_EMPTY", ARCHIVE_NOTICE)
         mock_slack.archive_channel.assert_called_once_with("C_EMPTY")
 
-    def test_skips_channel_with_history(self):
+    def test_skips_channel_with_human_messages(self):
         incident = self._make_incident()
         self._make_link(incident, "C_ACTIVE")
 
@@ -213,7 +213,7 @@ class TestArchiveStaleChannels:
             "is_archived": False,
         }
         mock_slack.get_channel_history.return_value = [
-            {"type": "message", "text": "still here", "ts": "1.0"}
+            {"type": "message", "user": "U123", "text": "still here", "ts": "1.0"}
         ]
 
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
@@ -221,6 +221,30 @@ class TestArchiveStaleChannels:
 
         mock_slack.post_message.assert_not_called()
         mock_slack.archive_channel.assert_not_called()
+
+    def test_archives_channel_with_only_bot_messages(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_BOTONLY")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.parse_channel_id_from_url.return_value = "C_BOTONLY"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_BOTONLY",
+            "name": "inc-2001",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = [
+            {"type": "message", "bot_id": "B123", "text": ARCHIVE_NOTICE, "ts": "1.0"}
+        ]
+        mock_slack.post_message.return_value = "2.0"
+        mock_slack.archive_channel.return_value = True
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.archive_channel.assert_called_once_with("C_BOTONLY")
 
     def test_skips_already_archived_channel(self):
         incident = self._make_incident()
@@ -342,6 +366,28 @@ class TestArchiveStaleChannels:
 
         mock_slack.post_message.assert_not_called()
         mock_slack.archive_channel.assert_not_called()
+
+    def test_deletes_notice_on_archive_exception(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_THROW")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.parse_channel_id_from_url.return_value = "C_THROW"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_THROW",
+            "name": "inc-2013",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = []
+        mock_slack.post_message.return_value = "99.99"
+        mock_slack.archive_channel.side_effect = ConnectionError("network timeout")
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.delete_message.assert_called_once_with("C_THROW", "99.99")
 
     def test_skips_archive_when_post_message_fails(self):
         incident = self._make_incident()
