@@ -7,7 +7,7 @@ An incident management platform for tracking, triaging, and resolving incidents.
 - **Backend**: Django 5.2, Django REST Framework, PostgreSQL
 - **Frontend**: React 19, TypeScript, TanStack Router/Query, Tailwind CSS, Radix UI
 - **SDK**: Python SDK with JWT auth for programmatic access
-- **Tooling**: uv (Python), Bun (JS), Docker Compose
+- **Tooling**: uv (Python), pnpm (JS), Docker Compose
 
 ## Getting Started
 
@@ -15,7 +15,7 @@ An incident management platform for tracking, triaging, and resolving incidents.
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
-- [Bun](https://bun.sh/)
+- [Node.js](https://nodejs.org/) 22+
 - [Docker](https://www.docker.com/)
 
 ### Database
@@ -42,8 +42,8 @@ The API will be available at http://localhost:8000.
 
 ```sh
 cd frontend
-bun install
-bun dev
+pnpm install
+pnpm dev
 ```
 
 The dev server will be available at http://localhost:5173.
@@ -94,7 +94,7 @@ uv run pytest
 
 # Frontend
 cd frontend
-bun test
+pnpm test
 ```
 
 ### Linting & Formatting
@@ -125,4 +125,88 @@ src/firetower/       # Django backend
   auth/              # Authentication
 frontend/            # React frontend
 sdk/                 # Python SDK
+```
+
+## Scheduled Tasks
+
+Scheduled tasks are stored as database objects and are managed via migrations.
+
+### Adding a Task
+
+First, define you task in the `SCHEDULES` map in `src/firetower/incidents/tasks.py`.
+
+Then, create a new migration referencing it:
+
+```python
+from django.db import migrations
+
+from firetower.incidents.tasks import SCHEDULES
+
+
+def create_schedule(apps, schema_editor):
+    Schedule = apps.get_model("django_q", "Schedule")
+    schedule_name = "[schedule name goes here]"
+    Schedule.objects.get_or_create(
+        name=schedule_name, defaults=SCHEDULES[schedule_name]
+    )
+
+
+def delete_schedule(apps, schema_editor):
+    Schedule = apps.get_model("django_q", "Schedule")
+    schedule_name = "schedule_demo"
+    Schedule.objects.filter(name=schedule_name).delete()
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("incidents", "[previous migration goes here]"),
+    ]
+
+    operations = [
+        migrations.RunPython(create_schedule, delete_schedule),
+    ]
+```
+
+### Removing a task
+
+First, generate the opposite of the migration used to add the schedule:
+
+```python
+from django.db import migrations
+
+from firetower.incidents.tasks import SCHEDULES
+
+
+def create_schedule(apps, schema_editor):
+    Schedule = apps.get_model("django_q", "Schedule")
+    schedule_name = "[schedule name goes here]"
+    Schedule.objects.get_or_create(
+        name=schedule_name, defaults=SCHEDULES[schedule_name]
+    )
+
+
+def delete_schedule(apps, schema_editor):
+    Schedule = apps.get_model("django_q", "Schedule")
+    schedule_name = "schedule_demo"
+    Schedule.objects.filter(name=schedule_name).delete()
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("incidents", "[previous migration goes here]"),
+    ]
+
+    operations = [
+        migrations.RunPython(delete_schedule, create_schedule),
+    ]
+```
+
+Once this migration has run everywhere, you can then remove the body from the `SCHEDULES` array, but keep the key since these are still referenced in legacy migrations!
+
+```python
+SCHEDULES = {
+    "schedule_demo": {
+        # Removed in <migration name>
+    },
+}
 ```

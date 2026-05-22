@@ -107,6 +107,7 @@ def get_bolt_app() -> App:
 def handle_command(
     ack: Any, body: dict, command: dict, respond: Any, client: Any = None
 ) -> None:
+    close_old_connections()
     raw_text = (body.get("text") or "").strip()
     parts = raw_text.split(None, 1)
     subcommand = parts[0].lower() if parts else ""
@@ -184,6 +185,7 @@ def _with_metrics(callback_id: str) -> Callable[..., Callable[..., Any]]:
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            close_old_connections()
             tags = [f"callback_id:{callback_id}"]
             statsd.increment("slack_app.views.submitted", tags=tags)
             try:

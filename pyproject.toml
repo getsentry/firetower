@@ -8,7 +8,6 @@ dependencies = [
     "cryptography>=48.0.0",
     "datadog==0.52.1",
     "datadog-api-client==2.54.0",
-    "ddtrace==3.18.1",
     "django>=5.2.14,<6",
     "django-cors-headers>=4.9.0",
     "django-fernet-encrypted-fields>=0.3.1",
@@ -20,6 +19,7 @@ dependencies = [
     "pyserde[toml]>=0.28.0",
     "notion-client>=3.0.0,<4.0.0",
     "requests>=2.32.0",
+    "django-q2>=1.7.4",
     "slack-bolt>=1.27.0",
     "slack-sdk>=3.31.0",
     "sentry-sdk>=2.47.0",
@@ -41,8 +41,10 @@ dev = [
     "ty>=0.0.1a19",
     "django-stubs>=5.2.7",
     "django-stubs-ext>=5.2.7",
+    "blessed>=1.39.0",
 ]
 prod = [
+    "ddtrace>=3.18.1",
     "granian>=2.6.0",
     "sentry-sdk[django]>=2.47.0",
 ]

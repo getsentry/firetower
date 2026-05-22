@@ -4,10 +4,13 @@ from unittest.mock import patch
 
 import pytest
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from rest_framework.test import APIClient
 
 from firetower.incidents.models import (
+    ActionItem,
+    ActionItemRelationType,
+    ActionItemStatus,
     ExternalLink,
     ExternalLinkType,
     Incident,
@@ -1481,3 +1484,245 @@ class TestTagListCreateAPIView:
 
         assert response.status_code == 200
         assert response.data == ["UsedTwice", "UsedOnce", "Unused"]
+
+
+@pytest.mark.django_db
+class TestIncidentStatusRetrieveAPIView:
+    """Tests for GET /api/incidents/{id}/status/."""
+
+    def setup_method(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test@example.com",
+            email="test@example.com",
+            password="testpass123",
+        )
+        self.other_user = User.objects.create_user(
+            username="other@example.com",
+            email="other@example.com",
+            password="testpass123",
+        )
+
+    def _grant_view_all_statuses(self, user: User) -> None:
+        perm = Permission.objects.get(codename="view_all_incident_statuses")
+        user.user_permissions.add(perm)
+
+    def test_returns_only_id_and_status(self):
+        """Response exposes only id and status — no title or other fields."""
+        incident = Incident.objects.create(
+            title="Secret Title",
+            description="Sensitive description",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/status/")
+
+        assert response.status_code == 200
+        assert response.data == {
+            "id": incident.incident_number,
+            "status": IncidentStatus.ACTIVE,
+        }
+
+    def test_visible_user_can_read_public_incident_status(self):
+        """User with normal read visibility (public incident) gets status."""
+        incident = Incident.objects.create(
+            title="Public",
+            status=IncidentStatus.MITIGATED,
+            severity=IncidentSeverity.P2,
+            is_private=False,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/status/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == IncidentStatus.MITIGATED
+
+    def test_captain_can_read_private_incident_status_via_visibility(self):
+        """Captain of a private incident has visibility, so no special perm needed."""
+        incident = Incident.objects.create(
+            title="Private",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.user,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/status/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == IncidentStatus.ACTIVE
+
+    def test_user_without_visibility_or_perm_gets_404(self):
+        """User who can't see a private incident and lacks the perm gets 404.
+
+        Must be 404, not 403 — a 403 would leak that the incident exists.
+        """
+        incident = Incident.objects.create(
+            title="Other's Private",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.other_user,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/status/")
+
+        assert response.status_code == 404
+
+    def test_user_with_view_all_perm_can_read_private_status(self):
+        """User without visibility but holding view_all_incident_statuses gets through."""
+        incident = Incident.objects.create(
+            title="Other's Private",
+            status=IncidentStatus.DONE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.other_user,
+        )
+        self._grant_view_all_statuses(self.user)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/status/")
+
+        assert response.status_code == 200
+        assert response.data == {
+            "id": incident.incident_number,
+            "status": IncidentStatus.DONE,
+        }
+
+    def test_superuser_can_read_private_incident_status(self):
+        superuser = User.objects.create_superuser(
+            username="admin@example.com",
+            email="admin@example.com",
+            password="testpass123",
+        )
+        incident = Incident.objects.create(
+            title="Other's Private",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.other_user,
+        )
+
+        self.client.force_authenticate(user=superuser)
+        response = self.client.get(f"/api/incidents/{incident.incident_number}/status/")
+
+        assert response.status_code == 200
+        assert response.data["status"] == IncidentStatus.ACTIVE
+
+    def test_invalid_format_returns_400(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/INVALID-123/status/")
+
+        assert response.status_code == 400
+
+    def test_not_found_returns_404(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            f"/api/incidents/{settings.PROJECT_KEY}-99999/status/"
+        )
+
+        assert response.status_code == 404
+
+
+@pytest.mark.django_db
+class TestActionItemListView:
+    def setup_method(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test@example.com",
+            email="test@example.com",
+            password="testpass123",
+        )
+        self.incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+    def _url(self, incident_id: str) -> str:
+        return f"/api/ui/incidents/{incident_id}/action-items/"
+
+    def test_returns_action_items(self):
+        ActionItem.objects.create(
+            incident=self.incident,
+            linear_issue_id="id-1",
+            linear_identifier="ENG-1",
+            title="Fix the bug",
+            status=ActionItemStatus.TODO,
+            relation_type=ActionItemRelationType.CHILD,
+            url="https://linear.app/team/issue/ENG-1",
+        )
+        ActionItem.objects.create(
+            incident=self.incident,
+            linear_issue_id="id-2",
+            linear_identifier="ENG-2",
+            title="Write tests",
+            status=ActionItemStatus.IN_PROGRESS,
+            relation_type=ActionItemRelationType.RELATED,
+            url="https://linear.app/team/issue/ENG-2",
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self._url(self.incident.incident_number))
+
+        assert response.status_code == 200
+        assert len(response.data) == 2
+        item = response.data[0]
+        assert item["linear_identifier"] == "ENG-1"
+        assert item["title"] == "Fix the bug"
+        assert item["status"] == "Todo"
+        assert item["relation_type"] == "child"
+        assert item["url"] == "https://linear.app/team/issue/ENG-1"
+        assert "assignee_name" in item
+        assert "assignee_avatar_url" in item
+
+    def test_empty_list(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self._url(self.incident.incident_number))
+
+        assert response.status_code == 200
+        assert response.data == []
+
+    def test_nonexistent_incident_returns_404(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self._url(f"{settings.PROJECT_KEY}-99999"))
+
+        assert response.status_code == 404
+
+    def test_invalid_incident_id_format(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self._url("INVALID-123"))
+
+        assert response.status_code == 400
+
+    def test_private_incident_not_visible_to_non_member(self):
+        other_user = User.objects.create_user(
+            username="other@example.com",
+            email="other@example.com",
+            password="testpass123",
+        )
+        private_incident = Incident.objects.create(
+            title="Private Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.user,
+        )
+        ActionItem.objects.create(
+            incident=private_incident,
+            linear_issue_id="id-priv",
+            linear_identifier="ENG-99",
+            title="Secret task",
+            status=ActionItemStatus.TODO,
+            url="https://linear.app/team/issue/ENG-99",
+        )
+
+        self.client.force_authenticate(user=other_user)
+        response = self.client.get(self._url(private_incident.incident_number))
+
+        assert response.status_code == 404

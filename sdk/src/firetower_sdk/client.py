@@ -94,6 +94,14 @@ class FiretowerClient:
         """Get an incident by ID."""
         return self._request("GET", f"/api/incidents/{incident_id}/")
 
+    def get_incident_status(self, incident_id: str) -> dict[str, Any]:
+        """Get the status of an incident by ID.
+
+        Returns only the incident's id and status. Requires the
+        `incidents.view_all_incident_statuses` permission on the server.
+        """
+        return self._request("GET", f"/api/incidents/{incident_id}/status/")
+
     def list_incidents(
         self,
         statuses: list[IncidentStatus] | None = None,
