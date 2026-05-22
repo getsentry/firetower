@@ -195,10 +195,7 @@ def _update_parent_issue_status(
         return
 
     statuses = list(incident.action_items.values_list("status", flat=True))
-    if not statuses:
-        return
-
-    all_complete = all(s in COMPLETED_STATUSES for s in statuses)
+    all_complete = not statuses or all(s in COMPLETED_STATUSES for s in statuses)
 
     states = linear_service.get_workflow_states(team_id)
     if not states:
