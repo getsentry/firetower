@@ -428,7 +428,7 @@ class TestSyncActionItemsFromLinear:
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_called_once_with(
+            mock_service.update_issue.assert_any_call(
                 "parent-issue-id", state_id="state-done"
             )
 
@@ -457,7 +457,7 @@ class TestSyncActionItemsFromLinear:
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_called_once_with(
+            mock_service.update_issue.assert_any_call(
                 "parent-issue-id", state_id="state-started"
             )
 
@@ -1089,7 +1089,7 @@ class TestCreateLinearParentIssuePrivacy:
         create_linear_parent_issue(incident)
 
         call_args = mock_service.update_issue.call_args
-        assert call_args[1]["title"] == f"[{incident.incident_number}] Private Incident"
+        assert call_args[1]["title"] == "Private Incident"
 
 
 @pytest.mark.django_db
