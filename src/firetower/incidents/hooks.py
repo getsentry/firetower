@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 
-from firetower.auth.models import ExternalProfileType
+from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
@@ -941,6 +941,14 @@ def create_linear_parent_issue(incident: Incident) -> None:
         sync_identifiers = linear_config.get("SYNC_IDENTIFIERS", False)
         title = _linear_issue_title(incident, sync_identifiers=sync_identifiers)
 
+        captain_linear_id = None
+        if incident.captain:
+            profile = ExternalProfile.objects.filter(
+                user=incident.captain, type=ExternalProfileType.LINEAR
+            ).first()
+            if profile:
+                captain_linear_id = profile.external_id
+
         if sync_identifiers:
             issue = _claim_linear_issue(linear_service, incident, team_id, project_id)
             if not issue:
@@ -957,6 +965,7 @@ def create_linear_parent_issue(incident: Incident) -> None:
                 title=title,
                 description=LINEAR_PARENT_DESCRIPTION,
                 state_id=started_state_id,
+                assignee_id=captain_linear_id,
             ):
                 linear_link.delete()
                 logger.warning(
@@ -965,7 +974,11 @@ def create_linear_parent_issue(incident: Incident) -> None:
                 return
         else:
             issue = linear_service.create_issue(
-                title, LINEAR_PARENT_DESCRIPTION, team_id, project_id
+                title,
+                LINEAR_PARENT_DESCRIPTION,
+                team_id,
+                project_id,
+                assignee_id=captain_linear_id,
             )
             if not issue:
                 linear_link.delete()
