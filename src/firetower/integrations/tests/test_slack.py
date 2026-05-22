@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 from slack_sdk.errors import SlackApiError
 
-from firetower.integrations.services.slack import SlackService
+from firetower.integrations.services.slack import SlackService, is_slack_guest
 
 # Set up Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "firetower.settings")
@@ -590,3 +590,32 @@ class TestSlackService:
         mock_response = MagicMock()
         mock_client.pins_add.side_effect = SlackApiError("error", mock_response)
         assert service.pin_message("C12345", "1234567890.123456") is False
+
+
+class TestIsSlackGuest:
+    def test_returns_true_for_restricted_user(self):
+        client = MagicMock()
+        client.users_info.return_value = {
+            "user": {"is_restricted": True, "is_ultra_restricted": False}
+        }
+        assert is_slack_guest(client, "U123") is True
+
+    def test_returns_true_for_ultra_restricted_user(self):
+        client = MagicMock()
+        client.users_info.return_value = {
+            "user": {"is_restricted": False, "is_ultra_restricted": True}
+        }
+        assert is_slack_guest(client, "U123") is True
+
+    def test_returns_false_for_full_member(self):
+        client = MagicMock()
+        client.users_info.return_value = {
+            "user": {"is_restricted": False, "is_ultra_restricted": False}
+        }
+        assert is_slack_guest(client, "U123") is False
+
+    def test_returns_true_on_api_error(self):
+        client = MagicMock()
+        mock_response = MagicMock()
+        client.users_info.side_effect = SlackApiError("error", mock_response)
+        assert is_slack_guest(client, "U123") is True

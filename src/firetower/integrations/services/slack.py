@@ -27,7 +27,7 @@ def is_slack_guest(client: Any, user_id: str) -> bool:
         return bool(user.get("is_restricted") or user.get("is_ultra_restricted"))
     except SlackApiError:
         logger.exception("Failed to fetch Slack user info for %s", user_id)
-        return False
+        return True
 
 
 def is_slack_url(url: str) -> bool:
