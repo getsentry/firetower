@@ -6,7 +6,13 @@ from typing import Protocol
 from datadog import statsd
 from django_q.tasks import Schedule
 
-from firetower.incidents.models import Incident
+from firetower.incidents.models import (
+    ExternalLinkType,
+    Incident,
+    IncidentSeverity,
+    IncidentStatus,
+)
+from firetower.integrations.services.slack import SlackService
 
 SCHEDULES = {
     "schedule_demo": {
@@ -68,3 +74,62 @@ def schedule_demo() -> None:
         logger.info(f"Most recent incident: INC-{incident.id}: {title}")
     else:
         logger.info("No incidents found.")
+
+
+STATUSPAGE_REMINDER_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
+STATUSPAGE_REMINDER_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
+
+STATUSPAGE_REMINDER_MESSAGE = (
+    ":rotating_light: *Statuspage Reminder* :rotating_light:\n"
+    "This is a *{severity}* incident. The SLO for posting an initial "
+    "Statuspage update is *20 minutes* from declaration. No Statuspage "
+    "update has been posted yet.\n\n"
+    "Please run `/ft statuspage` to create a Statuspage incident now."
+)
+
+
+def send_statuspage_reminder(incident_id: int) -> None:
+    tags = ["task:send_statuspage_reminder"]
+    statsd.increment("django_q.task.run", 1, tags)
+    try:
+        _send_statuspage_reminder(incident_id)
+    except Exception as e:
+        statsd.increment("django_q.task.error", 1, tags)
+        logger.error(
+            f"Error in send_statuspage_reminder for incident {incident_id}: {e}",
+            exc_info=True,
+        )
+        raise
+    else:
+        statsd.increment("django_q.task.success", 1, tags)
+
+
+def _send_statuspage_reminder(incident_id: int) -> None:
+    try:
+        incident = Incident.objects.get(pk=incident_id)
+    except Incident.DoesNotExist:
+        logger.warning(f"Incident {incident_id} not found for statuspage reminder")
+        return
+
+    if incident.severity not in STATUSPAGE_REMINDER_SEVERITIES:
+        return
+    if incident.status not in STATUSPAGE_REMINDER_STATUSES:
+        return
+
+    has_statuspage = incident.external_links.filter(
+        type=ExternalLinkType.STATUSPAGE
+    ).exists()
+    if has_statuspage:
+        return
+
+    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    if not slack_link:
+        return
+
+    slack = SlackService()
+    channel_id = slack.parse_channel_id_from_url(slack_link.url)
+    if not channel_id:
+        return
+
+    message = STATUSPAGE_REMINDER_MESSAGE.format(severity=incident.severity)
+    slack.post_message(channel_id, message)

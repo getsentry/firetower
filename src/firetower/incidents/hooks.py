@@ -1,10 +1,13 @@
 import logging
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.utils import timezone
+from django_q.tasks import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import (
@@ -28,6 +31,8 @@ _slack_service = SlackService()
 
 PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
+
+STATUSPAGE_REMINDER_DELAY_MINUTES = 15
 
 
 @dataclass
@@ -1025,6 +1030,24 @@ def create_linear_parent_issue(incident: Incident) -> None:
         )
 
 
+def _schedule_statuspage_reminder(incident: Incident) -> None:
+    if incident.severity not in PAGEABLE_SEVERITIES:
+        return
+
+    schedule_name = f"statuspage_reminder_{incident.id}"
+    Schedule.objects.get_or_create(
+        name=schedule_name,
+        defaults={
+            "func": "firetower.incidents.tasks.send_statuspage_reminder",
+            "kwargs": f"incident_id={incident.id}",
+            "schedule_type": Schedule.ONCE,
+            "next_run": timezone.now()
+            + timedelta(minutes=STATUSPAGE_REMINDER_DELAY_MINUTES),
+            "repeats": 1,
+        },
+    )
+
+
 def on_incident_created(incident: Incident) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
@@ -1138,6 +1161,13 @@ def on_incident_created(incident: Incident) -> None:
             f"Failed to create Linear parent issue for incident {incident.id}"
         )
 
+    try:
+        _schedule_statuspage_reminder(incident)
+    except Exception:
+        logger.exception(
+            f"Failed to schedule statuspage reminder for incident {incident.id}"
+        )
+
 
 def on_status_changed(incident: Incident, old_status: str) -> None:
     channel_id: str | None = None
@@ -1216,6 +1246,13 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
                 logger.exception(
                     f"Failed to create status channel for incident {incident.id}"
                 )
+
+        try:
+            _schedule_statuspage_reminder(incident)
+        except Exception:
+            logger.exception(
+                f"Failed to schedule statuspage reminder for incident {incident.id}"
+            )
 
 
 def on_title_changed(incident: Incident) -> None:
