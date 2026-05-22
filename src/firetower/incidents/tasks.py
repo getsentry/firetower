@@ -4,6 +4,7 @@ import re
 from typing import Protocol
 
 from datadog import statsd
+from django.conf import settings
 from django_q.tasks import Schedule
 
 from firetower.incidents.models import (
@@ -84,7 +85,7 @@ STATUSPAGE_REMINDER_MESSAGE = (
     "This is a *{severity}* incident. The SLO for posting an initial "
     "Statuspage update is *20 minutes* from declaration. No Statuspage "
     "update has been posted yet.\n\n"
-    "Please run `/ft statuspage` to create a Statuspage incident now."
+    "Please run `{slash_command} statuspage` to create a Statuspage incident now."
 )
 
 
@@ -131,5 +132,8 @@ def _send_statuspage_reminder(incident_id: int) -> None:
     if not channel_id:
         return
 
-    message = STATUSPAGE_REMINDER_MESSAGE.format(severity=incident.severity)
+    slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")
+    message = STATUSPAGE_REMINDER_MESSAGE.format(
+        severity=incident.severity, slash_command=slash_command
+    )
     slack.post_message(channel_id, message)

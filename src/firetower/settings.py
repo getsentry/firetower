@@ -229,6 +229,7 @@ class SlackSettings(TypedDict):
     INCIDENT_FEED_CHANNEL_ID: str
     ALWAYS_INVITED_IDS: list[str]
     INCIDENT_GUIDE_MESSAGE: str
+    SLASH_COMMAND: str
 
 
 SLACK: SlackSettings = {
@@ -238,6 +239,7 @@ SLACK: SlackSettings = {
     "INCIDENT_FEED_CHANNEL_ID": config.slack.incident_feed_channel_id,
     "ALWAYS_INVITED_IDS": config.slack.always_invited_ids,
     "INCIDENT_GUIDE_MESSAGE": config.slack.incident_guide_message,
+    "SLASH_COMMAND": config.slack.slash_command,
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)

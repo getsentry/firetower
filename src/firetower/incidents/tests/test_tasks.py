@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+from django.conf import settings
 
 from firetower.incidents.models import (
     ExternalLink,
@@ -183,7 +184,9 @@ class TestSendStatuspageReminder:
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
             _send_statuspage_reminder(incident.id)
 
-        expected_msg = STATUSPAGE_REMINDER_MESSAGE.format(severity="P0")
+        expected_msg = STATUSPAGE_REMINDER_MESSAGE.format(
+            severity="P0", slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc")
+        )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 
     def test_posts_reminder_for_p1_without_statuspage(self):
@@ -196,7 +199,9 @@ class TestSendStatuspageReminder:
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
             _send_statuspage_reminder(incident.id)
 
-        expected_msg = STATUSPAGE_REMINDER_MESSAGE.format(severity="P1")
+        expected_msg = STATUSPAGE_REMINDER_MESSAGE.format(
+            severity="P1", slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc")
+        )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 
     def test_skips_when_statuspage_exists(self):

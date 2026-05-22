@@ -41,6 +41,7 @@ class SlackConfig:
     incident_feed_channel_id: str = ""
     always_invited_ids: list[str] = field(default_factory=list)
     incident_guide_message: str = ""
+    slash_command: str = "/inc"
 
 
 @deserialize
