@@ -86,6 +86,8 @@ def archive_stale_channels() -> None:
         Schedule.objects.filter(name="archive_stale_channels").update(repeats=0)
         return
 
+    own_bot_id = slack.bot_id
+
     links = ExternalLink.objects.filter(type=ExternalLinkType.SLACK).select_related(
         "incident"
     )
@@ -120,7 +122,12 @@ def archive_stale_channels() -> None:
                 continue
 
             messages = slack.get_channel_history(channel_id, limit=5)
-            if any(not msg.get("bot_id") for msg in messages):
+            non_own_messages = [
+                msg
+                for msg in messages
+                if msg.get("bot_id") != own_bot_id or not own_bot_id
+            ]
+            if non_own_messages:
                 skipped += 1
                 continue
 

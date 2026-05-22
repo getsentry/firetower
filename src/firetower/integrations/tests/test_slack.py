@@ -671,3 +671,23 @@ class TestSlackService:
         info = service.get_channel_info("C12345")
         assert info is not None
         assert info["is_archived"] is True
+
+    def test_bot_id_returns_cached_value(self):
+        service, mock_client = self._make_service()
+        mock_client.auth_test.return_value = {"bot_id": "B_TEST"}
+
+        assert service.bot_id == "B_TEST"
+        assert service.bot_id == "B_TEST"
+        mock_client.auth_test.assert_called_once()
+
+    def test_bot_id_returns_none_without_client(self):
+        mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}
+        with patch.object(settings, "SLACK", mock_slack_config):
+            service = SlackService()
+        assert service.bot_id is None
+
+    def test_bot_id_returns_none_on_api_error(self):
+        service, mock_client = self._make_service()
+        mock_response = MagicMock()
+        mock_client.auth_test.side_effect = SlackApiError("error", mock_response)
+        assert service.bot_id is None

@@ -177,12 +177,15 @@ class TestArchiveStaleChannels:
             url=f"https://sentry.slack.com/archives/{channel_id}",
         )
 
+    OWN_BOT_ID = "B_FIRETOWER"
+
     def test_archives_channel_with_no_history(self):
         incident = self._make_incident()
         self._make_link(incident, "C_EMPTY")
 
         mock_slack = MagicMock()
         mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
         mock_slack.parse_channel_id_from_url.return_value = "C_EMPTY"
         mock_slack.get_channel_info.return_value = {
             "id": "C_EMPTY",
@@ -205,6 +208,7 @@ class TestArchiveStaleChannels:
 
         mock_slack = MagicMock()
         mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
         mock_slack.parse_channel_id_from_url.return_value = "C_ACTIVE"
         mock_slack.get_channel_info.return_value = {
             "id": "C_ACTIVE",
@@ -222,12 +226,13 @@ class TestArchiveStaleChannels:
         mock_slack.post_message.assert_not_called()
         mock_slack.archive_channel.assert_not_called()
 
-    def test_archives_channel_with_only_bot_messages(self):
+    def test_archives_channel_with_only_own_bot_messages(self):
         incident = self._make_incident()
         self._make_link(incident, "C_BOTONLY")
 
         mock_slack = MagicMock()
         mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
         mock_slack.parse_channel_id_from_url.return_value = "C_BOTONLY"
         mock_slack.get_channel_info.return_value = {
             "id": "C_BOTONLY",
@@ -236,7 +241,12 @@ class TestArchiveStaleChannels:
             "is_archived": False,
         }
         mock_slack.get_channel_history.return_value = [
-            {"type": "message", "bot_id": "B123", "text": ARCHIVE_NOTICE, "ts": "1.0"}
+            {
+                "type": "message",
+                "bot_id": self.OWN_BOT_ID,
+                "text": ARCHIVE_NOTICE,
+                "ts": "1.0",
+            }
         ]
         mock_slack.post_message.return_value = "2.0"
         mock_slack.archive_channel.return_value = True
@@ -245,6 +255,35 @@ class TestArchiveStaleChannels:
             archive_stale_channels.__wrapped__()
 
         mock_slack.archive_channel.assert_called_once_with("C_BOTONLY")
+
+    def test_skips_channel_with_other_bot_messages(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_OTHERBOT")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
+        mock_slack.parse_channel_id_from_url.return_value = "C_OTHERBOT"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_OTHERBOT",
+            "name": "inc-2001",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = [
+            {
+                "type": "message",
+                "bot_id": "B_SOMEONE_ELSE",
+                "text": "alert from another bot",
+                "ts": "1.0",
+            }
+        ]
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.post_message.assert_not_called()
+        mock_slack.archive_channel.assert_not_called()
 
     def test_skips_already_archived_channel(self):
         incident = self._make_incident()
@@ -302,6 +341,7 @@ class TestArchiveStaleChannels:
 
         mock_slack = MagicMock()
         mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
         mock_slack.parse_channel_id_from_url.side_effect = (
             lambda url: "C_BAD" if "C_BAD" in url else "C_GOOD"
         )
@@ -329,6 +369,7 @@ class TestArchiveStaleChannels:
 
         mock_slack = MagicMock()
         mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
         mock_slack.parse_channel_id_from_url.return_value = "C_FAIL"
         mock_slack.get_channel_info.return_value = {
             "id": "C_FAIL",
@@ -352,6 +393,7 @@ class TestArchiveStaleChannels:
 
         mock_slack = MagicMock()
         mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
         mock_slack.parse_channel_id_from_url.return_value = "C_BROKEN"
         mock_slack.get_channel_info.return_value = {
             "id": "C_BROKEN",
@@ -373,6 +415,7 @@ class TestArchiveStaleChannels:
 
         mock_slack = MagicMock()
         mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
         mock_slack.parse_channel_id_from_url.return_value = "C_THROW"
         mock_slack.get_channel_info.return_value = {
             "id": "C_THROW",
@@ -395,6 +438,7 @@ class TestArchiveStaleChannels:
 
         mock_slack = MagicMock()
         mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
         mock_slack.parse_channel_id_from_url.return_value = "C_NOPOST"
         mock_slack.get_channel_info.return_value = {
             "id": "C_NOPOST",

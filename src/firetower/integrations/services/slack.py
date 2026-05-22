@@ -51,9 +51,24 @@ class SlackService:
         )
 
         self.client = WebClient(token=self.bot_token) if self.bot_token else None
+        self._bot_id: str | None = None
 
         if self.client is None:
             logger.warning("Slack client not initialized - missing bot token")
+
+    @property
+    def bot_id(self) -> str | None:
+        if self._bot_id is not None:
+            return self._bot_id
+        if not self.client:
+            return None
+        try:
+            response = self.client.auth_test()
+            self._bot_id = response.get("bot_id")
+            return self._bot_id
+        except SlackApiError as e:
+            logger.error(f"Error fetching bot identity: {e}")
+            return None
 
     def get_user_profile_by_email(self, email: str) -> dict | None:
         """
