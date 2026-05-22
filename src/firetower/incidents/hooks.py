@@ -953,9 +953,11 @@ def create_linear_parent_issue(incident: Incident) -> None:
                 description=LINEAR_PARENT_DESCRIPTION,
                 state_id=started_state_id,
             ):
+                linear_link.delete()
                 logger.warning(
                     f"Failed to update claimed Linear issue for incident {incident.id}"
                 )
+                return
         else:
             issue = linear_service.create_issue(
                 title, LINEAR_PARENT_DESCRIPTION, team_id, project_id
