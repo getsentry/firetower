@@ -5,6 +5,7 @@ Basic pytest tests for Slack integration service.
 import os
 from unittest.mock import MagicMock, patch
 
+import pytest
 from slack_sdk.errors import SlackApiError
 
 from firetower.integrations.services.slack import SlackService
@@ -649,13 +650,12 @@ class TestSlackService:
 
         assert messages == []
 
-    def test_get_channel_history_with_limit_error(self):
+    def test_get_channel_history_with_limit_raises_on_error(self):
         service, mock_client = self._make_service()
         mock_client.conversations_history.side_effect = Exception("timeout")
 
-        messages = service.get_channel_history("C123", limit=1)
-
-        assert messages == []
+        with pytest.raises(Exception, match="timeout"):
+            service.get_channel_history("C123", limit=1)
 
     def test_get_channel_info_includes_is_archived(self):
         service, mock_client = self._make_service()

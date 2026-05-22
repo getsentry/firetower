@@ -301,6 +301,21 @@ class SlackService:
             )
             return False
 
+    def delete_message(self, channel_id: str, message_ts: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot delete message - Slack client not initialized")
+            return False
+
+        try:
+            self.client.chat_delete(channel=channel_id, ts=message_ts)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error deleting message: {e}",
+                extra={"channel_id": channel_id, "ts": message_ts},
+            )
+            return False
+
     def add_bookmark(self, channel_id: str, title: str, link: str) -> bool:
         if not self.client:
             logger.warning("Cannot add bookmark - Slack client not initialized")
@@ -419,18 +434,9 @@ class SlackService:
         if not self.client:
             return []
         if limit is not None:
-            try:
-                response = self.client.conversations_history(
-                    channel=channel_id, limit=limit
-                )
-            except Exception:
-                logger.exception("Failed to fetch history for channel %s", channel_id)
-                return []
-            if not response.get("ok"):
-                logger.error(
-                    "conversations_history returned not-ok for channel %s", channel_id
-                )
-                return []
+            response = self.client.conversations_history(
+                channel=channel_id, limit=limit
+            )
             return response.get("messages", [])
         messages: list[dict[str, Any]] = []
         cursor: str | None = None

@@ -293,3 +293,47 @@ class TestArchiveStaleChannels:
             archive_stale_channels.__wrapped__()
 
         mock_slack.archive_channel.assert_called_once_with("C_GOOD")
+
+    def test_deletes_notice_on_failed_archive(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_FAIL")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.parse_channel_id_from_url.return_value = "C_FAIL"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_FAIL",
+            "name": "inc-2010",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = []
+        mock_slack.post_message.return_value = "1234.5678"
+        mock_slack.archive_channel.return_value = False
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.post_message.assert_called_once_with("C_FAIL", ARCHIVE_NOTICE)
+        mock_slack.delete_message.assert_called_once_with("C_FAIL", "1234.5678")
+
+    def test_skips_channel_on_history_api_error(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_BROKEN")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.parse_channel_id_from_url.return_value = "C_BROKEN"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_BROKEN",
+            "name": "inc-2011",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.side_effect = Exception("API error")
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.post_message.assert_not_called()
+        mock_slack.archive_channel.assert_not_called()

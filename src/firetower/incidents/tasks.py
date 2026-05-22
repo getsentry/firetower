@@ -118,7 +118,7 @@ def archive_stale_channels() -> None:
                 skipped += 1
                 continue
 
-            slack.post_message(channel_id, ARCHIVE_NOTICE)
+            notice_ts = slack.post_message(channel_id, ARCHIVE_NOTICE)
             if slack.archive_channel(channel_id):
                 archived += 1
                 logger.info(
@@ -126,6 +126,8 @@ def archive_stale_channels() -> None:
                     f"(incident {link.incident.incident_number})"
                 )
             else:
+                if notice_ts:
+                    slack.delete_message(channel_id, notice_ts)
                 errored += 1
         except Exception:
             errored += 1
