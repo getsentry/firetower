@@ -24,13 +24,9 @@ class TestHandleCommand:
 
         ack.assert_called_once()
         respond.assert_called_once()
-        blocks = respond.call_args[1]["blocks"]
-        block_texts = " ".join(str(b.get("text", "")) for b in blocks)
-        assert "Firetower Slack App" in block_texts
-        field_texts = " ".join(
-            f.get("text", "") for b in blocks for f in b.get("fields", [])
-        )
-        assert "/ft help" in field_texts
+        response_text = respond.call_args[0][0]
+        assert "Firetower Slack App" in response_text
+        assert "/ft help" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
     def test_empty_text_returns_help(self, mock_statsd, _mock_close):
@@ -43,9 +39,8 @@ class TestHandleCommand:
 
         ack.assert_called_once()
         respond.assert_called_once()
-        blocks = respond.call_args[1]["blocks"]
-        block_texts = " ".join(str(b.get("text", "")) for b in blocks)
-        assert "Firetower Slack App" in block_texts
+        response_text = respond.call_args[0][0]
+        assert "Firetower Slack App" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
     def test_unknown_subcommand_returns_error(self, mock_statsd, _mock_close):
@@ -72,11 +67,8 @@ class TestHandleCommand:
         handle_command(ack=ack, body=body, command=command, respond=respond)
 
         ack.assert_called_once()
-        blocks = respond.call_args[1]["blocks"]
-        field_texts = " ".join(
-            f.get("text", "") for b in blocks for f in b.get("fields", [])
-        )
-        assert "/ft-test help" in field_texts
+        response_text = respond.call_args[0][0]
+        assert "/ft-test help" in response_text
 
     @patch("firetower.slack_app.bolt.statsd")
     def test_emits_submitted_and_completed_metrics(self, mock_statsd, _mock_close):
