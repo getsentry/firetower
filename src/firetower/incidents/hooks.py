@@ -859,20 +859,25 @@ def decorate_incident_channel(
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
 
 
-def _linear_issue_title(incident: Incident) -> str:
+def _linear_issue_title(incident: Incident, sync_identifiers: bool = False) -> str:
     if incident.is_private:
+        if sync_identifiers:
+            return "Private Incident"
         return f"[{incident.incident_number}] Private Incident"
+    if sync_identifiers:
+        return incident.title
     return f"[{incident.incident_number}] {incident.title}"
 
 
 def _sync_linear_title(incident: Incident) -> None:
     if not settings.LINEAR or not incident.linear_parent_issue_id:
         return
+    sync_identifiers = settings.LINEAR.get("SYNC_IDENTIFIERS", False)
     try:
         linear_service = LinearService()
         linear_service.update_issue(
             incident.linear_parent_issue_id,
-            title=_linear_issue_title(incident),
+            title=_linear_issue_title(incident, sync_identifiers=sync_identifiers),
         )
     except Exception:
         logger.exception(
@@ -934,7 +939,7 @@ def create_linear_parent_issue(incident: Incident) -> None:
         linear_service = LinearService()
         project_id = str(linear_config.get("PROJECT_ID", "")) or None
         sync_identifiers = linear_config.get("SYNC_IDENTIFIERS", False)
-        title = _linear_issue_title(incident)
+        title = _linear_issue_title(incident, sync_identifiers=sync_identifiers)
 
         if sync_identifiers:
             issue = _claim_linear_issue(linear_service, incident, team_id, project_id)
