@@ -9,6 +9,7 @@ from .views import (
     action_item_list,
     incident_detail_ui,
     incident_list_ui,
+    sync_action_items,
     sync_incident_participants,
 )
 
@@ -41,6 +42,11 @@ urlpatterns = [
         "incidents/<str:incident_id>/status/",
         IncidentStatusRetrieveAPIView.as_view(),
         name="incident-status-retrieve",
+    ),
+    path(
+        "incidents/<str:incident_id>/sync-action-items/",
+        sync_action_items,
+        name="sync-action-items",
     ),
     path(
         "incidents/<str:incident_id>/sync-participants/",

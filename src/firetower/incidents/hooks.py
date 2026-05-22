@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -15,6 +16,7 @@ from firetower.incidents.models import (
 )
 from firetower.integrations.services import (
     DatadogService,
+    LinearService,
     PagerDutyService,
     SlackService,
 )
@@ -857,6 +859,139 @@ def decorate_incident_channel(
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
 
 
+def _linear_issue_title(incident: Incident) -> str:
+    if incident.is_private:
+        return f"[{incident.incident_number}] Private Incident"
+    return f"[{incident.incident_number}] {incident.title}"
+
+
+def _sync_linear_title(incident: Incident) -> None:
+    if not settings.LINEAR or not incident.linear_parent_issue_id:
+        return
+    try:
+        linear_service = LinearService()
+        linear_service.update_issue(
+            incident.linear_parent_issue_id,
+            title=_linear_issue_title(incident),
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to update Linear issue title for incident {incident.id}"
+        )
+
+
+LINEAR_PARENT_DESCRIPTION = (
+    "Relate action items to this ticket to have them tracked by Firetower. "
+    "Child issues or other relations (related, blocking, etc.) will all work. "
+    "Do not update title or captain here, use Firetower for that."
+)
+
+
+MAX_CLAIM_ATTEMPTS = 5
+
+
+def _claim_linear_issue(
+    linear_service: LinearService,
+    incident: Incident,
+    team_id: str,
+    project_id: str | None,
+) -> dict[str, Any] | None:
+    identifier = incident.incident_number
+
+    for _ in range(MAX_CLAIM_ATTEMPTS):
+        issue = linear_service.get_issue(identifier)
+        if issue:
+            return issue
+        # Created issue may get a different identifier; discard it and retry lookup
+        result = linear_service.create_issue("Placeholder", "", team_id, project_id)
+        if not result:
+            logger.warning(
+                f"Failed to create placeholder Linear issue for {identifier}"
+            )
+            return None
+
+    return None
+
+
+def create_linear_parent_issue(incident: Incident) -> None:
+    linear_config = settings.LINEAR
+    if not linear_config:
+        return
+    team_id = str(linear_config.get("TEAM_ID", ""))
+    if not team_id:
+        return
+
+    linear_link, created = ExternalLink.objects.get_or_create(
+        incident=incident,
+        type=ExternalLinkType.LINEAR,
+        defaults={"url": ""},
+    )
+    if not created and incident.linear_parent_issue_id:
+        logger.info(f"Incident {incident.id} already has a Linear link, skipping")
+        return
+
+    try:
+        linear_service = LinearService()
+        project_id = str(linear_config.get("PROJECT_ID", "")) or None
+        sync_identifiers = linear_config.get("SYNC_IDENTIFIERS", False)
+        title = _linear_issue_title(incident)
+
+        if sync_identifiers:
+            issue = _claim_linear_issue(linear_service, incident, team_id, project_id)
+            if not issue:
+                linear_link.delete()
+                logger.warning(
+                    f"Failed to claim Linear issue for incident {incident.id}"
+                )
+                return
+
+            states = linear_service.get_workflow_states(team_id)
+            started_state_id = states.get("started") if states else None
+            if not linear_service.update_issue(
+                issue["id"],
+                title=title,
+                description=LINEAR_PARENT_DESCRIPTION,
+                state_id=started_state_id,
+            ):
+                linear_link.delete()
+                logger.warning(
+                    f"Failed to update claimed Linear issue for incident {incident.id}"
+                )
+                return
+        else:
+            issue = linear_service.create_issue(
+                title, LINEAR_PARENT_DESCRIPTION, team_id, project_id
+            )
+            if not issue:
+                linear_link.delete()
+                logger.warning(
+                    f"Failed to create Linear issue for incident {incident.id}"
+                )
+                return
+
+        linear_link.url = issue["url"]
+        linear_link.save(update_fields=["url"])
+
+        incident.linear_parent_issue_id = issue["id"]
+        incident.save(update_fields=["linear_parent_issue_id"])
+    except Exception:
+        linear_link.delete()
+        logger.exception(
+            f"Failed to create Linear parent issue for incident {incident.id}"
+        )
+        return
+
+    try:
+        incident_url = _build_incident_url(incident)
+        linear_service.create_attachment(
+            issue["id"], incident_url, f"Firetower: {incident.incident_number}"
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to create Linear attachment for incident {incident.id}"
+        )
+
+
 def on_incident_created(incident: Incident) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
@@ -963,6 +1098,13 @@ def on_incident_created(incident: Incident) -> None:
         _create_datadog_notebook(incident, channel_id)
         _create_troubleshooting_doc(incident, channel_id)
 
+    try:
+        create_linear_parent_issue(incident)
+    except Exception:
+        logger.exception(
+            f"Failed to create Linear parent issue for incident {incident.id}"
+        )
+
 
 def on_status_changed(incident: Incident, old_status: str) -> None:
     channel_id: str | None = None
@@ -1046,30 +1188,30 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
 def on_title_changed(incident: Incident) -> None:
     try:
         channel_id = _get_channel_id(incident)
-        if not channel_id:
-            return
-
-        _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
+        if channel_id:
+            _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
     except Exception:
         logger.exception(f"Error in on_title_changed for incident {incident.id}")
+
+    _sync_linear_title(incident)
 
 
 def on_visibility_changed(incident: Incident) -> None:
     try:
         channel_id = _get_channel_id(incident)
-        if not channel_id:
-            return
-
-        visibility = "private" if incident.is_private else "public"
-        incident_url = _build_incident_url(incident)
-        message = (
-            f"This incident has been marked as *{visibility}* in Firetower. "
-            f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
-            f"<{incident_url}|View in Firetower>"
-        )
-        _slack_service.post_message(channel_id, message)
+        if channel_id:
+            visibility = "private" if incident.is_private else "public"
+            incident_url = _build_incident_url(incident)
+            message = (
+                f"This incident has been marked as *{visibility}* in Firetower. "
+                f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
+                f"<{incident_url}|View in Firetower>"
+            )
+            _slack_service.post_message(channel_id, message)
     except Exception:
         logger.exception(f"Error in on_visibility_changed for incident {incident.id}")
+
+    _sync_linear_title(incident)
 
 
 def on_captain_changed(incident: Incident) -> None:
