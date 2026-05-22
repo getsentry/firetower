@@ -188,6 +188,25 @@ class LinearService:
             "url": issue["url"],
         }
 
+    def get_user_by_email(self, email: str) -> dict[str, str] | None:
+        query = """
+        query($email: String!) {
+            users(filter: { email: { eq: $email } }) {
+                nodes {
+                    id
+                    email
+                }
+            }
+        }
+        """
+        data = self._graphql(query, {"email": email})
+        if not data:
+            return None
+        nodes = data.get("users", {}).get("nodes", [])
+        if not nodes:
+            return None
+        return {"id": nodes[0]["id"], "email": nodes[0]["email"]}
+
     def create_issue(
         self,
         title: str,
@@ -195,6 +214,7 @@ class LinearService:
         team_id: str,
         project_id: str | None = None,
         state_id: str | None = None,
+        assignee_id: str | None = None,
     ) -> dict[str, Any] | None:
         mutation = """
         mutation($input: IssueCreateInput!) {
@@ -217,6 +237,8 @@ class LinearService:
             input_data["projectId"] = project_id
         if state_id:
             input_data["stateId"] = state_id
+        if assignee_id:
+            input_data["assigneeId"] = assignee_id
 
         data = self._graphql(mutation, {"input": input_data})
         if not data:
@@ -261,6 +283,7 @@ class LinearService:
         title: str | None = None,
         description: str | None = None,
         state_id: str | None = None,
+        assignee_id: str | None = None,
     ) -> bool:
         mutation = """
         mutation($id: String!, $input: IssueUpdateInput!) {
@@ -276,6 +299,8 @@ class LinearService:
             input_data["description"] = description
         if state_id is not None:
             input_data["stateId"] = state_id
+        if assignee_id is not None:
+            input_data["assigneeId"] = assignee_id
 
         if not input_data:
             return True
