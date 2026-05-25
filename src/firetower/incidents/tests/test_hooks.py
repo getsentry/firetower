@@ -18,6 +18,7 @@ from firetower.incidents.hooks import (
     _schedule_statuspage_reminder,
     build_channel_name,
     build_channel_topic,
+    create_linear_parent_issue,
     on_captain_changed,
     on_incident_created,
     on_severity_changed,
@@ -2839,3 +2840,89 @@ class TestScheduleStatuspageReminder:
         assert not Schedule.objects.filter(
             name=f"statuspage_reminder_{incident.id}"
         ).exists()
+
+class TestCreateLinearParentIssueBookmark:
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_adds_bookmark_when_channel_id_provided(
+        self, mock_linear_cls, mock_slack, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_linear = mock_linear_cls.return_value
+        mock_linear.create_issue.return_value = {
+            "id": "issue-1",
+            "url": "https://linear.app/team/issue/ENG-123",
+        }
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        create_linear_parent_issue(incident, channel_id="C99999")
+
+        mock_slack.add_bookmark.assert_called_once_with(
+            "C99999", "Linear Issue", "https://linear.app/team/issue/ENG-123"
+        )
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_no_bookmark_when_no_channel_id(
+        self, mock_linear_cls, mock_slack, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_linear = mock_linear_cls.return_value
+        mock_linear.create_issue.return_value = {
+            "id": "issue-1",
+            "url": "https://linear.app/team/issue/ENG-123",
+        }
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        create_linear_parent_issue(incident)
+
+        mock_slack.add_bookmark.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_bookmark_failure_does_not_raise(
+        self, mock_linear_cls, mock_slack, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_linear = mock_linear_cls.return_value
+        mock_linear.create_issue.return_value = {
+            "id": "issue-1",
+            "url": "https://linear.app/team/issue/ENG-123",
+        }
+        mock_slack.add_bookmark.side_effect = RuntimeError("bookmark boom")
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        create_linear_parent_issue(incident, channel_id="C99999")
+
+        link = ExternalLink.objects.get(incident=incident, type=ExternalLinkType.LINEAR)
+        assert link.url == "https://linear.app/team/issue/ENG-123"
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_no_bookmark_when_linear_creation_fails(
+        self, mock_linear_cls, mock_slack, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_linear = mock_linear_cls.return_value
+        mock_linear.create_issue.return_value = None
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        create_linear_parent_issue(incident, channel_id="C99999")
+
+        mock_slack.add_bookmark.assert_not_called()

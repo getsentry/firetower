@@ -1,0 +1,336 @@
+from unittest.mock import MagicMock
+
+import pytest
+from django.contrib.auth.models import User
+from slack_sdk.errors import SlackApiError
+
+from firetower.auth.models import ExternalProfile, ExternalProfileType
+from firetower.incidents.models import (
+    ExternalLink,
+    ExternalLinkType,
+    Incident,
+    IncidentSeverity,
+    IncidentStatus,
+)
+from firetower.slack_app.handlers.list_incidents import handle_list_command
+
+
+@pytest.mark.django_db
+class TestListCommand:
+    def test_no_incidents_responds_empty_message(self, db):
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        ack.assert_called_once()
+        assert "No active or mitigated incidents" in respond.call_args[0][0]
+        assert respond.call_args[1]["response_type"] == "ephemeral"
+
+    def test_active_incidents_shown(self, db):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        inc = Incident(
+            title="DB is on fire",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=captain,
+        )
+        inc.save()
+        ExternalLink.objects.create(
+            incident=inc,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C_INC",
+        )
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        text = respond.call_args[0][0]
+        assert respond.call_args[1]["response_type"] == "ephemeral"
+        assert "*Active Incidents*" in text
+        assert "P1" in text
+        assert "DB is on fire" in text
+        assert "Jane Doe" in text
+        assert (
+            f"<https://slack.com/archives/C_INC|#{inc.incident_number.lower()}>" in text
+        )
+
+    def test_captain_shown_as_slack_mention(self, db):
+        captain = User.objects.create_user(
+            username="cap@example.com",
+            email="cap@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAP123",
+        )
+        inc = Incident(
+            title="Linked captain",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=captain,
+        )
+        inc.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        text = respond.call_args[0][0]
+        assert "IC: <@U_CAP123>" in text
+        assert "Jane Doe" not in text
+
+    def test_mitigated_incidents_shown(self, db):
+        inc = Incident(
+            title="Mitigated issue",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.MITIGATED,
+        )
+        inc.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        text = respond.call_args[0][0]
+        assert "*Mitigated Incidents*" in text
+        assert "P2" in text
+        assert "Mitigated issue" in text
+        assert "unassigned" in text
+
+    def test_private_incidents_excluded(self, db):
+        inc = Incident(
+            title="Secret incident",
+            severity=IncidentSeverity.P0,
+            status=IncidentStatus.ACTIVE,
+            is_private=True,
+        )
+        inc.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        assert "No active or mitigated incidents" in respond.call_args[0][0]
+
+    def test_done_and_cancelled_excluded(self, db):
+        for status in (
+            IncidentStatus.DONE,
+            IncidentStatus.CANCELLED,
+            IncidentStatus.POSTMORTEM,
+        ):
+            inc = Incident(
+                title=f"Inc {status}",
+                severity=IncidentSeverity.P3,
+                status=status,
+            )
+            inc.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        assert "No active or mitigated incidents" in respond.call_args[0][0]
+
+    def test_grouped_active_before_mitigated(self, db):
+        active = Incident(
+            title="Active one",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        active.save()
+        mitigated = Incident(
+            title="Mitigated one",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.MITIGATED,
+        )
+        mitigated.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        text = respond.call_args[0][0]
+        active_pos = text.index("*Active Incidents*")
+        mitigated_pos = text.index("*Mitigated Incidents*")
+        assert active_pos < mitigated_pos
+
+    def test_no_slack_link_omits_link(self, db):
+        inc = Incident(
+            title="No slack link",
+            severity=IncidentSeverity.P3,
+            status=IncidentStatus.ACTIVE,
+        )
+        inc.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        text = respond.call_args[0][0]
+        assert "No slack link" in text
+        assert "Slack>" not in text
+
+    def test_newest_first_within_group(self, db):
+        older = Incident(
+            title="Older incident",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        older.save()
+        newer = Incident(
+            title="Newer incident",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        newer.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        text = respond.call_args[0][0]
+        newer_pos = text.index("Newer incident")
+        older_pos = text.index("Older incident")
+        assert newer_pos < older_pos
+
+    def test_guest_user_rejected(self, db):
+        inc = Incident(
+            title="Visible incident",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        inc.save()
+
+        client = MagicMock()
+        client.users_info.return_value = {
+            "user": {"is_restricted": True, "is_ultra_restricted": False}
+        }
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY", "user_id": "U_GUEST"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond, client=client)
+
+        ack.assert_called_once()
+        assert "not available to guest users" in respond.call_args[0][0]
+        assert respond.call_args[1]["response_type"] == "ephemeral"
+
+    def test_single_channel_guest_rejected(self, db):
+        client = MagicMock()
+        client.users_info.return_value = {
+            "user": {"is_restricted": False, "is_ultra_restricted": True}
+        }
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY", "user_id": "U_GUEST"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond, client=client)
+
+        ack.assert_called_once()
+        assert "not available to guest users" in respond.call_args[0][0]
+
+    def test_non_guest_allowed(self, db):
+        inc = Incident(
+            title="Visible incident",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        inc.save()
+
+        client = MagicMock()
+        client.users_info.return_value = {
+            "user": {"is_restricted": False, "is_ultra_restricted": False}
+        }
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY", "user_id": "U_MEMBER"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond, client=client)
+
+        text = respond.call_args[0][0]
+        assert "Visible incident" in text
+
+    def test_slack_api_error_allows_through(self, db):
+        inc = Incident(
+            title="Visible incident",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        inc.save()
+
+        client = MagicMock()
+        client.users_info.side_effect = SlackApiError(
+            message="error", response={"ok": False, "error": "user_not_found"}
+        )
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY", "user_id": "U_UNKNOWN"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond, client=client)
+
+        text = respond.call_args[0][0]
+        assert "Visible incident" in text
+
+    def test_title_with_special_chars_is_escaped(self, db):
+        inc = Incident(
+            title='<http://evil|click> & "fun"',
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+        )
+        inc.save()
+
+        ack = MagicMock()
+        body = {"channel_id": "C_ANY"}
+        command = {"command": "/ft"}
+        respond = MagicMock()
+
+        handle_list_command(ack, body, command, respond)
+
+        text = respond.call_args[0][0]
+        assert "<http://evil|click>" not in text
+        assert "&lt;http://evil|click&gt;" in text
+        assert "&amp;" in text

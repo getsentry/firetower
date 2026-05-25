@@ -944,7 +944,9 @@ def _claim_linear_issue(
     return None
 
 
-def create_linear_parent_issue(incident: Incident) -> None:
+def create_linear_parent_issue(
+    incident: Incident, *, channel_id: str | None = None
+) -> None:
     linear_config = settings.LINEAR
     if not linear_config:
         return
@@ -1028,6 +1030,14 @@ def create_linear_parent_issue(incident: Incident) -> None:
         logger.exception(
             f"Failed to create Linear attachment for incident {incident.id}"
         )
+
+    if channel_id and linear_link.url:
+        try:
+            _slack_service.add_bookmark(channel_id, "Linear Issue", linear_link.url)
+        except Exception:
+            logger.exception(
+                f"Failed to add Linear bookmark for incident {incident.id}"
+            )
 
 
 def _schedule_statuspage_reminder(incident: Incident) -> None:
@@ -1155,7 +1165,7 @@ def on_incident_created(incident: Incident) -> None:
         _create_troubleshooting_doc(incident, channel_id)
 
     try:
-        create_linear_parent_issue(incident)
+        create_linear_parent_issue(incident, channel_id=channel_id)
     except Exception:
         logger.exception(
             f"Failed to create Linear parent issue for incident {incident.id}"
