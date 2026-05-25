@@ -63,7 +63,7 @@ class StatuspageConfig:
     api_key: str
     page_id: str
     url: str
-    initial_reminder_delay_minutes: int = 15
+    initial_reminder_delay_minutes: int | None = None
     warning_buffer_minutes: int = 0
 
 

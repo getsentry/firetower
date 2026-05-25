@@ -8,7 +8,6 @@ from django_q.models import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
-    DEFAULT_STATUSPAGE_INITIAL_REMINDER_DELAY_MINUTES,
     DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
     _create_status_channel,
     _create_troubleshooting_doc,
@@ -2710,6 +2709,16 @@ class TestResolveLinearUserId:
 
 @pytest.mark.django_db
 class TestScheduleStatuspageReminder:
+    CONFIGURED_DELAY_MINUTES = 15
+
+    @pytest.fixture(autouse=True)
+    def _configure_reminder_delay(self):
+        with patch(
+            "firetower.incidents.hooks._get_statuspage_initial_reminder_delay_minutes",
+            return_value=self.CONFIGURED_DELAY_MINUTES,
+        ):
+            yield
+
     def _make_incident(self, **kwargs):
         defaults = {
             "title": "Test Incident",
@@ -2763,7 +2772,7 @@ class TestScheduleStatuspageReminder:
             == 1
         )
 
-    def test_schedule_next_run_is_15_minutes_out(self):
+    def test_schedule_next_run_uses_configured_delay(self):
         before = timezone.now()
         incident = self._make_incident(severity=IncidentSeverity.P0)
         _schedule_statuspage_reminder(incident)
@@ -2771,12 +2780,23 @@ class TestScheduleStatuspageReminder:
 
         schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
         delay = (
-            DEFAULT_STATUSPAGE_INITIAL_REMINDER_DELAY_MINUTES
-            - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
+            self.CONFIGURED_DELAY_MINUTES - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
         )
         expected_min = before + timedelta(minutes=delay)
         expected_max = after + timedelta(minutes=delay)
         assert expected_min <= schedule.next_run <= expected_max
+
+    def test_skips_when_delay_not_configured(self):
+        with patch(
+            "firetower.incidents.hooks._get_statuspage_initial_reminder_delay_minutes",
+            return_value=None,
+        ):
+            incident = self._make_incident(severity=IncidentSeverity.P0)
+            _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
 
     @patch("firetower.incidents.hooks._create_status_channel_for_context")
     @patch("firetower.incidents.hooks._invite_oncall_to_channel")

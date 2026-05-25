@@ -1,10 +1,12 @@
 import functools
 import logging
 import re
+from datetime import timedelta
 from typing import Protocol
 
 from datadog import statsd
 from django.conf import settings
+from django.utils import timezone
 from django_q.tasks import Schedule
 
 from firetower.incidents.models import (
@@ -83,8 +85,9 @@ STATUSPAGE_REMINDER_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 STATUSPAGE_REMINDER_MESSAGE = (
     ":rotating_light: *Statuspage Reminder* :rotating_light:\n"
     "This is a *{severity}* incident. The SLO for posting an initial "
-    "Statuspage update is *{slo_minutes} minutes* from declaration. No Statuspage "
-    "update has been posted yet.\n\n"
+    "Statuspage update is *{slo_minutes} minutes* from declaration. "
+    "The SLO will be violated in *{minutes_remaining} minutes*.\n\n"
+    "No Statuspage update has been posted yet. "
     "Please run `{slash_command} statuspage` to create a Statuspage incident now."
 )
 
@@ -132,16 +135,24 @@ def _send_statuspage_reminder(incident_id: int) -> None:
     if not channel_id:
         return
 
-    slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")
     statuspage = getattr(settings, "STATUSPAGE", None)
     slo_minutes = (
         int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
         if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES")
-        else 15
+        else None
+    )
+    if slo_minutes is None:
+        return
+
+    slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")
+    slo_deadline = incident.created_at + timedelta(minutes=slo_minutes)
+    minutes_remaining = max(
+        0, int((slo_deadline - timezone.now()).total_seconds() / 60)
     )
     message = STATUSPAGE_REMINDER_MESSAGE.format(
         severity=incident.severity,
         slash_command=slash_command,
         slo_minutes=slo_minutes,
+        minutes_remaining=minutes_remaining,
     )
     slack.post_message(channel_id, message)

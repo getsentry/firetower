@@ -249,7 +249,7 @@ class StatuspageSettings(TypedDict):
     API_KEY: str
     PAGE_ID: str
     URL: str
-    INITIAL_REMINDER_DELAY_MINUTES: int
+    INITIAL_REMINDER_DELAY_MINUTES: int | None
     WARNING_BUFFER_MINUTES: int
 
 

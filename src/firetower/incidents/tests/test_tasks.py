@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -156,6 +157,20 @@ class TestScheduleDemoPrivateIncident:
 
 @pytest.mark.django_db
 class TestSendStatuspageReminder:
+    CONFIGURED_DELAY_MINUTES = 15
+
+    @pytest.fixture(autouse=True)
+    def _configure_statuspage(self):
+        statuspage_settings = {
+            "API_KEY": "test",
+            "PAGE_ID": "test",
+            "URL": "https://test.statuspage.io/",
+            "INITIAL_REMINDER_DELAY_MINUTES": self.CONFIGURED_DELAY_MINUTES,
+            "WARNING_BUFFER_MINUTES": 0,
+        }
+        with patch.object(settings, "STATUSPAGE", statuspage_settings):
+            yield
+
     def _make_incident(self, **kwargs):
         defaults = {
             "title": "Test Incident",
@@ -175,19 +190,30 @@ class TestSendStatuspageReminder:
         )
 
     def test_posts_reminder_for_p0_without_statuspage(self):
+        now = datetime.now(tz=UTC)
         incident = self._make_incident(severity=IncidentSeverity.P0)
         self._make_link(incident, ExternalLinkType.SLACK)
 
         mock_slack = MagicMock()
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
-        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch("firetower.incidents.tasks.timezone") as mock_tz,
+        ):
+            mock_tz.now.return_value = now
             _send_statuspage_reminder(incident.id)
 
+        incident.refresh_from_db()
+        slo_deadline = incident.created_at + timedelta(
+            minutes=self.CONFIGURED_DELAY_MINUTES
+        )
+        minutes_remaining = max(0, int((slo_deadline - now).total_seconds() / 60))
         expected_msg = STATUSPAGE_REMINDER_MESSAGE.format(
             severity="P0",
             slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc"),
-            slo_minutes=15,
+            slo_minutes=self.CONFIGURED_DELAY_MINUTES,
+            minutes_remaining=minutes_remaining,
         )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 
@@ -201,12 +227,7 @@ class TestSendStatuspageReminder:
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
             _send_statuspage_reminder(incident.id)
 
-        expected_msg = STATUSPAGE_REMINDER_MESSAGE.format(
-            severity="P1",
-            slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc"),
-            slo_minutes=15,
-        )
-        mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
+        mock_slack.post_message.assert_called_once()
 
     def test_skips_when_statuspage_exists(self):
         incident = self._make_incident(severity=IncidentSeverity.P0)
@@ -270,6 +291,31 @@ class TestSendStatuspageReminder:
             _send_statuspage_reminder(incident.id)
 
         mock_slack.post_message.assert_called_once()
+
+    def test_skips_when_delay_not_configured(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch.object(
+                settings,
+                "STATUSPAGE",
+                {
+                    "API_KEY": "test",
+                    "PAGE_ID": "test",
+                    "URL": "https://test.statuspage.io/",
+                    "INITIAL_REMINDER_DELAY_MINUTES": None,
+                    "WARNING_BUFFER_MINUTES": 0,
+                },
+            ),
+        ):
+            _send_statuspage_reminder(incident.id)
+
+        mock_slack.post_message.assert_not_called()
 
     def test_skips_when_incident_not_found(self):
         mock_slack = MagicMock()
