@@ -38,6 +38,7 @@ def _make_linear_issue(
     relation_type="child",
     assignee_email=None,
     assignee_linear_id=None,
+    priority=0,
 ):
     return {
         "id": id,
@@ -48,6 +49,7 @@ def _make_linear_issue(
         "relation_type": relation_type,
         "assignee_email": assignee_email,
         "assignee_linear_id": assignee_linear_id,
+        "priority": priority,
     }
 
 
@@ -412,7 +414,7 @@ class TestSyncActionItemsFromLinear:
                 id="id-1", identifier="ENG-1", title="T1", status="Done"
             ),
             _make_linear_issue(
-                id="id-2", identifier="ENG-2", title="T2", status="Cancelled"
+                id="id-2", identifier="ENG-2", title="T2", status="Canceled"
             ),
         ]
 
@@ -849,7 +851,7 @@ class TestLinearService:
                         {"id": "s2", "name": "Todo", "type": "unstarted"},
                         {"id": "s3", "name": "In Progress", "type": "started"},
                         {"id": "s4", "name": "Done", "type": "completed"},
-                        {"id": "s5", "name": "Cancelled", "type": "cancelled"},
+                        {"id": "s5", "name": "Canceled", "type": "canceled"},
                     ]
                 }
             }

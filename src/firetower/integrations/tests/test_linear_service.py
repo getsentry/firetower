@@ -206,6 +206,7 @@ class TestParseIssue:
             "identifier": "ENG-123",
             "title": "Fix bug",
             "url": "https://linear.app/team/issue/ENG-123",
+            "priority": 2,
             "state": {"type": "started"},
             "assignee": {"id": "user-1", "email": "alice@sentry.io"},
         }
@@ -218,6 +219,7 @@ class TestParseIssue:
             "title": "Fix bug",
             "url": "https://linear.app/team/issue/ENG-123",
             "status": "In Progress",
+            "priority": 2,
             "assignee_email": "alice@sentry.io",
             "assignee_linear_id": "user-1",
             "relation_type": "child",
@@ -230,7 +232,7 @@ class TestParseIssue:
             ("unstarted", "Todo"),
             ("started", "In Progress"),
             ("completed", "Done"),
-            ("cancelled", "Cancelled"),
+            ("canceled", "Canceled"),
         ]:
             issue = {
                 "id": "i1",

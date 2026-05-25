@@ -300,6 +300,7 @@ LINEAR: dict | None = (
     {
         "CLIENT_ID": config.linear.client_id,
         "CLIENT_SECRET": config.linear.client_secret,
+        "API_KEY": config.linear.api_key,
         "TEAM_ID": config.linear.team_id,
         "PROJECT_ID": config.linear.project_id,
         "SYNC_IDENTIFIERS": config.linear.sync_identifiers,

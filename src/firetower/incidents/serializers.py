@@ -676,6 +676,7 @@ class ActionItemSerializer(serializers.ModelSerializer):
             "linear_identifier",
             "title",
             "status",
+            "priority",
             "relation_type",
             "assignee_name",
             "assignee_avatar_url",

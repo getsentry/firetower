@@ -442,7 +442,7 @@ class TestOnStatusChanged:
     def test_does_not_trigger_dump_on_other_statuses(self, mock_slack, mock_dump_async):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
-        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELLED):
+        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELED):
             incident = Incident.objects.create(
                 title="Test",
                 severity=IncidentSeverity.P1,

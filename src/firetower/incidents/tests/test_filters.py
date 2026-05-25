@@ -81,8 +81,8 @@ class TestUIIncidentFilters:
             severity=IncidentSeverity.P2,
         )
         Incident.objects.create(
-            title="Cancelled",
-            status=IncidentStatus.CANCELLED,
+            title="Canceled",
+            status=IncidentStatus.CANCELED,
             severity=IncidentSeverity.P3,
         )
 

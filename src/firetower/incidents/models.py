@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser, User
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q, QuerySet
@@ -46,7 +46,7 @@ class IncidentStatus(models.TextChoices):
     MITIGATED = "Mitigated", "Mitigated"
     POSTMORTEM = "Postmortem", "Postmortem"
     DONE = "Done", "Done"
-    CANCELLED = "Cancelled", "Cancelled"
+    CANCELED = "Canceled", "Canceled"
 
 
 class IncidentSeverity(models.TextChoices):
@@ -296,10 +296,16 @@ class Incident(models.Model):
             links[link.type.lower()] = link.url
         return links
 
-    def is_visible_to_user(self, user: User) -> bool:
+    def is_visible_to_user(self, user: User | AbstractUser) -> bool:
+        """Check if incident is visible to the given user"""
         if not self.is_private:
             return True
 
+        # Superusers can see all incidents
+        if user.is_superuser:
+            return True
+
+        # Check if user is involved
         if user in [self.captain, self.reporter]:
             return True
 
@@ -333,7 +339,7 @@ class ActionItemStatus(models.TextChoices):
     TODO = "Todo", "Todo"
     IN_PROGRESS = "In Progress", "In Progress"
     DONE = "Done", "Done"
-    CANCELLED = "Cancelled", "Cancelled"
+    CANCELED = "Canceled", "Canceled"
 
 
 class ActionItemRelationType(models.TextChoices):
@@ -366,6 +372,7 @@ class ActionItem(models.Model):
         blank=True,
         related_name="action_items",
     )
+    priority = models.IntegerField(default=0)
     url = models.URLField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -400,7 +407,7 @@ class ExternalLink(models.Model):
 
 
 def filter_visible_to_user(
-    queryset: QuerySet[Incident], user: User
+    queryset: QuerySet[Incident], user: User | AbstractUser
 ) -> QuerySet[Incident]:
     """
     Filter incidents queryset to only those visible to user.
@@ -415,6 +422,10 @@ def filter_visible_to_user(
     # Anonymous users see no incidents. IAP should prevent this, but just in case.
     if not user.is_authenticated:
         return queryset.none()
+
+    # Superusers see everything
+    if user.is_superuser:
+        return queryset
 
     return queryset.filter(
         Q(is_private=False) | Q(captain=user) | Q(reporter=user) | Q(participants=user)
