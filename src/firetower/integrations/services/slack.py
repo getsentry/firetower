@@ -20,6 +20,16 @@ def escape_slack_text(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def is_slack_guest(client: Any, user_id: str) -> bool:
+    try:
+        response = client.users_info(user=user_id)
+        user = response.get("user", {})
+        return bool(user.get("is_restricted") or user.get("is_ultra_restricted"))
+    except SlackApiError:
+        logger.exception("Failed to fetch Slack user info for %s", user_id)
+        return False
+
+
 def is_slack_url(url: str) -> bool:
     try:
         host = urlparse(url).hostname or ""
