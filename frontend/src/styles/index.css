@@ -187,6 +187,9 @@ input[type='number'] {
   .border-warning-vibrant {
     border-color: var(--tokens-color-border-warning-vibrant);
   }
+  .border-accent-vibrant {
+    border-color: var(--tokens-color-border-accent-vibrant);
+  }
 
   @media (prefers-color-scheme: dark) {
     .bg-background-primary {
@@ -319,6 +322,9 @@ input[type='number'] {
     }
     .border-warning-vibrant {
       border-color: var(--base-color-yellow-dark-opaque-600);
+    }
+    .border-accent-vibrant {
+      border-color: var(--base-color-blue-dark-opaque-500);
     }
   }
 

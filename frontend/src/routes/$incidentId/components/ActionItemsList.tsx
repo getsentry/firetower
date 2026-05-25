@@ -1,7 +1,9 @@
+import {useState} from 'react';
 import {useMutation, useQueryClient, useSuspenseQuery} from '@tanstack/react-query';
 import {Avatar} from 'components/Avatar';
 import {buttonVariants} from 'components/Button';
 import {Card} from 'components/Card';
+import {ConfirmationDialog} from 'components/ConfirmationDialog';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {Pill} from 'components/Pill';
 import {Loader2, Plus, RefreshCw} from 'lucide-react';
@@ -11,14 +13,16 @@ import type {ActionItem, ActionItemStatus} from '../queries/actionItemsQueryOpti
 import {actionItemsQueryOptions} from '../queries/actionItemsQueryOptions';
 import {syncActionItemsMutationOptions} from '../queries/syncActionItemsMutationOptions';
 
+import {PriorityIcon} from './PriorityIcon';
+
 const STATUS_CONFIG: Record<
   ActionItemStatus,
-  {pillVariant: 'Done' | 'Mitigated' | 'Active' | 'Cancelled'; borderClass: string}
+  {pillVariant: 'Done' | 'Mitigated' | 'Canceled'; borderClass: string}
 > = {
   Done: {pillVariant: 'Done', borderClass: 'border-success-vibrant'},
   'In Progress': {pillVariant: 'Mitigated', borderClass: 'border-warning-vibrant'},
-  Todo: {pillVariant: 'Active', borderClass: 'border-danger-vibrant'},
-  Cancelled: {pillVariant: 'Cancelled', borderClass: 'border-neutral-muted'},
+  Todo: {pillVariant: 'Canceled', borderClass: 'border-neutral-muted'},
+  Canceled: {pillVariant: 'Canceled', borderClass: 'border-neutral-muted'},
 };
 
 function ActionItemCard({item}: {item: ActionItem}) {
@@ -30,8 +34,8 @@ function ActionItemCard({item}: {item: ActionItem}) {
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'flex items-center gap-space-lg rounded-radius-md border-l-4 bg-background-secondary p-space-lg no-underline transition-colors',
-        'hover:bg-background-tertiary',
+        'flex items-center gap-space-lg rounded-radius-md border-l-4 bg-background-tertiary p-space-lg no-underline shadow-sm transition-all duration-200',
+        'hover:-translate-y-0.5 hover:shadow-md',
         config.borderClass
       )}
     >
@@ -39,7 +43,7 @@ function ActionItemCard({item}: {item: ActionItem}) {
         <p className="text-content-headings text-sm font-medium">{item.title}</p>
         <div className="text-content-secondary mt-space-xs gap-space-sm flex items-center text-xs">
           <span>{item.linear_identifier}</span>
-          {item.assignee_name && (
+          {item.assignee_name ? (
             <>
               <span aria-hidden="true">&middot;</span>
               <span className="gap-space-xs flex items-center">
@@ -52,26 +56,13 @@ function ActionItemCard({item}: {item: ActionItem}) {
                 {item.assignee_name}
               </span>
             </>
-          )}
+          ) : null}
         </div>
       </div>
+      <PriorityIcon priority={item.priority} />
       <Pill variant={config.pillVariant}>{item.status}</Pill>
     </a>
   );
-}
-
-function extractLinearIdentifier(linearUrl: string): string | null {
-  const match = linearUrl.match(/\/issue\/([A-Z]+-\d+)/);
-  return match ? match[1] : null;
-}
-
-function buildLinearNewUrl(linearUrl: string): string | null {
-  const identifier = extractLinearIdentifier(linearUrl);
-  if (!identifier) {
-    return null;
-  }
-  const params = new URLSearchParams({parent: identifier});
-  return `https://linear.app/new?${params.toString()}`;
 }
 
 interface ActionItemsListProps {
@@ -80,11 +71,11 @@ interface ActionItemsListProps {
 }
 
 export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
-  const createUrl = linearUrl ? buildLinearNewUrl(linearUrl) : null;
   const queryClient = useQueryClient();
   const syncMutation = useMutation(
     syncActionItemsMutationOptions(queryClient, incidentId)
   );
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   return (
     <Card>
@@ -104,27 +95,67 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
               <RefreshCw className="h-4 w-4" />
             )}
           </button>
-          {createUrl ? (
-            <a
-              href={createUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+          {linearUrl ? (
+            <button
+              type="button"
+              onClick={() => setShowCreateDialog(true)}
               className={cn(buttonVariants({variant: 'icon'}))}
-              aria-label="Create Linear issue"
+              aria-label="Create action item"
             >
-              <Plus className="h-4 w-4" />
-            </a>
+              <Plus className="h-4 w-4" strokeWidth={3} />
+            </button>
           ) : null}
         </div>
       </div>
       {linearUrl ? <ActionItemsLinked incidentId={incidentId} /> : <ActionItemsEmpty />}
+      {linearUrl ? (
+        <ConfirmationDialog
+          isOpen={showCreateDialog}
+          title="Create Action Item"
+          message={
+            <>
+              You'll be taken to the parent Linear issue for the incident. Create your
+              action item as a sub-issue or related issue there.
+              <br />
+              <br />
+              Make sure to assign the issue to the appropriate team as issues in the
+              Incident Management team will be overwritten by Firetower.
+              <br />
+              <br />
+              Please set priority on the issues according to our policy:
+              <ul
+                className="mt-space-xs space-y-space-xs text-sm"
+                style={{listStyle: 'none', paddingLeft: 0}}
+              >
+                <li className="flex items-center gap-space-xs flex-wrap">
+                  <PriorityIcon priority={1} /> <strong>Urgent</strong> /{' '}
+                  <PriorityIcon priority={2} /> <strong>High (P1)</strong> — 2 week SLA
+                </li>
+                <li className="flex items-center gap-space-xs flex-wrap">
+                  <PriorityIcon priority={3} /> <strong>Medium (P2)</strong> — 4 week SLA
+                </li>
+                <li className="flex items-center gap-space-xs flex-wrap">
+                  <PriorityIcon priority={4} /> <strong>Low (P3)</strong> — no SLA, can be
+                  put on backlog
+                </li>
+              </ul>
+            </>
+          }
+          confirmLabel="Open Linear"
+          onConfirm={() => {
+            window.open(linearUrl, '_blank', 'noopener,noreferrer');
+            setShowCreateDialog(false);
+          }}
+          onCancel={() => setShowCreateDialog(false)}
+        />
+      ) : null}
     </Card>
   );
 }
 
 function ActionItemsEmpty() {
   return (
-    <p className="text-content-secondary text-sm">
+    <p className="text-content-secondary text-center text-sm">
       This incident has no linked Linear issue, try refreshing to generate a new Linear
       issue. If the problem persists, come let us know in <GetHelpLink />.
     </p>
@@ -135,7 +166,7 @@ function ActionItemsLinked({incidentId}: {incidentId: string}) {
   const {data: actionItems} = useSuspenseQuery(actionItemsQueryOptions({incidentId}));
 
   return actionItems.length === 0 ? (
-    <p className="text-content-secondary text-sm">No action items yet</p>
+    <p className="text-content-secondary text-center text-sm">No action items yet</p>
   ) : (
     <div className="gap-space-md flex flex-col">
       {actionItems.map(item => (

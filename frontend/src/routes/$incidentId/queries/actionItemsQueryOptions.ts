@@ -2,12 +2,13 @@ import {queryOptions} from '@tanstack/react-query';
 import {Api} from 'api';
 import {z} from 'zod';
 
-const ActionItemStatusSchema = z.enum(['Todo', 'In Progress', 'Done', 'Cancelled']);
+const ActionItemStatusSchema = z.enum(['Todo', 'In Progress', 'Done', 'Canceled']);
 
 const ActionItemSchema = z.object({
   linear_identifier: z.string(),
   title: z.string(),
   status: ActionItemStatusSchema,
+  priority: z.number().int(),
   assignee_name: z.string().nullable(),
   assignee_avatar_url: z.string().nullable(),
   url: z.string(),

@@ -98,16 +98,6 @@ function Incident() {
               />
             </Suspense>
           </ErrorBoundary>
-          <Card>
-            <div className="text-content-muted p-12 text-center">
-              <p className="mb-2 text-lg">
-                <span role="img" aria-label="fire">
-                  🔥
-                </span>
-              </p>
-              <p>Cool features to come</p>
-            </div>
-          </Card>
         </section>
 
         <aside className="flex flex-col gap-4 md:flex-1">
