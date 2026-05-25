@@ -297,15 +297,12 @@ class Incident(models.Model):
         return links
 
     def is_visible_to_user(self, user: User | AbstractUser) -> bool:
-        """Check if incident is visible to the given user"""
         if not self.is_private:
             return True
 
-        # Superusers can see all incidents
-        if user.is_superuser:
-            return True
+        if not isinstance(user, User):
+            return False
 
-        # Check if user is involved
         if user in [self.captain, self.reporter]:
             return True
 
@@ -421,10 +418,6 @@ def filter_visible_to_user(
     # Anonymous users see no incidents. IAP should prevent this, but just in case.
     if not user.is_authenticated:
         return queryset.none()
-
-    # Superusers see everything
-    if user.is_superuser:
-        return queryset
 
     return queryset.filter(
         Q(is_private=False) | Q(captain=user) | Q(reporter=user) | Q(participants=user)

@@ -217,8 +217,8 @@ class TestIncident:
         assert incident.is_visible_to_user(participant) is True
         assert incident.is_visible_to_user(other_user) is False
 
-    def test_private_incident_visible_to_superuser(self):
-        """Test private incident is visible to superusers"""
+    def test_private_incident_not_visible_to_superuser(self):
+        """Test private incident is not visible to uninvolved superusers"""
         superuser = User.objects.create_superuser(
             username="superuser@example.com",
             email="superuser@example.com",
@@ -232,7 +232,7 @@ class TestIncident:
             is_private=True,
         )
 
-        assert incident.is_visible_to_user(superuser) is True
+        assert incident.is_visible_to_user(superuser) is False
 
     def test_affected_service_tag_names_property(self):
         """Test affected_service_tag_names property returns list of tag names"""
@@ -417,8 +417,8 @@ class TestExternalLink:
 
 @pytest.mark.django_db
 class TestFilterVisibleToUser:
-    def test_superuser_sees_all_incidents(self):
-        """Test superusers see all incidents"""
+    def test_superuser_cannot_see_private_incidents(self):
+        """Test superusers cannot see private incidents they are not involved in"""
         superuser = User.objects.create_superuser(
             username="superuser@example.com",
             email="superuser@example.com",
@@ -432,7 +432,7 @@ class TestFilterVisibleToUser:
             is_private=False,
         )
 
-        private = Incident.objects.create(
+        Incident.objects.create(
             title="Private",
             status=IncidentStatus.ACTIVE,
             severity=IncidentSeverity.P1,
@@ -442,9 +442,8 @@ class TestFilterVisibleToUser:
         queryset = Incident.objects.all()
         filtered = filter_visible_to_user(queryset, superuser)
 
-        assert filtered.count() == 2
+        assert filtered.count() == 1
         assert public in filtered
-        assert private in filtered
 
     def test_regular_user_sees_public_and_own_private(self):
         """Test regular users see public incidents and their own private ones"""
