@@ -1063,14 +1063,15 @@ def _schedule_statuspage_reminder(incident: Incident) -> None:
         return
 
     schedule_name = f"statuspage_reminder_{incident.id}"
-    next_run = timezone.now() + timedelta(
+    now = timezone.now()
+    next_run = now + timedelta(
         minutes=delay_minutes - _get_statuspage_warning_buffer_minutes()
     )
     Schedule.objects.update_or_create(
         name=schedule_name,
         defaults={
             "func": "firetower.incidents.tasks.send_statuspage_reminder",
-            "kwargs": f'{{"incident_id": {incident.id}}}',
+            "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{now.isoformat()}"}}',
             "schedule_type": Schedule.ONCE,
             "next_run": next_run,
             "repeats": 1,

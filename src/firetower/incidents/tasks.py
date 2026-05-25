@@ -1,7 +1,7 @@
 import functools
 import logging
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Protocol
 
 from datadog import statsd
@@ -92,11 +92,11 @@ STATUSPAGE_REMINDER_MESSAGE = (
 )
 
 
-def send_statuspage_reminder(incident_id: int) -> None:
+def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) -> None:
     tags = ["task:send_statuspage_reminder"]
     statsd.increment("django_q.task.run", 1, tags)
     try:
-        _send_statuspage_reminder(incident_id)
+        _send_statuspage_reminder(incident_id, scheduled_at=scheduled_at)
     except Exception as e:
         statsd.increment("django_q.task.error", 1, tags)
         logger.error(
@@ -108,7 +108,9 @@ def send_statuspage_reminder(incident_id: int) -> None:
         statsd.increment("django_q.task.success", 1, tags)
 
 
-def _send_statuspage_reminder(incident_id: int) -> None:
+def _send_statuspage_reminder(
+    incident_id: int, scheduled_at: str | None = None
+) -> None:
     # Only alert if we're configured to.
     statuspage = getattr(settings, "STATUSPAGE", None)
     slo_minutes = (
@@ -148,7 +150,10 @@ def _send_statuspage_reminder(incident_id: int) -> None:
         return
 
     slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")
-    slo_deadline = incident.created_at + timedelta(minutes=slo_minutes)
+    reference_time = (
+        datetime.fromisoformat(scheduled_at) if scheduled_at else incident.created_at
+    )
+    slo_deadline = reference_time + timedelta(minutes=slo_minutes)
     minutes_remaining = max(
         0, int((slo_deadline - timezone.now()).total_seconds() / 60)
     )

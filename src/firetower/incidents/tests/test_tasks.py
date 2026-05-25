@@ -217,6 +217,34 @@ class TestSendStatuspageReminder:
         )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 
+    def test_uses_scheduled_at_for_slo_deadline(self):
+        now = datetime.now(tz=UTC)
+        scheduled_at = now - timedelta(minutes=5)
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch("firetower.incidents.tasks.timezone") as mock_tz,
+        ):
+            mock_tz.now.return_value = now
+            _send_statuspage_reminder(
+                incident.id, scheduled_at=scheduled_at.isoformat()
+            )
+
+        slo_deadline = scheduled_at + timedelta(minutes=self.CONFIGURED_DELAY_MINUTES)
+        minutes_remaining = max(0, int((slo_deadline - now).total_seconds() / 60))
+        expected_msg = STATUSPAGE_REMINDER_MESSAGE.format(
+            severity="P0",
+            slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc"),
+            slo_minutes=self.CONFIGURED_DELAY_MINUTES,
+            minutes_remaining=minutes_remaining,
+        )
+        mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
+
     def test_posts_reminder_for_p1_without_statuspage(self):
         incident = self._make_incident(severity=IncidentSeverity.P1)
         self._make_link(incident, ExternalLinkType.SLACK)

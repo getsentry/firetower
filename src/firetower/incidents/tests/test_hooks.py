@@ -1,3 +1,4 @@
+import ast
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
@@ -2734,7 +2735,9 @@ class TestScheduleStatuspageReminder:
 
         schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
         assert schedule.func == "firetower.incidents.tasks.send_statuspage_reminder"
-        assert schedule.kwargs == f'{{"incident_id": {incident.id}}}'
+        stored_kwargs = ast.literal_eval(schedule.kwargs)
+        assert stored_kwargs["incident_id"] == incident.id
+        assert "scheduled_at" in stored_kwargs
         assert schedule.schedule_type == Schedule.ONCE
         assert schedule.repeats == 1
 
