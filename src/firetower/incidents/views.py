@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import asdict
 
 from django.conf import settings
-from django.db.models import Case, Count, QuerySet, When
+from django.db.models import Case, Count, F, QuerySet, When
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, serializers
@@ -366,7 +366,9 @@ class ActionItemListView(generics.ListAPIView):
         return (
             self._get_incident()
             .action_items.select_related("assignee__userprofile")
-            .order_by(Case(When(priority=0, then=5), default="priority"), "created_at")
+            .order_by(
+                Case(When(priority=0, then=5), default=F("priority")), "created_at"
+            )
         )
 
     def _get_incident(self) -> Incident:
