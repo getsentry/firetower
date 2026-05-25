@@ -594,3 +594,17 @@ class TestArchiveStaleChannels:
             archive_stale_channels.__wrapped__()
 
         mock_slack.archive_channel.assert_called_once_with("C_BOTTHREADS")
+
+    def test_aborts_when_bot_id_is_none(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_NOBOT")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.bot_id = None
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.parse_channel_id_from_url.assert_not_called()
+        mock_slack.archive_channel.assert_not_called()

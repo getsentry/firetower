@@ -92,6 +92,9 @@ def archive_stale_channels() -> None:
         return
 
     own_bot_id = slack.bot_id
+    if not own_bot_id:
+        logger.error("Could not determine own bot ID, aborting archive run")
+        return
 
     terminal_statuses = [IncidentStatus.DONE, IncidentStatus.CANCELLED]
     links = ExternalLink.objects.filter(
@@ -130,9 +133,7 @@ def archive_stale_channels() -> None:
 
             messages = slack.get_channel_history(channel_id)
             non_own_messages = [
-                msg
-                for msg in messages
-                if msg.get("bot_id") != own_bot_id or not own_bot_id
+                msg for msg in messages if msg.get("bot_id") != own_bot_id
             ]
             if non_own_messages:
                 skipped += 1
