@@ -1055,7 +1055,9 @@ def create_linear_parent_issue(
 
 
 def _schedule_statuspage_reminder(
-    incident: Incident, reference_time: datetime | None = None
+    incident: Incident,
+    reference_time: datetime | None = None,
+    allow_update: bool = False,
 ) -> None:
     if incident.severity not in PAGEABLE_SEVERITIES:
         return
@@ -1070,16 +1072,17 @@ def _schedule_statuspage_reminder(
     schedule_name = f"statuspage_reminder_{incident.id}"
     offset_minutes = max(0, delay_minutes - _get_statuspage_warning_buffer_minutes())
     next_run = reference_time + timedelta(minutes=offset_minutes)
-    Schedule.objects.update_or_create(
-        name=schedule_name,
-        defaults={
-            "func": "firetower.incidents.tasks.send_statuspage_reminder",
-            "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{reference_time.isoformat()}"}}',
-            "schedule_type": Schedule.ONCE,
-            "next_run": next_run,
-            "repeats": 1,
-        },
-    )
+    defaults = {
+        "func": "firetower.incidents.tasks.send_statuspage_reminder",
+        "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{reference_time.isoformat()}"}}',
+        "schedule_type": Schedule.ONCE,
+        "next_run": next_run,
+        "repeats": 1,
+    }
+    if allow_update:
+        Schedule.objects.update_or_create(name=schedule_name, defaults=defaults)
+    else:
+        Schedule.objects.get_or_create(name=schedule_name, defaults=defaults)
 
 
 def on_incident_created(incident: Incident) -> None:
@@ -1282,7 +1285,9 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
                 )
 
         try:
-            _schedule_statuspage_reminder(incident, reference_time=timezone.now())
+            _schedule_statuspage_reminder(
+                incident, reference_time=timezone.now(), allow_update=True
+            )
         except Exception:
             logger.exception(
                 f"Failed to schedule statuspage reminder for incident {incident.id}"

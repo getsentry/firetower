@@ -2775,6 +2775,16 @@ class TestScheduleStatuspageReminder:
             == 1
         )
 
+    def test_concurrent_creation_preserves_original_next_run(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+        original = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        original_next_run = original.next_run
+
+        _schedule_statuspage_reminder(incident)
+        original.refresh_from_db()
+        assert original.next_run == original_next_run
+
     def test_schedule_next_run_uses_configured_delay_from_created_at(self):
         incident = self._make_incident(severity=IncidentSeverity.P0)
         _schedule_statuspage_reminder(incident)
@@ -2787,18 +2797,22 @@ class TestScheduleStatuspageReminder:
         expected = incident.created_at + timedelta(minutes=offset)
         assert schedule.next_run == expected
 
-    def test_schedule_next_run_uses_reference_time_when_provided(self):
+    def test_re_escalation_updates_existing_schedule(self):
         incident = self._make_incident(severity=IncidentSeverity.P0)
-        ref = timezone.now()
-        _schedule_statuspage_reminder(incident, reference_time=ref)
+        _schedule_statuspage_reminder(incident)
+        original = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        original_next_run = original.next_run
 
-        schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        ref = timezone.now() + timedelta(hours=1)
+        _schedule_statuspage_reminder(incident, reference_time=ref, allow_update=True)
+
+        original.refresh_from_db()
+        assert original.next_run != original_next_run
         offset = max(
             0,
             self.CONFIGURED_DELAY_MINUTES - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
         )
-        expected = ref + timedelta(minutes=offset)
-        assert schedule.next_run == expected
+        assert original.next_run == ref + timedelta(minutes=offset)
 
     def test_schedule_clamps_negative_buffer_offset(self):
         incident = self._make_incident(severity=IncidentSeverity.P0)
