@@ -2737,7 +2737,7 @@ class TestScheduleStatuspageReminder:
         assert schedule.func == "firetower.incidents.tasks.send_statuspage_reminder"
         stored_kwargs = ast.literal_eval(schedule.kwargs)
         assert stored_kwargs["incident_id"] == incident.id
-        assert "scheduled_at" in stored_kwargs
+        assert stored_kwargs["scheduled_at"] == incident.created_at.isoformat()
         assert schedule.schedule_type == Schedule.ONCE
         assert schedule.repeats == 1
 
@@ -2775,19 +2775,41 @@ class TestScheduleStatuspageReminder:
             == 1
         )
 
-    def test_schedule_next_run_uses_configured_delay(self):
-        before = timezone.now()
+    def test_schedule_next_run_uses_configured_delay_from_created_at(self):
         incident = self._make_incident(severity=IncidentSeverity.P0)
         _schedule_statuspage_reminder(incident)
-        after = timezone.now()
 
         schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
-        delay = (
-            self.CONFIGURED_DELAY_MINUTES - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
+        offset = max(
+            0,
+            self.CONFIGURED_DELAY_MINUTES - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
         )
-        expected_min = before + timedelta(minutes=delay)
-        expected_max = after + timedelta(minutes=delay)
-        assert expected_min <= schedule.next_run <= expected_max
+        expected = incident.created_at + timedelta(minutes=offset)
+        assert schedule.next_run == expected
+
+    def test_schedule_next_run_uses_reference_time_when_provided(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        ref = timezone.now()
+        _schedule_statuspage_reminder(incident, reference_time=ref)
+
+        schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        offset = max(
+            0,
+            self.CONFIGURED_DELAY_MINUTES - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
+        )
+        expected = ref + timedelta(minutes=offset)
+        assert schedule.next_run == expected
+
+    def test_schedule_clamps_negative_buffer_offset(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        with patch(
+            "firetower.incidents.hooks._get_statuspage_warning_buffer_minutes",
+            return_value=self.CONFIGURED_DELAY_MINUTES + 10,
+        ):
+            _schedule_statuspage_reminder(incident)
+
+        schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        assert schedule.next_run == incident.created_at
 
     def test_skips_when_delay_not_configured(self):
         with patch(

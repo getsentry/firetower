@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from django.conf import settings
@@ -1054,7 +1054,9 @@ def create_linear_parent_issue(
             )
 
 
-def _schedule_statuspage_reminder(incident: Incident) -> None:
+def _schedule_statuspage_reminder(
+    incident: Incident, reference_time: datetime | None = None
+) -> None:
     if incident.severity not in PAGEABLE_SEVERITIES:
         return
 
@@ -1062,16 +1064,17 @@ def _schedule_statuspage_reminder(incident: Incident) -> None:
     if delay_minutes is None:
         return
 
+    if reference_time is None:
+        reference_time = incident.created_at
+
     schedule_name = f"statuspage_reminder_{incident.id}"
-    now = timezone.now()
-    next_run = now + timedelta(
-        minutes=delay_minutes - _get_statuspage_warning_buffer_minutes()
-    )
+    offset_minutes = max(0, delay_minutes - _get_statuspage_warning_buffer_minutes())
+    next_run = reference_time + timedelta(minutes=offset_minutes)
     Schedule.objects.update_or_create(
         name=schedule_name,
         defaults={
             "func": "firetower.incidents.tasks.send_statuspage_reminder",
-            "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{now.isoformat()}"}}',
+            "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{reference_time.isoformat()}"}}',
             "schedule_type": Schedule.ONCE,
             "next_run": next_run,
             "repeats": 1,
@@ -1279,7 +1282,7 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
                 )
 
         try:
-            _schedule_statuspage_reminder(incident)
+            _schedule_statuspage_reminder(incident, reference_time=timezone.now())
         except Exception:
             logger.exception(
                 f"Failed to schedule statuspage reminder for incident {incident.id}"
