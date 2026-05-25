@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser, User
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q, QuerySet
@@ -296,12 +296,9 @@ class Incident(models.Model):
             links[link.type.lower()] = link.url
         return links
 
-    def is_visible_to_user(self, user: User | AbstractUser) -> bool:
+    def is_visible_to_user(self, user: User) -> bool:
         if not self.is_private:
             return True
-
-        if not isinstance(user, User):
-            return False
 
         if user in [self.captain, self.reporter]:
             return True
@@ -403,7 +400,7 @@ class ExternalLink(models.Model):
 
 
 def filter_visible_to_user(
-    queryset: QuerySet[Incident], user: User | AbstractUser
+    queryset: QuerySet[Incident], user: User
 ) -> QuerySet[Incident]:
     """
     Filter incidents queryset to only those visible to user.

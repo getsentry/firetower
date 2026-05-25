@@ -237,7 +237,7 @@ class TestIncidentViews:
 
         assert response.status_code == 200
         assert response.data["count"] == 1
-        assert len(response.data["results"]) == 2
+        assert len(response.data["results"]) == 1
 
     def test_retrieve_incident_syncs_participants(self):
         """Test that retrieving incident details syncs participants from Slack"""

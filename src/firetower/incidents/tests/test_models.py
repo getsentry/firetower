@@ -234,6 +234,44 @@ class TestIncident:
 
         assert incident.is_visible_to_user(superuser) is False
 
+    def test_private_incident_visible_to_involved_superuser(self):
+        """Test private incident is visible to superusers who are captain, reporter, or participant"""
+        superuser = User.objects.create_superuser(
+            username="superuser@example.com",
+            email="superuser@example.com",
+            password="test123",
+        )
+
+        # Visible as captain
+        incident_captain = Incident.objects.create(
+            title="Private Captain",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=superuser,
+        )
+        assert incident_captain.is_visible_to_user(superuser) is True
+
+        # Visible as reporter
+        incident_reporter = Incident.objects.create(
+            title="Private Reporter",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            reporter=superuser,
+        )
+        assert incident_reporter.is_visible_to_user(superuser) is True
+
+        # Visible as participant
+        incident_participant = Incident.objects.create(
+            title="Private Participant",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+        incident_participant.participants.add(superuser)
+        assert incident_participant.is_visible_to_user(superuser) is True
+
     def test_affected_service_tag_names_property(self):
         """Test affected_service_tag_names property returns list of tag names"""
         incident = Incident.objects.create(
