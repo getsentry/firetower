@@ -2,6 +2,7 @@ import {Suspense, useEffect} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {Card} from 'components/Card';
+import {ErrorBoundary} from 'components/ErrorBoundary';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {Skeleton} from 'components/Skeleton';
@@ -81,12 +82,22 @@ function Incident() {
 
       <div className="flex flex-col gap-4 md:flex-row">
         <section className="flex flex-col gap-4 md:flex-[2]">
-          <Suspense fallback={<ActionItemsSkeleton />}>
-            <ActionItemsList
-              incidentId={params.incidentId}
-              incidentTitle={incident.title}
-            />
-          </Suspense>
+          <ErrorBoundary
+            fallback={
+              <Card>
+                <p className="text-content-secondary text-sm">
+                  Failed to load action items. Try refreshing the page.
+                </p>
+              </Card>
+            }
+          >
+            <Suspense fallback={<ActionItemsSkeleton />}>
+              <ActionItemsList
+                incidentId={params.incidentId}
+                linearUrl={incident.external_links.linear}
+              />
+            </Suspense>
+          </ErrorBoundary>
           <Card>
             <div className="text-content-muted p-12 text-center">
               <p className="mb-2 text-lg">

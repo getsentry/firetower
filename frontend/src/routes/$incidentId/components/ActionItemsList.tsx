@@ -1,13 +1,15 @@
-import {useSuspenseQuery} from '@tanstack/react-query';
+import {useMutation, useQueryClient, useSuspenseQuery} from '@tanstack/react-query';
 import {Avatar} from 'components/Avatar';
 import {buttonVariants} from 'components/Button';
 import {Card} from 'components/Card';
+import {GetHelpLink} from 'components/GetHelpLink';
 import {Pill} from 'components/Pill';
-import {Plus} from 'lucide-react';
+import {Loader2, Plus, RefreshCw} from 'lucide-react';
 import {cn} from 'utils/cn';
 
 import type {ActionItem, ActionItemStatus} from '../queries/actionItemsQueryOptions';
 import {actionItemsQueryOptions} from '../queries/actionItemsQueryOptions';
+import {syncActionItemsMutationOptions} from '../queries/syncActionItemsMutationOptions';
 
 const STATUS_CONFIG: Record<
   ActionItemStatus,
@@ -58,46 +60,87 @@ function ActionItemCard({item}: {item: ActionItem}) {
   );
 }
 
-function buildLinearNewUrl(incidentId: string, incidentTitle: string): string {
-  const firetowerUrl = `${window.location.origin}/${incidentId}/`;
-  const params = new URLSearchParams({
-    'attachment[url]': firetowerUrl,
-    'attachment[title]': incidentTitle,
-  });
+function extractLinearIdentifier(linearUrl: string): string | null {
+  const match = linearUrl.match(/\/issue\/([A-Z]+-\d+)/);
+  return match ? match[1] : null;
+}
+
+function buildLinearNewUrl(linearUrl: string): string | null {
+  const identifier = extractLinearIdentifier(linearUrl);
+  if (!identifier) {
+    return null;
+  }
+  const params = new URLSearchParams({parent: identifier});
   return `https://linear.app/new?${params.toString()}`;
 }
 
 interface ActionItemsListProps {
   incidentId: string;
-  incidentTitle: string;
+  linearUrl?: string;
 }
 
-export function ActionItemsList({incidentId, incidentTitle}: ActionItemsListProps) {
-  const {data: actionItems} = useSuspenseQuery(actionItemsQueryOptions({incidentId}));
+export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
+  const createUrl = linearUrl ? buildLinearNewUrl(linearUrl) : null;
+  const queryClient = useQueryClient();
+  const syncMutation = useMutation(
+    syncActionItemsMutationOptions(queryClient, incidentId)
+  );
 
   return (
     <Card>
       <div className="mb-space-lg flex items-center justify-between">
         <h2 className="text-content-headings text-lg font-semibold">Action Items</h2>
-        <a
-          href={buildLinearNewUrl(incidentId, incidentTitle)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(buttonVariants({variant: 'icon'}))}
-          aria-label="Create Linear issue"
-        >
-          <Plus className="h-4 w-4" />
-        </a>
-      </div>
-      {actionItems.length === 0 ? (
-        <p className="text-content-secondary text-sm">No action items yet</p>
-      ) : (
-        <div className="gap-space-md flex flex-col">
-          {actionItems.map(item => (
-            <ActionItemCard key={item.linear_identifier} item={item} />
-          ))}
+        <div className="flex items-center gap-space-sm">
+          <button
+            type="button"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+            className={cn(buttonVariants({variant: 'icon'}))}
+            aria-label="Sync action items"
+          >
+            {syncMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </button>
+          {createUrl ? (
+            <a
+              href={createUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonVariants({variant: 'icon'}))}
+              aria-label="Create Linear issue"
+            >
+              <Plus className="h-4 w-4" />
+            </a>
+          ) : null}
         </div>
-      )}
+      </div>
+      {linearUrl ? <ActionItemsLinked incidentId={incidentId} /> : <ActionItemsEmpty />}
     </Card>
+  );
+}
+
+function ActionItemsEmpty() {
+  return (
+    <p className="text-content-secondary text-sm">
+      This incident has no linked Linear issue, try refreshing to generate a new Linear
+      issue. If the problem persists, come let us know in <GetHelpLink />.
+    </p>
+  );
+}
+
+function ActionItemsLinked({incidentId}: {incidentId: string}) {
+  const {data: actionItems} = useSuspenseQuery(actionItemsQueryOptions({incidentId}));
+
+  return actionItems.length === 0 ? (
+    <p className="text-content-secondary text-sm">No action items yet</p>
+  ) : (
+    <div className="gap-space-md flex flex-col">
+      {actionItems.map(item => (
+        <ActionItemCard key={item.linear_identifier} item={item} />
+      ))}
+    </div>
   );
 }
