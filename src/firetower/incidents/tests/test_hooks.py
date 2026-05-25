@@ -2734,7 +2734,7 @@ class TestScheduleStatuspageReminder:
 
         schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
         assert schedule.func == "firetower.incidents.tasks.send_statuspage_reminder"
-        assert schedule.kwargs == f"incident_id={incident.id}"
+        assert schedule.kwargs == f'{{"incident_id": {incident.id}}}'
         assert schedule.schedule_type == Schedule.ONCE
         assert schedule.repeats == 1
 
