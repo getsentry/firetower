@@ -91,6 +91,13 @@ STATUSPAGE_REMINDER_MESSAGE = (
     "Please run `{slash_command} statuspage` to create a Statuspage incident now."
 )
 
+STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE = (
+    ":rotating_light: *Statuspage Update Reminder* :rotating_light:\n"
+    "This is a *{severity}* incident. The next Statuspage update "
+    "is due in *{minutes_until_due} minutes*.\n\n"
+    "Please run `{slash_command} statuspage` to post a Statuspage update."
+)
+
 
 def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) -> None:
     tags = ["task:send_statuspage_reminder"]
@@ -164,3 +171,78 @@ def _send_statuspage_reminder(
         minutes_remaining=minutes_remaining,
     )
     slack.post_message(channel_id, message)
+
+
+def send_statuspage_followup_reminder(incident_id: int) -> None:
+    tags = ["task:send_statuspage_followup_reminder"]
+    statsd.increment("django_q.task.run", 1, tags)
+    try:
+        _send_statuspage_followup_reminder(incident_id)
+    except Exception as e:
+        statsd.increment("django_q.task.error", 1, tags)
+        logger.error(
+            f"Error in send_statuspage_followup_reminder for incident {incident_id}: {e}",
+            exc_info=True,
+        )
+        raise
+    else:
+        statsd.increment("django_q.task.success", 1, tags)
+
+
+def _send_statuspage_followup_reminder(incident_id: int) -> None:
+    try:
+        incident = Incident.objects.get(pk=incident_id)
+    except Incident.DoesNotExist:
+        logger.warning(
+            f"Incident {incident_id} not found for statuspage followup reminder"
+        )
+        return
+
+    if incident.severity not in STATUSPAGE_REMINDER_SEVERITIES:
+        return
+    if incident.status not in STATUSPAGE_REMINDER_STATUSES:
+        return
+
+    has_statuspage = incident.external_links.filter(
+        type=ExternalLinkType.STATUSPAGE
+    ).exists()
+    if not has_statuspage:
+        return
+
+    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    if not slack_link:
+        return
+
+    slack = SlackService()
+    channel_id = slack.parse_channel_id_from_url(slack_link.url)
+    if not channel_id:
+        return
+
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    followup_minutes = (
+        int(statuspage["FOLLOWUP_REMINDER_DELAY_MINUTES"])
+        if statuspage and statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES")
+        else None
+    )
+    if followup_minutes is None:
+        return
+
+    warning_buffer = (
+        int(statuspage["WARNING_BUFFER_MINUTES"])
+        if statuspage and statuspage.get("WARNING_BUFFER_MINUTES")
+        else 0
+    )
+
+    slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")
+    message = STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE.format(
+        severity=incident.severity,
+        slash_command=slash_command,
+        minutes_until_due=warning_buffer,
+    )
+    slack.post_message(channel_id, message)
+
+    from firetower.incidents.hooks import (  # noqa: PLC0415
+        schedule_statuspage_followup_reminder,
+    )
+
+    schedule_statuspage_followup_reminder(incident)

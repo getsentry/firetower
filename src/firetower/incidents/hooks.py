@@ -42,6 +42,13 @@ def _get_statuspage_initial_reminder_delay_minutes() -> int | None:
     return None
 
 
+def _get_statuspage_followup_reminder_delay_minutes() -> int | None:
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    if statuspage and statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES"):
+        return int(statuspage["FOLLOWUP_REMINDER_DELAY_MINUTES"])
+    return None
+
+
 def _get_statuspage_warning_buffer_minutes() -> int:
     statuspage = getattr(settings, "STATUSPAGE", None)
     if statuspage and statuspage.get("WARNING_BUFFER_MINUTES"):
@@ -1083,6 +1090,32 @@ def _schedule_statuspage_reminder(
         Schedule.objects.update_or_create(name=schedule_name, defaults=defaults)
     else:
         Schedule.objects.get_or_create(name=schedule_name, defaults=defaults)
+
+
+def schedule_statuspage_followup_reminder(incident: Incident) -> None:
+    if incident.severity not in PAGEABLE_SEVERITIES:
+        return
+    if incident.status not in PAGEABLE_STATUSES:
+        return
+
+    delay_minutes = _get_statuspage_followup_reminder_delay_minutes()
+    if delay_minutes is None:
+        return
+
+    schedule_name = f"statuspage_followup_reminder_{incident.id}"
+    Schedule.objects.update_or_create(
+        name=schedule_name,
+        defaults={
+            "func": "firetower.incidents.tasks.send_statuspage_followup_reminder",
+            "kwargs": f"incident_id={incident.id}",
+            "schedule_type": Schedule.ONCE,
+            "next_run": timezone.now()
+            + timedelta(
+                minutes=delay_minutes - _get_statuspage_warning_buffer_minutes()
+            ),
+            "repeats": 1,
+        },
+    )
 
 
 def on_incident_created(incident: Incident) -> None:

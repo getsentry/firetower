@@ -503,6 +503,18 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
             success_message,
         )
 
+    try:
+        from firetower.incidents.hooks import (  # noqa: PLC0415
+            schedule_statuspage_followup_reminder,
+        )
+
+        schedule_statuspage_followup_reminder(incident)
+    except Exception:
+        logger.exception(
+            "Failed to schedule statuspage followup reminder for incident %s",
+            incident.id,
+        )
+
     return True
 
 
