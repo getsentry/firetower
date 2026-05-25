@@ -7,7 +7,12 @@ from typing import Protocol
 from datadog import statsd
 from django_q.tasks import Schedule
 
-from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
+from firetower.incidents.models import (
+    ExternalLink,
+    ExternalLinkType,
+    Incident,
+    IncidentStatus,
+)
 from firetower.integrations.services.slack import SlackService
 
 SCHEDULES = {
@@ -88,9 +93,11 @@ def archive_stale_channels() -> None:
 
     own_bot_id = slack.bot_id
 
-    links = ExternalLink.objects.filter(type=ExternalLinkType.SLACK).select_related(
-        "incident"
-    )
+    terminal_statuses = [IncidentStatus.DONE, IncidentStatus.CANCELLED]
+    links = ExternalLink.objects.filter(
+        type=ExternalLinkType.SLACK,
+        incident__status__in=terminal_statuses,
+    ).select_related("incident")
 
     scanned = 0
     archived = 0
@@ -121,13 +128,24 @@ def archive_stale_channels() -> None:
                 skipped += 1
                 continue
 
-            messages = slack.get_channel_history(channel_id, limit=5)
+            messages = slack.get_channel_history(channel_id)
             non_own_messages = [
                 msg
                 for msg in messages
                 if msg.get("bot_id") != own_bot_id or not own_bot_id
             ]
             if non_own_messages:
+                skipped += 1
+                continue
+
+            has_thread_activity = False
+            for msg in messages:
+                if msg.get("reply_count", 0) > 0:
+                    replies = slack.get_thread_replies(channel_id, msg["ts"])
+                    if replies:
+                        has_thread_activity = True
+                        break
+            if has_thread_activity:
                 skipped += 1
                 continue
 

@@ -199,6 +199,7 @@ class TestArchiveStaleChannels:
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
             archive_stale_channels.__wrapped__()
 
+        mock_slack.get_channel_history.assert_called_once_with("C_EMPTY")
         mock_slack.post_message.assert_called_once_with("C_EMPTY", ARCHIVE_NOTICE)
         mock_slack.archive_channel.assert_called_once_with("C_EMPTY")
 
@@ -453,3 +454,143 @@ class TestArchiveStaleChannels:
             archive_stale_channels.__wrapped__()
 
         mock_slack.archive_channel.assert_not_called()
+
+    def test_skips_active_incident_channels(self):
+        active = self._make_incident(status=IncidentStatus.ACTIVE)
+        self._make_link(active, "C_ACTIVE_INC")
+        mitigated = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._make_link(mitigated, "C_MITIGATED_INC")
+        postmortem = self._make_incident(status=IncidentStatus.POSTMORTEM)
+        self._make_link(postmortem, "C_POSTMORTEM_INC")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.parse_channel_id_from_url.assert_not_called()
+        mock_slack.archive_channel.assert_not_called()
+
+    def test_includes_cancelled_incident_channels(self):
+        incident = self._make_incident(status=IncidentStatus.CANCELLED)
+        self._make_link(incident, "C_CANCELLED")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
+        mock_slack.parse_channel_id_from_url.return_value = "C_CANCELLED"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_CANCELLED",
+            "name": "inc-3000",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = []
+        mock_slack.get_thread_replies.return_value = []
+        mock_slack.archive_channel.return_value = True
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.archive_channel.assert_called_once_with("C_CANCELLED")
+
+    def test_fetches_full_history_not_limited(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_DEEPHISTORY")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
+        mock_slack.parse_channel_id_from_url.return_value = "C_DEEPHISTORY"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_DEEPHISTORY",
+            "name": "inc-4000",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = [
+            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot1", "ts": "5.0"},
+            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot2", "ts": "4.0"},
+            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot3", "ts": "3.0"},
+            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot4", "ts": "2.0"},
+            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot5", "ts": "1.5"},
+            {
+                "type": "message",
+                "user": "U_HUMAN",
+                "text": "old human msg",
+                "ts": "1.0",
+            },
+        ]
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.get_channel_history.assert_called_once_with("C_DEEPHISTORY")
+        mock_slack.archive_channel.assert_not_called()
+
+    def test_skips_channel_with_human_thread_replies(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_THREADS")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
+        mock_slack.parse_channel_id_from_url.return_value = "C_THREADS"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_THREADS",
+            "name": "inc-5000",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = [
+            {
+                "type": "message",
+                "bot_id": self.OWN_BOT_ID,
+                "text": "bot msg with thread",
+                "ts": "1.0",
+                "reply_count": 2,
+            }
+        ]
+        mock_slack.get_thread_replies.return_value = [
+            {"type": "message", "user": "U_HUMAN", "text": "reply", "ts": "1.1"}
+        ]
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.get_thread_replies.assert_called_once_with("C_THREADS", "1.0")
+        mock_slack.archive_channel.assert_not_called()
+
+    def test_archives_channel_with_bot_only_threads(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_BOTTHREADS")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
+        mock_slack.parse_channel_id_from_url.return_value = "C_BOTTHREADS"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_BOTTHREADS",
+            "name": "inc-5001",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = [
+            {
+                "type": "message",
+                "bot_id": self.OWN_BOT_ID,
+                "text": "bot msg",
+                "ts": "1.0",
+                "reply_count": 1,
+            }
+        ]
+        mock_slack.get_thread_replies.return_value = []
+        mock_slack.post_message.return_value = "2.0"
+        mock_slack.archive_channel.return_value = True
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.archive_channel.assert_called_once_with("C_BOTTHREADS")
