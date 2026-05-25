@@ -4,17 +4,26 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth.models import User
 from django.utils import timezone
+from rest_framework.test import APIClient
 
-from firetower.auth.models import ExternalProfile, ExternalProfileType
+from firetower.auth.models import ExternalProfile, ExternalProfileType, UserProfile
+from firetower.incidents.hooks import (
+    create_linear_parent_issue,
+    on_title_changed,
+    on_visibility_changed,
+)
 from firetower.incidents.models import (
     ActionItem,
     ActionItemRelationType,
     ActionItemStatus,
+    ExternalLink,
+    ExternalLinkType,
     Incident,
     IncidentSeverity,
     IncidentStatus,
 )
 from firetower.incidents.services import (
+    ActionItemsSyncStats,
     sync_action_items_from_linear,
 )
 from firetower.integrations.services.linear import LinearService
@@ -360,6 +369,40 @@ class TestSyncActionItemsFromLinear:
             )
             assert profile.external_id == "linear-user-456"
 
+    def test_backfill_creates_parent_and_syncs(self, settings):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        children = [
+            _make_linear_issue(id="id-1", identifier="ENG-1", title="Task 1"),
+        ]
+
+        def fake_create_parent(inc):
+            inc.linear_parent_issue_id = "backfilled-parent-id"
+            inc.save(update_fields=["linear_parent_issue_id"])
+
+        with (
+            patch(
+                "firetower.incidents.hooks.create_linear_parent_issue",
+                side_effect=fake_create_parent,
+            ) as mock_create_parent,
+            patch("firetower.incidents.services._get_linear_service") as mock_get,
+        ):
+            mock_get.return_value.get_child_issues.return_value = children
+            mock_get.return_value.get_related_issues.return_value = []
+            mock_get.return_value.get_workflow_states.return_value = None
+
+            stats = sync_action_items_from_linear(incident, force=True)
+
+            mock_create_parent.assert_called_once_with(incident)
+            assert stats.skipped is False
+            assert stats.created == 1
+            assert incident.action_items.count() == 1
+
     def test_auto_completes_parent_when_all_done(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
         incident = self._make_incident()
@@ -385,7 +428,7 @@ class TestSyncActionItemsFromLinear:
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_called_once_with(
+            mock_service.update_issue.assert_any_call(
                 "parent-issue-id", state_id="state-done"
             )
 
@@ -414,8 +457,71 @@ class TestSyncActionItemsFromLinear:
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_called_once_with(
+            mock_service.update_issue.assert_any_call(
                 "parent-issue-id", state_id="state-started"
+            )
+
+    def test_completes_parent_when_no_action_items(self, settings):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        incident = self._make_incident()
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_service = mock_get.return_value
+            mock_service.get_child_issues.return_value = []
+            mock_service.get_related_issues.return_value = []
+            mock_service.get_workflow_states.return_value = {
+                "completed": "state-done",
+                "backlog": "state-backlog",
+            }
+            mock_service.update_issue.return_value = True
+
+            sync_action_items_from_linear(incident, force=True)
+
+            mock_service.update_issue.assert_any_call(
+                "parent-issue-id", state_id="state-done"
+            )
+
+    def test_syncs_captain_as_parent_assignee(self, settings):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.LINEAR,
+            external_id="linear-captain-id",
+        )
+        incident = self._make_incident(captain=captain)
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_service = mock_get.return_value
+            mock_service.get_child_issues.return_value = []
+            mock_service.get_related_issues.return_value = []
+            mock_service.get_workflow_states.return_value = None
+            mock_service.update_issue.return_value = True
+
+            sync_action_items_from_linear(incident, force=True)
+
+            mock_service.update_issue.assert_any_call(
+                "parent-issue-id", assignee_id="linear-captain-id"
+            )
+
+    def test_unassigns_parent_when_no_captain(self, settings):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        incident = self._make_incident(captain=None)
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_service = mock_get.return_value
+            mock_service.get_child_issues.return_value = []
+            mock_service.get_related_issues.return_value = []
+            mock_service.get_workflow_states.return_value = None
+            mock_service.update_issue.return_value = True
+
+            sync_action_items_from_linear(incident, force=True)
+
+            mock_service.update_issue.assert_any_call(
+                "parent-issue-id", assignee_id=None
             )
 
 
@@ -757,3 +863,467 @@ class TestLinearService:
             states2 = service.get_workflow_states("team-1")
             assert states2 is states
             assert mock_gql.call_count == 1
+
+
+@pytest.mark.django_db
+class TestCreateLinearParentIssueHook:
+    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks.settings")
+    def test_claims_precreated_issue(self, mock_settings, MockLinearService):
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "",
+            "SYNC_IDENTIFIERS": True,
+        }
+        mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+
+        mock_service = MockLinearService.return_value
+        mock_service.get_issue.return_value = {
+            "id": "linear-issue-id",
+            "identifier": "INC-100",
+            "title": "Placeholder",
+            "url": "https://linear.app/t/INC-100",
+        }
+        mock_service.get_workflow_states.return_value = {"started": "started-id"}
+        mock_service.update_issue.return_value = True
+        mock_service.create_attachment.return_value = True
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        create_linear_parent_issue(incident)
+
+        incident.refresh_from_db()
+        assert incident.linear_parent_issue_id == "linear-issue-id"
+
+        linear_link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.LINEAR
+        )
+        assert linear_link.url == "https://linear.app/t/INC-100"
+
+        mock_service.create_issue.assert_not_called()
+        mock_service.update_issue.assert_called_once()
+        mock_service.create_attachment.assert_called_once_with(
+            "linear-issue-id",
+            f"https://firetower.example.com/{incident.incident_number}",
+            f"Firetower: {incident.incident_number}",
+        )
+
+    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks.settings")
+    def test_creates_placeholder_when_not_precreated(
+        self, mock_settings, MockLinearService
+    ):
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "",
+            "SYNC_IDENTIFIERS": True,
+        }
+        mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+
+        mock_service = MockLinearService.return_value
+        issue_data = {
+            "id": "linear-issue-id",
+            "identifier": "INC-100",
+            "title": "Placeholder",
+            "url": "https://linear.app/t/INC-100",
+        }
+        mock_service.get_issue.side_effect = [None, issue_data]
+        mock_service.create_issue.return_value = {
+            "id": "placeholder-id",
+            "identifier": "INC-99",
+            "url": "https://linear.app/t/INC-99",
+        }
+        mock_service.get_workflow_states.return_value = {"started": "started-id"}
+        mock_service.update_issue.return_value = True
+        mock_service.create_attachment.return_value = True
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        create_linear_parent_issue(incident)
+
+        incident.refresh_from_db()
+        assert incident.linear_parent_issue_id == "linear-issue-id"
+        mock_service.create_issue.assert_called_once_with(
+            "Placeholder", "", "team-1", None
+        )
+
+    @patch("firetower.incidents.hooks.settings")
+    def test_skips_when_no_team_id(self, mock_settings):
+        mock_settings.LINEAR = {"TEAM_ID": ""}
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        create_linear_parent_issue(incident)
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.LINEAR
+        ).exists()
+
+    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks.settings")
+    def test_cleans_up_on_claim_failure(self, mock_settings, MockLinearService):
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "",
+            "SYNC_IDENTIFIERS": True,
+        }
+        mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+
+        mock_service = MockLinearService.return_value
+        mock_service.get_issue.return_value = None
+        mock_service.create_issue.return_value = None
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        create_linear_parent_issue(incident)
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.LINEAR
+        ).exists()
+        assert incident.linear_parent_issue_id is None
+
+    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks.settings")
+    def test_skips_when_link_already_exists(self, mock_settings, MockLinearService):
+        mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="existing-id",
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.LINEAR,
+            url="https://linear.app/existing",
+        )
+
+        create_linear_parent_issue(incident)
+
+        MockLinearService.return_value.get_issue.assert_not_called()
+        MockLinearService.return_value.create_issue.assert_not_called()
+
+    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks.settings")
+    def test_creates_new_issue_when_sync_identifiers_disabled(
+        self, mock_settings, MockLinearService
+    ):
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "proj-1",
+            "SYNC_IDENTIFIERS": False,
+        }
+        mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+
+        mock_service = MockLinearService.return_value
+        mock_service.create_issue.return_value = {
+            "id": "new-issue-id",
+            "identifier": "ENG-200",
+            "url": "https://linear.app/t/ENG-200",
+        }
+        mock_service.create_attachment.return_value = True
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        create_linear_parent_issue(incident)
+
+        incident.refresh_from_db()
+        assert incident.linear_parent_issue_id == "new-issue-id"
+
+        linear_link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.LINEAR
+        )
+        assert linear_link.url == "https://linear.app/t/ENG-200"
+
+        mock_service.get_issue.assert_not_called()
+        mock_service.create_issue.assert_called_once()
+
+
+@pytest.mark.django_db
+class TestTitleChangeLinearSync:
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_updates_linear_title(self, MockLinearService):
+        mock_service = MockLinearService.return_value
+        mock_service.update_issue.return_value = True
+
+        incident = Incident.objects.create(
+            title="Updated Title",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="linear-issue-id",
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_title_changed(incident)
+
+        mock_service.update_issue.assert_called_once_with(
+            "linear-issue-id",
+            title=f"[{incident.incident_number}] Updated Title",
+        )
+
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_skips_when_no_parent_issue(self, MockLinearService):
+        incident = Incident.objects.create(
+            title="Test",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_title_changed(incident)
+
+        MockLinearService.return_value.update_issue.assert_not_called()
+
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_redacts_title_for_private_incident(self, MockLinearService):
+        mock_service = MockLinearService.return_value
+        mock_service.update_issue.return_value = True
+
+        incident = Incident.objects.create(
+            title="Secret Outage",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="linear-issue-id",
+            is_private=True,
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_title_changed(incident)
+
+        mock_service.update_issue.assert_called_once_with(
+            "linear-issue-id",
+            title=f"[{incident.incident_number}] Private Incident",
+        )
+
+
+@pytest.mark.django_db
+class TestCreateLinearParentIssuePrivacy:
+    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks.settings")
+    def test_creates_with_redacted_title_for_private_incident(
+        self, mock_settings, MockLinearService
+    ):
+        mock_settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "PROJECT_ID": "",
+            "SYNC_IDENTIFIERS": True,
+        }
+        mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+
+        mock_service = MockLinearService.return_value
+        mock_service.get_issue.return_value = {
+            "id": "linear-issue-id",
+            "identifier": "INC-100",
+            "title": "Placeholder",
+            "url": "https://linear.app/t/INC-100",
+        }
+        mock_service.get_workflow_states.return_value = {"started": "started-id"}
+        mock_service.update_issue.return_value = True
+        mock_service.create_attachment.return_value = True
+
+        incident = Incident.objects.create(
+            title="Secret Outage",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        create_linear_parent_issue(incident)
+
+        call_args = mock_service.update_issue.call_args
+        assert call_args[1]["title"] == "Private Incident"
+
+
+@pytest.mark.django_db
+class TestVisibilityChangeLinearSync:
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_redacts_title_when_made_private(self, MockLinearService):
+        mock_service = MockLinearService.return_value
+        mock_service.update_issue.return_value = True
+
+        incident = Incident.objects.create(
+            title="Visible Outage",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="linear-issue-id",
+            is_private=True,
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_visibility_changed(incident)
+
+        mock_service.update_issue.assert_called_once_with(
+            "linear-issue-id",
+            title=f"[{incident.incident_number}] Private Incident",
+        )
+
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_restores_title_when_made_public(self, MockLinearService):
+        mock_service = MockLinearService.return_value
+        mock_service.update_issue.return_value = True
+
+        incident = Incident.objects.create(
+            title="Now Public Outage",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="linear-issue-id",
+            is_private=False,
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_visibility_changed(incident)
+
+        mock_service.update_issue.assert_called_once_with(
+            "linear-issue-id",
+            title=f"[{incident.incident_number}] Now Public Outage",
+        )
+
+    @patch("firetower.incidents.hooks.LinearService")
+    def test_skips_when_no_parent_issue(self, MockLinearService):
+        incident = Incident.objects.create(
+            title="Test",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
+            on_visibility_changed(incident)
+
+        MockLinearService.return_value.update_issue.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestActionItemViews:
+    def setup_method(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test@example.com",
+            email="test@example.com",
+            password="testpass123",
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_list_action_items(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-1",
+            linear_identifier="ENG-1",
+            title="Task 1",
+            status=ActionItemStatus.TODO,
+            url="https://linear.app/t/ENG-1",
+        )
+
+        with patch("firetower.incidents.views.sync_action_items_from_linear"):
+            response = self.client.get(
+                f"/api/ui/incidents/{incident.incident_number}/action-items/"
+            )
+
+        assert response.status_code == 200
+        assert len(response.data) == 1
+        assert response.data[0]["linear_identifier"] == "ENG-1"
+        assert response.data[0]["title"] == "Task 1"
+        assert response.data[0]["relation_type"] == "child"
+
+    def test_list_action_items_includes_assignee_info(self):
+        user = User.objects.create_user(
+            username="dev@example.com",
+            email="dev@example.com",
+            first_name="Jane",
+            last_name="Dev",
+        )
+        UserProfile.objects.filter(user=user).update(
+            avatar_url="https://example.com/avatar.jpg"
+        )
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-1",
+            linear_identifier="ENG-1",
+            title="Task 1",
+            status=ActionItemStatus.TODO,
+            assignee=user,
+            url="https://linear.app/t/ENG-1",
+        )
+
+        with patch("firetower.incidents.views.sync_action_items_from_linear"):
+            response = self.client.get(
+                f"/api/ui/incidents/{incident.incident_number}/action-items/"
+            )
+
+        assert response.status_code == 200
+        assert response.data[0]["assignee_name"] == "Jane Dev"
+        assert (
+            response.data[0]["assignee_avatar_url"] == "https://example.com/avatar.jpg"
+        )
+
+    def test_force_sync_action_items(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        with patch(
+            "firetower.incidents.views.sync_action_items_from_linear"
+        ) as mock_sync:
+            mock_sync.return_value = ActionItemsSyncStats(created=1)
+
+            response = self.client.post(
+                f"/api/incidents/{incident.incident_number}/sync-action-items/"
+            )
+
+        assert response.status_code == 200
+        assert response.data["success"] is True
+        assert response.data["stats"]["created"] == 1
+        mock_sync.assert_called_once_with(incident, force=True)
+
+    def test_action_items_respects_privacy(self):
+        other_user = User.objects.create_user(
+            username="other@example.com",
+            email="other@example.com",
+        )
+        incident = Incident.objects.create(
+            title="Private Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=other_user,
+        )
+
+        response = self.client.get(
+            f"/api/ui/incidents/{incident.incident_number}/action-items/"
+        )
+
+        assert response.status_code == 404

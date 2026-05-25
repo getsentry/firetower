@@ -8,7 +8,9 @@ from firetower.incidents.hooks import (
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_users,
+    _linear_issue_title,
     _page_if_needed,
+    _resolve_linear_user_id,
     build_channel_name,
     build_channel_topic,
     on_captain_changed,
@@ -2587,3 +2589,113 @@ class TestOnIncidentCreatedTroubleshootingDoc:
         on_incident_created(incident)
 
         mock_create_ts.assert_called_once_with(incident, "C99999")
+
+
+@pytest.mark.django_db
+class TestLinearIssueTitle:
+    def test_public_incident_without_sync_identifiers(self):
+        incident = Incident.objects.create(
+            title="Database outage",
+            severity=IncidentSeverity.P1,
+        )
+
+        result = _linear_issue_title(incident, sync_identifiers=False)
+
+        assert result == f"[{incident.incident_number}] Database outage"
+
+    def test_public_incident_with_sync_identifiers(self):
+        incident = Incident.objects.create(
+            title="Database outage",
+            severity=IncidentSeverity.P1,
+        )
+
+        result = _linear_issue_title(incident, sync_identifiers=True)
+
+        assert result == "Database outage"
+
+    def test_private_incident_without_sync_identifiers(self):
+        incident = Incident.objects.create(
+            title="Secret outage",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        result = _linear_issue_title(incident, sync_identifiers=False)
+
+        assert result == f"[{incident.incident_number}] Private Incident"
+
+    def test_private_incident_with_sync_identifiers(self):
+        incident = Incident.objects.create(
+            title="Secret outage",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        result = _linear_issue_title(incident, sync_identifiers=True)
+
+        assert result == "Private Incident"
+
+
+@pytest.mark.django_db
+class TestResolveLinearUserId:
+    def test_returns_none_for_no_user(self):
+        mock_service = MagicMock()
+
+        result = _resolve_linear_user_id(None, mock_service)
+
+        assert result is None
+        mock_service.get_user_by_email.assert_not_called()
+
+    def test_returns_existing_external_profile(self):
+        user = User.objects.create_user(
+            username="dev@example.com",
+            email="dev@example.com",
+        )
+        ExternalProfile.objects.create(
+            user=user,
+            type=ExternalProfileType.LINEAR,
+            external_id="existing-linear-id",
+        )
+        mock_service = MagicMock()
+
+        result = _resolve_linear_user_id(user, mock_service)
+
+        assert result == "existing-linear-id"
+        mock_service.get_user_by_email.assert_not_called()
+
+    def test_falls_back_to_linear_api_and_creates_profile(self):
+        user = User.objects.create_user(
+            username="dev@example.com",
+            email="dev@example.com",
+        )
+        mock_service = MagicMock()
+        mock_service.get_user_by_email.return_value = {
+            "id": "api-linear-id",
+            "email": "dev@example.com",
+        }
+
+        result = _resolve_linear_user_id(user, mock_service)
+
+        assert result == "api-linear-id"
+        mock_service.get_user_by_email.assert_called_once_with("dev@example.com")
+        assert ExternalProfile.objects.filter(
+            user=user,
+            type=ExternalProfileType.LINEAR,
+            external_id="api-linear-id",
+        ).exists()
+
+    def test_returns_none_when_linear_api_returns_nothing(self):
+        user = User.objects.create_user(
+            username="dev@example.com",
+            email="dev@example.com",
+        )
+        mock_service = MagicMock()
+        mock_service.get_user_by_email.return_value = None
+
+        result = _resolve_linear_user_id(user, mock_service)
+
+        assert result is None
+        assert not ExternalProfile.objects.filter(
+            user=user,
+            type=ExternalProfileType.LINEAR,
+        ).exists()
