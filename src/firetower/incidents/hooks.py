@@ -33,6 +33,7 @@ PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 
 DEFAULT_STATUSPAGE_INITIAL_REMINDER_DELAY_MINUTES = 15
+DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
 
 
 def _get_statuspage_initial_reminder_delay_minutes() -> int:
@@ -40,6 +41,13 @@ def _get_statuspage_initial_reminder_delay_minutes() -> int:
     if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES"):
         return int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
     return DEFAULT_STATUSPAGE_INITIAL_REMINDER_DELAY_MINUTES
+
+
+def _get_statuspage_warning_buffer_minutes() -> int:
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    if statuspage and statuspage.get("WARNING_BUFFER_MINUTES"):
+        return int(statuspage["WARNING_BUFFER_MINUTES"])
+    return DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
 
 
 @dataclass
@@ -1059,7 +1067,10 @@ def _schedule_statuspage_reminder(incident: Incident) -> None:
             "kwargs": f"incident_id={incident.id}",
             "schedule_type": Schedule.ONCE,
             "next_run": timezone.now()
-            + timedelta(minutes=_get_statuspage_initial_reminder_delay_minutes()),
+            + timedelta(
+                minutes=_get_statuspage_initial_reminder_delay_minutes()
+                - _get_statuspage_warning_buffer_minutes()
+            ),
             "repeats": 1,
         },
     )

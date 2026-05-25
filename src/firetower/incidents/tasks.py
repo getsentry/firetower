@@ -83,7 +83,7 @@ STATUSPAGE_REMINDER_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 STATUSPAGE_REMINDER_MESSAGE = (
     ":rotating_light: *Statuspage Reminder* :rotating_light:\n"
     "This is a *{severity}* incident. The SLO for posting an initial "
-    "Statuspage update is *20 minutes* from declaration. No Statuspage "
+    "Statuspage update is *{slo_minutes} minutes* from declaration. No Statuspage "
     "update has been posted yet.\n\n"
     "Please run `{slash_command} statuspage` to create a Statuspage incident now."
 )
@@ -133,7 +133,15 @@ def _send_statuspage_reminder(incident_id: int) -> None:
         return
 
     slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    slo_minutes = (
+        int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
+        if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES")
+        else 15
+    )
     message = STATUSPAGE_REMINDER_MESSAGE.format(
-        severity=incident.severity, slash_command=slash_command
+        severity=incident.severity,
+        slash_command=slash_command,
+        slo_minutes=slo_minutes,
     )
     slack.post_message(channel_id, message)

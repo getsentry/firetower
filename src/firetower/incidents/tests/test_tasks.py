@@ -185,7 +185,9 @@ class TestSendStatuspageReminder:
             _send_statuspage_reminder(incident.id)
 
         expected_msg = STATUSPAGE_REMINDER_MESSAGE.format(
-            severity="P0", slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc")
+            severity="P0",
+            slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc"),
+            slo_minutes=15,
         )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 
@@ -200,7 +202,9 @@ class TestSendStatuspageReminder:
             _send_statuspage_reminder(incident.id)
 
         expected_msg = STATUSPAGE_REMINDER_MESSAGE.format(
-            severity="P1", slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc")
+            severity="P1",
+            slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc"),
+            slo_minutes=15,
         )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 

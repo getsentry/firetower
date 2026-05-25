@@ -250,6 +250,7 @@ class StatuspageSettings(TypedDict):
     PAGE_ID: str
     URL: str
     INITIAL_REMINDER_DELAY_MINUTES: int
+    WARNING_BUFFER_MINUTES: int
 
 
 STATUSPAGE: StatuspageSettings | None = (
@@ -258,6 +259,7 @@ STATUSPAGE: StatuspageSettings | None = (
         "PAGE_ID": config.statuspage.page_id,
         "URL": config.statuspage.url,
         "INITIAL_REMINDER_DELAY_MINUTES": config.statuspage.initial_reminder_delay_minutes,
+        "WARNING_BUFFER_MINUTES": config.statuspage.warning_buffer_minutes,
     }
     if config.statuspage
     else None
