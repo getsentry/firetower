@@ -109,17 +109,29 @@ def send_statuspage_reminder(incident_id: int) -> None:
 
 
 def _send_statuspage_reminder(incident_id: int) -> None:
+    # Only alert if we're configured to.
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    slo_minutes = (
+        int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
+        if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES")
+        else None
+    )
+    if slo_minutes is None:
+        return
+
     try:
         incident = Incident.objects.get(pk=incident_id)
     except Incident.DoesNotExist:
         logger.warning(f"Incident {incident_id} not found for statuspage reminder")
         return
 
+    # Only alert if the incident is at least a P0 or P1.
     if incident.severity not in STATUSPAGE_REMINDER_SEVERITIES:
         return
     if incident.status not in STATUSPAGE_REMINDER_STATUSES:
         return
 
+    # Don't alert if the incident has a Statuspage link, someone's already posted an initial status page.
     has_statuspage = incident.external_links.filter(
         type=ExternalLinkType.STATUSPAGE
     ).exists()
@@ -133,15 +145,6 @@ def _send_statuspage_reminder(incident_id: int) -> None:
     slack = SlackService()
     channel_id = slack.parse_channel_id_from_url(slack_link.url)
     if not channel_id:
-        return
-
-    statuspage = getattr(settings, "STATUSPAGE", None)
-    slo_minutes = (
-        int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
-        if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES")
-        else None
-    )
-    if slo_minutes is None:
         return
 
     slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")

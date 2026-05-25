@@ -2867,6 +2867,7 @@ class TestScheduleStatuspageReminder:
         ).exists()
 
 
+@pytest.mark.django_db
 class TestCreateLinearParentIssueBookmark:
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.LinearService")
