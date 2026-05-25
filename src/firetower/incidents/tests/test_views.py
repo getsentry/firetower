@@ -211,8 +211,8 @@ class TestIncidentViews:
 
         assert response.status_code == 404
 
-    def test_superuser_sees_all_private_incidents(self):
-        """Test superuser can see all incidents including private ones"""
+    def test_superuser_cannot_see_private_incidents(self):
+        """Test superuser cannot see private incidents they are not involved in"""
         superuser = User.objects.create_superuser(
             username="admin@example.com",
             email="admin@example.com",
@@ -236,8 +236,8 @@ class TestIncidentViews:
         response = self.client.get("/api/ui/incidents/")
 
         assert response.status_code == 200
-        assert response.data["count"] == 2
-        assert len(response.data["results"]) == 2
+        assert response.data["count"] == 1
+        assert len(response.data["results"]) == 1
 
     def test_retrieve_incident_syncs_participants(self):
         """Test that retrieving incident details syncs participants from Slack"""
