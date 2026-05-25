@@ -32,7 +32,14 @@ _slack_service = SlackService()
 PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 
-STATUSPAGE_REMINDER_DELAY_MINUTES = 15
+DEFAULT_STATUSPAGE_REMINDER_DELAY_MINUTES = 15
+
+
+def _get_statuspage_reminder_delay_minutes() -> int:
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    if statuspage and statuspage.get("REMINDER_DELAY_MINUTES"):
+        return int(statuspage["REMINDER_DELAY_MINUTES"])
+    return DEFAULT_STATUSPAGE_REMINDER_DELAY_MINUTES
 
 
 @dataclass
@@ -1052,7 +1059,7 @@ def _schedule_statuspage_reminder(incident: Incident) -> None:
             "kwargs": f"incident_id={incident.id}",
             "schedule_type": Schedule.ONCE,
             "next_run": timezone.now()
-            + timedelta(minutes=STATUSPAGE_REMINDER_DELAY_MINUTES),
+            + timedelta(minutes=_get_statuspage_reminder_delay_minutes()),
             "repeats": 1,
         },
     )

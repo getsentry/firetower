@@ -63,6 +63,7 @@ class StatuspageConfig:
     api_key: str
     page_id: str
     url: str
+    reminder_delay_minutes: int = 15
 
 
 @deserialize

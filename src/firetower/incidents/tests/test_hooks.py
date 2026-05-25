@@ -8,7 +8,7 @@ from django_q.models import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
-    STATUSPAGE_REMINDER_DELAY_MINUTES,
+    DEFAULT_STATUSPAGE_REMINDER_DELAY_MINUTES,
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_users,
@@ -2769,8 +2769,12 @@ class TestScheduleStatuspageReminder:
         after = timezone.now()
 
         schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
-        expected_min = before + timedelta(minutes=STATUSPAGE_REMINDER_DELAY_MINUTES)
-        expected_max = after + timedelta(minutes=STATUSPAGE_REMINDER_DELAY_MINUTES)
+        expected_min = before + timedelta(
+            minutes=DEFAULT_STATUSPAGE_REMINDER_DELAY_MINUTES
+        )
+        expected_max = after + timedelta(
+            minutes=DEFAULT_STATUSPAGE_REMINDER_DELAY_MINUTES
+        )
         assert expected_min <= schedule.next_run <= expected_max
 
     @patch("firetower.incidents.hooks._create_status_channel_for_context")
@@ -2840,6 +2844,7 @@ class TestScheduleStatuspageReminder:
         assert not Schedule.objects.filter(
             name=f"statuspage_reminder_{incident.id}"
         ).exists()
+
 
 class TestCreateLinearParentIssueBookmark:
     @patch("firetower.incidents.hooks._slack_service")

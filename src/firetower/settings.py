@@ -249,6 +249,7 @@ class StatuspageSettings(TypedDict):
     API_KEY: str
     PAGE_ID: str
     URL: str
+    REMINDER_DELAY_MINUTES: int
 
 
 STATUSPAGE: StatuspageSettings | None = (
@@ -256,6 +257,7 @@ STATUSPAGE: StatuspageSettings | None = (
         "API_KEY": config.statuspage.api_key,
         "PAGE_ID": config.statuspage.page_id,
         "URL": config.statuspage.url,
+        "REMINDER_DELAY_MINUTES": config.statuspage.reminder_delay_minutes,
     }
     if config.statuspage
     else None
