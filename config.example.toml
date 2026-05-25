@@ -61,4 +61,4 @@ troubleshooting_template_markdown = """
 api_key = ""
 page_id = ""
 url = "https://your-page.statuspage.io/"
-reminder_delay_minutes = 15
+initial_reminder_delay_minutes = 15

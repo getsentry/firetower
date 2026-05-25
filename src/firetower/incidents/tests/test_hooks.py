@@ -8,7 +8,7 @@ from django_q.models import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
-    DEFAULT_STATUSPAGE_REMINDER_DELAY_MINUTES,
+    DEFAULT_STATUSPAGE_INITIAL_REMINDER_DELAY_MINUTES,
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_users,
@@ -2770,10 +2770,10 @@ class TestScheduleStatuspageReminder:
 
         schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
         expected_min = before + timedelta(
-            minutes=DEFAULT_STATUSPAGE_REMINDER_DELAY_MINUTES
+            minutes=DEFAULT_STATUSPAGE_INITIAL_REMINDER_DELAY_MINUTES
         )
         expected_max = after + timedelta(
-            minutes=DEFAULT_STATUSPAGE_REMINDER_DELAY_MINUTES
+            minutes=DEFAULT_STATUSPAGE_INITIAL_REMINDER_DELAY_MINUTES
         )
         assert expected_min <= schedule.next_run <= expected_max
 
