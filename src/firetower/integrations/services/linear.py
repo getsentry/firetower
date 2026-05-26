@@ -133,6 +133,12 @@ class LinearService:
             response = self._make_graphql_request(query, variables, access_token)
 
             if response.status_code == 401:
+                if self.api_key:
+                    logger.error(
+                        "Linear API returned 401 with api_key — key is invalid or expired"
+                    )
+                    return None
+
                 logger.info("Linear token expired, requesting new token")
                 access_token = self._request_new_token()
                 if not access_token:

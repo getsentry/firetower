@@ -166,6 +166,26 @@ class TestGraphql:
             "query { viewer { id } }", None, "refreshed-token"
         )
 
+    def test_does_not_refresh_on_401_when_api_key_is_set(self, linear_service):
+        linear_service.api_key = "lin_api_test"
+        first_response = MagicMock()
+        first_response.status_code = 401
+        first_response.ok = False
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="lin_api_test"
+            ),
+            patch.object(linear_service, "_request_new_token") as mock_refresh,
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=first_response
+            ) as mock_request,
+        ):
+            assert linear_service._graphql("query { viewer { id } }") is None
+
+        mock_refresh.assert_not_called()
+        assert mock_request.call_count == 1
+
     def test_returns_none_when_401_and_refresh_fails(self, linear_service):
         first_response = MagicMock()
         first_response.status_code = 401
