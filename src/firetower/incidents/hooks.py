@@ -35,6 +35,7 @@ PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
 
 
+# A None return means reminders are disabled (not set in config).
 def _get_statuspage_initial_reminder_delay_minutes() -> int | None:
     statuspage = getattr(settings, "STATUSPAGE", None)
     if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES"):
