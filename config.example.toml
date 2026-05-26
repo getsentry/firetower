@@ -21,6 +21,7 @@ app_token = ""
 incident_feed_channel_id = ""
 always_invited_ids = []
 incident_guide_message = "This is the message posted whenever a new incident slack channel is created."
+slash_command = "/inc"
 
 [auth]
 iap_enabled = false
