@@ -83,6 +83,7 @@ function Incident() {
       <div className="flex flex-col gap-4 md:flex-row">
         <section className="flex flex-col gap-4 md:flex-[2]">
           <ErrorBoundary
+            resetKeys={[params.incidentId]}
             fallback={
               <Card>
                 <p className="text-content-secondary text-sm">

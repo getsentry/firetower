@@ -81,20 +81,22 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
     <Card>
       <div className="mb-space-lg flex items-center justify-between">
         <h2 className="text-content-headings text-lg font-semibold">Action Items</h2>
-        <div className="flex items-center gap-space-sm">
-          <button
-            type="button"
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-            className={cn(buttonVariants({variant: 'icon'}))}
-            aria-label="Sync action items"
-          >
-            {syncMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-          </button>
+        <div className="gap-space-sm flex items-center">
+          {linearUrl ? (
+            <button
+              type="button"
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              className={cn(buttonVariants({variant: 'icon'}))}
+              aria-label="Sync action items"
+            >
+              {syncMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </button>
+          ) : null}
           {linearUrl ? (
             <button
               type="button"
@@ -107,6 +109,11 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
           ) : null}
         </div>
       </div>
+      {syncMutation.isError ? (
+        <p className="text-content-danger mb-space-md text-sm">
+          Failed to sync action items. Please try again.
+        </p>
+      ) : null}
       {linearUrl ? <ActionItemsLinked incidentId={incidentId} /> : <ActionItemsEmpty />}
       {linearUrl ? (
         <ConfirmationDialog
@@ -127,14 +134,14 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
                 className="mt-space-xs space-y-space-xs text-sm"
                 style={{listStyle: 'none', paddingLeft: 0}}
               >
-                <li className="flex items-center gap-space-xs flex-wrap">
+                <li className="gap-space-xs flex flex-wrap items-center">
                   <PriorityIcon priority={1} /> <strong>Urgent</strong> /{' '}
                   <PriorityIcon priority={2} /> <strong>High (P1)</strong> — 2 week SLA
                 </li>
-                <li className="flex items-center gap-space-xs flex-wrap">
+                <li className="gap-space-xs flex flex-wrap items-center">
                   <PriorityIcon priority={3} /> <strong>Medium (P2)</strong> — 4 week SLA
                 </li>
-                <li className="flex items-center gap-space-xs flex-wrap">
+                <li className="gap-space-xs flex flex-wrap items-center">
                   <PriorityIcon priority={4} /> <strong>Low (P3)</strong> — no SLA, can be
                   put on backlog
                 </li>
