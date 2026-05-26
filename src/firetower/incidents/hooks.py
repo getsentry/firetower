@@ -38,16 +38,14 @@ DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
 # A None return means reminders are disabled (not set in config).
 def _get_statuspage_initial_reminder_delay_minutes() -> int | None:
     statuspage = getattr(settings, "STATUSPAGE", None)
-    if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES"):
-        return int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
-    return None
+    raw = statuspage.get("INITIAL_REMINDER_DELAY_MINUTES") if statuspage else None
+    return int(raw) if raw is not None else None
 
 
 def _get_statuspage_warning_buffer_minutes() -> int:
     statuspage = getattr(settings, "STATUSPAGE", None)
-    if statuspage and statuspage.get("WARNING_BUFFER_MINUTES"):
-        return int(statuspage["WARNING_BUFFER_MINUTES"])
-    return DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
+    raw = statuspage.get("WARNING_BUFFER_MINUTES") if statuspage else None
+    return int(raw) if raw is not None else DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
 
 
 @dataclass

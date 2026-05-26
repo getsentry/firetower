@@ -93,11 +93,8 @@ STATUSPAGE_REMINDER_MESSAGE = (
 @datadog_log
 def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) -> None:
     statuspage = getattr(settings, "STATUSPAGE", None)
-    slo_minutes = (
-        int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
-        if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES")
-        else None
-    )
+    raw = statuspage.get("INITIAL_REMINDER_DELAY_MINUTES") if statuspage else None
+    slo_minutes = int(raw) if raw is not None else None
     if slo_minutes is None:
         return
 
