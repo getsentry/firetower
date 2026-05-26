@@ -56,6 +56,28 @@ class TestNewIncidentModal:
         assert view["callback_id"] == "new_incident_modal"
         assert view["type"] == "modal"
 
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    def test_new_modal_has_minimal_blocks(self, mock_get_bolt_app):
+        """The /inc new modal should only require title + severity. Tag blocks
+        are deferred to /inc mitigated and /inc resolved."""
+        ack = MagicMock()
+        body = {"trigger_id": "T12345"}
+        command = {"text": "new"}
+        respond = MagicMock()
+
+        handle_new_command(ack, body, command, respond)
+
+        view = mock_get_bolt_app.return_value.client.views_open.call_args[1]["view"]
+        block_ids = [b["block_id"] for b in view["blocks"] if "block_id" in b]
+        assert set(block_ids) == {
+            "captain_block",
+            "severity_block",
+            "title_block",
+            "description_block",
+            "impact_summary_block",
+            "private_block",
+        }
+
 
 @pytest.mark.django_db
 class TestNewIncidentSubmission:

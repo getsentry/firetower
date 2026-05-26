@@ -109,51 +109,6 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
             },
             "label": {"type": "plain_text", "text": "Impact Summary"},
         },
-        {
-            "type": "input",
-            "block_id": "impact_type_block",
-            "optional": True,
-            "element": {
-                "type": "multi_external_select",
-                "action_id": "impact_type_tags",
-                "min_query_length": 0,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "Select impact types",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Impact Type"},
-        },
-        {
-            "type": "input",
-            "block_id": "affected_service_block",
-            "optional": True,
-            "element": {
-                "type": "multi_external_select",
-                "action_id": "affected_service_tags",
-                "min_query_length": 0,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "Select affected services",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Affected Service"},
-        },
-        {
-            "type": "input",
-            "block_id": "affected_region_block",
-            "optional": True,
-            "element": {
-                "type": "multi_external_select",
-                "action_id": "affected_region_tags",
-                "min_query_length": 0,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "Select affected regions",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Affected Region"},
-        },
     ]
 
 
