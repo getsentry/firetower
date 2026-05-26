@@ -9,10 +9,10 @@ from django.conf import settings
 from django.utils import timezone
 from django_q.tasks import Schedule
 
+from firetower.incidents.hooks import HIGH_SEVERITIES
 from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
-    IncidentSeverity,
     IncidentStatus,
 )
 from firetower.integrations.services.slack import SlackService
@@ -79,7 +79,6 @@ def schedule_demo() -> None:
         logger.info("No incidents found.")
 
 
-STATUSPAGE_REMINDER_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 STATUSPAGE_REMINDER_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 
 STATUSPAGE_REMINDER_MESSAGE = (
@@ -128,7 +127,7 @@ def _send_statuspage_reminder(
         return
 
     # Only alert if the incident is at least a P0 or P1.
-    if incident.severity not in STATUSPAGE_REMINDER_SEVERITIES:
+    if incident.severity not in HIGH_SEVERITIES:
         return
     if incident.status not in STATUSPAGE_REMINDER_STATUSES:
         return
