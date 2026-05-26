@@ -79,21 +79,19 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
       <div className="mb-space-lg flex items-center justify-between">
         <h2 className="text-content-headings text-lg font-semibold">Action Items</h2>
         <div className="gap-space-sm flex items-center">
-          {linearUrl ? (
-            <button
-              type="button"
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-              className={cn(buttonVariants({variant: 'icon'}))}
-              aria-label="Sync action items"
-            >
-              {syncMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+            className={cn(buttonVariants({variant: 'icon'}))}
+            aria-label="Sync action items"
+          >
+            {syncMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </button>
           {linearUrl ? (
             <button
               type="button"
@@ -112,7 +110,10 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
         </p>
       ) : null}
       {linearUrl ? (
-        <ErrorBoundary fallback={<ActionItemsError />} resetKeys={[incidentId]}>
+        <ErrorBoundary
+          fallback={<ActionItemsError />}
+          resetKeys={[incidentId, syncMutation.submittedAt]}
+        >
           <Suspense fallback={<ActionItemsBodySkeleton />}>
             <ActionItemsLinked incidentId={incidentId} />
           </Suspense>
