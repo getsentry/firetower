@@ -25,6 +25,15 @@ from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
+_linear_service: LinearService | None = None
+
+
+def _get_linear_service() -> LinearService:
+    global _linear_service  # noqa: PLW0603
+    if _linear_service is None:
+        _linear_service = LinearService()
+    return _linear_service
+
 
 PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
@@ -895,7 +904,7 @@ def _sync_linear_title(incident: Incident) -> None:
         return
     sync_identifiers = settings.LINEAR.get("SYNC_IDENTIFIERS", False)
     try:
-        linear_service = LinearService()
+        linear_service = _get_linear_service()
         linear_service.update_issue(
             incident.linear_parent_issue_id,
             title=_linear_issue_title(incident, sync_identifiers=sync_identifiers),
@@ -959,7 +968,7 @@ def create_linear_parent_issue(
         return
 
     try:
-        linear_service = LinearService()
+        linear_service = _get_linear_service()
         project_id = str(linear_config.get("PROJECT_ID", "")) or None
         sync_identifiers = linear_config.get("SYNC_IDENTIFIERS", False)
         title = _linear_issue_title(incident, sync_identifiers=sync_identifiers)

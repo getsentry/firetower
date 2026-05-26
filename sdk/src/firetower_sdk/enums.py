@@ -6,7 +6,7 @@ class IncidentStatus(StrEnum):
     MITIGATED = "Mitigated"
     POSTMORTEM = "Postmortem"
     DONE = "Done"
-    CANCELLED = "Cancelled"
+    CANCELED = "Canceled"
 
 
 class IncidentSeverity(StrEnum):

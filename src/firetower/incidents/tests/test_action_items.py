@@ -38,6 +38,7 @@ def _make_linear_issue(
     relation_type="child",
     assignee_email=None,
     assignee_linear_id=None,
+    priority=0,
 ):
     return {
         "id": id,
@@ -48,6 +49,7 @@ def _make_linear_issue(
         "relation_type": relation_type,
         "assignee_email": assignee_email,
         "assignee_linear_id": assignee_linear_id,
+        "priority": priority,
     }
 
 
@@ -412,7 +414,7 @@ class TestSyncActionItemsFromLinear:
                 id="id-1", identifier="ENG-1", title="T1", status="Done"
             ),
             _make_linear_issue(
-                id="id-2", identifier="ENG-2", title="T2", status="Cancelled"
+                id="id-2", identifier="ENG-2", title="T2", status="Canceled"
             ),
         ]
 
@@ -849,7 +851,7 @@ class TestLinearService:
                         {"id": "s2", "name": "Todo", "type": "unstarted"},
                         {"id": "s3", "name": "In Progress", "type": "started"},
                         {"id": "s4", "name": "Done", "type": "completed"},
-                        {"id": "s5", "name": "Cancelled", "type": "cancelled"},
+                        {"id": "s5", "name": "Canceled", "type": "canceled"},
                     ]
                 }
             }
@@ -867,9 +869,9 @@ class TestLinearService:
 
 @pytest.mark.django_db
 class TestCreateLinearParentIssueHook:
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     @patch("firetower.incidents.hooks.settings")
-    def test_claims_precreated_issue(self, mock_settings, MockLinearService):
+    def test_claims_precreated_issue(self, mock_settings, mock_get_linear):
         mock_settings.LINEAR = {
             "TEAM_ID": "team-1",
             "PROJECT_ID": "",
@@ -877,7 +879,7 @@ class TestCreateLinearParentIssueHook:
         }
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
-        mock_service = MockLinearService.return_value
+        mock_service = mock_get_linear.return_value
         mock_service.get_issue.return_value = {
             "id": "linear-issue-id",
             "identifier": "INC-100",
@@ -912,10 +914,10 @@ class TestCreateLinearParentIssueHook:
             f"Firetower: {incident.incident_number}",
         )
 
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     @patch("firetower.incidents.hooks.settings")
     def test_creates_placeholder_when_not_precreated(
-        self, mock_settings, MockLinearService
+        self, mock_settings, mock_get_linear
     ):
         mock_settings.LINEAR = {
             "TEAM_ID": "team-1",
@@ -924,7 +926,7 @@ class TestCreateLinearParentIssueHook:
         }
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
-        mock_service = MockLinearService.return_value
+        mock_service = mock_get_linear.return_value
         issue_data = {
             "id": "linear-issue-id",
             "identifier": "INC-100",
@@ -971,9 +973,9 @@ class TestCreateLinearParentIssueHook:
             incident=incident, type=ExternalLinkType.LINEAR
         ).exists()
 
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     @patch("firetower.incidents.hooks.settings")
-    def test_cleans_up_on_claim_failure(self, mock_settings, MockLinearService):
+    def test_cleans_up_on_claim_failure(self, mock_settings, mock_get_linear):
         mock_settings.LINEAR = {
             "TEAM_ID": "team-1",
             "PROJECT_ID": "",
@@ -981,7 +983,7 @@ class TestCreateLinearParentIssueHook:
         }
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
-        mock_service = MockLinearService.return_value
+        mock_service = mock_get_linear.return_value
         mock_service.get_issue.return_value = None
         mock_service.create_issue.return_value = None
 
@@ -998,9 +1000,9 @@ class TestCreateLinearParentIssueHook:
         ).exists()
         assert incident.linear_parent_issue_id is None
 
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     @patch("firetower.incidents.hooks.settings")
-    def test_skips_when_link_already_exists(self, mock_settings, MockLinearService):
+    def test_skips_when_link_already_exists(self, mock_settings, mock_get_linear):
         mock_settings.LINEAR = {"TEAM_ID": "team-1", "PROJECT_ID": ""}
 
         incident = Incident.objects.create(
@@ -1017,13 +1019,13 @@ class TestCreateLinearParentIssueHook:
 
         create_linear_parent_issue(incident)
 
-        MockLinearService.return_value.get_issue.assert_not_called()
-        MockLinearService.return_value.create_issue.assert_not_called()
+        mock_get_linear.return_value.get_issue.assert_not_called()
+        mock_get_linear.return_value.create_issue.assert_not_called()
 
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     @patch("firetower.incidents.hooks.settings")
     def test_creates_new_issue_when_sync_identifiers_disabled(
-        self, mock_settings, MockLinearService
+        self, mock_settings, mock_get_linear
     ):
         mock_settings.LINEAR = {
             "TEAM_ID": "team-1",
@@ -1032,7 +1034,7 @@ class TestCreateLinearParentIssueHook:
         }
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
-        mock_service = MockLinearService.return_value
+        mock_service = mock_get_linear.return_value
         mock_service.create_issue.return_value = {
             "id": "new-issue-id",
             "identifier": "ENG-200",
@@ -1062,9 +1064,10 @@ class TestCreateLinearParentIssueHook:
 
 @pytest.mark.django_db
 class TestTitleChangeLinearSync:
-    @patch("firetower.incidents.hooks.LinearService")
-    def test_updates_linear_title(self, MockLinearService):
-        mock_service = MockLinearService.return_value
+    @patch("firetower.incidents.hooks._get_linear_service")
+    def test_updates_linear_title(self, mock_get_linear, settings):
+        settings.LINEAR = {"SYNC_IDENTIFIERS": False}
+        mock_service = mock_get_linear.return_value
         mock_service.update_issue.return_value = True
 
         incident = Incident.objects.create(
@@ -1082,8 +1085,9 @@ class TestTitleChangeLinearSync:
             title=f"[{incident.incident_number}] Updated Title",
         )
 
-    @patch("firetower.incidents.hooks.LinearService")
-    def test_skips_when_no_parent_issue(self, MockLinearService):
+    @patch("firetower.incidents.hooks._get_linear_service")
+    def test_skips_when_no_parent_issue(self, mock_get_linear, settings):
+        settings.LINEAR = {"SYNC_IDENTIFIERS": False}
         incident = Incident.objects.create(
             title="Test",
             status=IncidentStatus.ACTIVE,
@@ -1093,11 +1097,12 @@ class TestTitleChangeLinearSync:
         with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
             on_title_changed(incident)
 
-        MockLinearService.return_value.update_issue.assert_not_called()
+        mock_get_linear.return_value.update_issue.assert_not_called()
 
-    @patch("firetower.incidents.hooks.LinearService")
-    def test_redacts_title_for_private_incident(self, MockLinearService):
-        mock_service = MockLinearService.return_value
+    @patch("firetower.incidents.hooks._get_linear_service")
+    def test_redacts_title_for_private_incident(self, mock_get_linear, settings):
+        settings.LINEAR = {"SYNC_IDENTIFIERS": False}
+        mock_service = mock_get_linear.return_value
         mock_service.update_issue.return_value = True
 
         incident = Incident.objects.create(
@@ -1119,10 +1124,10 @@ class TestTitleChangeLinearSync:
 
 @pytest.mark.django_db
 class TestCreateLinearParentIssuePrivacy:
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     @patch("firetower.incidents.hooks.settings")
     def test_creates_with_redacted_title_for_private_incident(
-        self, mock_settings, MockLinearService
+        self, mock_settings, mock_get_linear
     ):
         mock_settings.LINEAR = {
             "TEAM_ID": "team-1",
@@ -1131,7 +1136,7 @@ class TestCreateLinearParentIssuePrivacy:
         }
         mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
 
-        mock_service = MockLinearService.return_value
+        mock_service = mock_get_linear.return_value
         mock_service.get_issue.return_value = {
             "id": "linear-issue-id",
             "identifier": "INC-100",
@@ -1157,9 +1162,10 @@ class TestCreateLinearParentIssuePrivacy:
 
 @pytest.mark.django_db
 class TestVisibilityChangeLinearSync:
-    @patch("firetower.incidents.hooks.LinearService")
-    def test_redacts_title_when_made_private(self, MockLinearService):
-        mock_service = MockLinearService.return_value
+    @patch("firetower.incidents.hooks._get_linear_service")
+    def test_redacts_title_when_made_private(self, mock_get_linear, settings):
+        settings.LINEAR = {"SYNC_IDENTIFIERS": False}
+        mock_service = mock_get_linear.return_value
         mock_service.update_issue.return_value = True
 
         incident = Incident.objects.create(
@@ -1178,9 +1184,10 @@ class TestVisibilityChangeLinearSync:
             title=f"[{incident.incident_number}] Private Incident",
         )
 
-    @patch("firetower.incidents.hooks.LinearService")
-    def test_restores_title_when_made_public(self, MockLinearService):
-        mock_service = MockLinearService.return_value
+    @patch("firetower.incidents.hooks._get_linear_service")
+    def test_restores_title_when_made_public(self, mock_get_linear, settings):
+        settings.LINEAR = {"SYNC_IDENTIFIERS": False}
+        mock_service = mock_get_linear.return_value
         mock_service.update_issue.return_value = True
 
         incident = Incident.objects.create(
@@ -1199,8 +1206,9 @@ class TestVisibilityChangeLinearSync:
             title=f"[{incident.incident_number}] Now Public Outage",
         )
 
-    @patch("firetower.incidents.hooks.LinearService")
-    def test_skips_when_no_parent_issue(self, MockLinearService):
+    @patch("firetower.incidents.hooks._get_linear_service")
+    def test_skips_when_no_parent_issue(self, mock_get_linear, settings):
+        settings.LINEAR = {"SYNC_IDENTIFIERS": False}
         incident = Incident.objects.create(
             title="Test",
             status=IncidentStatus.ACTIVE,
@@ -1211,7 +1219,7 @@ class TestVisibilityChangeLinearSync:
         with patch("firetower.incidents.hooks._get_channel_id", return_value=None):
             on_visibility_changed(incident)
 
-        MockLinearService.return_value.update_issue.assert_not_called()
+        mock_get_linear.return_value.update_issue.assert_not_called()
 
 
 @pytest.mark.django_db

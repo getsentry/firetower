@@ -182,7 +182,7 @@ def _resolve_assignees(
     return resolved
 
 
-COMPLETED_STATUSES = {ActionItemStatus.DONE, ActionItemStatus.CANCELLED}
+COMPLETED_STATUSES = {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
 
 
 def _update_parent_issue_status(
@@ -287,6 +287,7 @@ def sync_action_items_from_linear(
         "linear_identifier",
         "title",
         "status",
+        "priority",
         "relation_type",
         "assignee",
         "url",
@@ -302,6 +303,7 @@ def sync_action_items_from_linear(
             ai.linear_identifier = issue["identifier"]
             ai.title = issue["title"]
             ai.status = issue["status"]
+            ai.priority = issue["priority"]
             ai.relation_type = issue["relation_type"]
             ai.assignee = assignee
             ai.url = issue["url"]
@@ -315,6 +317,7 @@ def sync_action_items_from_linear(
                     linear_identifier=issue["identifier"],
                     title=issue["title"],
                     status=issue["status"],
+                    priority=issue["priority"],
                     relation_type=issue["relation_type"],
                     assignee=assignee,
                     url=issue["url"],

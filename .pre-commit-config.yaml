@@ -71,7 +71,7 @@ repos:
         name: eslint
         language: system
         files: \.(ts|js|tsx|jsx|mjs)$
-        entry: bash -c 'cd frontend && pnpm run eslint --quiet --fix'
+        entry: bash -c 'cd frontend && pnpm run lint:fix --quiet'
 
       - id: prettier
         name: prettier
