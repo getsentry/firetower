@@ -317,7 +317,7 @@ def sync_action_items_from_linear(
                     linear_identifier=issue["identifier"],
                     title=issue["title"],
                     status=issue["status"],
-                    priority=issue["priority"],  # type: ignore[misc]
+                    priority=issue["priority"],
                     relation_type=issue["relation_type"],
                     assignee=assignee,
                     url=issue["url"],
