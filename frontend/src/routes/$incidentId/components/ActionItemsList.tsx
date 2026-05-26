@@ -1,10 +1,10 @@
 import {Suspense, useState} from 'react';
 import {useMutation, useQueryClient, useSuspenseQuery} from '@tanstack/react-query';
+import {CatchBoundary} from '@tanstack/react-router';
 import {Avatar} from 'components/Avatar';
 import {buttonVariants} from 'components/Button';
 import {Card} from 'components/Card';
 import {ConfirmationDialog} from 'components/ConfirmationDialog';
-import {ErrorBoundary} from 'components/ErrorBoundary';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {Pill} from 'components/Pill';
 import {Skeleton} from 'components/Skeleton';
@@ -110,14 +110,14 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
         </p>
       ) : null}
       {linearUrl ? (
-        <ErrorBoundary
-          fallback={<ActionItemsError />}
-          resetKeys={[incidentId, syncMutation.submittedAt]}
+        <CatchBoundary
+          getResetKey={() => `${incidentId}:${syncMutation.submittedAt}`}
+          errorComponent={ActionItemsError}
         >
           <Suspense fallback={<ActionItemsBodySkeleton />}>
             <ActionItemsLinked incidentId={incidentId} />
           </Suspense>
-        </ErrorBoundary>
+        </CatchBoundary>
       ) : (
         <ActionItemsEmpty />
       )}
