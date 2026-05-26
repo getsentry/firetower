@@ -1,11 +1,13 @@
-import {useState} from 'react';
+import {Suspense, useState} from 'react';
 import {useMutation, useQueryClient, useSuspenseQuery} from '@tanstack/react-query';
 import {Avatar} from 'components/Avatar';
 import {buttonVariants} from 'components/Button';
 import {Card} from 'components/Card';
 import {ConfirmationDialog} from 'components/ConfirmationDialog';
+import {ErrorBoundary} from 'components/ErrorBoundary';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {Pill} from 'components/Pill';
+import {Skeleton} from 'components/Skeleton';
 import {Loader2, Plus, RefreshCw} from 'lucide-react';
 import {cn} from 'utils/cn';
 
@@ -15,19 +17,14 @@ import {syncActionItemsMutationOptions} from '../queries/syncActionItemsMutation
 
 import {PriorityIcon} from './PriorityIcon';
 
-const STATUS_CONFIG: Record<
-  ActionItemStatus,
-  {pillVariant: 'Done' | 'Mitigated' | 'Canceled'; borderClass: string}
-> = {
-  Done: {pillVariant: 'Done', borderClass: 'border-success-vibrant'},
-  'In Progress': {pillVariant: 'Mitigated', borderClass: 'border-warning-vibrant'},
-  Todo: {pillVariant: 'Canceled', borderClass: 'border-neutral-muted'},
-  Canceled: {pillVariant: 'Canceled', borderClass: 'border-neutral-muted'},
+const BORDER_CLASS: Record<ActionItemStatus, string> = {
+  Done: 'border-success-vibrant',
+  'In Progress': 'border-warning-vibrant',
+  Todo: 'border-neutral-muted',
+  Canceled: 'border-neutral-muted',
 };
 
 function ActionItemCard({item}: {item: ActionItem}) {
-  const config = STATUS_CONFIG[item.status];
-
   return (
     <a
       href={item.url}
@@ -36,7 +33,7 @@ function ActionItemCard({item}: {item: ActionItem}) {
       className={cn(
         'flex items-center gap-space-lg rounded-radius-md border-l-4 p-space-lg no-underline transition-all duration-200',
         'hover:-translate-y-0.5 hover:shadow-md',
-        config.borderClass
+        BORDER_CLASS[item.status]
       )}
     >
       <div className="min-w-0 flex-1">
@@ -60,7 +57,7 @@ function ActionItemCard({item}: {item: ActionItem}) {
         </div>
       </div>
       <PriorityIcon priority={item.priority} />
-      <Pill variant={config.pillVariant}>{item.status}</Pill>
+      <Pill variant={item.status}>{item.status}</Pill>
     </a>
   );
 }
@@ -114,7 +111,15 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
           Failed to sync action items. Please try again.
         </p>
       ) : null}
-      {linearUrl ? <ActionItemsLinked incidentId={incidentId} /> : <ActionItemsEmpty />}
+      {linearUrl ? (
+        <ErrorBoundary fallback={<ActionItemsError />} resetKeys={[incidentId]}>
+          <Suspense fallback={<ActionItemsBodySkeleton />}>
+            <ActionItemsLinked incidentId={incidentId} />
+          </Suspense>
+        </ErrorBoundary>
+      ) : (
+        <ActionItemsEmpty />
+      )}
       {linearUrl ? (
         <ConfirmationDialog
           isOpen={showCreateDialog}
@@ -169,11 +174,29 @@ function ActionItemsEmpty() {
   );
 }
 
+function ActionItemsError() {
+  return (
+    <p className="text-content-secondary text-center text-sm">
+      Failed to load action items. Try refreshing, or come let us know in <GetHelpLink />.
+    </p>
+  );
+}
+
+function ActionItemsBodySkeleton() {
+  return (
+    <div className="gap-space-md flex flex-col">
+      <Skeleton className="rounded-radius-md h-16 w-full" />
+      <Skeleton className="rounded-radius-md h-16 w-full" />
+      <Skeleton className="rounded-radius-md h-16 w-full" />
+    </div>
+  );
+}
+
 function ActionItemsLinked({incidentId}: {incidentId: string}) {
   const {data: actionItems} = useSuspenseQuery(actionItemsQueryOptions({incidentId}));
 
   return actionItems.length === 0 ? (
-    <p className="text-content-secondary text-center text-sm">No action items yet</p>
+    <p className="text-content-secondary text-center text-sm">Nothing here yet</p>
   ) : (
     <div className="gap-space-md flex flex-col">
       {actionItems.map(item => (

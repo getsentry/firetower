@@ -1,11 +1,8 @@
-import {Suspense, useEffect} from 'react';
+import {useEffect} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
-import {Card} from 'components/Card';
-import {ErrorBoundary} from 'components/ErrorBoundary';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
-import {Skeleton} from 'components/Skeleton';
 
 import {ActionItemsList} from './components/ActionItemsList';
 import {IncidentDetailSkeleton} from './components/IncidentDetailSkeleton';
@@ -38,22 +35,6 @@ export const Route = createFileRoute('/$incidentId/')({
   ),
 });
 
-function ActionItemsSkeleton() {
-  return (
-    <Card>
-      <div className="mb-space-lg flex items-center justify-between">
-        <Skeleton className="h-7 w-32" />
-        <Skeleton className="h-8 w-8 rounded-full" />
-      </div>
-      <div className="gap-space-md flex flex-col">
-        <Skeleton className="rounded-radius-md h-16 w-full" />
-        <Skeleton className="rounded-radius-md h-16 w-full" />
-        <Skeleton className="rounded-radius-md h-16 w-full" />
-      </div>
-    </Card>
-  );
-}
-
 function Incident() {
   const params = Route.useParams();
   const {data: inc_or_redir} = useSuspenseQuery(incidentDetailQueryOptions(params));
@@ -81,27 +62,14 @@ function Incident() {
       <IncidentSummary incident={incident} />
 
       <div className="flex flex-col gap-4 md:flex-row">
-        <section className="flex flex-col gap-4 md:flex-[2]">
-          <ErrorBoundary
-            resetKeys={[params.incidentId]}
-            fallback={
-              <Card>
-                <p className="text-content-secondary text-sm">
-                  Failed to load action items. Try refreshing the page.
-                </p>
-              </Card>
-            }
-          >
-            <Suspense fallback={<ActionItemsSkeleton />}>
-              <ActionItemsList
-                incidentId={params.incidentId}
-                linearUrl={incident.external_links.linear}
-              />
-            </Suspense>
-          </ErrorBoundary>
+        <section className="order-2 flex flex-col gap-4 md:order-1 md:flex-[2]">
+          <ActionItemsList
+            incidentId={params.incidentId}
+            linearUrl={incident.external_links.linear}
+          />
         </section>
 
-        <aside className="flex flex-col gap-4 md:flex-1">
+        <aside className="order-1 flex flex-col gap-4 md:order-2 md:flex-1">
           {incident.external_links.slack && (
             <SlackLink
               slackUrl={incident.external_links.slack}

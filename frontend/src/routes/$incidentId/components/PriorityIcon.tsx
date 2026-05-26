@@ -1,30 +1,24 @@
 import {Tooltip, TooltipContent, TooltipTrigger} from 'components/Tooltip';
 
-const PRIORITY_CONFIG: Record<
-  number,
-  {bars?: number; urgent?: boolean; label: string; className: string}
-> = {
-  1: {
-    urgent: true,
-    label: 'Urgent (P1): interrupts normal work. SLA: 2 weeks.',
-    className: 'text-content-secondary',
-  },
-  2: {
-    bars: 3,
-    label: 'High (P1): interrupts normal work. SLA: 2 weeks.',
-    className: 'text-content-secondary',
-  },
-  3: {
-    bars: 2,
-    label: 'Medium (P2): scheduled ASAP. SLA: 4 weeks.',
-    className: 'text-content-secondary',
-  },
-  4: {
-    bars: 1,
-    label: 'Low (P3): can be placed on the backlog.',
-    className: 'text-content-secondary',
-  },
-};
+const PRIORITY_CONFIG: Record<number, {bars?: number; urgent?: boolean; label: string}> =
+  {
+    1: {
+      urgent: true,
+      label: 'Urgent (P1): interrupts normal work. SLA: 2 weeks.',
+    },
+    2: {
+      bars: 3,
+      label: 'High (P1): interrupts normal work. SLA: 2 weeks.',
+    },
+    3: {
+      bars: 2,
+      label: 'Medium (P2): scheduled ASAP. SLA: 4 weeks.',
+    },
+    4: {
+      bars: 1,
+      label: 'Low (P3): can be placed on the backlog.',
+    },
+  };
 
 const BAR_POSITIONS = [
   {x: 1, height: 4, y: 9},
@@ -41,7 +35,7 @@ export function PriorityIcon({priority}: {priority: number}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span tabIndex={0} className={config.className}>
+        <span className="text-content-secondary">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             {config.urgent ? (
               <>

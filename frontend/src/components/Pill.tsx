@@ -25,6 +25,12 @@ const pill = cva(
         Postmortem: ['bg-background-transparent-accent-muted', 'text-content-accent'],
         Done: ['bg-background-transparent-success-muted', 'text-content-success'],
         Canceled: ['bg-background-transparent-neutral-muted', 'text-content-secondary'],
+        // Action item status variants
+        Todo: ['bg-background-transparent-neutral-muted', 'text-content-secondary'],
+        'In Progress': [
+          'bg-background-transparent-warning-muted',
+          'text-content-warning',
+        ],
         // Severity variants
         P0: ['bg-background-danger-vibrant', 'text-content-on-vibrant-light'],
         P1: ['bg-background-transparent-danger-muted', 'text-content-danger'],
