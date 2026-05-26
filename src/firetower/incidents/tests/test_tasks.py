@@ -292,9 +292,9 @@ class TestSendStatuspageReminder:
 
         mock_slack.post_message.assert_not_called()
 
-    def test_skips_for_cancelled_status(self):
+    def test_skips_for_canceled_status(self):
         incident = self._make_incident(
-            severity=IncidentSeverity.P0, status=IncidentStatus.CANCELLED
+            severity=IncidentSeverity.P0, status=IncidentStatus.CANCELED
         )
         self._make_link(incident, ExternalLinkType.SLACK)
 
