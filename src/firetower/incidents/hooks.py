@@ -29,7 +29,7 @@ from firetower.integrations.services.slack import escape_slack_text
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
 
-PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
+HIGH_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 
 DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
@@ -101,7 +101,7 @@ def page_for_channel(
     """
     paged: set[str] = set()
 
-    if severity not in PAGEABLE_SEVERITIES:
+    if severity not in HIGH_SEVERITIES:
         return paged
 
     pd_config = settings.PAGERDUTY
@@ -274,7 +274,7 @@ def _invite_oncall_to_channel(
     paged_policies: set[str] | None = None,
 ) -> None:
     """Invite on-call users to a channel. No DB access."""
-    if severity not in PAGEABLE_SEVERITIES:
+    if severity not in HIGH_SEVERITIES:
         return
 
     pd_config = settings.PAGERDUTY
@@ -408,7 +408,7 @@ def _create_status_channel_for_context(
     ctx: ChannelSetupContext, slack_service: SlackService
 ) -> None:
     """Create a companion status channel. No DB access."""
-    if ctx.severity not in PAGEABLE_SEVERITIES:
+    if ctx.severity not in HIGH_SEVERITIES:
         return
 
     if ctx.is_private:
@@ -1059,7 +1059,7 @@ def _schedule_statuspage_reminder(
     reference_time: datetime | None = None,
     allow_update: bool = False,
 ) -> None:
-    if incident.severity not in PAGEABLE_SEVERITIES:
+    if incident.severity not in HIGH_SEVERITIES:
         return
 
     delay_minutes = _get_statuspage_initial_reminder_delay_minutes()
@@ -1251,8 +1251,8 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
 
     if (
-        old_severity not in PAGEABLE_SEVERITIES
-        and incident.severity in PAGEABLE_SEVERITIES
+        old_severity not in HIGH_SEVERITIES
+        and incident.severity in HIGH_SEVERITIES
         and incident.status in PAGEABLE_STATUSES
     ):
         try:
