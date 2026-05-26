@@ -2,7 +2,7 @@ import functools
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 
 from datadog import statsd
 from django.conf import settings
@@ -35,8 +35,7 @@ logger = logging.getLogger(__name__)
 class NamedFunction(Protocol):
     __name__: str
 
-    def __call__(self) -> None:
-        pass
+    def __call__(self, *args: Any, **kwargs: Any) -> None: ...
 
 
 def datadog_log(f: NamedFunction) -> NamedFunction:
@@ -44,10 +43,10 @@ def datadog_log(f: NamedFunction) -> NamedFunction:
     tags = [f"task:{task_name}"]
 
     @functools.wraps(f)
-    def wrapper() -> None:
+    def wrapper(*args: Any, **kwargs: Any) -> None:
         statsd.increment("django_q.task.run", 1, tags)
         try:
-            f()
+            f(*args, **kwargs)
         except Exception as e:
             statsd.increment("django_q.task.error", 1, tags)
             logger.error(
@@ -91,26 +90,8 @@ STATUSPAGE_REMINDER_MESSAGE = (
 )
 
 
+@datadog_log
 def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) -> None:
-    tags = ["task:send_statuspage_reminder"]
-    statsd.increment("django_q.task.run", 1, tags)
-    try:
-        _send_statuspage_reminder(incident_id, scheduled_at=scheduled_at)
-    except Exception as e:
-        statsd.increment("django_q.task.error", 1, tags)
-        logger.error(
-            f"Error in send_statuspage_reminder for incident {incident_id}: {e}",
-            exc_info=True,
-        )
-        raise
-    else:
-        statsd.increment("django_q.task.success", 1, tags)
-
-
-def _send_statuspage_reminder(
-    incident_id: int, scheduled_at: str | None = None
-) -> None:
-    # Only alert if we're configured to.
     statuspage = getattr(settings, "STATUSPAGE", None)
     slo_minutes = (
         int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
