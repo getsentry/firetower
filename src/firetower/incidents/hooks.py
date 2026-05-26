@@ -1077,7 +1077,7 @@ def _schedule_statuspage_reminder(
         "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{reference_time.isoformat()}"}}',
         "schedule_type": Schedule.ONCE,
         "next_run": next_run,
-        "repeats": 1,
+        "repeats": -1,
     }
     if allow_update:
         Schedule.objects.update_or_create(name=schedule_name, defaults=defaults)
