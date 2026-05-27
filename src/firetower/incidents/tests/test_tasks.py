@@ -15,7 +15,7 @@ from firetower.incidents.models import (
 from firetower.incidents.tasks import (
     STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE,
     STATUSPAGE_REMINDER_MESSAGE,
-    _send_statuspage_followup_reminder,,
+    _send_statuspage_followup_reminder,
     datadog_log,
     schedule_demo,
     send_statuspage_reminder,
