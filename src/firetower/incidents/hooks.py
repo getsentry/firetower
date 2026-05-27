@@ -45,7 +45,7 @@ DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
 
 
 # A None return means reminders are disabled (not set in config).
-def _get_statuspage_initial_reminder_delay_minutes() -> int | None:
+def get_statuspage_initial_reminder_delay_minutes() -> int | None:
     statuspage = getattr(settings, "STATUSPAGE", None)
     raw = statuspage.get("INITIAL_REMINDER_DELAY_MINUTES") if statuspage else None
     return int(raw) if raw is not None else None
@@ -1089,7 +1089,7 @@ def _schedule_statuspage_reminder(
     if incident.severity not in HIGH_SEVERITIES:
         return
 
-    delay_minutes = _get_statuspage_initial_reminder_delay_minutes()
+    delay_minutes = get_statuspage_initial_reminder_delay_minutes()
     if delay_minutes is None:
         return
 

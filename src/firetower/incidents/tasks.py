@@ -9,11 +9,14 @@ from django.conf import settings
 from django.utils import timezone
 from django_q.tasks import Schedule
 
-from firetower.incidents.hooks import HIGH_SEVERITIES
+from firetower.incidents.hooks import (
+    HIGH_SEVERITIES,
+    PAGEABLE_STATUSES,
+    get_statuspage_initial_reminder_delay_minutes,
+)
 from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
-    IncidentStatus,
 )
 from firetower.integrations.services.slack import SlackService
 
@@ -78,8 +81,6 @@ def schedule_demo() -> None:
         logger.info("No incidents found.")
 
 
-STATUSPAGE_REMINDER_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
-
 STATUSPAGE_REMINDER_MESSAGE = (
     ":rotating_light: *Statuspage Reminder* :rotating_light:\n"
     "This is a *{severity}* incident. The SLO for posting an initial "
@@ -92,9 +93,7 @@ STATUSPAGE_REMINDER_MESSAGE = (
 
 @datadog_log
 def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) -> None:
-    statuspage = getattr(settings, "STATUSPAGE", None)
-    raw = statuspage.get("INITIAL_REMINDER_DELAY_MINUTES") if statuspage else None
-    slo_minutes = int(raw) if raw is not None else None
+    slo_minutes = get_statuspage_initial_reminder_delay_minutes()
     if slo_minutes is None:
         return
 
@@ -107,7 +106,7 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
     # Only alert if the incident is at least a P0 or P1.
     if incident.severity not in HIGH_SEVERITIES:
         return
-    if incident.status not in STATUSPAGE_REMINDER_STATUSES:
+    if incident.status not in PAGEABLE_STATUSES:
         return
 
     # Don't alert if the incident has a Statuspage link, someone's already posted an initial status page.

@@ -2718,7 +2718,7 @@ class TestScheduleStatuspageReminder:
     @pytest.fixture(autouse=True)
     def _configure_reminder_delay(self):
         with patch(
-            "firetower.incidents.hooks._get_statuspage_initial_reminder_delay_minutes",
+            "firetower.incidents.hooks.get_statuspage_initial_reminder_delay_minutes",
             return_value=self.CONFIGURED_DELAY_MINUTES,
         ):
             yield
@@ -2830,7 +2830,7 @@ class TestScheduleStatuspageReminder:
 
     def test_skips_when_delay_not_configured(self):
         with patch(
-            "firetower.incidents.hooks._get_statuspage_initial_reminder_delay_minutes",
+            "firetower.incidents.hooks.get_statuspage_initial_reminder_delay_minutes",
             return_value=None,
         ):
             incident = self._make_incident(severity=IncidentSeverity.P0)
