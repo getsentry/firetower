@@ -39,7 +39,7 @@ def _get_linear_service() -> LinearService:
 
 
 HIGH_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
-PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
+ACTIVE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 
 DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
 
@@ -1101,9 +1101,9 @@ def _schedule_statuspage_reminder(
 
 
 def schedule_statuspage_followup_reminder(incident: Incident) -> None:
-    if incident.severity not in PAGEABLE_SEVERITIES:
+    if incident.severity not in HIGH_SEVERITIES:
         return
-    if incident.status not in PAGEABLE_STATUSES:
+    if incident.status not in ACTIVE_STATUSES:
         return
 
     delay_minutes = _get_statuspage_followup_reminder_delay_minutes()
@@ -1294,7 +1294,7 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
     if (
         old_severity not in HIGH_SEVERITIES
         and incident.severity in HIGH_SEVERITIES
-        and incident.status in PAGEABLE_STATUSES
+        and incident.status in ACTIVE_STATUSES
     ):
         try:
             channel_id = _get_channel_id(incident)
