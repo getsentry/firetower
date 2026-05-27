@@ -2945,6 +2945,7 @@ class TestScheduleStatuspageFollowupReminder:
         parsed_kwargs = ast.literal_eval(schedule.kwargs)
         assert parsed_kwargs["incident_id"] == incident.id
         assert "scheduled_at" in parsed_kwargs
+        assert parsed_kwargs["reschedule_count"] == 0
         assert schedule.schedule_type == Schedule.ONCE
         assert schedule.repeats == -1
 

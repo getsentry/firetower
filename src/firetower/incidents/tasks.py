@@ -79,6 +79,8 @@ def schedule_demo() -> None:
 
 STATUSPAGE_REMINDER_STATUSES = ACTIVE_STATUSES
 
+MAX_FOLLOWUP_RESCHEDULES = 48
+
 STATUSPAGE_REMINDER_MESSAGE = (
     ":rotating_light: *Statuspage Reminder* :rotating_light:\n"
     "This is a *{severity}* incident. The SLO for posting an initial "
@@ -155,7 +157,9 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
 
 @datadog_log
 def send_statuspage_followup_reminder(
-    incident_id: int, scheduled_at: str | None = None
+    incident_id: int,
+    scheduled_at: str | None = None,
+    reschedule_count: int = 0,
 ) -> None:
     try:
         incident = Incident.objects.get(pk=incident_id)
@@ -212,8 +216,11 @@ def send_statuspage_followup_reminder(
     try:
         slack.post_message(channel_id, message)
     finally:
-        from firetower.incidents.hooks import (  # noqa: PLC0415
-            schedule_statuspage_followup_reminder,
-        )
+        if reschedule_count < MAX_FOLLOWUP_RESCHEDULES:
+            from firetower.incidents.hooks import (  # noqa: PLC0415
+                schedule_statuspage_followup_reminder,
+            )
 
-        schedule_statuspage_followup_reminder(incident, initial=False)
+            schedule_statuspage_followup_reminder(
+                incident, reschedule_count=reschedule_count + 1
+            )
