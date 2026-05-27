@@ -21,6 +21,7 @@ app_token = ""
 incident_feed_channel_id = ""
 always_invited_ids = []
 incident_guide_message = "This is the message posted whenever a new incident slack channel is created."
+slash_command = "/inc"
 
 [auth]
 iap_enabled = false
@@ -61,3 +62,6 @@ troubleshooting_template_markdown = """
 api_key = ""
 page_id = ""
 url = "https://your-page.statuspage.io/"
+warning_buffer_minutes = 5
+# Set to enable statuspage reminders; omit to disable them
+# initial_reminder_delay_minutes = 20

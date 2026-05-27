@@ -1,16 +1,22 @@
+import ast
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth.models import User
+from django.utils import timezone
+from django_q.models import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
+    DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_users,
     _linear_issue_title,
     _page_if_needed,
     _resolve_linear_user_id,
+    _schedule_statuspage_reminder,
     build_channel_name,
     build_channel_topic,
     create_linear_parent_issue,
@@ -1907,6 +1913,9 @@ class TestCreateStatusChannel:
     def test_creates_public_channel_for_public_incident(self, mock_slack, settings):
         settings.SLACK = {"ALWAYS_INVITED_IDS": []}
         mock_slack.create_channel.return_value = "C_STATUS"
+        mock_slack.build_channel_url.return_value = (
+            "https://slack.com/archives/C_STATUS"
+        )
         incident = Incident.objects.create(
             title="Public outage",
             severity=IncidentSeverity.P0,
@@ -2699,6 +2708,204 @@ class TestResolveLinearUserId:
         assert not ExternalProfile.objects.filter(
             user=user,
             type=ExternalProfileType.LINEAR,
+        ).exists()
+
+
+@pytest.mark.django_db
+class TestScheduleStatuspageReminder:
+    CONFIGURED_DELAY_MINUTES = 15
+
+    @pytest.fixture(autouse=True)
+    def _configure_reminder_delay(self):
+        with patch(
+            "firetower.incidents.hooks.get_statuspage_initial_reminder_delay_minutes",
+            return_value=self.CONFIGURED_DELAY_MINUTES,
+        ):
+            yield
+
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "status": IncidentStatus.ACTIVE,
+            "severity": IncidentSeverity.P0,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def test_creates_schedule_for_p0(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+
+        schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        assert schedule.func == "firetower.incidents.tasks.send_statuspage_reminder"
+        stored_kwargs = ast.literal_eval(schedule.kwargs)
+        assert stored_kwargs["incident_id"] == incident.id
+        assert stored_kwargs["scheduled_at"] == incident.created_at.isoformat()
+        assert schedule.schedule_type == Schedule.ONCE
+        assert schedule.repeats == -1
+
+    def test_creates_schedule_for_p1(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        _schedule_statuspage_reminder(incident)
+
+        assert Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_p2(self):
+        incident = self._make_incident(severity=IncidentSeverity.P2)
+        _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_p3(self):
+        incident = self._make_incident(severity=IncidentSeverity.P3)
+        _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    def test_does_not_duplicate_schedule(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+        _schedule_statuspage_reminder(incident)
+
+        assert (
+            Schedule.objects.filter(name=f"statuspage_reminder_{incident.id}").count()
+            == 1
+        )
+
+    def test_concurrent_creation_preserves_original_next_run(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+        original = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        original_next_run = original.next_run
+
+        _schedule_statuspage_reminder(incident)
+        original.refresh_from_db()
+        assert original.next_run == original_next_run
+
+    def test_schedule_next_run_uses_configured_delay_from_created_at(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+
+        schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        offset = max(
+            0,
+            self.CONFIGURED_DELAY_MINUTES - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
+        )
+        expected = incident.created_at + timedelta(minutes=offset)
+        assert schedule.next_run == expected
+
+    def test_re_escalation_updates_existing_schedule(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+        original = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        original_next_run = original.next_run
+
+        ref = timezone.now() + timedelta(hours=1)
+        _schedule_statuspage_reminder(incident, reference_time=ref, allow_update=True)
+
+        original.refresh_from_db()
+        assert original.next_run != original_next_run
+        offset = max(
+            0,
+            self.CONFIGURED_DELAY_MINUTES - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
+        )
+        assert original.next_run == ref + timedelta(minutes=offset)
+
+    def test_schedule_clamps_negative_buffer_offset(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        with patch(
+            "firetower.incidents.hooks._get_statuspage_warning_buffer_minutes",
+            return_value=self.CONFIGURED_DELAY_MINUTES + 10,
+        ):
+            _schedule_statuspage_reminder(incident)
+
+        schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        assert schedule.next_run == incident.created_at
+
+    def test_skips_when_delay_not_configured(self):
+        with patch(
+            "firetower.incidents.hooks.get_statuspage_initial_reminder_delay_minutes",
+            return_value=None,
+        ):
+            incident = self._make_incident(severity=IncidentSeverity.P0)
+            _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_on_incident_created_schedules_reminder(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="P0 outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        on_incident_created(incident)
+
+        assert Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_on_severity_changed_schedules_reminder(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+    ):
+        incident = Incident.objects.create(
+            title="Minor issue",
+            severity=IncidentSeverity.P3,
+            status=IncidentStatus.ACTIVE,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C99999",
+        )
+        mock_slack.parse_channel_id_from_url.return_value = "C99999"
+
+        incident.severity = IncidentSeverity.P0
+        incident.save()
+        on_severity_changed(incident, IncidentSeverity.P3)
+
+        assert Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_on_severity_changed_no_reminder_for_downgrade(self, mock_slack):
+        incident = Incident.objects.create(
+            title="Big issue downgraded",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C99999",
+        )
+        mock_slack.parse_channel_id_from_url.return_value = "C99999"
+
+        on_severity_changed(incident, IncidentSeverity.P0)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
         ).exists()
 
 

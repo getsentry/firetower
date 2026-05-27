@@ -41,6 +41,7 @@ class SlackConfig:
     incident_feed_channel_id: str = ""
     always_invited_ids: list[str] = field(default_factory=list)
     incident_guide_message: str = ""
+    slash_command: str = "/inc"
 
 
 @deserialize
@@ -62,6 +63,8 @@ class StatuspageConfig:
     api_key: str
     page_id: str
     url: str
+    initial_reminder_delay_minutes: int | None = None
+    warning_buffer_minutes: int = 0
 
 
 @deserialize

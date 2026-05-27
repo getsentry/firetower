@@ -1,12 +1,24 @@
 import functools
 import logging
 import re
-from typing import Protocol
+from datetime import datetime, timedelta
+from typing import Any, Protocol
 
 from datadog import statsd
+from django.conf import settings
+from django.utils import timezone
 from django_q.tasks import Schedule
 
-from firetower.incidents.models import Incident
+from firetower.incidents.hooks import (
+    HIGH_SEVERITIES,
+    PAGEABLE_STATUSES,
+    get_statuspage_initial_reminder_delay_minutes,
+)
+from firetower.incidents.models import (
+    ExternalLinkType,
+    Incident,
+)
+from firetower.integrations.services.slack import SlackService
 
 SCHEDULES = {
     "schedule_demo": {
@@ -26,8 +38,7 @@ logger = logging.getLogger(__name__)
 class NamedFunction(Protocol):
     __name__: str
 
-    def __call__(self) -> None:
-        pass
+    def __call__(self, *args: Any, **kwargs: Any) -> None: ...
 
 
 def datadog_log(f: NamedFunction) -> NamedFunction:
@@ -35,10 +46,10 @@ def datadog_log(f: NamedFunction) -> NamedFunction:
     tags = [f"task:{task_name}"]
 
     @functools.wraps(f)
-    def wrapper() -> None:
+    def wrapper(*args: Any, **kwargs: Any) -> None:
         statsd.increment("django_q.task.run", 1, tags)
         try:
-            f()
+            f(*args, **kwargs)
         except Exception as e:
             statsd.increment("django_q.task.error", 1, tags)
             logger.error(
@@ -68,3 +79,70 @@ def schedule_demo() -> None:
         logger.info(f"Most recent incident: INC-{incident.id}: {title}")
     else:
         logger.info("No incidents found.")
+
+
+STATUSPAGE_REMINDER_MESSAGE = (
+    ":rotating_light: *Statuspage Reminder* :rotating_light:\n"
+    "This is a *{severity}* incident. The SLO for posting an initial "
+    "Statuspage update is *{slo_minutes} minutes* from declaration. "
+    "The SLO will be violated in *{minutes_remaining} minutes*.\n\n"
+    "No Statuspage update has been posted yet. "
+    "Please run `{slash_command} statuspage` to create a Statuspage incident now."
+)
+
+
+@datadog_log
+def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) -> None:
+    slo_minutes = get_statuspage_initial_reminder_delay_minutes()
+    if slo_minutes is None:
+        return
+
+    try:
+        incident = Incident.objects.get(pk=incident_id)
+    except Incident.DoesNotExist:
+        logger.warning(f"Incident {incident_id} not found for statuspage reminder")
+        return
+
+    # Only alert if the incident is at least a P0 or P1.
+    if incident.severity not in HIGH_SEVERITIES:
+        return
+    if incident.status not in PAGEABLE_STATUSES:
+        return
+
+    # Don't alert if the incident has a Statuspage link, someone's already posted an initial status page.
+    has_statuspage = incident.external_links.filter(
+        type=ExternalLinkType.STATUSPAGE
+    ).exists()
+    if has_statuspage:
+        return
+
+    status_link = incident.external_links.filter(
+        type=ExternalLinkType.SLACK_STATUS
+    ).first()
+    slack_link = (
+        status_link
+        or incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    )
+    if not slack_link:
+        return
+
+    slack = SlackService()
+    channel_id = slack.parse_channel_id_from_url(slack_link.url)
+    if not channel_id:
+        return
+
+    slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")
+    reference_time = (
+        datetime.fromisoformat(scheduled_at) if scheduled_at else incident.created_at
+    )
+    slo_deadline = reference_time + timedelta(minutes=slo_minutes)
+    minutes_remaining = max(
+        0, int((slo_deadline - timezone.now()).total_seconds() / 60)
+    )
+    message = STATUSPAGE_REMINDER_MESSAGE.format(
+        severity=incident.severity,
+        slash_command=slash_command,
+        slo_minutes=slo_minutes,
+        minutes_remaining=minutes_remaining,
+    )
+    slack.post_message(channel_id, message)

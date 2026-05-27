@@ -1,10 +1,13 @@
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.utils import timezone
+from django_q.tasks import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import (
@@ -35,8 +38,23 @@ def _get_linear_service() -> LinearService:
     return _linear_service
 
 
-PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
+HIGH_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
+
+DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
+
+
+# A None return means reminders are disabled (not set in config).
+def get_statuspage_initial_reminder_delay_minutes() -> int | None:
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    raw = statuspage.get("INITIAL_REMINDER_DELAY_MINUTES") if statuspage else None
+    return int(raw) if raw is not None else None
+
+
+def _get_statuspage_warning_buffer_minutes() -> int:
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    raw = statuspage.get("WARNING_BUFFER_MINUTES") if statuspage else None
+    return int(raw) if raw is not None else DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
 
 
 @dataclass
@@ -91,7 +109,7 @@ def page_for_channel(
     """
     paged: set[str] = set()
 
-    if severity not in PAGEABLE_SEVERITIES:
+    if severity not in HIGH_SEVERITIES:
         return paged
 
     pd_config = settings.PAGERDUTY
@@ -264,7 +282,7 @@ def _invite_oncall_to_channel(
     paged_policies: set[str] | None = None,
 ) -> None:
     """Invite on-call users to a channel. No DB access."""
-    if severity not in PAGEABLE_SEVERITIES:
+    if severity not in HIGH_SEVERITIES:
         return
 
     pd_config = settings.PAGERDUTY
@@ -394,15 +412,27 @@ def _invite_oncall_users(
     )
 
 
+def _save_status_channel_link(incident: Incident, status_channel_id: str) -> None:
+    url = _slack_service.build_channel_url(status_channel_id)
+    ExternalLink.objects.update_or_create(
+        incident=incident,
+        type=ExternalLinkType.SLACK_STATUS,
+        defaults={"url": url},
+    )
+
+
 def _create_status_channel_for_context(
     ctx: ChannelSetupContext, slack_service: SlackService
-) -> None:
-    """Create a companion status channel. No DB access."""
-    if ctx.severity not in PAGEABLE_SEVERITIES:
-        return
+) -> str | None:
+    """Create a companion status channel. No DB access.
+
+    Returns the status channel ID if created, None otherwise.
+    """
+    if ctx.severity not in HIGH_SEVERITIES:
+        return None
 
     if ctx.is_private:
-        return
+        return None
 
     status_channel_name = f"{ctx.channel_name}-status"
     try:
@@ -411,13 +441,13 @@ def _create_status_channel_for_context(
         )
     except Exception:
         logger.exception(f"Failed to create status channel {status_channel_name}")
-        return
+        return None
 
     if not status_channel_id:
         logger.info(
             f"Status channel {status_channel_name} already exists or could not be created"
         )
-        return
+        return None
 
     label = ctx.incident_number or ctx.channel_name
     message_lines = [f"This is the status channel for *{label}*."]
@@ -463,6 +493,8 @@ def _create_status_channel_for_context(
     except Exception:
         logger.exception(f"Failed to post status channel link in {ctx.channel_name}")
 
+    return status_channel_id
+
 
 def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
     captain_slack_id = (
@@ -482,7 +514,9 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
         incident_url=_build_incident_url(incident),
         incident_number=incident.incident_number,
     )
-    _create_status_channel_for_context(ctx, _slack_service)
+    status_channel_id = _create_status_channel_for_context(ctx, _slack_service)
+    if status_channel_id:
+        _save_status_channel_link(incident, status_channel_id)
 
 
 def _do_create_datadog_notebook(
@@ -722,7 +756,7 @@ def decorate_incident_channel(
     skip_datadog: bool = False,
     skip_notion: bool = False,
     paged_policies: set[str] | None = None,
-) -> None:
+) -> str | None:
     """
     Shared channel setup called by both the normal and fallback creation paths.
 
@@ -841,8 +875,9 @@ def decorate_incident_channel(
     except Exception:
         logger.exception(f"Failed to invite oncall users to {ctx.channel_name}")
 
+    status_channel_id: str | None = None
     try:
-        _create_status_channel_for_context(ctx, slack_service)
+        status_channel_id = _create_status_channel_for_context(ctx, slack_service)
     except Exception:
         logger.exception(f"Failed to create status channel for {ctx.channel_name}")
 
@@ -866,6 +901,8 @@ def decorate_incident_channel(
             slack_service.post_message(feed_channel_id, feed_message)
         except Exception:
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
+
+    return status_channel_id
 
 
 def _resolve_linear_user_id(
@@ -1044,6 +1081,37 @@ def create_linear_parent_issue(
             )
 
 
+def _schedule_statuspage_reminder(
+    incident: Incident,
+    reference_time: datetime | None = None,
+    allow_update: bool = False,
+) -> None:
+    if incident.severity not in HIGH_SEVERITIES:
+        return
+
+    delay_minutes = get_statuspage_initial_reminder_delay_minutes()
+    if delay_minutes is None:
+        return
+
+    if reference_time is None:
+        reference_time = incident.created_at
+
+    schedule_name = f"statuspage_reminder_{incident.id}"
+    offset_minutes = max(0, delay_minutes - _get_statuspage_warning_buffer_minutes())
+    next_run = reference_time + timedelta(minutes=offset_minutes)
+    defaults = {
+        "func": "firetower.incidents.tasks.send_statuspage_reminder",
+        "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{reference_time.isoformat()}"}}',
+        "schedule_type": Schedule.ONCE,
+        "next_run": next_run,
+        "repeats": -1,
+    }
+    if allow_update:
+        Schedule.objects.update_or_create(name=schedule_name, defaults=defaults)
+    else:
+        Schedule.objects.get_or_create(name=schedule_name, defaults=defaults)
+
+
 def on_incident_created(incident: Incident) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
@@ -1137,13 +1205,15 @@ def on_incident_created(incident: Incident) -> None:
             incident_url=incident_url,
             incident_number=incident.incident_number,
         )
-        decorate_incident_channel(
+        status_channel_id = decorate_incident_channel(
             ctx,
             _slack_service,
             skip_datadog=True,
             skip_notion=True,
             paged_policies=paged_policies,
         )
+        if status_channel_id:
+            _save_status_channel_link(incident, status_channel_id)
 
         # DB-dedup Datadog/Notion after shared decoration so the guide message
         # appears first in the channel.
@@ -1155,6 +1225,13 @@ def on_incident_created(incident: Incident) -> None:
     except Exception:
         logger.exception(
             f"Failed to create Linear parent issue for incident {incident.id}"
+        )
+
+    try:
+        _schedule_statuspage_reminder(incident)
+    except Exception:
+        logger.exception(
+            f"Failed to schedule statuspage reminder for incident {incident.id}"
         )
 
 
@@ -1203,8 +1280,8 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
 
     if (
-        old_severity not in PAGEABLE_SEVERITIES
-        and incident.severity in PAGEABLE_SEVERITIES
+        old_severity not in HIGH_SEVERITIES
+        and incident.severity in HIGH_SEVERITIES
         and incident.status in PAGEABLE_STATUSES
     ):
         try:
@@ -1235,6 +1312,15 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
                 logger.exception(
                     f"Failed to create status channel for incident {incident.id}"
                 )
+
+        try:
+            _schedule_statuspage_reminder(
+                incident, reference_time=timezone.now(), allow_update=True
+            )
+        except Exception:
+            logger.exception(
+                f"Failed to schedule statuspage reminder for incident {incident.id}"
+            )
 
 
 def on_title_changed(incident: Incident) -> None:
