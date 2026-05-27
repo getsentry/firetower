@@ -15,9 +15,9 @@ from firetower.incidents.models import (
 from firetower.incidents.tasks import (
     STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE,
     STATUSPAGE_REMINDER_MESSAGE,
-    _send_statuspage_followup_reminder,
     datadog_log,
     schedule_demo,
+    send_statuspage_followup_reminder,
     send_statuspage_reminder,
 )
 
@@ -455,7 +455,7 @@ class TestSendStatuspageFollowupReminder:
                 return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
             ),
         ):
-            _send_statuspage_followup_reminder(incident.id)
+            send_statuspage_followup_reminder(incident.id)
 
         expected_msg = STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE.format(
             severity="P0",
@@ -483,7 +483,7 @@ class TestSendStatuspageFollowupReminder:
                 return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
             ),
         ):
-            _send_statuspage_followup_reminder(incident.id)
+            send_statuspage_followup_reminder(incident.id)
 
         assert Schedule.objects.filter(
             name=f"statuspage_followup_reminder_{incident.id}"
@@ -495,7 +495,7 @@ class TestSendStatuspageFollowupReminder:
 
         mock_slack = MagicMock()
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
-            _send_statuspage_followup_reminder(incident.id)
+            send_statuspage_followup_reminder(incident.id)
 
         mock_slack.post_message.assert_not_called()
 
@@ -510,7 +510,7 @@ class TestSendStatuspageFollowupReminder:
 
         mock_slack = MagicMock()
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
-            _send_statuspage_followup_reminder(incident.id)
+            send_statuspage_followup_reminder(incident.id)
 
         mock_slack.post_message.assert_not_called()
 
@@ -527,7 +527,7 @@ class TestSendStatuspageFollowupReminder:
 
         mock_slack = MagicMock()
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
-            _send_statuspage_followup_reminder(incident.id)
+            send_statuspage_followup_reminder(incident.id)
 
         mock_slack.post_message.assert_not_called()
 
@@ -558,14 +558,14 @@ class TestSendStatuspageFollowupReminder:
                 },
             ),
         ):
-            _send_statuspage_followup_reminder(incident.id)
+            send_statuspage_followup_reminder(incident.id)
 
         mock_slack.post_message.assert_not_called()
 
     def test_skips_when_incident_not_found(self):
         mock_slack = MagicMock()
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
-            _send_statuspage_followup_reminder(99999)
+            send_statuspage_followup_reminder(99999)
 
         mock_slack.post_message.assert_not_called()
 
@@ -579,7 +579,7 @@ class TestSendStatuspageFollowupReminder:
 
         mock_slack = MagicMock()
         with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
-            _send_statuspage_followup_reminder(incident.id)
+            send_statuspage_followup_reminder(incident.id)
 
         mock_slack.post_message.assert_not_called()
 
@@ -604,6 +604,6 @@ class TestSendStatuspageFollowupReminder:
                 return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
             ),
         ):
-            _send_statuspage_followup_reminder(incident.id)
+            send_statuspage_followup_reminder(incident.id)
 
         mock_slack.post_message.assert_called_once()
