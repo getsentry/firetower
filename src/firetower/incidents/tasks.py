@@ -77,8 +77,6 @@ def schedule_demo() -> None:
         logger.info("No incidents found.")
 
 
-STATUSPAGE_REMINDER_STATUSES = ACTIVE_STATUSES
-
 MAX_FOLLOWUP_RESCHEDULES = 48
 
 STATUSPAGE_REMINDER_MESSAGE = (
@@ -114,7 +112,7 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
 
     if incident.severity not in HIGH_SEVERITIES:
         return
-    if incident.status not in STATUSPAGE_REMINDER_STATUSES:
+    if incident.status not in ACTIVE_STATUSES:
         return
 
     has_statuspage = incident.external_links.filter(
@@ -171,7 +169,7 @@ def send_statuspage_followup_reminder(
 
     if incident.severity not in HIGH_SEVERITIES:
         return
-    if incident.status not in STATUSPAGE_REMINDER_STATUSES:
+    if incident.status not in ACTIVE_STATUSES:
         return
 
     has_statuspage = incident.external_links.filter(
