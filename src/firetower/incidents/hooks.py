@@ -1129,16 +1129,15 @@ def schedule_statuspage_followup_reminder(incident: Incident) -> None:
         return
 
     schedule_name = f"statuspage_followup_reminder_{incident.id}"
+    now = timezone.now()
+    offset_minutes = max(0, delay_minutes - _get_statuspage_warning_buffer_minutes())
     Schedule.objects.update_or_create(
         name=schedule_name,
         defaults={
             "func": "firetower.incidents.tasks.send_statuspage_followup_reminder",
-            "kwargs": f'{{"incident_id": {incident.id}}}',
+            "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{now.isoformat()}"}}',
             "schedule_type": Schedule.ONCE,
-            "next_run": timezone.now()
-            + timedelta(
-                minutes=delay_minutes - _get_statuspage_warning_buffer_minutes()
-            ),
+            "next_run": now + timedelta(minutes=offset_minutes),
             "repeats": 1,
         },
     )

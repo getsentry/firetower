@@ -155,7 +155,9 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
 
 
 @datadog_log
-def send_statuspage_followup_reminder(incident_id: int) -> None:
+def send_statuspage_followup_reminder(
+    incident_id: int, scheduled_at: str | None = None
+) -> None:
     try:
         incident = Incident.objects.get(pk=incident_id)
     except Incident.DoesNotExist:
@@ -199,17 +201,17 @@ def send_statuspage_followup_reminder(incident_id: int) -> None:
     if followup_minutes is None:
         return
 
-    warning_buffer = (
-        int(statuspage["WARNING_BUFFER_MINUTES"])
-        if statuspage and statuspage.get("WARNING_BUFFER_MINUTES")
-        else 0
+    reference_time = (
+        datetime.fromisoformat(scheduled_at) if scheduled_at else timezone.now()
     )
+    deadline = reference_time + timedelta(minutes=followup_minutes)
+    minutes_until_due = max(0, int((deadline - timezone.now()).total_seconds() / 60))
 
     slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")
     message = STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE.format(
         severity=incident.severity,
         slash_command=slash_command,
-        minutes_until_due=warning_buffer,
+        minutes_until_due=minutes_until_due,
     )
     slack.post_message(channel_id, message)
 
