@@ -412,15 +412,27 @@ def _invite_oncall_users(
     )
 
 
+def _save_status_channel_link(incident: Incident, status_channel_id: str) -> None:
+    url = _slack_service.build_channel_url(status_channel_id)
+    ExternalLink.objects.update_or_create(
+        incident=incident,
+        type=ExternalLinkType.SLACK_STATUS,
+        defaults={"url": url},
+    )
+
+
 def _create_status_channel_for_context(
     ctx: ChannelSetupContext, slack_service: SlackService
-) -> None:
-    """Create a companion status channel. No DB access."""
+) -> str | None:
+    """Create a companion status channel. No DB access.
+
+    Returns the status channel ID if created, None otherwise.
+    """
     if ctx.severity not in HIGH_SEVERITIES:
-        return
+        return None
 
     if ctx.is_private:
-        return
+        return None
 
     status_channel_name = f"{ctx.channel_name}-status"
     try:
@@ -429,13 +441,13 @@ def _create_status_channel_for_context(
         )
     except Exception:
         logger.exception(f"Failed to create status channel {status_channel_name}")
-        return
+        return None
 
     if not status_channel_id:
         logger.info(
             f"Status channel {status_channel_name} already exists or could not be created"
         )
-        return
+        return None
 
     label = ctx.incident_number or ctx.channel_name
     message_lines = [f"This is the status channel for *{label}*."]
@@ -481,6 +493,8 @@ def _create_status_channel_for_context(
     except Exception:
         logger.exception(f"Failed to post status channel link in {ctx.channel_name}")
 
+    return status_channel_id
+
 
 def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
     captain_slack_id = (
@@ -500,7 +514,9 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
         incident_url=_build_incident_url(incident),
         incident_number=incident.incident_number,
     )
-    _create_status_channel_for_context(ctx, _slack_service)
+    status_channel_id = _create_status_channel_for_context(ctx, _slack_service)
+    if status_channel_id:
+        _save_status_channel_link(incident, status_channel_id)
 
 
 def _do_create_datadog_notebook(
@@ -740,7 +756,7 @@ def decorate_incident_channel(
     skip_datadog: bool = False,
     skip_notion: bool = False,
     paged_policies: set[str] | None = None,
-) -> None:
+) -> str | None:
     """
     Shared channel setup called by both the normal and fallback creation paths.
 
@@ -859,8 +875,9 @@ def decorate_incident_channel(
     except Exception:
         logger.exception(f"Failed to invite oncall users to {ctx.channel_name}")
 
+    status_channel_id: str | None = None
     try:
-        _create_status_channel_for_context(ctx, slack_service)
+        status_channel_id = _create_status_channel_for_context(ctx, slack_service)
     except Exception:
         logger.exception(f"Failed to create status channel for {ctx.channel_name}")
 
@@ -884,6 +901,8 @@ def decorate_incident_channel(
             slack_service.post_message(feed_channel_id, feed_message)
         except Exception:
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
+
+    return status_channel_id
 
 
 def _resolve_linear_user_id(
@@ -1186,13 +1205,15 @@ def on_incident_created(incident: Incident) -> None:
             incident_url=incident_url,
             incident_number=incident.incident_number,
         )
-        decorate_incident_channel(
+        status_channel_id = decorate_incident_channel(
             ctx,
             _slack_service,
             skip_datadog=True,
             skip_notion=True,
             paged_policies=paged_policies,
         )
+        if status_channel_id:
+            _save_status_channel_link(incident, status_channel_id)
 
         # DB-dedup Datadog/Notion after shared decoration so the guide message
         # appears first in the channel.

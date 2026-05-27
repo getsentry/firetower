@@ -117,7 +117,13 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
     if has_statuspage:
         return
 
-    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    status_link = incident.external_links.filter(
+        type=ExternalLinkType.SLACK_STATUS
+    ).first()
+    slack_link = (
+        status_link
+        or incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    )
     if not slack_link:
         return
 
