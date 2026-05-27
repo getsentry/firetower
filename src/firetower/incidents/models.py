@@ -199,6 +199,7 @@ class Incident(models.Model):
     time_mitigated = models.DateTimeField(null=True, blank=True)
     time_recovered = models.DateTimeField(null=True, blank=True)
     statuspage_slo_started_at = models.DateTimeField(null=True, blank=True)
+    statuspage_slo_ended_at = models.DateTimeField(null=True, blank=True)
 
     # Relationships
     captain = models.ForeignKey(

@@ -4,7 +4,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0019_canceled_and_priority"),
+        ("incidents", "0020_add_slack_status_external_link_type"),
     ]
 
     operations = [
@@ -37,6 +37,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="incident",
             name="statuspage_slo_started_at",
+            field=models.DateTimeField(blank=True, null=True),
+        ),
+        migrations.AddField(
+            model_name="incident",
+            name="statuspage_slo_ended_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
     ]

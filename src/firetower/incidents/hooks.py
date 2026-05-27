@@ -1255,6 +1255,21 @@ def on_status_changed(incident: Incident, old_status: str) -> None:
         logger.exception(f"Error in on_status_changed for incident {incident.id}")
 
     if (
+        incident.statuspage_slo_started_at
+        and old_status in PAGEABLE_STATUSES
+        and incident.status not in PAGEABLE_STATUSES
+    ):
+        incident.statuspage_slo_ended_at = timezone.now()
+        incident.save(update_fields=["statuspage_slo_ended_at"])
+    elif (
+        incident.statuspage_slo_started_at
+        and old_status not in PAGEABLE_STATUSES
+        and incident.status in PAGEABLE_STATUSES
+    ):
+        incident.statuspage_slo_ended_at = None
+        incident.save(update_fields=["statuspage_slo_ended_at"])
+
+    if (
         incident.status
         in (IncidentStatus.MITIGATED, IncidentStatus.DONE, IncidentStatus.POSTMORTEM)
         and channel_id
