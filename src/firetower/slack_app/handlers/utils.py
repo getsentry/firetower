@@ -373,13 +373,13 @@ def build_incident_lifecycle_modal(
                 "type": "input",
                 "block_id": "affected_service_block",
                 "element": affected_service_element,
-                "label": {"type": "plain_text", "text": "Affected Service"},
+                "label": {"type": "plain_text", "text": "Affected Services"},
             },
             {
                 "type": "input",
                 "block_id": "affected_region_block",
                 "element": affected_region_element,
-                "label": {"type": "plain_text", "text": "Affected Region"},
+                "label": {"type": "plain_text", "text": "Affected Regions"},
             },
             {
                 "type": "context",
