@@ -318,3 +318,18 @@ class TestResolvedSubmission:
         call_kwargs = ack.call_args[1]
         assert call_kwargs["response_action"] == "errors"
         assert "service_tier_block" in call_kwargs["errors"]
+
+    @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
+    def test_captain_resolution_failure(self, mock_get_user, incident):
+        mock_get_user.return_value = None
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_resolved_view()
+
+        handle_resolved_submission(ack, body, view, client)
+
+        ack.assert_called_once_with()
+        client.chat_postMessage.assert_called_once()
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "Failed to resolve the selected captain" in msg

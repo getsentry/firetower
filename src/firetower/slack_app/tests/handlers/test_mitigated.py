@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.conf import settings
 
 from firetower.incidents.models import IncidentStatus, Tag, TagType
 from firetower.slack_app.handlers.mitigated import (
@@ -257,3 +258,45 @@ class TestMitigatedSubmission:
         call_kwargs = ack.call_args[1]
         assert call_kwargs["response_action"] == "errors"
         assert "impact_summary_block" in call_kwargs["errors"]
+
+    @patch("firetower.slack_app.handlers.mitigated.get_or_create_user_from_slack_id")
+    def test_captain_resolution_failure(self, mock_get_user, incident):
+        mock_get_user.return_value = None
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_mitigated_view()
+
+        handle_mitigated_submission(ack, body, view, client)
+
+        ack.assert_called_once_with()
+        client.chat_postMessage.assert_called_once()
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "Failed to resolve the selected captain" in msg
+
+
+@pytest.mark.django_db
+class TestServiceRegistryBlock:
+    @patch.object(settings, "SERVICE_REGISTRY_URL", "https://example.com/registry")
+    def test_context_block_present_when_url_set(self, incident):
+        modal = _build_mitigated_modal(incident, CHANNEL_ID)
+        blocks = modal["blocks"]
+        service_tier_idx = next(
+            i for i, b in enumerate(blocks) if b.get("block_id") == "service_tier_block"
+        )
+        affected_service_idx = next(
+            i
+            for i, b in enumerate(blocks)
+            if b.get("block_id") == "affected_service_block"
+        )
+        context_block = blocks[service_tier_idx + 1]
+        assert context_block["type"] == "context"
+        assert "https://example.com/registry" in context_block["elements"][0]["text"]
+        assert affected_service_idx == service_tier_idx + 2
+
+    @patch.object(settings, "SERVICE_REGISTRY_URL", None)
+    def test_no_context_block_when_url_not_set(self, incident):
+        modal = _build_mitigated_modal(incident, CHANNEL_ID)
+        blocks = modal["blocks"]
+        context_blocks = [b for b in blocks if b.get("type") == "context"]
+        assert len(context_blocks) == 0

@@ -8,6 +8,7 @@ from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
     IncidentSeverity,
+    IncidentStatus,
     ServiceTier,
 )
 
@@ -388,8 +389,44 @@ def build_incident_lifecycle_modal(
         "type": "modal",
         "callback_id": callback_id,
         "private_metadata": channel_id,
-        "title": {"type": "plain_text", "text": title_text},
+        "title": {"type": "plain_text", "text": title_text[:24]},
         "submit": {"type": "plain_text", "text": "Submit"},
         "close": {"type": "plain_text", "text": "Cancel"},
         "blocks": blocks,
+    }
+
+
+def validate_lifecycle_form(form: dict[str, Any]) -> dict[str, str]:
+    errors: dict[str, str] = {}
+    if not form["captain_slack_id"]:
+        errors["captain_block"] = "An incident captain is required."
+    if not form["severity"]:
+        errors["severity_block"] = "Severity is required."
+    if not form["title"]:
+        errors["title_block"] = "This field is required."
+    if not form["description"]:
+        errors["description_block"] = "Description is required."
+    if not form["impact_summary"]:
+        errors["impact_summary_block"] = "Impact summary is required."
+    if not form["impact_type_tags"]:
+        errors["impact_type_block"] = "Select at least one impact type."
+    if not form["service_tier"]:
+        errors["service_tier_block"] = "Service tier is required."
+    return errors
+
+
+def build_incident_update_data(
+    form: dict[str, Any], status: IncidentStatus, captain_email: str
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "severity": form["severity"],
+        "service_tier": form["service_tier"],
+        "captain": captain_email,
+        "title": form["title"],
+        "description": form["description"],
+        "impact_summary": form["impact_summary"],
+        "impact_type_tags": form["impact_type_tags"],
+        "affected_service_tags": form["affected_service_tags"],
+        "affected_region_tags": form["affected_region_tags"],
     }

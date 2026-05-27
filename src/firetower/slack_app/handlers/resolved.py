@@ -6,8 +6,10 @@ from firetower.incidents.models import Incident, IncidentStatus
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import (
     build_incident_lifecycle_modal,
+    build_incident_update_data,
     get_incident_from_channel,
     parse_incident_form_values,
+    validate_lifecycle_form,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,26 +50,7 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
     form = parse_incident_form_values(view)
     channel_id = view.get("private_metadata", "")
 
-    captain_slack_id = form["captain_slack_id"]
-    severity = form["severity"]
-    service_tier = form["service_tier"]
-
-    errors: dict[str, str] = {}
-    if not captain_slack_id:
-        errors["captain_block"] = "An incident captain is required."
-    if not severity:
-        errors["severity_block"] = "Severity is required."
-    if not form["title"]:
-        errors["title_block"] = "This field is required."
-    if not form["description"]:
-        errors["description_block"] = "Description is required."
-    if not form["impact_summary"]:
-        errors["impact_summary_block"] = "Impact summary is required."
-    if not form["impact_type_tags"]:
-        errors["impact_type_block"] = "Select at least one impact type."
-    if not service_tier:
-        errors["service_tier_block"] = "Service tier is required."
-
+    errors = validate_lifecycle_form(form)
     if errors:
         ack(response_action="errors", errors=errors)
         return
@@ -79,10 +62,11 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
         logger.error("Resolved submission: no incident for channel %s", channel_id)
         return
 
-    captain_user = get_or_create_user_from_slack_id(captain_slack_id)
+    captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
     if not captain_user:
         logger.error(
-            "Could not resolve Slack user %s to a Firetower user", captain_slack_id
+            "Could not resolve Slack user %s to a Firetower user",
+            form["captain_slack_id"],
         )
         client.chat_postMessage(
             channel=channel_id,
@@ -90,23 +74,13 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
         )
         return
 
+    severity = form["severity"]
     if severity in ("P0", "P1", "P2"):
         target_status = IncidentStatus.POSTMORTEM
     else:
         target_status = IncidentStatus.DONE
 
-    data: dict[str, Any] = {
-        "status": target_status,
-        "severity": severity,
-        "service_tier": service_tier,
-        "captain": captain_user.email,
-        "title": form["title"],
-        "description": form["description"],
-        "impact_summary": form["impact_summary"],
-        "impact_type_tags": form["impact_type_tags"],
-        "affected_service_tags": form["affected_service_tags"],
-        "affected_region_tags": form["affected_region_tags"],
-    }
+    data = build_incident_update_data(form, target_status, captain_user.email)
 
     serializer = IncidentWriteSerializer(instance=incident, data=data, partial=True)
     if not serializer.is_valid():
