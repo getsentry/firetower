@@ -209,10 +209,11 @@ def send_statuspage_followup_reminder(
         slash_command=slash_command,
         minutes_until_due=minutes_until_due,
     )
-    slack.post_message(channel_id, message)
+    try:
+        slack.post_message(channel_id, message)
+    finally:
+        from firetower.incidents.hooks import (  # noqa: PLC0415
+            schedule_statuspage_followup_reminder,
+        )
 
-    from firetower.incidents.hooks import (  # noqa: PLC0415
-        schedule_statuspage_followup_reminder,
-    )
-
-    schedule_statuspage_followup_reminder(incident)
+        schedule_statuspage_followup_reminder(incident, initial=False)

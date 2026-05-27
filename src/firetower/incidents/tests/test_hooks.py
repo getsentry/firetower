@@ -2946,7 +2946,7 @@ class TestScheduleStatuspageFollowupReminder:
         assert parsed_kwargs["incident_id"] == incident.id
         assert "scheduled_at" in parsed_kwargs
         assert schedule.schedule_type == Schedule.ONCE
-        assert schedule.repeats == 1
+        assert schedule.repeats == -1
 
     def test_creates_schedule_for_p1(self):
         incident = self._make_incident(severity=IncidentSeverity.P1)

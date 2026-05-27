@@ -1117,7 +1117,9 @@ def _schedule_statuspage_reminder(
         Schedule.objects.get_or_create(name=schedule_name, defaults=defaults)
 
 
-def schedule_statuspage_followup_reminder(incident: Incident) -> None:
+def schedule_statuspage_followup_reminder(
+    incident: Incident, *, initial: bool = True
+) -> None:
     if incident.severity not in HIGH_SEVERITIES:
         return
     if incident.status not in ACTIVE_STATUSES:
@@ -1129,7 +1131,12 @@ def schedule_statuspage_followup_reminder(incident: Incident) -> None:
 
     schedule_name = f"statuspage_followup_reminder_{incident.id}"
     now = timezone.now()
-    offset_minutes = max(0, delay_minutes - _get_statuspage_warning_buffer_minutes())
+    if initial:
+        offset_minutes = max(
+            1, delay_minutes - _get_statuspage_warning_buffer_minutes()
+        )
+    else:
+        offset_minutes = max(1, delay_minutes)
     Schedule.objects.update_or_create(
         name=schedule_name,
         defaults={
@@ -1137,7 +1144,7 @@ def schedule_statuspage_followup_reminder(incident: Incident) -> None:
             "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{now.isoformat()}"}}',
             "schedule_type": Schedule.ONCE,
             "next_run": now + timedelta(minutes=offset_minutes),
-            "repeats": 1,
+            "repeats": -1,
         },
     )
 
