@@ -130,11 +130,11 @@ def parse_incident_form_values(view: dict) -> dict[str, Any]:
     service_tier = service_tier_option.get("value") if service_tier_option else None
     description = (
         values.get("description_block", {}).get("description", {}).get("value") or ""
-    )
+    ).strip()
     impact_summary = (
         values.get("impact_summary_block", {}).get("impact_summary", {}).get("value")
         or ""
-    )
+    ).strip()
 
     impact_type_selections = (
         values.get("impact_type_block", {})
@@ -186,10 +186,9 @@ def build_incident_lifecycle_modal(
 ) -> dict[str, Any]:
     """Build the shared 9-field modal used by /inc mitigated and /inc resolved.
 
-    Fields are pre-filled from `incident`. Required fields (captain, severity,
-    title, description, impact_summary, impact_type, service_tier) are marked
-    required by Slack defaults. Optional fields (affected_service,
-    affected_region) set "optional": True.
+    Fields are pre-filled from `incident`. All nine fields (captain, severity,
+    title, impact_summary, description, impact_type, service_tier,
+    affected_service, affected_region) are required by Slack defaults.
     """
     severity_options = [
         {"text": {"type": "plain_text", "text": sev.label}, "value": sev.value}

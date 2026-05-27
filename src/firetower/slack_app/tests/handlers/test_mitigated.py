@@ -271,6 +271,32 @@ class TestMitigatedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "impact_summary_block" in call_kwargs["errors"]
 
+    def test_whitespace_only_description_returns_error(self, incident):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_mitigated_view(description="   \n\t  ")
+
+        handle_mitigated_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        call_kwargs = ack.call_args[1]
+        assert call_kwargs["response_action"] == "errors"
+        assert "description_block" in call_kwargs["errors"]
+
+    def test_whitespace_only_impact_summary_returns_error(self, incident):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_mitigated_view(impact_summary="   ")
+
+        handle_mitigated_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        call_kwargs = ack.call_args[1]
+        assert call_kwargs["response_action"] == "errors"
+        assert "impact_summary_block" in call_kwargs["errors"]
+
     @patch("firetower.slack_app.handlers.mitigated.get_or_create_user_from_slack_id")
     def test_captain_resolution_failure(self, mock_get_user, incident):
         mock_get_user.return_value = None
