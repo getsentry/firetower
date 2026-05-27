@@ -111,20 +111,24 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
         logger.warning(f"Incident {incident_id} not found for statuspage reminder")
         return
 
-    # Only alert if the incident is at least a P0 or P1.
     if incident.severity not in HIGH_SEVERITIES:
         return
     if incident.status not in STATUSPAGE_REMINDER_STATUSES:
         return
 
-    # Don't alert if the incident has a Statuspage link, someone's already posted an initial status page.
     has_statuspage = incident.external_links.filter(
         type=ExternalLinkType.STATUSPAGE
     ).exists()
     if has_statuspage:
         return
 
-    slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    status_link = incident.external_links.filter(
+        type=ExternalLinkType.SLACK_STATUS
+    ).first()
+    slack_link = (
+        status_link
+        or incident.external_links.filter(type=ExternalLinkType.SLACK).first()
+    )
     if not slack_link:
         return
 

@@ -220,6 +220,31 @@ class TestSendStatuspageReminder:
         )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 
+    def test_prefers_status_channel_over_main_channel(self):
+        now = datetime.now(tz=UTC)
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.SLACK_STATUS,
+            url="https://sentry.slack.com/archives/C99999",
+        )
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C99999"
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch("firetower.incidents.tasks.timezone") as mock_tz,
+        ):
+            mock_tz.now.return_value = now
+            send_statuspage_reminder(incident.id)
+
+        mock_slack.parse_channel_id_from_url.assert_called_once_with(
+            "https://sentry.slack.com/archives/C99999"
+        )
+        mock_slack.post_message.assert_called_once()
+
     def test_uses_scheduled_at_for_slo_deadline(self):
         now = datetime.now(tz=UTC)
         scheduled_at = now - timedelta(minutes=5)
