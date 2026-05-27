@@ -1206,6 +1206,10 @@ def on_incident_created(incident: Incident) -> None:
             f"Failed to create Linear parent issue for incident {incident.id}"
         )
 
+    if incident.severity in HIGH_SEVERITIES and not incident.statuspage_slo_started_at:
+        incident.statuspage_slo_started_at = incident.created_at
+        incident.save(update_fields=["statuspage_slo_started_at"])
+
     try:
         _schedule_statuspage_reminder(incident)
     except Exception:
@@ -1263,6 +1267,10 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         and incident.severity in HIGH_SEVERITIES
         and incident.status in PAGEABLE_STATUSES
     ):
+        if not incident.statuspage_slo_started_at:
+            incident.statuspage_slo_started_at = timezone.now()
+            incident.save(update_fields=["statuspage_slo_started_at"])
+
         try:
             channel_id = _get_channel_id(incident)
         except Exception:

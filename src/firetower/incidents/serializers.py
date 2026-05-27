@@ -25,6 +25,7 @@ from .models import (
     Incident,
     IncidentOrRedirect,
     IncidentStatus,
+    StatusPagePost,
     Tag,
     TagType,
 )
@@ -109,6 +110,12 @@ class ParticipantSerializer(serializers.Serializer):
         return "Participant"
 
 
+class StatusPagePostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StatusPagePost
+        fields = ["posted_at"]
+
+
 class IncidentDetailUISerializer(serializers.ModelSerializer):
     """
     Serializer for incident detail view.
@@ -144,6 +151,8 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
     # External links as dict for easy frontend access
     external_links = serializers.DictField(source="external_links_dict", read_only=True)
 
+    statuspage_posts = StatusPagePostSerializer(many=True, read_only=True)
+
     class Meta:
         model = Incident
         fields = [
@@ -169,6 +178,8 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
             "time_mitigated",
             "time_recovered",
             "total_downtime",
+            "statuspage_slo_started_at",
+            "statuspage_posts",
         ]
         read_only_fields = [
             "id",
@@ -179,6 +190,7 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
             "time_analyzed",
             "time_mitigated",
             "time_recovered",
+            "statuspage_slo_started_at",
         ]
 
     def get_participants(self, obj: Incident) -> list[ParticipantData]:
@@ -263,6 +275,7 @@ class IncidentReadSerializer(serializers.ModelSerializer):
         read_only=True,
     )
     external_links = serializers.DictField(source="external_links_dict", read_only=True)
+    statuspage_posts = StatusPagePostSerializer(many=True, read_only=True)
 
     class Meta:
         model = Incident
@@ -291,6 +304,8 @@ class IncidentReadSerializer(serializers.ModelSerializer):
             "time_mitigated",
             "time_recovered",
             "total_downtime",
+            "statuspage_slo_started_at",
+            "statuspage_posts",
         ]
 
     def get_captain(self, obj: Incident) -> str | None:

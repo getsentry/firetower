@@ -4,8 +4,9 @@ from typing import Any
 
 import requests
 from django.db import transaction
+from django.utils import timezone
 
-from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.incidents.models import ExternalLink, ExternalLinkType, StatusPagePost
 from firetower.integrations.services.statuspage import (
     COMPONENT_STATUS_OPTIONS,
     DEFAULT_MESSAGES,
@@ -486,6 +487,11 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
                 statuspage_link.url = statuspage_url
                 statuspage_link.save(update_fields=["url"])
                 success_message = f"Statuspage post created: {statuspage_url}"
+
+            StatusPagePost.objects.create(
+                incident=incident,
+                posted_at=timezone.now(),
+            )
     except Exception:
         logger.exception("Failed to create/update statuspage incident")
         client.chat_postMessage(

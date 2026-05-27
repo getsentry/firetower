@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.incidents.models import ExternalLink, ExternalLinkType, StatusPagePost
 from firetower.slack_app.handlers.statuspage import (
     _build_statuspage_modal,
     handle_statuspage_command,
@@ -356,6 +356,10 @@ class TestStatuspageSubmission:
         )
         assert link.url == "https://test.statuspage.io/incidents/new_sp_123"
 
+        posts = StatusPagePost.objects.filter(incident=incident)
+        assert posts.count() == 1
+        assert posts.first().posted_at is not None
+
         assert "created" in client.chat_postMessage.call_args[1]["text"]
 
     def test_creates_with_components(self, incident):
@@ -416,6 +420,9 @@ class TestStatuspageSubmission:
             components=None,
         )
         assert "updated" in client.chat_postMessage.call_args[1]["text"]
+
+        posts = StatusPagePost.objects.filter(incident=incident)
+        assert posts.count() == 1
 
     def test_empty_message_returns_error(self, incident):
         ack = MagicMock()

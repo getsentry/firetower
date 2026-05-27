@@ -197,6 +197,7 @@ class Incident(models.Model):
     time_analyzed = models.DateTimeField(null=True, blank=True)
     time_mitigated = models.DateTimeField(null=True, blank=True)
     time_recovered = models.DateTimeField(null=True, blank=True)
+    statuspage_slo_started_at = models.DateTimeField(null=True, blank=True)
 
     # Relationships
     captain = models.ForeignKey(
@@ -420,6 +421,19 @@ def filter_visible_to_user(
     return queryset.filter(
         Q(is_private=False) | Q(captain=user) | Q(reporter=user) | Q(participants=user)
     ).distinct()
+
+
+class StatusPagePost(models.Model):
+    incident = models.ForeignKey(
+        "Incident", on_delete=models.CASCADE, related_name="statuspage_posts"
+    )
+    posted_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["posted_at"]
+
+    def __str__(self) -> str:
+        return f"{self.incident.incident_number} - {self.posted_at.isoformat()}"
 
 
 @dataclass
