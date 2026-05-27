@@ -159,6 +159,12 @@ def send_statuspage_followup_reminder(
     scheduled_at: str | None = None,
     reschedule_count: int = 0,
 ) -> None:
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    raw = statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES") if statuspage else None
+    followup_minutes = int(raw) if raw is not None else None
+    if followup_minutes is None:
+        return
+
     try:
         incident = Incident.objects.get(pk=incident_id)
     except Incident.DoesNotExist:
@@ -191,12 +197,6 @@ def send_statuspage_followup_reminder(
     slack = SlackService()
     channel_id = slack.parse_channel_id_from_url(slack_link.url)
     if not channel_id:
-        return
-
-    statuspage = getattr(settings, "STATUSPAGE", None)
-    raw = statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES") if statuspage else None
-    followup_minutes = int(raw) if raw is not None else None
-    if followup_minutes is None:
         return
 
     reference_time = (
