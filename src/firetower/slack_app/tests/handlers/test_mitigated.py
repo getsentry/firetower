@@ -21,8 +21,8 @@ def _make_mitigated_view(
     impact_summary="Users affected",
     impact_type_tags=("Degraded Service",),
     service_tier="T1",
-    affected_service_tags=(),
-    affected_region_tags=(),
+    affected_service_tags=("api-server",),
+    affected_region_tags=("us-east-1",),
 ):
     def _options(values):
         return [{"value": v} for v in values]
@@ -62,6 +62,16 @@ def _make_mitigated_view(
 @pytest.fixture
 def impact_type_tag(db):
     return Tag.objects.create(name="Degraded Service", type=TagType.IMPACT_TYPE)
+
+
+@pytest.fixture
+def affected_service_tag(db):
+    return Tag.objects.create(name="api-server", type=TagType.AFFECTED_SERVICE)
+
+
+@pytest.fixture
+def affected_region_tag(db):
+    return Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
 
 
 @pytest.mark.django_db
@@ -113,7 +123,7 @@ class TestMitigatedModal:
         ):
             assert required in block_ids
 
-    def test_required_vs_optional_blocks(self, incident):
+    def test_all_blocks_required(self, incident):
         modal = _build_mitigated_modal(incident, CHANNEL_ID)
         by_id = {b["block_id"]: b for b in modal["blocks"] if "block_id" in b}
         for required in (
@@ -124,10 +134,10 @@ class TestMitigatedModal:
             "impact_summary_block",
             "impact_type_block",
             "service_tier_block",
+            "affected_service_block",
+            "affected_region_block",
         ):
             assert by_id[required].get("optional", False) is False
-        assert by_id["affected_service_block"]["optional"] is True
-        assert by_id["affected_region_block"]["optional"] is True
 
     def test_prefills_title_and_severity(self, incident):
         modal = _build_mitigated_modal(incident, CHANNEL_ID)
@@ -149,6 +159,8 @@ class TestMitigatedSubmission:
         user,
         incident,
         impact_type_tag,
+        affected_service_tag,
+        affected_region_tag,
     ):
         mock_get_user.return_value = user
         ack = MagicMock()
@@ -168,30 +180,31 @@ class TestMitigatedSubmission:
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Mitigated" in msg
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
-    @patch("firetower.slack_app.handlers.mitigated.get_or_create_user_from_slack_id")
-    def test_optional_affected_fields(
-        self,
-        mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
-        user,
-        incident,
-        impact_type_tag,
-    ):
-        mock_get_user.return_value = user
+    def test_missing_affected_service_returns_error(self, incident):
         ack = MagicMock()
         client = MagicMock()
         body = {"user": {"id": "U_CAPTAIN"}}
-        # Omit affected_service and affected_region — submission should still succeed.
-        view = _make_mitigated_view(affected_service_tags=(), affected_region_tags=())
+        view = _make_mitigated_view(affected_service_tags=())
 
         handle_mitigated_submission(ack, body, view, client)
 
-        ack.assert_called_once_with()
-        incident.refresh_from_db()
-        assert incident.status == IncidentStatus.MITIGATED
+        ack.assert_called_once()
+        call_kwargs = ack.call_args[1]
+        assert call_kwargs["response_action"] == "errors"
+        assert "affected_service_block" in call_kwargs["errors"]
+
+    def test_missing_affected_region_returns_error(self, incident):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_mitigated_view(affected_region_tags=())
+
+        handle_mitigated_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        call_kwargs = ack.call_args[1]
+        assert call_kwargs["response_action"] == "errors"
+        assert "affected_region_block" in call_kwargs["errors"]
 
     def test_missing_captain_returns_error(self, incident):
         ack = MagicMock()
@@ -277,7 +290,7 @@ class TestMitigatedSubmission:
 @pytest.mark.django_db
 class TestServiceRegistryBlock:
     @patch.object(settings, "SERVICE_REGISTRY_URL", "https://example.com/registry")
-    def test_context_block_present_when_url_set(self, incident):
+    def test_service_registry_block_present_when_url_set(self, incident):
         modal = _build_mitigated_modal(incident, CHANNEL_ID)
         blocks = modal["blocks"]
         service_tier_idx = next(
@@ -294,8 +307,23 @@ class TestServiceRegistryBlock:
         assert affected_service_idx == service_tier_idx + 2
 
     @patch.object(settings, "SERVICE_REGISTRY_URL", None)
-    def test_no_context_block_when_url_not_set(self, incident):
+    def test_no_service_registry_block_when_url_not_set(self, incident):
         modal = _build_mitigated_modal(incident, CHANNEL_ID)
-        blocks = modal["blocks"]
-        context_blocks = [b for b in blocks if b.get("type") == "context"]
-        assert len(context_blocks) == 0
+        registry_blocks = [
+            b
+            for b in modal["blocks"]
+            if b.get("type") == "context"
+            and "service registry" in b["elements"][0]["text"]
+        ]
+        assert len(registry_blocks) == 0
+
+    def test_incident_page_hint_block_always_present(self, incident):
+        modal = _build_mitigated_modal(incident, CHANNEL_ID)
+        hint_blocks = [
+            b
+            for b in modal["blocks"]
+            if b.get("type") == "context"
+            and "incident page" in b["elements"][0]["text"]
+            and incident.incident_number in b["elements"][0]["text"]
+        ]
+        assert len(hint_blocks) == 1

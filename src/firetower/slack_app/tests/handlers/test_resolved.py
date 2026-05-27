@@ -20,8 +20,8 @@ def _make_resolved_view(
     impact_summary="Updated impact",
     impact_type_tags=("Degraded Service",),
     service_tier="T1",
-    affected_service_tags=(),
-    affected_region_tags=(),
+    affected_service_tags=("api-server",),
+    affected_region_tags=("us-east-1",),
 ):
     def _options(values):
         return [{"value": v} for v in values]
@@ -101,10 +101,9 @@ class TestResolvedModal:
         assert "affected_service_block" in block_ids
         assert "affected_region_block" in block_ids
 
-    def test_required_vs_optional_blocks(self, incident):
+    def test_all_blocks_required(self, incident):
         modal = _build_resolved_modal(incident, CHANNEL_ID)
         by_id = {b["block_id"]: b for b in modal["blocks"] if "block_id" in b}
-        # Required: not marked optional
         for required in (
             "captain_block",
             "severity_block",
@@ -113,11 +112,10 @@ class TestResolvedModal:
             "impact_summary_block",
             "impact_type_block",
             "service_tier_block",
+            "affected_service_block",
+            "affected_region_block",
         ):
             assert by_id[required].get("optional", False) is False
-        # Optional fields
-        assert by_id["affected_service_block"]["optional"] is True
-        assert by_id["affected_region_block"]["optional"] is True
 
     def test_contains_context_message(self, incident):
         modal = _build_resolved_modal(incident, CHANNEL_ID)
@@ -170,6 +168,16 @@ def impact_type_tag(db):
     return Tag.objects.create(name="Degraded Service", type=TagType.IMPACT_TYPE)
 
 
+@pytest.fixture
+def affected_service_tag(db):
+    return Tag.objects.create(name="api-server", type=TagType.AFFECTED_SERVICE)
+
+
+@pytest.fixture
+def affected_region_tag(db):
+    return Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
+
+
 @pytest.mark.django_db
 class TestResolvedSubmission:
     @patch("firetower.incidents.serializers.on_status_changed")
@@ -187,6 +195,8 @@ class TestResolvedSubmission:
         user,
         incident,
         impact_type_tag,
+        affected_service_tag,
+        affected_region_tag,
     ):
         mock_get_user.return_value = user
         ack = MagicMock()
@@ -214,6 +224,8 @@ class TestResolvedSubmission:
         user,
         incident,
         impact_type_tag,
+        affected_service_tag,
+        affected_region_tag,
     ):
         mock_get_user.return_value = user
         ack = MagicMock()
@@ -238,6 +250,8 @@ class TestResolvedSubmission:
         user,
         incident,
         impact_type_tag,
+        affected_service_tag,
+        affected_region_tag,
     ):
         mock_get_user.return_value = user
         ack = MagicMock()
@@ -318,6 +332,32 @@ class TestResolvedSubmission:
         call_kwargs = ack.call_args[1]
         assert call_kwargs["response_action"] == "errors"
         assert "service_tier_block" in call_kwargs["errors"]
+
+    def test_missing_affected_service_returns_error(self, incident):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_resolved_view(affected_service_tags=())
+
+        handle_resolved_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        call_kwargs = ack.call_args[1]
+        assert call_kwargs["response_action"] == "errors"
+        assert "affected_service_block" in call_kwargs["errors"]
+
+    def test_missing_affected_region_returns_error(self, incident):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_resolved_view(affected_region_tags=())
+
+        handle_resolved_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        call_kwargs = ack.call_args[1]
+        assert call_kwargs["response_action"] == "errors"
+        assert "affected_region_block" in call_kwargs["errors"]
 
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_captain_resolution_failure(self, mock_get_user, incident):

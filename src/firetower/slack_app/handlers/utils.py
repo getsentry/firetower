@@ -105,7 +105,7 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
                 "multiline": True,
                 "placeholder": {
                     "type": "plain_text",
-                    "text": "What is the user/business impact?",
+                    "text": "How is this affecting users?",
                 },
             },
             "label": {"type": "plain_text", "text": "Impact Summary"},
@@ -229,7 +229,10 @@ def build_incident_lifecycle_modal(
         "type": "plain_text_input",
         "action_id": "description",
         "multiline": True,
-        "placeholder": {"type": "plain_text", "text": "What's happening?"},
+        "placeholder": {
+            "type": "plain_text",
+            "text": "Additional relevant information",
+        },
     }
     if incident.description:
         description_element["initial_value"] = incident.description
@@ -238,10 +241,7 @@ def build_incident_lifecycle_modal(
         "type": "plain_text_input",
         "action_id": "impact_summary",
         "multiline": True,
-        "placeholder": {
-            "type": "plain_text",
-            "text": "What is the user/business impact?",
-        },
+        "placeholder": {"type": "plain_text", "text": "How is this affecting users?"},
     }
     if incident.impact_summary:
         impact_summary_element["initial_value"] = incident.impact_summary
@@ -254,7 +254,7 @@ def build_incident_lifecycle_modal(
         "type": "multi_external_select",
         "action_id": "impact_type_tags",
         "min_query_length": 0,
-        "placeholder": {"type": "plain_text", "text": "Select impact types"},
+        "placeholder": {"type": "plain_text", "text": "Type"},
     }
     if impact_type_initial:
         impact_type_element["initial_options"] = impact_type_initial
@@ -328,21 +328,21 @@ def build_incident_lifecycle_modal(
         },
         {
             "type": "input",
-            "block_id": "description_block",
-            "element": description_element,
-            "label": {"type": "plain_text", "text": "Description"},
-        },
-        {
-            "type": "input",
             "block_id": "impact_summary_block",
             "element": impact_summary_element,
             "label": {"type": "plain_text", "text": "Impact Summary"},
         },
         {
             "type": "input",
+            "block_id": "description_block",
+            "element": description_element,
+            "label": {"type": "plain_text", "text": "Description"},
+        },
+        {
+            "type": "input",
             "block_id": "impact_type_block",
             "element": impact_type_element,
-            "label": {"type": "plain_text", "text": "Impact Type"},
+            "label": {"type": "plain_text", "text": "Type of impact"},
         },
         {
             "type": "input",
@@ -366,21 +366,29 @@ def build_incident_lifecycle_modal(
             }
         )
 
+    incident_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
     blocks.extend(
         [
             {
                 "type": "input",
                 "block_id": "affected_service_block",
-                "optional": True,
                 "element": affected_service_element,
                 "label": {"type": "plain_text", "text": "Affected Service"},
             },
             {
                 "type": "input",
                 "block_id": "affected_region_block",
-                "optional": True,
                 "element": affected_region_element,
                 "label": {"type": "plain_text", "text": "Affected Region"},
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"Missing a service or region? Add it from the <{incident_url}|incident page>.",
+                    }
+                ],
             },
         ]
     )
@@ -412,6 +420,10 @@ def validate_lifecycle_form(form: dict[str, Any]) -> dict[str, str]:
         errors["impact_type_block"] = "Select at least one impact type."
     if not form["service_tier"]:
         errors["service_tier_block"] = "Service tier is required."
+    if not form["affected_service_tags"]:
+        errors["affected_service_block"] = "Select at least one affected service."
+    if not form["affected_region_tags"]:
+        errors["affected_region_block"] = "Select at least one affected region."
     return errors
 
 
