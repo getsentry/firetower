@@ -46,7 +46,7 @@ class IncidentStatus(models.TextChoices):
     MITIGATED = "Mitigated", "Mitigated"
     POSTMORTEM = "Postmortem", "Postmortem"
     DONE = "Done", "Done"
-    CANCELLED = "Cancelled", "Cancelled"
+    CANCELED = "Canceled", "Canceled"
 
 
 class IncidentSeverity(models.TextChoices):
@@ -333,7 +333,7 @@ class ActionItemStatus(models.TextChoices):
     TODO = "Todo", "Todo"
     IN_PROGRESS = "In Progress", "In Progress"
     DONE = "Done", "Done"
-    CANCELLED = "Cancelled", "Cancelled"
+    CANCELED = "Canceled", "Canceled"
 
 
 class ActionItemRelationType(models.TextChoices):
@@ -366,6 +366,7 @@ class ActionItem(models.Model):
         blank=True,
         related_name="action_items",
     )
+    priority = models.IntegerField(default=0)
     url = models.URLField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

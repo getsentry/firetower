@@ -70,12 +70,13 @@ class StatuspageConfig:
 
 @deserialize
 class LinearConfig:
-    client_id: str
-    client_secret: str
-    action_item_sync_throttle_seconds: int
+    client_id: str = ""
+    client_secret: str = ""
+    action_item_sync_throttle_seconds: int = 300
     team_id: str = ""
     project_id: str = ""
     sync_identifiers: bool = False
+    api_key: str = ""
 
 
 @deserialize

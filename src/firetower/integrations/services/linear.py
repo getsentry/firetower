@@ -19,7 +19,7 @@ LINEAR_STATE_TYPE_MAP = {
     "unstarted": "Todo",
     "started": "In Progress",
     "completed": "Done",
-    "cancelled": "Cancelled",
+    "canceled": "Canceled",
 }
 
 LINEAR_RELATION_TYPE_MAP = {
@@ -37,6 +37,7 @@ ISSUE_FIELDS = """
     identifier
     title
     url
+    priority
     state {
         type
     }
@@ -52,6 +53,7 @@ class LinearService:
         assert settings.LINEAR is not None
         self.client_id = settings.LINEAR.get("CLIENT_ID")
         self.client_secret = settings.LINEAR.get("CLIENT_SECRET")
+        self.api_key = settings.LINEAR.get("API_KEY")
         self._workflow_states_cache: dict[str, str] | None = None
 
     def _request_new_token(self) -> str | None:
@@ -93,6 +95,9 @@ class LinearService:
             return None
 
     def _get_access_token(self) -> str | None:
+        if self.api_key:
+            return self.api_key
+
         if not self.client_id or not self.client_secret:
             return None
 
@@ -105,11 +110,12 @@ class LinearService:
     def _make_graphql_request(
         self, query: str, variables: dict | None, access_token: str
     ) -> requests.Response:
+        auth_value = access_token if self.api_key else f"Bearer {access_token}"
         return requests.post(
             LINEAR_API_URL,
             json={"query": query, "variables": variables or {}},
             headers={
-                "Authorization": f"Bearer {access_token}",
+                "Authorization": auth_value,
                 "Content-Type": "application/json",
             },
             timeout=30,
@@ -127,6 +133,12 @@ class LinearService:
             response = self._make_graphql_request(query, variables, access_token)
 
             if response.status_code == 401:
+                if self.api_key:
+                    logger.error(
+                        "Linear API returned 401 with api_key — key is invalid or expired"
+                    )
+                    return None
+
                 logger.info("Linear token expired, requesting new token")
                 access_token = self._request_new_token()
                 if not access_token:
@@ -135,7 +147,9 @@ class LinearService:
                 response = self._make_graphql_request(query, variables, access_token)
 
             if not response.ok:
-                logger.error("Linear API returned %d", response.status_code)
+                logger.error(
+                    "Linear API returned %d: %s", response.status_code, response.text
+                )
                 return None
 
             data = response.json()
@@ -164,6 +178,7 @@ class LinearService:
             "title": issue["title"],
             "url": issue["url"],
             "status": status,
+            "priority": issue.get("priority", 0),
             "assignee_email": assignee.get("email"),
             "assignee_linear_id": assignee.get("id"),
             "relation_type": relation_type,

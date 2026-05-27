@@ -28,18 +28,27 @@ from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
+_linear_service: LinearService | None = None
 
-PAGEABLE_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
+
+def _get_linear_service() -> LinearService:
+    global _linear_service  # noqa: PLW0603
+    if _linear_service is None:
+        _linear_service = LinearService()
+    return _linear_service
+
+
+HIGH_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 
 DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
 
 
+# A None return means reminders are disabled (not set in config).
 def _get_statuspage_initial_reminder_delay_minutes() -> int | None:
     statuspage = getattr(settings, "STATUSPAGE", None)
-    if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES"):
-        return int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
-    return None
+    raw = statuspage.get("INITIAL_REMINDER_DELAY_MINUTES") if statuspage else None
+    return int(raw) if raw is not None else None
 
 
 def _get_statuspage_followup_reminder_delay_minutes() -> int | None:
@@ -51,9 +60,8 @@ def _get_statuspage_followup_reminder_delay_minutes() -> int | None:
 
 def _get_statuspage_warning_buffer_minutes() -> int:
     statuspage = getattr(settings, "STATUSPAGE", None)
-    if statuspage and statuspage.get("WARNING_BUFFER_MINUTES"):
-        return int(statuspage["WARNING_BUFFER_MINUTES"])
-    return DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
+    raw = statuspage.get("WARNING_BUFFER_MINUTES") if statuspage else None
+    return int(raw) if raw is not None else DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
 
 
 @dataclass
@@ -108,7 +116,7 @@ def page_for_channel(
     """
     paged: set[str] = set()
 
-    if severity not in PAGEABLE_SEVERITIES:
+    if severity not in HIGH_SEVERITIES:
         return paged
 
     pd_config = settings.PAGERDUTY
@@ -281,7 +289,7 @@ def _invite_oncall_to_channel(
     paged_policies: set[str] | None = None,
 ) -> None:
     """Invite on-call users to a channel. No DB access."""
-    if severity not in PAGEABLE_SEVERITIES:
+    if severity not in HIGH_SEVERITIES:
         return
 
     pd_config = settings.PAGERDUTY
@@ -415,7 +423,7 @@ def _create_status_channel_for_context(
     ctx: ChannelSetupContext, slack_service: SlackService
 ) -> None:
     """Create a companion status channel. No DB access."""
-    if ctx.severity not in PAGEABLE_SEVERITIES:
+    if ctx.severity not in HIGH_SEVERITIES:
         return
 
     if ctx.is_private:
@@ -921,7 +929,7 @@ def _sync_linear_title(incident: Incident) -> None:
         return
     sync_identifiers = settings.LINEAR.get("SYNC_IDENTIFIERS", False)
     try:
-        linear_service = LinearService()
+        linear_service = _get_linear_service()
         linear_service.update_issue(
             incident.linear_parent_issue_id,
             title=_linear_issue_title(incident, sync_identifiers=sync_identifiers),
@@ -985,7 +993,7 @@ def create_linear_parent_issue(
         return
 
     try:
-        linear_service = LinearService()
+        linear_service = _get_linear_service()
         project_id = str(linear_config.get("PROJECT_ID", "")) or None
         sync_identifiers = linear_config.get("SYNC_IDENTIFIERS", False)
         title = _linear_issue_title(incident, sync_identifiers=sync_identifiers)
@@ -1066,7 +1074,7 @@ def _schedule_statuspage_reminder(
     reference_time: datetime | None = None,
     allow_update: bool = False,
 ) -> None:
-    if incident.severity not in PAGEABLE_SEVERITIES:
+    if incident.severity not in HIGH_SEVERITIES:
         return
 
     delay_minutes = _get_statuspage_initial_reminder_delay_minutes()
@@ -1084,7 +1092,7 @@ def _schedule_statuspage_reminder(
         "kwargs": f'{{"incident_id": {incident.id}, "scheduled_at": "{reference_time.isoformat()}"}}',
         "schedule_type": Schedule.ONCE,
         "next_run": next_run,
-        "repeats": 1,
+        "repeats": -1,
     }
     if allow_update:
         Schedule.objects.update_or_create(name=schedule_name, defaults=defaults)
@@ -1284,8 +1292,8 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
 
     if (
-        old_severity not in PAGEABLE_SEVERITIES
-        and incident.severity in PAGEABLE_SEVERITIES
+        old_severity not in HIGH_SEVERITIES
+        and incident.severity in HIGH_SEVERITIES
         and incident.status in PAGEABLE_STATUSES
     ):
         try:

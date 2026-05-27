@@ -2,17 +2,17 @@ import functools
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 
 from datadog import statsd
 from django.conf import settings
 from django.utils import timezone
 from django_q.tasks import Schedule
 
+from firetower.incidents.hooks import HIGH_SEVERITIES
 from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
-    IncidentSeverity,
     IncidentStatus,
 )
 from firetower.integrations.services.slack import SlackService
@@ -35,8 +35,7 @@ logger = logging.getLogger(__name__)
 class NamedFunction(Protocol):
     __name__: str
 
-    def __call__(self) -> None:
-        pass
+    def __call__(self, *args: Any, **kwargs: Any) -> None: ...
 
 
 def datadog_log(f: NamedFunction) -> NamedFunction:
@@ -44,10 +43,10 @@ def datadog_log(f: NamedFunction) -> NamedFunction:
     tags = [f"task:{task_name}"]
 
     @functools.wraps(f)
-    def wrapper() -> None:
+    def wrapper(*args: Any, **kwargs: Any) -> None:
         statsd.increment("django_q.task.run", 1, tags)
         try:
-            f()
+            f(*args, **kwargs)
         except Exception as e:
             statsd.increment("django_q.task.error", 1, tags)
             logger.error(
@@ -79,7 +78,6 @@ def schedule_demo() -> None:
         logger.info("No incidents found.")
 
 
-STATUSPAGE_REMINDER_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 STATUSPAGE_REMINDER_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 
 STATUSPAGE_REMINDER_MESSAGE = (
@@ -99,32 +97,11 @@ STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE = (
 )
 
 
+@datadog_log
 def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) -> None:
-    tags = ["task:send_statuspage_reminder"]
-    statsd.increment("django_q.task.run", 1, tags)
-    try:
-        _send_statuspage_reminder(incident_id, scheduled_at=scheduled_at)
-    except Exception as e:
-        statsd.increment("django_q.task.error", 1, tags)
-        logger.error(
-            f"Error in send_statuspage_reminder for incident {incident_id}: {e}",
-            exc_info=True,
-        )
-        raise
-    else:
-        statsd.increment("django_q.task.success", 1, tags)
-
-
-def _send_statuspage_reminder(
-    incident_id: int, scheduled_at: str | None = None
-) -> None:
-    # Only alert if we're configured to.
     statuspage = getattr(settings, "STATUSPAGE", None)
-    slo_minutes = (
-        int(statuspage["INITIAL_REMINDER_DELAY_MINUTES"])
-        if statuspage and statuspage.get("INITIAL_REMINDER_DELAY_MINUTES")
-        else None
-    )
+    raw = statuspage.get("INITIAL_REMINDER_DELAY_MINUTES") if statuspage else None
+    slo_minutes = int(raw) if raw is not None else None
     if slo_minutes is None:
         return
 
@@ -135,7 +112,7 @@ def _send_statuspage_reminder(
         return
 
     # Only alert if the incident is at least a P0 or P1.
-    if incident.severity not in STATUSPAGE_REMINDER_SEVERITIES:
+    if incident.severity not in HIGH_SEVERITIES:
         return
     if incident.status not in STATUSPAGE_REMINDER_STATUSES:
         return

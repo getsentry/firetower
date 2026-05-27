@@ -449,7 +449,7 @@ class TestOnStatusChanged:
     def test_does_not_trigger_dump_on_other_statuses(self, mock_slack, mock_dump_async):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
-        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELLED):
+        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELED):
             incident = Incident.objects.create(
                 title="Test",
                 severity=IncidentSeverity.P1,
@@ -2740,7 +2740,7 @@ class TestScheduleStatuspageReminder:
         assert stored_kwargs["incident_id"] == incident.id
         assert stored_kwargs["scheduled_at"] == incident.created_at.isoformat()
         assert schedule.schedule_type == Schedule.ONCE
-        assert schedule.repeats == 1
+        assert schedule.repeats == -1
 
     def test_creates_schedule_for_p1(self):
         incident = self._make_incident(severity=IncidentSeverity.P1)
@@ -3033,12 +3033,12 @@ class TestScheduleStatuspageFollowupReminder:
 
 class TestCreateLinearParentIssueBookmark:
     @patch("firetower.incidents.hooks._slack_service")
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     def test_adds_bookmark_when_channel_id_provided(
-        self, mock_linear_cls, mock_slack, settings
+        self, mock_get_linear, mock_slack, settings
     ):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        mock_linear = mock_linear_cls.return_value
+        mock_linear = mock_get_linear.return_value
         mock_linear.create_issue.return_value = {
             "id": "issue-1",
             "url": "https://linear.app/team/issue/ENG-123",
@@ -3056,12 +3056,12 @@ class TestCreateLinearParentIssueBookmark:
         )
 
     @patch("firetower.incidents.hooks._slack_service")
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     def test_no_bookmark_when_no_channel_id(
-        self, mock_linear_cls, mock_slack, settings
+        self, mock_get_linear, mock_slack, settings
     ):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        mock_linear = mock_linear_cls.return_value
+        mock_linear = mock_get_linear.return_value
         mock_linear.create_issue.return_value = {
             "id": "issue-1",
             "url": "https://linear.app/team/issue/ENG-123",
@@ -3077,12 +3077,12 @@ class TestCreateLinearParentIssueBookmark:
         mock_slack.add_bookmark.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     def test_bookmark_failure_does_not_raise(
-        self, mock_linear_cls, mock_slack, settings
+        self, mock_get_linear, mock_slack, settings
     ):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        mock_linear = mock_linear_cls.return_value
+        mock_linear = mock_get_linear.return_value
         mock_linear.create_issue.return_value = {
             "id": "issue-1",
             "url": "https://linear.app/team/issue/ENG-123",
@@ -3100,12 +3100,12 @@ class TestCreateLinearParentIssueBookmark:
         assert link.url == "https://linear.app/team/issue/ENG-123"
 
     @patch("firetower.incidents.hooks._slack_service")
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     def test_no_bookmark_when_linear_creation_fails(
-        self, mock_linear_cls, mock_slack, settings
+        self, mock_get_linear, mock_slack, settings
     ):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        mock_linear = mock_linear_cls.return_value
+        mock_linear = mock_get_linear.return_value
         mock_linear.create_issue.return_value = None
 
         incident = Incident.objects.create(

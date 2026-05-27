@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import asdict
 
 from django.conf import settings
-from django.db.models import Count, QuerySet
+from django.db.models import Case, Count, F, QuerySet, When
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, serializers
@@ -363,7 +363,13 @@ class ActionItemListView(generics.ListAPIView):
     pagination_class = None
 
     def get_queryset(self) -> QuerySet[ActionItem]:
-        return self._get_incident().action_items.select_related("assignee__userprofile")
+        return (
+            self._get_incident()
+            .action_items.select_related("assignee__userprofile")
+            .order_by(
+                Case(When(priority=0, then=5), default=F("priority")), "created_at"
+            )
+        )
 
     def _get_incident(self) -> Incident:
         if not hasattr(self, "_incident"):
