@@ -1913,6 +1913,9 @@ class TestCreateStatusChannel:
     def test_creates_public_channel_for_public_incident(self, mock_slack, settings):
         settings.SLACK = {"ALWAYS_INVITED_IDS": []}
         mock_slack.create_channel.return_value = "C_STATUS"
+        mock_slack.build_channel_url.return_value = (
+            "https://slack.com/archives/C_STATUS"
+        )
         incident = Incident.objects.create(
             title="Public outage",
             severity=IncidentSeverity.P0,
