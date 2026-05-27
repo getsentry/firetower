@@ -52,9 +52,8 @@ def _get_statuspage_initial_reminder_delay_minutes() -> int | None:
 
 def _get_statuspage_followup_reminder_delay_minutes() -> int | None:
     statuspage = getattr(settings, "STATUSPAGE", None)
-    if statuspage and statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES"):
-        return int(statuspage["FOLLOWUP_REMINDER_DELAY_MINUTES"])
-    return None
+    raw = statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES") if statuspage else None
+    return int(raw) if raw is not None else None
 
 
 def _get_statuspage_warning_buffer_minutes() -> int:

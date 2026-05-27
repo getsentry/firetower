@@ -9,11 +9,10 @@ from django.conf import settings
 from django.utils import timezone
 from django_q.tasks import Schedule
 
-from firetower.incidents.hooks import HIGH_SEVERITIES
+from firetower.incidents.hooks import ACTIVE_STATUSES, HIGH_SEVERITIES
 from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
-    IncidentStatus,
 )
 from firetower.integrations.services.slack import SlackService
 
@@ -78,7 +77,7 @@ def schedule_demo() -> None:
         logger.info("No incidents found.")
 
 
-STATUSPAGE_REMINDER_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
+STATUSPAGE_REMINDER_STATUSES = ACTIVE_STATUSES
 
 STATUSPAGE_REMINDER_MESSAGE = (
     ":rotating_light: *Statuspage Reminder* :rotating_light:\n"
@@ -193,11 +192,8 @@ def send_statuspage_followup_reminder(
         return
 
     statuspage = getattr(settings, "STATUSPAGE", None)
-    followup_minutes = (
-        int(statuspage["FOLLOWUP_REMINDER_DELAY_MINUTES"])
-        if statuspage and statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES")
-        else None
-    )
+    raw = statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES") if statuspage else None
+    followup_minutes = int(raw) if raw is not None else None
     if followup_minutes is None:
         return
 
