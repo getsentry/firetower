@@ -93,8 +93,5 @@ def handle_mitigated_submission(ack: Any, body: dict, view: dict, client: Any) -
     incident_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
     client.chat_postMessage(
         channel=channel_id,
-        text=(
-            f"<{incident_url}|{incident.incident_number}> has been marked Mitigated.\n"
-            f"Track follow-ups via the Action Items section on the incident page."
-        ),
+        text=f"<{incident_url}|{incident.incident_number}> has been marked Mitigated.",
     )

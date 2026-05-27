@@ -337,10 +337,6 @@ def handle_new_incident_submission(
         dm_message += f"Incident: {incident_url}\n"
         if channel_id:
             dm_message += f"Slack channel: <#{channel_id}>"
-        dm_message += (
-            "\n\nYou'll be asked to fill in impact details and affected systems at "
-            "`/inc mitigated` and `/inc resolved`. You can also edit any field with `/inc update`."
-        )
 
         client.chat_postMessage(channel=slack_user_id, text=dm_message)
 

@@ -167,7 +167,6 @@ class TestMitigatedSubmission:
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Mitigated" in msg
-        assert "Action Items" in msg
 
     @patch("firetower.incidents.serializers.on_status_changed")
     @patch("firetower.incidents.serializers.on_title_changed")
