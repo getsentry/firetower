@@ -82,21 +82,6 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
         },
         {
             "type": "input",
-            "block_id": "description_block",
-            "optional": True,
-            "element": {
-                "type": "plain_text_input",
-                "action_id": "description",
-                "multiline": True,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "What's happening?",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Description"},
-        },
-        {
-            "type": "input",
             "block_id": "impact_summary_block",
             "optional": True,
             "element": {
@@ -109,6 +94,21 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
                 },
             },
             "label": {"type": "plain_text", "text": "Impact Summary"},
+        },
+        {
+            "type": "input",
+            "block_id": "description_block",
+            "optional": True,
+            "element": {
+                "type": "plain_text_input",
+                "action_id": "description",
+                "multiline": True,
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "What's happening?",
+                },
+            },
+            "label": {"type": "plain_text", "text": "Description"},
         },
     ]
 
