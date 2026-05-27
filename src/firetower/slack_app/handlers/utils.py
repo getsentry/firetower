@@ -360,7 +360,7 @@ def build_incident_lifecycle_modal(
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f"<{service_registry_url}|See service registry>",
+                        "text": f"<{service_registry_url}|Service Registry>",
                     }
                 ],
             }

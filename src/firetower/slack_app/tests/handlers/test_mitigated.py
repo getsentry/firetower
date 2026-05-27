@@ -313,7 +313,7 @@ class TestServiceRegistryBlock:
             b
             for b in modal["blocks"]
             if b.get("type") == "context"
-            and "service registry" in b["elements"][0]["text"]
+            and "Service Registry" in b["elements"][0]["text"]
         ]
         assert len(registry_blocks) == 0
 
