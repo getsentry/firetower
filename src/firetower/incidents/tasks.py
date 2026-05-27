@@ -9,7 +9,12 @@ from django.conf import settings
 from django.utils import timezone
 from django_q.tasks import Schedule
 
-from firetower.incidents.hooks import ACTIVE_STATUSES, HIGH_SEVERITIES
+from firetower.incidents.hooks import (
+    ACTIVE_STATUSES,
+    HIGH_SEVERITIES,
+    get_statuspage_followup_reminder_delay_minutes,
+    get_statuspage_initial_reminder_delay_minutes,
+)
 from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
@@ -98,9 +103,7 @@ STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE = (
 
 @datadog_log
 def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) -> None:
-    statuspage = getattr(settings, "STATUSPAGE", None)
-    raw = statuspage.get("INITIAL_REMINDER_DELAY_MINUTES") if statuspage else None
-    slo_minutes = int(raw) if raw is not None else None
+    slo_minutes = get_statuspage_initial_reminder_delay_minutes()
     if slo_minutes is None:
         return
 
@@ -159,9 +162,7 @@ def send_statuspage_followup_reminder(
     scheduled_at: str | None = None,
     reschedule_count: int = 0,
 ) -> None:
-    statuspage = getattr(settings, "STATUSPAGE", None)
-    raw = statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES") if statuspage else None
-    followup_minutes = int(raw) if raw is not None else None
+    followup_minutes = get_statuspage_followup_reminder_delay_minutes()
     if followup_minutes is None:
         return
 

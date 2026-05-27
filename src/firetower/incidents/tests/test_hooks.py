@@ -2719,7 +2719,7 @@ class TestScheduleStatuspageReminder:
     @pytest.fixture(autouse=True)
     def _configure_reminder_delay(self):
         with patch(
-            "firetower.incidents.hooks._get_statuspage_initial_reminder_delay_minutes",
+            "firetower.incidents.hooks.get_statuspage_initial_reminder_delay_minutes",
             return_value=self.CONFIGURED_DELAY_MINUTES,
         ):
             yield
@@ -2821,7 +2821,7 @@ class TestScheduleStatuspageReminder:
     def test_schedule_clamps_negative_buffer_offset(self):
         incident = self._make_incident(severity=IncidentSeverity.P0)
         with patch(
-            "firetower.incidents.hooks._get_statuspage_warning_buffer_minutes",
+            "firetower.incidents.hooks.get_statuspage_warning_buffer_minutes",
             return_value=self.CONFIGURED_DELAY_MINUTES + 10,
         ):
             _schedule_statuspage_reminder(incident)
@@ -2831,7 +2831,7 @@ class TestScheduleStatuspageReminder:
 
     def test_skips_when_delay_not_configured(self):
         with patch(
-            "firetower.incidents.hooks._get_statuspage_initial_reminder_delay_minutes",
+            "firetower.incidents.hooks.get_statuspage_initial_reminder_delay_minutes",
             return_value=None,
         ):
             incident = self._make_incident(severity=IncidentSeverity.P0)
@@ -2917,7 +2917,7 @@ class TestScheduleStatuspageFollowupReminder:
     @pytest.fixture(autouse=True)
     def _configure_followup_delay(self):
         with patch(
-            "firetower.incidents.hooks._get_statuspage_followup_reminder_delay_minutes",
+            "firetower.incidents.hooks.get_statuspage_followup_reminder_delay_minutes",
             return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
         ):
             yield
@@ -3004,7 +3004,7 @@ class TestScheduleStatuspageFollowupReminder:
 
     def test_skips_when_followup_delay_not_configured(self):
         with patch(
-            "firetower.incidents.hooks._get_statuspage_followup_reminder_delay_minutes",
+            "firetower.incidents.hooks.get_statuspage_followup_reminder_delay_minutes",
             return_value=None,
         ):
             incident = self._make_incident(severity=IncidentSeverity.P0)

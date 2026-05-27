@@ -459,7 +459,7 @@ class TestSendStatuspageFollowupReminder:
             patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
             patch("firetower.incidents.tasks.timezone") as mock_tz,
             patch(
-                "firetower.incidents.hooks._get_statuspage_followup_reminder_delay_minutes",
+                "firetower.incidents.hooks.get_statuspage_followup_reminder_delay_minutes",
                 return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
             ),
         ):
@@ -490,7 +490,7 @@ class TestSendStatuspageFollowupReminder:
         with (
             patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
             patch(
-                "firetower.incidents.hooks._get_statuspage_followup_reminder_delay_minutes",
+                "firetower.incidents.hooks.get_statuspage_followup_reminder_delay_minutes",
                 return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
             ),
         ):
@@ -611,7 +611,7 @@ class TestSendStatuspageFollowupReminder:
         with (
             patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
             patch(
-                "firetower.incidents.hooks._get_statuspage_followup_reminder_delay_minutes",
+                "firetower.incidents.hooks.get_statuspage_followup_reminder_delay_minutes",
                 return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
             ),
         ):
