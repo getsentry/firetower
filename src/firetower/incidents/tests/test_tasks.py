@@ -448,14 +448,25 @@ class TestSendStatuspageFollowupReminder:
         mock_slack = MagicMock()
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
+        now = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+        offset_minutes = (
+            self.CONFIGURED_FOLLOWUP_DELAY_MINUTES
+            - self.CONFIGURED_WARNING_BUFFER_MINUTES
+        )
+        scheduled_at = now - timedelta(minutes=offset_minutes)
+
         with (
             patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch("firetower.incidents.tasks.timezone") as mock_tz,
             patch(
                 "firetower.incidents.hooks._get_statuspage_followup_reminder_delay_minutes",
                 return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
             ),
         ):
-            send_statuspage_followup_reminder(incident.id)
+            mock_tz.now.return_value = now
+            send_statuspage_followup_reminder(
+                incident.id, scheduled_at=scheduled_at.isoformat()
+            )
 
         expected_msg = STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE.format(
             severity="P0",
