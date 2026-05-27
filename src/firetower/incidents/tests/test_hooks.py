@@ -2974,7 +2974,7 @@ class TestScheduleStatuspageFollowupReminder:
 
     def test_skips_for_cancelled_status(self):
         incident = self._make_incident(
-            severity=IncidentSeverity.P0, status=IncidentStatus.CANCELLED
+            severity=IncidentSeverity.P0, status=IncidentStatus.CANCELED
         )
         schedule_statuspage_followup_reminder(incident)
 
