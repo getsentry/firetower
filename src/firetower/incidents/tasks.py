@@ -154,23 +154,8 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
     slack.post_message(channel_id, message)
 
 
+@datadog_log
 def send_statuspage_followup_reminder(incident_id: int) -> None:
-    tags = ["task:send_statuspage_followup_reminder"]
-    statsd.increment("django_q.task.run", 1, tags)
-    try:
-        _send_statuspage_followup_reminder(incident_id)
-    except Exception as e:
-        statsd.increment("django_q.task.error", 1, tags)
-        logger.error(
-            f"Error in send_statuspage_followup_reminder for incident {incident_id}: {e}",
-            exc_info=True,
-        )
-        raise
-    else:
-        statsd.increment("django_q.task.success", 1, tags)
-
-
-def _send_statuspage_followup_reminder(incident_id: int) -> None:
     try:
         incident = Incident.objects.get(pk=incident_id)
     except Incident.DoesNotExist:
