@@ -380,6 +380,8 @@ def build_incident_lifecycle_modal(
                 "element": affected_region_element,
                 "label": {"type": "plain_text", "text": "Affected Regions"},
             },
+            # TODO(RELENG-768): drop this hint once inline tag creation
+            # ("+ Create 'X'" synthetic option) lands for service/region.
             {
                 "type": "context",
                 "elements": [
