@@ -175,7 +175,7 @@ def _send_statuspage_followup_reminder(incident_id: int) -> None:
         )
         return
 
-    if incident.severity not in STATUSPAGE_REMINDER_SEVERITIES:
+    if incident.severity not in HIGH_SEVERITIES:
         return
     if incident.status not in STATUSPAGE_REMINDER_STATUSES:
         return
