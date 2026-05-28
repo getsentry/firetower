@@ -11,7 +11,7 @@ from django.conf import settings
 from django.db import transaction
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
-from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.integrations.services.genai import GenAIService, parse_key_timestamps
 from firetower.integrations.services.notion import NotionService
@@ -182,19 +182,23 @@ def _backfill_milestones(incident: Any, timeline_md: str) -> None:
     if not timestamps:
         return
 
-    incident.refresh_from_db()
-    data = {
-        field: value
-        for field, value in timestamps.items()
-        if getattr(incident, field) is None
-    }
-    if not data:
-        return
-
-    serializer = IncidentWriteSerializer(instance=incident, data=data, partial=True)
     try:
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        with transaction.atomic():
+            # Lock the row to prevent a TOCTOU race with concurrent user edits.
+            incident = Incident.objects.select_for_update().get(pk=incident.pk)
+            data = {
+                field: value
+                for field, value in timestamps.items()
+                if getattr(incident, field) is None
+            }
+            if not data:
+                return
+
+            serializer = IncidentWriteSerializer(
+                instance=incident, data=data, partial=True
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
         logger.debug(
             "Backfilled milestone fields %s for incident %s",
             list(data.keys()),
