@@ -441,6 +441,25 @@ class TestSendStatuspageReminder:
         msg = mock_slack.post_message.call_args[0][1]
         assert "\nJane Doe" in msg
 
+    def test_escapes_ic_name_for_slack(self):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Jane <script>",
+            last_name="O'Doe & Co",
+        )
+        incident = self._make_incident(severity=IncidentSeverity.P0, captain=captain)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            send_statuspage_reminder(incident.id)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "Jane &lt;script&gt; O'Doe &amp; Co" in msg
+
 
 @pytest.mark.django_db
 class TestSendStatuspageFollowupReminder:
@@ -721,3 +740,33 @@ class TestSendStatuspageFollowupReminder:
 
         msg = mock_slack.post_message.call_args[0][1]
         assert "\nJane Doe" in msg
+
+    def test_escapes_ic_name_for_slack(self):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Jane <script>",
+            last_name="O'Doe & Co",
+        )
+        incident = self._make_incident(severity=IncidentSeverity.P0, captain=captain)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch(
+                "firetower.incidents.tasks.get_statuspage_followup_reminder_delay_minutes",
+                return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
+            ),
+        ):
+            send_statuspage_followup_reminder(incident.id)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "Jane &lt;script&gt; O'Doe &amp; Co" in msg

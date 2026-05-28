@@ -20,7 +20,7 @@ from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
 )
-from firetower.integrations.services.slack import SlackService
+from firetower.integrations.services.slack import SlackService, escape_slack_text
 
 SCHEDULES = {
     "schedule_demo": {
@@ -111,7 +111,7 @@ def _build_ic_mention(incident: Incident) -> str:
     if slack_id:
         return f"\n<@{slack_id}>"
     name = incident.captain.get_full_name() or incident.captain.username
-    return f"\n{name}"
+    return f"\n{escape_slack_text(name)}"
 
 
 @datadog_log
