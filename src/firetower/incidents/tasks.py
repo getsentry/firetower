@@ -82,7 +82,7 @@ def schedule_demo() -> None:
         logger.info("No incidents found.")
 
 
-MAX_FOLLOWUP_RESCHEDULES = 48
+MAX_FOLLOWUP_RESCHEDULES = 20
 
 STATUSPAGE_REMINDER_MESSAGE = (
     ":rotating_light: *Statuspage Reminder* :rotating_light:\n"
