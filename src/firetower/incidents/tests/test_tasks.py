@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 from django.conf import settings
+from django_q.models import Schedule
 
 from firetower.incidents.models import (
     ExternalLink,
@@ -12,9 +13,11 @@ from firetower.incidents.models import (
     IncidentStatus,
 )
 from firetower.incidents.tasks import (
+    STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE,
     STATUSPAGE_REMINDER_MESSAGE,
     datadog_log,
     schedule_demo,
+    send_statuspage_followup_reminder,
     send_statuspage_reminder,
 )
 
@@ -395,3 +398,223 @@ class TestSendStatuspageReminder:
             send_statuspage_reminder(incident.id)
 
         mock_slack.post_message.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestSendStatuspageFollowupReminder:
+    CONFIGURED_FOLLOWUP_DELAY_MINUTES = 30
+    CONFIGURED_WARNING_BUFFER_MINUTES = 5
+
+    @pytest.fixture(autouse=True)
+    def _configure_statuspage(self):
+        statuspage_settings = {
+            "API_KEY": "test",
+            "PAGE_ID": "test",
+            "URL": "https://test.statuspage.io/",
+            "INITIAL_REMINDER_DELAY_MINUTES": 15,
+            "FOLLOWUP_REMINDER_DELAY_MINUTES": self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
+            "WARNING_BUFFER_MINUTES": self.CONFIGURED_WARNING_BUFFER_MINUTES,
+        }
+        with patch.object(settings, "STATUSPAGE", statuspage_settings):
+            yield
+
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "status": IncidentStatus.ACTIVE,
+            "severity": IncidentSeverity.P0,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def _make_link(
+        self, incident, link_type, url="https://sentry.slack.com/archives/C12345"
+    ):
+        return ExternalLink.objects.create(
+            incident=incident,
+            type=link_type,
+            url=url,
+        )
+
+    def test_posts_followup_reminder_when_statuspage_exists(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        now = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+        offset_minutes = (
+            self.CONFIGURED_FOLLOWUP_DELAY_MINUTES
+            - self.CONFIGURED_WARNING_BUFFER_MINUTES
+        )
+        scheduled_at = now - timedelta(minutes=offset_minutes)
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch("firetower.incidents.tasks.timezone") as mock_tz,
+            patch(
+                "firetower.incidents.tasks.get_statuspage_followup_reminder_delay_minutes",
+                return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
+            ),
+        ):
+            mock_tz.now.return_value = now
+            send_statuspage_followup_reminder(
+                incident.id, scheduled_at=scheduled_at.isoformat()
+            )
+
+        expected_msg = STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE.format(
+            severity="P0",
+            slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc"),
+            minutes_until_due=self.CONFIGURED_WARNING_BUFFER_MINUTES,
+        )
+        mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
+
+    def test_reschedules_after_posting(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch(
+                "firetower.incidents.tasks.get_statuspage_followup_reminder_delay_minutes",
+                return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
+            ),
+        ):
+            send_statuspage_followup_reminder(incident.id)
+
+        assert Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_when_no_statuspage(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            send_statuspage_followup_reminder(incident.id)
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_for_p2_severity(self):
+        incident = self._make_incident(severity=IncidentSeverity.P2)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            send_statuspage_followup_reminder(incident.id)
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_for_done_status(self):
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0, status=IncidentStatus.DONE
+        )
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            send_statuspage_followup_reminder(incident.id)
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_when_followup_delay_not_configured(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch.object(
+                settings,
+                "STATUSPAGE",
+                {
+                    "API_KEY": "test",
+                    "PAGE_ID": "test",
+                    "URL": "https://test.statuspage.io/",
+                    "INITIAL_REMINDER_DELAY_MINUTES": 15,
+                    "FOLLOWUP_REMINDER_DELAY_MINUTES": None,
+                    "WARNING_BUFFER_MINUTES": 0,
+                },
+            ),
+        ):
+            send_statuspage_followup_reminder(incident.id)
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_when_incident_not_found(self):
+        mock_slack = MagicMock()
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            send_statuspage_followup_reminder(99999)
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_when_no_slack_link(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            send_statuspage_followup_reminder(incident.id)
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_posts_for_mitigated_status(self):
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0, status=IncidentStatus.MITIGATED
+        )
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch(
+                "firetower.incidents.tasks.get_statuspage_followup_reminder_delay_minutes",
+                return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
+            ),
+        ):
+            send_statuspage_followup_reminder(incident.id)
+
+        mock_slack.post_message.assert_called_once()

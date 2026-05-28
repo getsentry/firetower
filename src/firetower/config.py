@@ -64,6 +64,7 @@ class StatuspageConfig:
     page_id: str
     url: str
     initial_reminder_delay_minutes: int | None = None
+    followup_reminder_delay_minutes: int | None = None
     warning_buffer_minutes: int = 0
 
 

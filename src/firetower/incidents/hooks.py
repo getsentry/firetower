@@ -39,19 +39,24 @@ def _get_linear_service() -> LinearService:
 
 
 HIGH_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
-PAGEABLE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
+ACTIVE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 
 DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
 
 
-# A None return means reminders are disabled (not set in config).
 def get_statuspage_initial_reminder_delay_minutes() -> int | None:
     statuspage = getattr(settings, "STATUSPAGE", None)
     raw = statuspage.get("INITIAL_REMINDER_DELAY_MINUTES") if statuspage else None
     return int(raw) if raw is not None else None
 
 
-def _get_statuspage_warning_buffer_minutes() -> int:
+def get_statuspage_followup_reminder_delay_minutes() -> int | None:
+    statuspage = getattr(settings, "STATUSPAGE", None)
+    raw = statuspage.get("FOLLOWUP_REMINDER_DELAY_MINUTES") if statuspage else None
+    return int(raw) if raw is not None else None
+
+
+def get_statuspage_warning_buffer_minutes() -> int:
     statuspage = getattr(settings, "STATUSPAGE", None)
     raw = statuspage.get("WARNING_BUFFER_MINUTES") if statuspage else None
     return int(raw) if raw is not None else DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
@@ -1097,7 +1102,7 @@ def _schedule_statuspage_reminder(
         reference_time = incident.created_at
 
     schedule_name = f"statuspage_reminder_{incident.id}"
-    offset_minutes = max(0, delay_minutes - _get_statuspage_warning_buffer_minutes())
+    offset_minutes = max(0, delay_minutes - get_statuspage_warning_buffer_minutes())
     next_run = reference_time + timedelta(minutes=offset_minutes)
     defaults = {
         "func": "firetower.incidents.tasks.send_statuspage_reminder",
@@ -1110,6 +1115,37 @@ def _schedule_statuspage_reminder(
         Schedule.objects.update_or_create(name=schedule_name, defaults=defaults)
     else:
         Schedule.objects.get_or_create(name=schedule_name, defaults=defaults)
+
+
+def schedule_statuspage_followup_reminder(
+    incident: Incident, *, reschedule_count: int = 0
+) -> None:
+    if incident.severity not in HIGH_SEVERITIES:
+        return
+    if incident.status not in ACTIVE_STATUSES:
+        return
+
+    delay_minutes = get_statuspage_followup_reminder_delay_minutes()
+    if delay_minutes is None:
+        return
+
+    schedule_name = f"statuspage_followup_reminder_{incident.id}"
+    now = timezone.now()
+    offset_minutes = max(1, delay_minutes - get_statuspage_warning_buffer_minutes())
+    Schedule.objects.update_or_create(
+        name=schedule_name,
+        defaults={
+            "func": "firetower.incidents.tasks.send_statuspage_followup_reminder",
+            "kwargs": (
+                f'{{"incident_id": {incident.id},'
+                f' "scheduled_at": "{now.isoformat()}",'
+                f' "reschedule_count": {reschedule_count}}}'
+            ),
+            "schedule_type": Schedule.ONCE,
+            "next_run": now + timedelta(minutes=offset_minutes),
+            "repeats": -1,
+        },
+    )
 
 
 def on_incident_created(incident: Incident) -> None:
@@ -1282,7 +1318,7 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
     if (
         old_severity not in HIGH_SEVERITIES
         and incident.severity in HIGH_SEVERITIES
-        and incident.status in PAGEABLE_STATUSES
+        and incident.status in ACTIVE_STATUSES
     ):
         try:
             channel_id = _get_channel_id(incident)
@@ -1320,6 +1356,13 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         except Exception:
             logger.exception(
                 f"Failed to schedule statuspage reminder for incident {incident.id}"
+            )
+
+        try:
+            schedule_statuspage_followup_reminder(incident)
+        except Exception:
+            logger.exception(
+                f"Failed to schedule statuspage followup reminder for incident {incident.id}"
             )
 
 

@@ -27,6 +27,7 @@ from firetower.incidents.hooks import (
     on_title_changed,
     on_visibility_changed,
     page_for_channel,
+    schedule_statuspage_followup_reminder,
 )
 from firetower.incidents.models import (
     ExternalLink,
@@ -2820,7 +2821,7 @@ class TestScheduleStatuspageReminder:
     def test_schedule_clamps_negative_buffer_offset(self):
         incident = self._make_incident(severity=IncidentSeverity.P0)
         with patch(
-            "firetower.incidents.hooks._get_statuspage_warning_buffer_minutes",
+            "firetower.incidents.hooks.get_statuspage_warning_buffer_minutes",
             return_value=self.CONFIGURED_DELAY_MINUTES + 10,
         ):
             _schedule_statuspage_reminder(incident)
@@ -2907,6 +2908,133 @@ class TestScheduleStatuspageReminder:
         assert not Schedule.objects.filter(
             name=f"statuspage_reminder_{incident.id}"
         ).exists()
+
+
+@pytest.mark.django_db
+class TestScheduleStatuspageFollowupReminder:
+    CONFIGURED_FOLLOWUP_DELAY_MINUTES = 30
+
+    @pytest.fixture(autouse=True)
+    def _configure_followup_delay(self):
+        with patch(
+            "firetower.incidents.hooks.get_statuspage_followup_reminder_delay_minutes",
+            return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
+        ):
+            yield
+
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "status": IncidentStatus.ACTIVE,
+            "severity": IncidentSeverity.P0,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def test_creates_schedule_for_p0(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        schedule_statuspage_followup_reminder(incident)
+
+        schedule = Schedule.objects.get(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        )
+        assert (
+            schedule.func
+            == "firetower.incidents.tasks.send_statuspage_followup_reminder"
+        )
+        parsed_kwargs = ast.literal_eval(schedule.kwargs)
+        assert parsed_kwargs["incident_id"] == incident.id
+        assert "scheduled_at" in parsed_kwargs
+        assert parsed_kwargs["reschedule_count"] == 0
+        assert schedule.schedule_type == Schedule.ONCE
+        assert schedule.repeats == -1
+
+    def test_creates_schedule_for_p1(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        schedule_statuspage_followup_reminder(incident)
+
+        assert Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_p2(self):
+        incident = self._make_incident(severity=IncidentSeverity.P2)
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_done_status(self):
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0, status=IncidentStatus.DONE
+        )
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_cancelled_status(self):
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0, status=IncidentStatus.CANCELED
+        )
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_schedule_next_run_uses_configured_delay(self):
+        before = timezone.now()
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        schedule_statuspage_followup_reminder(incident)
+        after = timezone.now()
+
+        schedule = Schedule.objects.get(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        )
+        delay = (
+            self.CONFIGURED_FOLLOWUP_DELAY_MINUTES
+            - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
+        )
+        expected_min = before + timedelta(minutes=delay)
+        expected_max = after + timedelta(minutes=delay)
+        assert expected_min <= schedule.next_run <= expected_max
+
+    def test_skips_when_followup_delay_not_configured(self):
+        with patch(
+            "firetower.incidents.hooks.get_statuspage_followup_reminder_delay_minutes",
+            return_value=None,
+        ):
+            incident = self._make_incident(severity=IncidentSeverity.P0)
+            schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_resets_schedule_on_repeated_call(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        schedule_statuspage_followup_reminder(incident)
+
+        first_schedule = Schedule.objects.get(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        )
+        first_next_run = first_schedule.next_run
+
+        schedule_statuspage_followup_reminder(incident)
+
+        assert (
+            Schedule.objects.filter(
+                name=f"statuspage_followup_reminder_{incident.id}"
+            ).count()
+            == 1
+        )
+        updated_schedule = Schedule.objects.get(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        )
+        assert updated_schedule.next_run >= first_next_run
 
 
 @pytest.mark.django_db

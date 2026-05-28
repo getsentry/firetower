@@ -65,3 +65,4 @@ url = "https://your-page.statuspage.io/"
 warning_buffer_minutes = 5
 # Set to enable statuspage reminders; omit to disable them
 # initial_reminder_delay_minutes = 20
+# followup_reminder_delay_minutes = 60
