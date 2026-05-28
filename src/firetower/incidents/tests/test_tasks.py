@@ -3,8 +3,10 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 from django.conf import settings
+from django.contrib.auth.models import User
 from django_q.models import Schedule
 
+from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
@@ -217,6 +219,7 @@ class TestSendStatuspageReminder:
             slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc"),
             slo_minutes=self.CONFIGURED_DELAY_MINUTES,
             minutes_remaining=minutes_remaining,
+            ic_mention="",
         )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 
@@ -268,6 +271,7 @@ class TestSendStatuspageReminder:
             slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc"),
             slo_minutes=self.CONFIGURED_DELAY_MINUTES,
             minutes_remaining=minutes_remaining,
+            ic_mention="",
         )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 
@@ -399,6 +403,44 @@ class TestSendStatuspageReminder:
 
         mock_slack.post_message.assert_not_called()
 
+    def test_includes_ic_slack_mention(self):
+        captain = User.objects.create_user(
+            username="captain@example.com", email="captain@example.com"
+        )
+        ExternalProfile.objects.create(
+            user=captain, type=ExternalProfileType.SLACK, external_id="U_CAPTAIN"
+        )
+        incident = self._make_incident(severity=IncidentSeverity.P0, captain=captain)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            send_statuspage_reminder(incident.id)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "\n<@U_CAPTAIN>" in msg
+
+    def test_includes_ic_name_without_slack_profile(self):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        incident = self._make_incident(severity=IncidentSeverity.P0, captain=captain)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
+            send_statuspage_reminder(incident.id)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "\nJane Doe" in msg
+
 
 @pytest.mark.django_db
 class TestSendStatuspageFollowupReminder:
@@ -472,6 +514,7 @@ class TestSendStatuspageFollowupReminder:
             severity="P0",
             slash_command=settings.SLACK.get("SLASH_COMMAND", "/inc"),
             minutes_until_due=self.CONFIGURED_WARNING_BUFFER_MINUTES,
+            ic_mention="",
         )
         mock_slack.post_message.assert_called_once_with("C12345", expected_msg)
 
@@ -618,3 +661,63 @@ class TestSendStatuspageFollowupReminder:
             send_statuspage_followup_reminder(incident.id)
 
         mock_slack.post_message.assert_called_once()
+
+    def test_includes_ic_slack_mention(self):
+        captain = User.objects.create_user(
+            username="captain@example.com", email="captain@example.com"
+        )
+        ExternalProfile.objects.create(
+            user=captain, type=ExternalProfileType.SLACK, external_id="U_CAPTAIN"
+        )
+        incident = self._make_incident(severity=IncidentSeverity.P0, captain=captain)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch(
+                "firetower.incidents.tasks.get_statuspage_followup_reminder_delay_minutes",
+                return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
+            ),
+        ):
+            send_statuspage_followup_reminder(incident.id)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "\n<@U_CAPTAIN>" in msg
+
+    def test_includes_ic_name_without_slack_profile(self):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        incident = self._make_incident(severity=IncidentSeverity.P0, captain=captain)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with (
+            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
+            patch(
+                "firetower.incidents.tasks.get_statuspage_followup_reminder_delay_minutes",
+                return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
+            ),
+        ):
+            send_statuspage_followup_reminder(incident.id)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "\nJane Doe" in msg
