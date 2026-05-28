@@ -694,6 +694,82 @@ class TestOnCaptainChanged:
         mock_slack.post_message.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_invites_captain_to_status_channel_for_high_severity(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.side_effect = (
+            lambda url: "C12345" if "C12345" in url else "CSTATUS"
+        )
+
+        captain = User.objects.create_user(
+            username="newcaptain@example.com",
+            email="newcaptain@example.com",
+            first_name="New",
+            last_name="Captain",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_NEW",
+        )
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=captain,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK_STATUS,
+            url="https://slack.com/archives/CSTATUS",
+        )
+
+        on_captain_changed(incident)
+
+        assert mock_slack.invite_to_channel.call_count == 2
+        mock_slack.invite_to_channel.assert_any_call("C12345", ["U_NEW"])
+        mock_slack.invite_to_channel.assert_any_call("CSTATUS", ["U_NEW"])
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_status_channel_invite_for_low_severity(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="newcaptain@example.com",
+            email="newcaptain@example.com",
+            first_name="New",
+            last_name="Captain",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_NEW",
+        )
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P3,
+            captain=captain,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK_STATUS,
+            url="https://slack.com/archives/CSTATUS",
+        )
+
+        on_captain_changed(incident)
+
+        mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_NEW"])
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
         incident = Incident.objects.create(
             title="Test",
