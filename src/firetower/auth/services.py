@@ -192,7 +192,7 @@ def get_or_create_user_from_email(email: str) -> User | None:
 
     user = _get_or_create_user_by_email(email, first_name, last_name)
 
-    if avatar_url and not user.userprofile.avatar_url:
+    if avatar_url and user.userprofile.avatar_url != avatar_url:
         try:
             URLValidator(schemes=["https"])(avatar_url)
             user.userprofile.avatar_url = avatar_url
@@ -255,7 +255,7 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
 
     user = _get_or_create_user_by_email(email, first_name, last_name)
 
-    if avatar_url and not user.userprofile.avatar_url:
+    if avatar_url and user.userprofile.avatar_url != avatar_url:
         try:
             URLValidator(schemes=["https"])(avatar_url)
             user.userprofile.avatar_url = avatar_url
