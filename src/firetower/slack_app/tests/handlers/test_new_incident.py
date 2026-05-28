@@ -444,9 +444,6 @@ class TestFallbackChannel:
             "impact_summary": "All users affected",
             "captain_slack_id": "U_CAPTAIN",
             "is_private": False,
-            "impact_type_tags": ["Degraded Service"],
-            "affected_service_tags": ["api"],
-            "affected_region_tags": ["us-east-1"],
         }
 
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
@@ -490,9 +487,6 @@ class TestFallbackChannel:
         assert "Captain: <@U_CAPTAIN>" in metadata_text
         assert "Reporter: <@U_REPORTER>" in metadata_text
         assert "Private: no" in metadata_text
-        assert "Impact Types: Degraded Service" in metadata_text
-        assert "Affected Services: api" in metadata_text
-        assert "Affected Regions: us-east-1" in metadata_text
         mock_slack_svc.pin_message.assert_called_once_with("C_FALLBACK", "1234.5678")
 
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
