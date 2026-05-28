@@ -216,10 +216,15 @@ def send_statuspage_followup_reminder(
         slack.post_message(channel_id, message)
     finally:
         if reschedule_count < MAX_FOLLOWUP_RESCHEDULES:
-            from firetower.incidents.hooks import (  # noqa: PLC0415
-                schedule_statuspage_followup_reminder,
-            )
+            try:
+                from firetower.incidents.hooks import (  # noqa: PLC0415
+                    schedule_statuspage_followup_reminder,
+                )
 
-            schedule_statuspage_followup_reminder(
-                incident, reschedule_count=reschedule_count + 1
-            )
+                schedule_statuspage_followup_reminder(
+                    incident, reschedule_count=reschedule_count + 1
+                )
+            except Exception:
+                logger.exception(
+                    f"Failed to reschedule followup reminder for incident {incident_id}"
+                )
