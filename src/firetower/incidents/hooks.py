@@ -749,6 +749,99 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
         ).delete()
 
 
+def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
+    try:
+        if incident.is_private:
+            logger.info("Skipping postmortem doc for private incident %s", incident.id)
+            return
+
+        if not NotionService.is_configured():
+            logger.info(
+                "Notion not configured, skipping postmortem doc for incident %s",
+                incident.id,
+            )
+            return
+
+        with transaction.atomic():
+            link, created = ExternalLink.objects.select_for_update().get_or_create(
+                incident=incident,
+                type=ExternalLinkType.NOTION,
+                defaults={"url": ""},
+            )
+            if not created:
+                if link.url:
+                    logger.info(
+                        "Incident %s already has a postmortem doc, skipping",
+                        incident.id,
+                    )
+                else:
+                    logger.info(
+                        "Incident %s postmortem doc creation already in progress, skipping",
+                        incident.id,
+                    )
+                return
+
+        notion = NotionService.from_settings()
+        if not notion:
+            ExternalLink.objects.filter(
+                incident=incident,
+                type=ExternalLinkType.NOTION,
+                url="",
+            ).delete()
+            return
+
+        incident_url = _build_incident_url(incident)
+        captain_email = incident.captain.email if incident.captain else None
+        page = notion.create_postmortem_page(
+            incident_number=incident.incident_number,
+            incident_title=incident.title,
+            incident_url=incident_url,
+            incident_date=incident.created_at,
+            severity=incident.severity,
+            captain_email=captain_email,
+        )
+        if not page or not page.get("url"):
+            logger.error(
+                "Postmortem doc creation returned no URL for %s",
+                incident.incident_number,
+            )
+            ExternalLink.objects.filter(
+                incident=incident,
+                type=ExternalLinkType.NOTION,
+                url="",
+            ).delete()
+            return
+
+        with transaction.atomic():
+            link = ExternalLink.objects.select_for_update().get(
+                incident=incident,
+                type=ExternalLinkType.NOTION,
+            )
+            if link.url:
+                logger.warning(
+                    "Race condition: concurrent call already created postmortem doc for %s",
+                    incident.incident_number,
+                )
+                return
+            link.url = page["url"]
+            link.save(update_fields=["url"])
+
+        try:
+            _slack_service.add_bookmark(channel_id, "Postmortem Doc", page["url"])
+        except Exception:
+            logger.exception(
+                "Failed to add postmortem doc bookmark for %s",
+                incident.incident_number,
+            )
+    except Exception:
+        logger.exception("Failed to create postmortem doc for incident %s", incident.id)
+        ExternalLink.objects.filter(
+            incident=incident,
+            type=ExternalLinkType.NOTION,
+            url="",
+        ).delete()
+
+
 def decorate_incident_channel(
     ctx: ChannelSetupContext,
     slack_service: SlackService,
@@ -1219,6 +1312,7 @@ def on_incident_created(incident: Incident) -> None:
         # appears first in the channel.
         _create_datadog_notebook(incident, channel_id)
         _create_troubleshooting_doc(incident, channel_id)
+        _create_postmortem_doc(incident, channel_id)
 
     try:
         create_linear_parent_issue(incident, channel_id=channel_id)
