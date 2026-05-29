@@ -34,6 +34,7 @@ from firetower.slack_app.handlers.resolved import (
     handle_resolved_submission,
 )
 from firetower.slack_app.handlers.severity import handle_severity_command
+from firetower.slack_app.handlers.status import handle_status_command
 from firetower.slack_app.handlers.statuspage import (
     handle_component_impact_select,
     handle_statuspage_command,
@@ -41,7 +42,6 @@ from firetower.slack_app.handlers.statuspage import (
     handle_statuspage_resolve_anyway,
     handle_statuspage_submission,
 )
-from firetower.slack_app.handlers.status import handle_status_command
 from firetower.slack_app.handlers.subject import handle_subject_command
 from firetower.slack_app.handlers.update_incident import (
     handle_update_command,

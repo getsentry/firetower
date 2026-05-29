@@ -1,7 +1,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.utils import timezone
 
+from firetower.incidents.models import IncidentStatus
 from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.status import handle_status_command
 
@@ -61,10 +63,6 @@ class TestStatusCommand:
         assert "Could not find" in respond.call_args[0][0]
 
     def test_mitigated_shows_mitigated_time(self, incident):
-        from django.utils import timezone
-
-        from firetower.incidents.models import IncidentStatus
-
         mitigated_at = timezone.now()
         incident.status = IncidentStatus.MITIGATED
         incident.time_mitigated = mitigated_at
@@ -82,8 +80,6 @@ class TestStatusCommand:
         assert "Mitigated:" in text
 
     def test_mitigated_status_without_time(self, incident):
-        from firetower.incidents.models import IncidentStatus
-
         incident.status = IncidentStatus.MITIGATED
         incident.time_mitigated = None
         incident.save()
