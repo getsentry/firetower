@@ -89,6 +89,12 @@ def handle_cancel_submission(ack: Any, body: dict, view: dict, client: Any) -> N
         logger.error("Cancel submission: no incident for channel %s", channel_id)
         return
 
+    if incident.status == IncidentStatus.CANCELED:
+        logger.info(
+            "Cancel submission: %s already Canceled, no-op", incident.incident_number
+        )
+        return
+
     serializer = IncidentWriteSerializer(
         instance=incident, data={"status": IncidentStatus.CANCELED}, partial=True
     )
