@@ -17,6 +17,7 @@ def handle_help_command(ack: Any, command: dict, respond: Any) -> None:
         f"  `{cmd} mitigated`        - Mark incident as mitigated (alias: `{cmd} mit`)\n"
         f"  `{cmd} resolved`         - Mark incident as resolved (alias: `{cmd} fixed`)\n"
         f"  `{cmd} reopen`           - Reopen an incident\n"
+        f"  `{cmd} cancel`           - Cancel an incident\n"
         f"  `{cmd} status`           - Show current incident status and IC\n"
         f"  `{cmd} severity <P0-P4>` - Change incident severity (alias: `{cmd} sev`)\n"
         f"  `{cmd} statuspage`       - Create or update a statuspage post\n"
