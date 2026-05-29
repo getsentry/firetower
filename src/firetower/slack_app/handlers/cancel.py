@@ -35,7 +35,7 @@ def _build_cancel_modal(incident_number: str, channel_id: str) -> dict:
                     "multiline": True,
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "Why is this incident being canceled?",
+                        "text": "e.g. Duplicate, false alarm",
                     },
                 },
                 "label": {"type": "plain_text", "text": "Reason"},
