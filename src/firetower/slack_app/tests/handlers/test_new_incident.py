@@ -461,9 +461,10 @@ class TestTagOptions:
 
         ack.assert_called_once()
         options = ack.call_args[1]["options"]
-        assert len(options) == 2
+        assert len(options) == 3
         names = {o["text"]["text"] for o in options}
-        assert names == {"us-east-1", "us-west-2"}
+        assert names == {"us-east-1", "us-west-2", '+ Create "us"'}
+        assert options[-1]["value"] == "__create__:us"
 
     def test_empty_query_returns_all(self, _mock_close):
         Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
