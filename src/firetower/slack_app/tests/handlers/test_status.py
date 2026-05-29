@@ -105,8 +105,9 @@ class TestStatusCommand:
             mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
             handle_status_command(ack, body, command, respond)
 
-        text = respond.call_args[0][0]
-        assert "https://firetower.example.com" in text
+        inc_num = incident.incident_number
+        first_line = respond.call_args[0][0].split("\n")[0]
+        assert first_line == f"*<https://firetower.example.com/{inc_num}|{inc_num}>* — {incident.title}"
 
 
 @pytest.mark.django_db
