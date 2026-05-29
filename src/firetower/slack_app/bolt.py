@@ -41,6 +41,7 @@ from firetower.slack_app.handlers.statuspage import (
     handle_statuspage_resolve_anyway,
     handle_statuspage_submission,
 )
+from firetower.slack_app.handlers.status import handle_status_command
 from firetower.slack_app.handlers.subject import handle_subject_command
 from firetower.slack_app.handlers.update_incident import (
     handle_update_command,
@@ -71,6 +72,7 @@ KNOWN_SUBCOMMANDS = {
     "edit",
     "captain",
     "ic",
+    "status",
     "statuspage",
     "dumpslack",
 }
@@ -162,6 +164,8 @@ def handle_command(
                 handle_subject_command(ack, body, command, respond, new_subject=args)
         elif subcommand in ("captain", "ic"):
             handle_captain_command(ack, body, command, respond)
+        elif subcommand == "status":
+            handle_status_command(ack, body, command, respond)
         elif subcommand == "statuspage":
             handle_statuspage_command(ack, body, command, respond)
         elif subcommand == "dumpslack":
