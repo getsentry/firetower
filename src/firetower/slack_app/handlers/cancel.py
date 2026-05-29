@@ -10,12 +10,12 @@ from firetower.slack_app.handlers.utils import get_incident_from_channel
 logger = logging.getLogger(__name__)
 
 
-def _build_cancel_modal(channel_id: str) -> dict:
+def _build_cancel_modal(incident_number: str, channel_id: str) -> dict:
     return {
         "type": "modal",
         "callback_id": "cancel_incident_modal",
         "private_metadata": channel_id,
-        "title": {"type": "plain_text", "text": "Cancel incident"},
+        "title": {"type": "plain_text", "text": incident_number},
         "submit": {"type": "plain_text", "text": "Cancel incident"},
         "close": {"type": "plain_text", "text": "Back"},
         "blocks": [
@@ -65,7 +65,7 @@ def handle_cancel_command(ack: Any, body: dict, command: dict, respond: Any) -> 
 
     get_bolt_app().client.views_open(
         trigger_id=trigger_id,
-        view=_build_cancel_modal(channel_id),
+        view=_build_cancel_modal(incident.incident_number, channel_id),
     )
 
 
