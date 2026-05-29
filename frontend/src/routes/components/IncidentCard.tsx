@@ -16,17 +16,22 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
       params={{incidentId: incident.id}}
       className="block no-underline"
       preload={'intent'}
+      onClick={e => {
+        if (window.getSelection()?.toString()) {
+          e.preventDefault();
+        }
+      }}
     >
       <div
-        className="bg-background-primary rounded-radius-lg p-space-xl cursor-pointer shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        className="bg-background-primary hover:bg-background-transparent-neutral-muted rounded-radius-lg p-space-xl cursor-pointer shadow-sm transition-colors duration-200"
         data-testid={`incident-card-${incident.id}`}
       >
         <div className="gap-space-xl mb-space-md flex flex-wrap items-center md:flex-nowrap">
-          <span className="text-size-md text-content-secondary font-regular gap-space-xs flex items-center leading-none">
+          <span className="text-size-lg text-content-secondary gap-space-xs flex select-text items-center font-regular leading-none">
             {incident.is_private && <span aria-label="Private incident">🔒</span>}
             {incident.id}
           </span>
-          <div className="text-size-sm text-content-secondary ml-auto text-right md:order-last">
+          <div className="text-size-sm text-content-secondary ml-auto select-none text-right md:order-last">
             <time dateTime={incident.created_at}>
               {createdAt.toLocaleDateString('en-US', {
                 month: 'short',
@@ -44,7 +49,7 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
               })}
             </p>
           </div>
-          <h3 className="text-size-xl text-content-headings w-full font-semibold md:w-auto md:flex-1">
+          <h3 className="text-size-xl text-content-headings w-full select-text font-semibold md:w-auto md:flex-1">
             {incident.title}
           </h3>
         </div>
@@ -56,15 +61,17 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
             {incident.is_private && <Pill variant="private">Private</Pill>}
           </div>
           {incident.captain && (
-            <p className="text-content-secondary text-size-sm">
+            <p className="text-content-secondary text-size-sm select-none">
               Captain: {incident.captain}
             </p>
           )}
         </div>
 
-        <p className="text-content-secondary text-size-sm leading-comfortable">
-          {incident.description}
-        </p>
+        {incident.description ? (
+          <p className="text-content-secondary text-size-sm leading-comfortable line-clamp-1 select-none">
+            {incident.description}
+          </p>
+        ) : null}
       </div>
     </Link>
   );
