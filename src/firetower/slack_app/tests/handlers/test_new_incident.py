@@ -78,6 +78,20 @@ class TestNewIncidentModal:
             "private_block",
         }
 
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    def test_modal_omits_incident_page_hint(self, mock_get_bolt_app):
+        ack = MagicMock()
+        body = {"trigger_id": "T12345"}
+        command = {"text": "new"}
+        respond = MagicMock()
+
+        handle_new_command(ack, body, command, respond)
+
+        view = mock_get_bolt_app.return_value.client.views_open.call_args[1]["view"]
+        rendered = str(view["blocks"])
+        assert "incident page" not in rendered
+        assert "Missing a service or region" not in rendered
+
 
 @pytest.mark.django_db
 class TestNewIncidentSubmission:
@@ -125,6 +139,53 @@ class TestNewIncidentSubmission:
         assert incident.captain == self.user
         assert incident.reporter == self.user
         client.chat_postMessage.assert_called_once()
+
+    @patch("firetower.incidents.serializers.on_incident_created")
+    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
+    def test_creates_tag_inline_from_submission(self, mock_get_user, mock_hook):
+        mock_get_user.return_value = self.user
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "Test Incident"}},
+                    "severity_block": {
+                        "severity": {"selected_option": {"value": "P1"}}
+                    },
+                    "description_block": {"description": {"value": "Description"}},
+                    "affected_service_block": {
+                        "affected_service_tags": {
+                            "selected_options": [
+                                {"value": "__create__:payments"},
+                            ]
+                        }
+                    },
+                    "affected_region_block": {
+                        "affected_region_tags": {
+                            "selected_options": [
+                                {"value": "__create__:ap-south-1"},
+                            ]
+                        }
+                    },
+                    "private_block": {"is_private": {"selected_options": []}},
+                }
+            }
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        ack.assert_called_once_with()
+        service_tag = Tag.objects.get(name="payments", type=TagType.AFFECTED_SERVICE)
+        assert service_tag.type == TagType.AFFECTED_SERVICE
+        region_tag = Tag.objects.get(name="ap-south-1", type=TagType.AFFECTED_REGION)
+        assert region_tag.type == TagType.AFFECTED_REGION
+
+        incident = Incident.objects.get(title="Test Incident")
+        assert "payments" in incident.affected_service_tag_names
+        assert "ap-south-1" in incident.affected_region_tag_names
 
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
     @patch("firetower.incidents.serializers.on_incident_created")
@@ -433,6 +494,51 @@ class TestTagOptions:
         options = ack.call_args[1]["options"]
         assert len(options) == 1
         assert options[0]["text"]["text"] == "us-east-1"
+
+    def test_offers_create_option_for_service(self, _mock_close):
+        ack = MagicMock()
+        payload = {"action_id": "affected_service_tags", "value": "payments"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert options[-1] == {
+            "text": {"type": "plain_text", "text": '+ Create "payments"'},
+            "value": "__create__:payments",
+        }
+
+    def test_offers_create_option_for_region(self, _mock_close):
+        ack = MagicMock()
+        payload = {"action_id": "affected_region_tags", "value": "ap-south-1"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert options[-1]["value"] == "__create__:ap-south-1"
+
+    def test_no_create_option_for_impact_type(self, _mock_close):
+        ack = MagicMock()
+        payload = {"action_id": "impact_type_tags", "value": "Brand New"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert all(not o["value"].startswith("__create__:") for o in options)
+
+    def test_no_create_option_for_empty_keyword(self, _mock_close):
+        ack = MagicMock()
+        payload = {"action_id": "affected_service_tags", "value": "   "}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert all(not o["value"].startswith("__create__:") for o in options)
+
+    def test_no_create_option_for_exact_match(self, _mock_close):
+        Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+
+        ack = MagicMock()
+        payload = {"action_id": "affected_service_tags", "value": "api"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert all(not o["value"].startswith("__create__:") for o in options)
 
 
 class TestFallbackChannel:

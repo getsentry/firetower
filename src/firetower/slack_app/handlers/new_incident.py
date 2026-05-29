@@ -17,6 +17,7 @@ from firetower.integrations.services import SlackService
 from firetower.integrations.services.slack import escape_slack_text
 from firetower.slack_app.handlers.utils import (
     _DEFAULT_SEVERITY,
+    CREATE_TAG_PREFIX,
     build_incident_form_blocks,
     parse_incident_form_values,
 )
@@ -170,6 +171,10 @@ ACTION_ID_TO_TAG_TYPE = {
     "affected_region_tags": TagType.AFFECTED_REGION,
 }
 
+# Tag types users can create inline from the lifecycle modals. impact_type stays
+# curated since it powers dashboards, so it is intentionally excluded.
+INLINE_CREATABLE_TAG_TYPES = {TagType.AFFECTED_SERVICE, TagType.AFFECTED_REGION}
+
 
 def handle_tag_options(ack: Any, payload: dict) -> None:
     close_old_connections()
@@ -185,10 +190,26 @@ def handle_tag_options(ack: Any, payload: dict) -> None:
     if keyword:
         qs = qs.filter(name__icontains=keyword)
 
+    matches = list(qs.order_by("name")[:100])
     options = [
         {"text": {"type": "plain_text", "text": tag.name}, "value": tag.name}
-        for tag in qs.order_by("name")[:100]
+        for tag in matches
     ]
+
+    stripped = keyword.strip()
+    if tag_type in INLINE_CREATABLE_TAG_TYPES and stripped:
+        exact_match = any(tag.name.lower() == stripped.lower() for tag in matches)
+        if not exact_match:
+            options.append(
+                {
+                    "text": {
+                        "type": "plain_text",
+                        "text": f'+ Create "{stripped}"',
+                    },
+                    "value": f"{CREATE_TAG_PREFIX}{stripped}",
+                }
+            )
+
     ack(options=options)
 
 
