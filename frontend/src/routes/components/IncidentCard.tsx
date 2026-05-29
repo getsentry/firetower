@@ -16,11 +16,6 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
       params={{incidentId: incident.id}}
       className="block no-underline"
       preload={'intent'}
-      onClick={e => {
-        if (window.getSelection()?.toString()) {
-          e.preventDefault();
-        }
-      }}
     >
       <div
         className="bg-background-primary hover:bg-background-transparent-neutral-muted rounded-radius-lg p-space-xl cursor-pointer shadow-sm transition-colors duration-200"
