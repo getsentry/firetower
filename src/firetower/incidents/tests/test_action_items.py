@@ -407,7 +407,7 @@ class TestSyncActionItemsFromLinear:
 
     def test_auto_completes_parent_when_all_done(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident()
+        incident = self._make_incident(status=IncidentStatus.DONE)
 
         children = [
             _make_linear_issue(
@@ -465,7 +465,7 @@ class TestSyncActionItemsFromLinear:
 
     def test_completes_parent_when_no_action_items(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident()
+        incident = self._make_incident(status=IncidentStatus.DONE)
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_service = mock_get.return_value
