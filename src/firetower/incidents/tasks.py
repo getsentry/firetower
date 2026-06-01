@@ -22,6 +22,7 @@ from firetower.incidents.models import (
     Incident,
 )
 from firetower.incidents.services import sync_action_items_from_linear
+from firetower.integrations.services.linear import LinearService
 from firetower.integrations.services.slack import SlackService
 
 SCHEDULES = {
@@ -252,6 +253,30 @@ def send_action_item_reminder() -> None:
             now - timedelta(days=ACTION_ITEM_REMINDER_NAG_EVERY_DAYS)
         )
 
+    def _nag(action_item: ActionItem) -> None:
+        comment = (
+            settings.LINEAR.get("ACTION_ITEM_NAG_COMMENT", "")
+            if settings.LINEAR
+            else ""
+        )
+        if not comment:
+            logger.warning(
+                "Linear not configured, skipping nag for %s", action_item.url
+            )
+            return
+        try:
+            success = LinearService().create_comment(
+                action_item.linear_issue_id, comment
+            )
+        except Exception:
+            logger.exception(
+                f"Failed to post nag comment for action item {action_item.linear_identifier}"
+            )
+            return
+        if success:
+            action_item.last_nag = timezone.now()
+            action_item.save(update_fields=["last_nag"])
+
     now = timezone.now()
     min_age = now - timedelta(days=ACTION_ITEM_REMINDER_MAX_AGE_DAYS)
     max_age = now - timedelta(days=ACTION_ITEM_REMINDER_MIN_AGE_DAYS)
@@ -280,4 +305,4 @@ def send_action_item_reminder() -> None:
         ]
 
         for action_item in eligible:
-            pass
+            _nag(action_item)

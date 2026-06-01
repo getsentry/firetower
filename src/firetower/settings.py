@@ -313,6 +313,7 @@ LINEAR: dict | None = (
         "TEAM_ID": config.linear.team_id,
         "PROJECT_ID": config.linear.project_id,
         "SYNC_IDENTIFIERS": config.linear.sync_identifiers,
+        "ACTION_ITEM_NAG_COMMENT": config.linear.action_item_nag_comment,
     }
     if config.linear
     else None
