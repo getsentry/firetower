@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 from datadog import statsd
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 from django_q.tasks import Schedule
 
@@ -20,6 +21,7 @@ from firetower.incidents.models import (
     ActionItemStatus,
     ExternalLinkType,
     Incident,
+    IncidentStatus,
 )
 from firetower.incidents.services import sync_action_items_from_linear
 from firetower.integrations.services.linear import LinearService
@@ -282,7 +284,11 @@ def send_action_item_reminder() -> None:
     max_age = now - timedelta(days=ACTION_ITEM_REMINDER_MIN_AGE_DAYS)
 
     incidents = Incident.objects.filter(
-        created_at__gte=min_age, created_at__lte=max_age
+        created_at__gte=min_age,
+        created_at__lte=max_age,
+        severity__in=HIGH_SEVERITIES,
+    ).exclude(
+        Q(status=IncidentStatus.CANCELED) | Q(root_cause_tags__name="false-alarm")
     )
 
     for incident in incidents:
