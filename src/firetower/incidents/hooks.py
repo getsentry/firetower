@@ -249,6 +249,15 @@ def _get_channel_id(incident: Incident) -> str | None:
     return _slack_service.parse_channel_id_from_url(slack_link.url)
 
 
+def _get_status_channel_id(incident: Incident) -> str | None:
+    slack_link = incident.external_links.filter(
+        type=ExternalLinkType.SLACK_STATUS
+    ).first()
+    if not slack_link:
+        return None
+    return _slack_service.parse_channel_id_from_url(slack_link.url)
+
+
 def _invite_user_to_channel(
     channel_id: str, user: User, slack_user_id: str | None = None
 ) -> None:
@@ -1415,5 +1424,12 @@ def on_captain_changed(incident: Incident) -> None:
                 f"Incident captain updated to {captain_ref}\n<{incident_url}|View in Firetower>",
             )
             _invite_user_to_channel(channel_id, incident.captain)
+
+            if incident.severity in HIGH_SEVERITIES:
+                status_channel_id = _get_status_channel_id(incident)
+                if status_channel_id:
+                    _invite_user_to_channel(
+                        status_channel_id, incident.captain, slack_user_id=slack_id
+                    )
     except Exception:
         logger.exception(f"Error in on_captain_changed for incident {incident.id}")

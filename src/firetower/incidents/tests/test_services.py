@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -7,13 +7,18 @@ from django.utils import timezone
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import (
+    ActionItem,
+    ActionItemStatus,
     ExternalLink,
     ExternalLinkType,
     Incident,
     IncidentSeverity,
     IncidentStatus,
 )
-from firetower.incidents.services import sync_incident_participants_from_slack
+from firetower.incidents.services import (
+    _update_parent_issue_status,
+    sync_incident_participants_from_slack,
+)
 
 
 @pytest.mark.django_db
@@ -407,3 +412,122 @@ class TestSyncIncidentParticipantsFromSlack:
                 assert incident.participants.count() == 1
                 assert active_user in incident.participants.all()
                 assert inactive_user not in incident.participants.all()
+
+
+@pytest.mark.django_db
+class TestUpdateParentIssueStatus:
+    def _make_incident(self, status=IncidentStatus.ACTIVE):
+        return Incident.objects.create(
+            title="Test Incident",
+            status=status,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="lin-123",
+        )
+
+    def _make_linear_service(self):
+        svc = MagicMock()
+        svc.get_workflow_states.return_value = {
+            "started": "state-started",
+            "completed": "state-completed",
+        }
+        return svc
+
+    @pytest.fixture(autouse=True)
+    def _linear_settings(self, settings):
+        settings.LINEAR = {"TEAM_ID": "team-1", "API_KEY": "key"}
+
+    def test_active_incident_no_action_items_sets_started(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        svc = self._make_linear_service()
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+
+    def test_active_incident_all_items_done_sets_started(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="li-1",
+            linear_identifier="INC-1",
+            title="Item 1",
+            status=ActionItemStatus.DONE,
+            url="https://linear.app/issue/1",
+        )
+        svc = self._make_linear_service()
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+
+    def test_done_incident_no_action_items_sets_completed(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = self._make_linear_service()
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+
+    def test_done_incident_all_items_done_sets_completed(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="li-1",
+            linear_identifier="INC-1",
+            title="Item 1",
+            status=ActionItemStatus.DONE,
+            url="https://linear.app/issue/1",
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="li-2",
+            linear_identifier="INC-2",
+            title="Item 2",
+            status=ActionItemStatus.CANCELED,
+            url="https://linear.app/issue/2",
+        )
+        svc = self._make_linear_service()
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+
+    def test_done_incident_incomplete_items_sets_started(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="li-1",
+            linear_identifier="INC-1",
+            title="Item 1",
+            status=ActionItemStatus.DONE,
+            url="https://linear.app/issue/1",
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="li-2",
+            linear_identifier="INC-2",
+            title="Item 2",
+            status=ActionItemStatus.IN_PROGRESS,
+            url="https://linear.app/issue/2",
+        )
+        svc = self._make_linear_service()
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+
+    def test_mitigated_incident_all_items_done_sets_started(self):
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="li-1",
+            linear_identifier="INC-1",
+            title="Item 1",
+            status=ActionItemStatus.DONE,
+            url="https://linear.app/issue/1",
+        )
+        svc = self._make_linear_service()
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
