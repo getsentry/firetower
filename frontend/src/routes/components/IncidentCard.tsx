@@ -23,13 +23,13 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
       >
         <div className="gap-space-xl flex justify-between">
           <div className="min-w-0 flex-1">
-            <span className="text-size-lg text-content-secondary mb-space-sm gap-space-xs flex select-text items-center font-regular leading-none">
-              {incident.is_private && <span aria-label="Private incident">🔒</span>}
-              {incident.id}
-            </span>
             <h3 className="text-size-xl text-content-headings select-text font-semibold">
               {incident.title}
             </h3>
+            <span className="text-size-lg text-content-secondary mt-space-sm gap-space-xs flex select-text items-center font-regular leading-none">
+              {incident.is_private && <span aria-label="Private incident">🔒</span>}
+              {incident.id}
+            </span>
             <div className="gap-space-md mt-space-md flex">
               <Pill variant={incident.severity}>{incident.severity}</Pill>
               <Pill variant={incident.status}>{incident.status}</Pill>
