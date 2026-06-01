@@ -767,7 +767,7 @@ class TestSendActionItemReminder:
         action_item.refresh_from_db()
         assert action_item.last_nag is None
 
-    def test_skips_nag_when_no_comment_configured(self):
+    def test_skips_job_when_no_comment_configured(self, mock_sync):
         incident = self._make_incident()
         self._make_action_item(incident)
 
@@ -777,6 +777,7 @@ class TestSendActionItemReminder:
         ):
             send_action_item_reminder()
 
+        mock_sync.assert_not_called()
         mock_service.assert_not_called()
 
     def test_skips_done_action_item(self, mock_linear):

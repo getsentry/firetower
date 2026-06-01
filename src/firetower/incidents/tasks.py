@@ -241,6 +241,13 @@ def send_statuspage_followup_reminder(
 
 @datadog_log
 def send_action_item_reminder() -> None:
+    comment = (
+        settings.LINEAR.get("ACTION_ITEM_NAG_COMMENT", "") if settings.LINEAR else ""
+    )
+    if not comment:
+        logger.warning("Linear nag comment not configured, skipping job")
+        return
+
     def _action_item_eligible(action_item: ActionItem, now: datetime) -> bool:
         if action_item.status not in [
             ActionItemStatus.TODO,
@@ -256,16 +263,6 @@ def send_action_item_reminder() -> None:
         )
 
     def _nag(action_item: ActionItem) -> None:
-        comment = (
-            settings.LINEAR.get("ACTION_ITEM_NAG_COMMENT", "")
-            if settings.LINEAR
-            else ""
-        )
-        if not comment:
-            logger.warning(
-                "Linear not configured, skipping nag for %s", action_item.url
-            )
-            return
         try:
             success = LinearService().create_comment(
                 action_item.linear_issue_id, comment
