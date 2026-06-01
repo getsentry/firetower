@@ -250,12 +250,6 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
         "is_private": is_private,
         "external_links": {"slack": channel_url},
     }
-    if form["impact_type_tags"]:
-        data["impact_type_tags"] = form["impact_type_tags"]
-    if form["affected_service_tags"]:
-        data["affected_service_tags"] = form["affected_service_tags"]
-    if form["affected_region_tags"]:
-        data["affected_region_tags"] = form["affected_region_tags"]
 
     serializer = IncidentWriteSerializer(data=data, context={"skip_hooks": True})
     if not serializer.is_valid():
