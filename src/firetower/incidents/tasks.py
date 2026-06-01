@@ -16,9 +16,12 @@ from firetower.incidents.hooks import (
     get_statuspage_initial_reminder_delay_minutes,
 )
 from firetower.incidents.models import (
+    ActionItem,
+    ActionItemStatus,
     ExternalLinkType,
     Incident,
 )
+from firetower.incidents.services import sync_action_items_from_linear
 from firetower.integrations.services.slack import SlackService
 
 SCHEDULES = {
@@ -28,7 +31,19 @@ SCHEDULES = {
         "minutes": 5,
         "repeats": -1,  # repeat indefinitely
     },
+    "send_action_item_reminder": {
+        "func": "firetower.incidents.tasks.send_action_item_reminder",
+        "schedule_type": Schedule.MINUTES,
+        "minutes": 30,
+        "repeats": -1,
+    },
 }
+
+ACTION_ITEM_REMINDER_MIN_AGE_DAYS = 21
+ACTION_ITEM_REMINDER_MAX_AGE_DAYS = 90
+ACTION_ITEM_REMINDER_NAG_EVERY_DAYS = 7
+# Linear priority values: 1 = Urgent (P0), 2 = High (P1)
+ACTION_ITEM_REMINDER_PRIORITIES = (1, 2)
 
 DATADOG_INVALID_CHARS = re.compile(r"[^A-Za-z0-9-_.\/]")
 
@@ -219,3 +234,50 @@ def send_statuspage_followup_reminder(
                 logger.exception(
                     f"Failed to reschedule followup reminder for incident {incident_id}"
                 )
+
+
+@datadog_log
+def send_action_item_reminder() -> None:
+    def _action_item_eligible(action_item: ActionItem, now: datetime) -> bool:
+        if action_item.status not in [
+            ActionItemStatus.TODO,
+            ActionItemStatus.IN_PROGRESS,
+        ]:
+            return False
+        if action_item.priority < 1:
+            return False
+        if action_item.last_nag is None:
+            return True
+        return action_item.last_nag < (
+            now - timedelta(days=ACTION_ITEM_REMINDER_NAG_EVERY_DAYS)
+        )
+
+    now = timezone.now()
+    min_age = now - timedelta(days=ACTION_ITEM_REMINDER_MAX_AGE_DAYS)
+    max_age = now - timedelta(days=ACTION_ITEM_REMINDER_MIN_AGE_DAYS)
+
+    incidents = Incident.objects.filter(
+        created_at__gte=min_age, created_at__lte=max_age
+    )
+
+    for incident in incidents:
+        try:
+            sync_action_items_from_linear(incident)
+        except Exception:
+            logger.exception(
+                f"Failed to refresh action items for incident {incident.id}"
+            )
+            continue
+
+        action_items = incident.action_items.filter(
+            priority__in=ACTION_ITEM_REMINDER_PRIORITIES
+        )
+
+        eligible: list[ActionItem] = [
+            action_item
+            for action_item in action_items
+            if _action_item_eligible(action_item, now)
+        ]
+
+        for action_item in eligible:
+            pass
