@@ -1,6 +1,7 @@
 import logging
 import re
 import threading
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -60,6 +61,34 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                 )
             )
             existing_url = notion_link.url
+
+        # Another process (e.g. _create_postmortem_doc) may have claimed the
+        # placeholder row but not yet saved the Notion URL. Wait for it.
+        if not db_record_created and not existing_url:
+            for _ in range(15):
+                time.sleep(1)
+                notion_link.refresh_from_db()
+                if notion_link.url:
+                    existing_url = notion_link.url
+                    break
+
+            if not existing_url:
+                logger.warning(
+                    "Timed out waiting for in-progress postmortem doc for %s",
+                    incident.incident_number,
+                )
+                try:
+                    client.chat_postMessage(
+                        channel=channel_id,
+                        text="Postmortem doc creation is still in progress. "
+                        "Please try `/ft dumpslack` again shortly.",
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to post in-progress message to channel %s",
+                        channel_id,
+                    )
+                return
 
         # Notion API calls happen outside the transaction to avoid holding the
         # SELECT FOR UPDATE lock while making slow external requests.
