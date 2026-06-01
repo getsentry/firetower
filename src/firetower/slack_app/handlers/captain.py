@@ -73,6 +73,7 @@ def handle_captain_command(ack: Any, body: dict, command: dict, respond: Any) ->
 def handle_captain_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
     values = view.get("state", {}).get("values", {})
     channel_id = view.get("private_metadata", "")
+    actor_slack_id = body.get("user", {}).get("id", "")
 
     captain_slack_id = (
         values.get("captain_block", {}).get("captain_select", {}).get("selected_user")
@@ -115,3 +116,7 @@ def handle_captain_submission(ack: Any, body: dict, view: dict, client: Any) -> 
         return
 
     serializer.save()
+    client.chat_postMessage(
+        channel=channel_id,
+        text=f"<@{actor_slack_id}> updated *{incident.incident_number}* captain to <@{captain_slack_id}>",
+    )

@@ -216,6 +216,7 @@ def handle_resolved_command(ack: Any, body: dict, command: dict, respond: Any) -
 def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
     form = parse_incident_form_values(view)
     channel_id = view.get("private_metadata", "")
+    actor_slack_id = body.get("user", {}).get("id", "")
 
     values = view.get("state", {}).get("values", {})
 
@@ -291,7 +292,7 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
     client.chat_postMessage(
         channel=channel_id,
         text=(
-            f"*{incident.incident_number} marked as {target_status}*\n"
+            f"<@{actor_slack_id}> marked *{incident.incident_number}* as {target_status}\n"
             f"Severity: {severity} | Captain: {captain_user.get_full_name()}"
         ),
     )

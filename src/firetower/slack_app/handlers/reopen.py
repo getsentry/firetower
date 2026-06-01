@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 def handle_reopen_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
     ack()
     channel_id = body.get("channel_id", "")
+    actor_slack_id = body.get("user_id", "")
     incident = get_incident_from_channel(channel_id)
     if not incident:
         respond("Could not find an incident associated with this channel.")
@@ -25,6 +26,9 @@ def handle_reopen_command(ack: Any, body: dict, command: dict, respond: Any) -> 
     )
     if serializer.is_valid():
         serializer.save()
-        respond(f"{incident.incident_number} has been reopened.")
+        respond(
+            f"<@{actor_slack_id}> reopened {incident.incident_number}.",
+            response_type="in_channel",
+        )
     else:
         respond(f"Failed to reopen incident: {serializer.errors}")

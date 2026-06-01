@@ -29,7 +29,9 @@ _PRIVATE_INCIDENT_PM_MESSAGE = (
 )
 
 
-def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
+def _trigger_slack_dump(
+    client: Any, channel_id: str, incident: Any, actor_slack_id: str = ""
+) -> None:
     if incident.is_private:
         try:
             client.chat_postMessage(
@@ -165,9 +167,10 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         except Exception:
             logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
 
+    attribution = f" by <@{actor_slack_id}>" if actor_slack_id else ""
     try:
         client.chat_postMessage(
-            channel=channel_id, text=f"{action} postmortem doc: {page_url}"
+            channel=channel_id, text=f"{action} postmortem doc{attribution}: {page_url}"
         )
     except Exception:
         logger.exception(
@@ -211,12 +214,14 @@ def _backfill_milestones(incident: Any, timeline_md: str) -> None:
         )
 
 
-def trigger_slack_dump_async(client: Any, channel_id: str, incident: Any) -> None:
+def trigger_slack_dump_async(
+    client: Any, channel_id: str, incident: Any, actor_slack_id: str = ""
+) -> None:
     def _run() -> None:
         from django.db import connection  # noqa: PLC0415
 
         try:
-            _trigger_slack_dump(client, channel_id, incident)
+            _trigger_slack_dump(client, channel_id, incident, actor_slack_id)
         except Exception:
             logger.exception("Background dumpslack failed for incident %s", incident.id)
             statsd.increment("slack_app.commands.failed", tags=["subcommand:dumpslack"])
@@ -255,10 +260,11 @@ def handle_dumpslack_command(
         respond(_PRIVATE_INCIDENT_PM_MESSAGE)
         return
 
+    actor_slack_id = body.get("user_id", "")
     respond(
         "Fetching Slack history and generating postmortem doc, this may take a moment..."
     )
-    trigger_slack_dump_async(client, channel_id, incident)
+    trigger_slack_dump_async(client, channel_id, incident, actor_slack_id)
 
 
 def _resolve_user_emails(

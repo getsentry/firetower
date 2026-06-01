@@ -641,7 +641,7 @@ class TestHandleDumpslackCommand:
 
         ack.assert_called_once()
         respond.assert_called()
-        mock_async.assert_called_once_with(client, "C123", mock_incident)
+        mock_async.assert_called_once_with(client, "C123", mock_incident, "")
 
 
 @pytest.mark.django_db

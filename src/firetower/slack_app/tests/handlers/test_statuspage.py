@@ -525,6 +525,7 @@ class TestStatuspageSubmission:
             "message": "Looking into it",
             "impact": "major",
             "components": {"c1": "major_outage"},
+            "actor_slack_id": "",
         }
         assert pushed_view["private_metadata"] == json.dumps(expected_data)
 
@@ -656,7 +657,7 @@ class TestStatuspageResolveAnyway:
             handle_statuspage_resolve_anyway(ack, body, client)
 
         ack.assert_called_once_with()
-        mock_process.assert_called_once_with(data, client)
+        mock_process.assert_called_once_with(data, client, actor_slack_id="")
         passed_data = mock_process.call_args[0][0]
         assert passed_data["components"] == {
             "c1": "major_outage",
