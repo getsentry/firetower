@@ -787,6 +787,15 @@ class TestSendActionItemReminder:
 
         mock_linear.create_comment.assert_not_called()
 
+    @pytest.mark.parametrize("priority", [0, 3, 4])
+    def test_skips_low_priority_action_item(self, mock_linear, priority):
+        incident = self._make_incident()
+        self._make_action_item(incident, priority=priority)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_not_called()
+
     def test_skips_recently_nagged_action_item(self, mock_linear):
         incident = self._make_incident()
         recent = timezone.now() - timedelta(days=2)
