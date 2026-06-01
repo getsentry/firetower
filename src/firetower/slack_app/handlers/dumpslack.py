@@ -67,28 +67,30 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         if not db_record_created and not existing_url:
             for _ in range(15):
                 time.sleep(1)
-                notion_link.refresh_from_db()
+                try:
+                    notion_link.refresh_from_db()
+                except ExternalLink.DoesNotExist:
+                    break
                 if notion_link.url:
                     existing_url = notion_link.url
                     break
 
             if not existing_url:
-                logger.warning(
-                    "Timed out waiting for in-progress postmortem doc for %s",
-                    incident.incident_number,
-                )
-                try:
-                    client.chat_postMessage(
-                        channel=channel_id,
-                        text="Postmortem doc creation is still in progress. "
-                        "Please try `/ft dumpslack` again shortly.",
+                # Placeholder was deleted (creation failed) or timed out
+                # (process crashed without cleanup). Re-acquire under lock
+                # so we can take over an orphaned placeholder or create a
+                # fresh row.
+                with transaction.atomic():
+                    notion_link, db_record_created = (
+                        ExternalLink.objects.select_for_update().get_or_create(
+                            incident=incident,
+                            type=ExternalLinkType.NOTION,
+                            defaults={"url": ""},
+                        )
                     )
-                except Exception:
-                    logger.exception(
-                        "Failed to post in-progress message to channel %s",
-                        channel_id,
-                    )
-                return
+                    existing_url = notion_link.url
+                    if not db_record_created and not existing_url:
+                        db_record_created = True
 
         # Notion API calls happen outside the transaction to avoid holding the
         # SELECT FOR UPDATE lock while making slow external requests.
