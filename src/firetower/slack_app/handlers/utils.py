@@ -13,7 +13,7 @@ _DEFAULT_SEVERITY = IncidentSeverity.P3
 def get_incident_from_channel(channel_id: str) -> Incident | None:
     link = (
         ExternalLink.objects.filter(
-            type=ExternalLinkType.SLACK,
+            type__in=[ExternalLinkType.SLACK, ExternalLinkType.SLACK_STATUS],
             url__endswith=f"/archives/{channel_id}",
         )
         .select_related("incident")
