@@ -125,8 +125,8 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             page_id = page["id"]
             page_url = page["url"]
             # Re-acquire lock before saving to detect concurrent callers that
-            # also saw url="" and raced to create a page. The loser exits here;
-            # the winner's URL and apply_template call stand.
+            # also saw url="" and raced to create a page. The loser adopts the
+            # winner's page so apply_template still populates it.
             with transaction.atomic():
                 notion_link = ExternalLink.objects.select_for_update().get(
                     incident=incident,
@@ -137,10 +137,15 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                         "Race condition: concurrent call already created Notion page for %s",
                         incident.incident_number,
                     )
-                    return
-                notion_link.url = page_url
-                notion_link.save(update_fields=["url"])
-            notion_page_created = True
+                    page_id = _extract_notion_page_id(notion_link.url)
+                    page_url = notion_link.url
+                    if not page_id:
+                        return
+                    update_slack = True
+                else:
+                    notion_link.url = page_url
+                    notion_link.save(update_fields=["url"])
+                    notion_page_created = True
     except Exception:
         logger.exception(
             "Failed to create Notion postmortem page for %s",
