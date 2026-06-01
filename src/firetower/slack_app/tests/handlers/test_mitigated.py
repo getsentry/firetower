@@ -133,11 +133,15 @@ class TestMitigatedModal:
             "description_block",
             "impact_summary_block",
             "impact_type_block",
-            "service_tier_block",
             "affected_service_block",
             "affected_region_block",
         ):
             assert by_id[required].get("optional", False) is False
+
+    def test_service_tier_block_is_optional(self, incident):
+        modal = _build_mitigated_modal(incident, CHANNEL_ID)
+        by_id = {b["block_id"]: b for b in modal["blocks"] if "block_id" in b}
+        assert by_id["service_tier_block"].get("optional") is True
 
     def test_prefills_title_and_severity(self, incident):
         modal = _build_mitigated_modal(incident, CHANNEL_ID)
@@ -232,7 +236,21 @@ class TestMitigatedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "impact_type_block" in call_kwargs["errors"]
 
-    def test_missing_service_tier_returns_error(self, incident):
+    @patch("firetower.incidents.serializers.on_status_changed")
+    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.slack_app.handlers.mitigated.get_or_create_user_from_slack_id")
+    def test_missing_service_tier_succeeds(
+        self,
+        mock_get_user,
+        mock_title_hook,
+        mock_status_hook,
+        user,
+        incident,
+        impact_type_tag,
+        affected_service_tag,
+        affected_region_tag,
+    ):
+        mock_get_user.return_value = user
         ack = MagicMock()
         client = MagicMock()
         body = {"user": {"id": "U_CAPTAIN"}}
@@ -240,10 +258,10 @@ class TestMitigatedSubmission:
 
         handle_mitigated_submission(ack, body, view, client)
 
-        ack.assert_called_once()
-        call_kwargs = ack.call_args[1]
-        assert call_kwargs["response_action"] == "errors"
-        assert "service_tier_block" in call_kwargs["errors"]
+        ack.assert_called_once_with()
+        incident.refresh_from_db()
+        assert incident.status == IncidentStatus.MITIGATED
+        assert incident.service_tier is None
 
     def test_missing_description_returns_error(self, incident):
         ack = MagicMock()
