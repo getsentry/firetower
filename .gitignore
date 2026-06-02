@@ -20,4 +20,4 @@ config.toml
 .env.production.local
 .warden/logs/
 
-./claude
+.claude/
