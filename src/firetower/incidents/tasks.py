@@ -42,11 +42,18 @@ SCHEDULES = {
     },
 }
 
-ACTION_ITEM_REMINDER_MIN_AGE_DAYS = 21
 ACTION_ITEM_REMINDER_MAX_AGE_DAYS = 90
 ACTION_ITEM_REMINDER_NAG_EVERY_DAYS = 7
-# Linear priority values: 1 = Urgent (P0), 2 = High (P1)
-ACTION_ITEM_REMINDER_PRIORITIES = (1, 2)
+
+# Per-tier minimum incident age (in days) before we nag, and the settings.LINEAR
+# key holding the comment for that tier.
+# Linear priority values: 1 = Urgent (P0), 2 = High (P1), 3 = Medium (P2).
+ACTION_ITEM_NAG_TIERS: dict[int, tuple[int, str]] = {
+    1: (7, "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY"),
+    2: (7, "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY"),
+    3: (21, "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY"),
+}
+ACTION_ITEM_REMINDER_PRIORITIES = tuple(ACTION_ITEM_NAG_TIERS.keys())
 
 DATADOG_INVALID_CHARS = re.compile(r"[^A-Za-z0-9-_.\/]")
 
@@ -241,20 +248,35 @@ def send_statuspage_followup_reminder(
 
 @datadog_log
 def send_action_item_reminder() -> None:
-    comment = (
-        settings.LINEAR.get("ACTION_ITEM_NAG_COMMENT", "") if settings.LINEAR else ""
-    )
-    if not comment:
-        logger.warning("Linear nag comment not configured, skipping job")
+    linear = settings.LINEAR or {}
+    comments_by_priority: dict[int, str] = {
+        priority: linear.get(setting_key, "")
+        for priority, (_, setting_key) in ACTION_ITEM_NAG_TIERS.items()
+    }
+    if not any(comments_by_priority.values()):
+        logger.warning("No Linear nag comments configured, skipping job")
         return
 
-    def _action_item_eligible(action_item: ActionItem, now: datetime) -> bool:
+    now = timezone.now()
+    earliest_min_age_days = min(
+        min_age for min_age, _ in ACTION_ITEM_NAG_TIERS.values()
+    )
+    min_age = now - timedelta(days=ACTION_ITEM_REMINDER_MAX_AGE_DAYS)
+    max_age = now - timedelta(days=earliest_min_age_days)
+
+    def _action_item_eligible(action_item: ActionItem, incident: Incident) -> bool:
         if action_item.status not in [
             ActionItemStatus.TODO,
             ActionItemStatus.IN_PROGRESS,
         ]:
             return False
-        if action_item.priority < 1:
+        tier = ACTION_ITEM_NAG_TIERS.get(action_item.priority)
+        if not tier:
+            return False
+        tier_min_age_days, _ = tier
+        if not comments_by_priority.get(action_item.priority):
+            return False
+        if incident.created_at > now - timedelta(days=tier_min_age_days):
             return False
         if action_item.last_nag is None:
             return True
@@ -263,6 +285,7 @@ def send_action_item_reminder() -> None:
         )
 
     def _nag(action_item: ActionItem) -> None:
+        comment = comments_by_priority[action_item.priority]
         try:
             success = LinearService().create_comment(
                 action_item.linear_issue_id, comment
@@ -275,10 +298,6 @@ def send_action_item_reminder() -> None:
         if success:
             action_item.last_nag = timezone.now()
             action_item.save(update_fields=["last_nag"])
-
-    now = timezone.now()
-    min_age = now - timedelta(days=ACTION_ITEM_REMINDER_MAX_AGE_DAYS)
-    max_age = now - timedelta(days=ACTION_ITEM_REMINDER_MIN_AGE_DAYS)
 
     incidents = Incident.objects.filter(
         created_at__gte=min_age,
@@ -304,7 +323,7 @@ def send_action_item_reminder() -> None:
         eligible: list[ActionItem] = [
             action_item
             for action_item in action_items
-            if _action_item_eligible(action_item, now)
+            if _action_item_eligible(action_item, incident)
         ]
 
         for action_item in eligible:

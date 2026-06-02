@@ -628,7 +628,8 @@ class TestSendStatuspageFollowupReminder:
 
 @pytest.mark.django_db
 class TestSendActionItemReminder:
-    CONFIGURED_COMMENT = "This action item is stale, please update it."
+    CONFIGURED_HIGH_PRIORITY_COMMENT = "P0/P1 nag: this action item is overdue."
+    CONFIGURED_MEDIUM_PRIORITY_COMMENT = "P2 nag: this action item is overdue."
 
     @pytest.fixture(autouse=True)
     def _configure_linear(self):
@@ -639,7 +640,8 @@ class TestSendActionItemReminder:
             "TEAM_ID": "test",
             "PROJECT_ID": "test",
             "SYNC_IDENTIFIERS": False,
-            "ACTION_ITEM_NAG_COMMENT": self.CONFIGURED_COMMENT,
+            "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": self.CONFIGURED_HIGH_PRIORITY_COMMENT,
+            "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": self.CONFIGURED_MEDIUM_PRIORITY_COMMENT,
         }
         with patch.object(settings, "LINEAR", linear_settings):
             yield
@@ -688,8 +690,8 @@ class TestSendActionItemReminder:
         synced_ids = {c.args[0].id for c in mock_sync.call_args_list}
         assert synced_ids == {incident.id}
 
-    def test_skips_incident_younger_than_min_age(self, mock_sync):
-        self._make_incident(days_old=10)
+    def test_skips_incident_younger_than_global_floor(self, mock_sync):
+        self._make_incident(days_old=5)
         send_action_item_reminder()
         mock_sync.assert_not_called()
 
@@ -732,20 +734,74 @@ class TestSendActionItemReminder:
         send_action_item_reminder()
 
         mock_linear.create_comment.assert_called_once_with(
-            succeeding_item.linear_issue_id, self.CONFIGURED_COMMENT
+            succeeding_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
 
-    def test_posts_comment_and_stamps_last_nag(self, mock_linear):
+    def test_posts_high_priority_comment_for_p0(self, mock_linear):
         incident = self._make_incident()
-        action_item = self._make_action_item(incident)
+        action_item = self._make_action_item(incident, priority=1)
 
         send_action_item_reminder()
 
         mock_linear.create_comment.assert_called_once_with(
-            action_item.linear_issue_id, self.CONFIGURED_COMMENT
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
         action_item.refresh_from_db()
         assert action_item.last_nag is not None
+
+    def test_posts_high_priority_comment_for_p1(self, mock_linear):
+        incident = self._make_incident()
+        action_item = self._make_action_item(incident, priority=2)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
+
+    def test_posts_medium_priority_comment_for_p2(self, mock_linear):
+        incident = self._make_incident(days_old=30)
+        action_item = self._make_action_item(incident, priority=3)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_MEDIUM_PRIORITY_COMMENT
+        )
+
+    def test_nags_high_priority_at_seven_days(self, mock_linear):
+        incident = self._make_incident(days_old=8)
+        action_item = self._make_action_item(incident, priority=1)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
+
+    def test_skips_medium_priority_under_twenty_one_days(self, mock_linear):
+        incident = self._make_incident(days_old=10)
+        self._make_action_item(incident, priority=3)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_not_called()
+
+    def test_runs_when_only_high_priority_comment_set(self, mock_linear):
+        linear_only_high = {
+            "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": self.CONFIGURED_HIGH_PRIORITY_COMMENT,
+            "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": "",
+        }
+        incident = self._make_incident(days_old=30)
+        urgent = self._make_action_item(incident, title="urgent", priority=1)
+        self._make_action_item(incident, title="medium", priority=3)
+
+        with patch.object(settings, "LINEAR", linear_only_high):
+            send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            urgent.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
 
     def test_does_not_stamp_when_comment_returns_failure(self, mock_linear):
         incident = self._make_incident()
@@ -788,8 +844,8 @@ class TestSendActionItemReminder:
 
         mock_linear.create_comment.assert_not_called()
 
-    @pytest.mark.parametrize("priority", [0, 3, 4])
-    def test_skips_low_priority_action_item(self, mock_linear, priority):
+    @pytest.mark.parametrize("priority", [0, 4])
+    def test_skips_unranked_or_low_priority_action_item(self, mock_linear, priority):
         incident = self._make_incident()
         self._make_action_item(incident, priority=priority)
 
@@ -814,5 +870,5 @@ class TestSendActionItemReminder:
         send_action_item_reminder()
 
         mock_linear.create_comment.assert_called_once_with(
-            action_item.linear_issue_id, self.CONFIGURED_COMMENT
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )

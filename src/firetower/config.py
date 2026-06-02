@@ -77,7 +77,8 @@ class LinearConfig:
     project_id: str = ""
     sync_identifiers: bool = False
     api_key: str = ""
-    action_item_nag_comment: str = ""
+    action_item_nag_comment_high_priority: str = ""
+    action_item_nag_comment_medium_priority: str = ""
 
 
 @deserialize
