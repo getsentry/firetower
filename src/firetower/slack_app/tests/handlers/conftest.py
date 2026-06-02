@@ -11,6 +11,7 @@ from firetower.incidents.models import (
 )
 
 CHANNEL_ID = "C_TEST_CHANNEL"
+STATUS_CHANNEL_ID = "C_TEST_STATUS_CHANNEL"
 
 
 @pytest.fixture
@@ -43,5 +44,10 @@ def incident(user):
         incident=inc,
         type=ExternalLinkType.SLACK,
         url="https://slack.com/archives/C_TEST_CHANNEL",
+    )
+    ExternalLink.objects.create(
+        incident=inc,
+        type=ExternalLinkType.SLACK_STATUS,
+        url="https://slack.com/archives/C_TEST_STATUS_CHANNEL",
     )
     return inc
