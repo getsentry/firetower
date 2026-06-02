@@ -3470,8 +3470,10 @@ class TestOnIncidentUpdated:
 
         mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_CAP4"])
 
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_visibility_posted_separately(self, mock_slack):
+    def test_visibility_posted_separately(self, mock_slack, mock_bolt, mock_dump_async):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = self._make_incident(status=IncidentStatus.MITIGATED, is_private=True)

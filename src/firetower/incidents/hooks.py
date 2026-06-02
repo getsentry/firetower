@@ -1614,10 +1614,6 @@ def on_incident_updated(
                     f"Failed to invite captain to status channel in on_incident_updated for incident {incident.id}"
                 )
 
-    # Title change: sync linear
-    if old_title is not None:
-        _sync_linear_title(incident)
-
-    # Visibility change: sync linear
-    if visibility_changed:
+    # Title or visibility change: sync linear
+    if old_title is not None or visibility_changed:
         _sync_linear_title(incident)
