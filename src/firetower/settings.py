@@ -58,6 +58,7 @@ if not env_is_dev():
         environment=os.environ.get("DJANGO_ENV", "unknown"),
         traces_sample_rate=1.0,
         enable_logs=True,
+        trace_propagation_targets=[],
     )
 
 

@@ -19,7 +19,7 @@ if (import.meta.env.MODE != 'development') {
       Sentry.replayIntegration(),
     ],
     tracesSampleRate: 1.0,
-    tracePropagationTargets: [/^\//, /firetower\.getsentry\.net/],
+    tracePropagationTargets: [/^\//, /^https:\/\/(test\.)?firetower\.getsentry\.net/],
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,
   });
