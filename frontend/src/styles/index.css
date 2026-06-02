@@ -53,6 +53,10 @@ body {
   font-family: 'Rubik', sans-serif;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
