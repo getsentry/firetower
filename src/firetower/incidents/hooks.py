@@ -1487,7 +1487,7 @@ def on_incident_updated(
 
     if lines and channel_id:
         # Build header
-        if actor:
+        if actor and actor.is_authenticated:
             actor_slack_id = _get_slack_user_id(actor)
             if actor_slack_id:
                 header = f"<@{actor_slack_id}> updated incident:"
