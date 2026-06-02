@@ -103,6 +103,7 @@ class ConfigFile:
     django_secret_key: str
     salt_key: str
     sentry_dsn: str
+    service_registry_url: str | None = None
     notion: NotionConfig | None = None
     genai: GenAIConfig | None = None
     log_level: str = "INFO"
@@ -175,6 +176,7 @@ class DummyConfigFile(ConfigFile):
         self.django_secret_key = "dummy_value_DO_NOT_USE"
         self.salt_key = ""
         self.sentry_dsn = ""
+        self.service_registry_url = None
         self.region_grouping: list[list[str]] = []
         self.log_level = "INFO"
         self.hooks_enabled = False

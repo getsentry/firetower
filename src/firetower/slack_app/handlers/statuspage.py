@@ -6,6 +6,7 @@ import requests
 from django.db import transaction
 
 from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.integrations.services.slack import SlackService
 from firetower.integrations.services.statuspage import (
     COMPONENT_STATUS_OPTIONS,
     DEFAULT_MESSAGES,
@@ -502,14 +503,25 @@ def _process_statuspage_submission(
         )
         return False
 
-    try:
-        client.chat_postMessage(channel=channel_id, text=success_message)
-    except Exception:
-        logger.exception(
-            "Failed to post statuspage success message for incident %s (%s)",
-            incident.id,
-            success_message,
-        )
+    notify_channels = {channel_id}
+    slack = SlackService()
+    for link in incident.external_links.filter(
+        type__in=[ExternalLinkType.SLACK, ExternalLinkType.SLACK_STATUS]
+    ):
+        parsed = slack.parse_channel_id_from_url(link.url)
+        if parsed:
+            notify_channels.add(parsed)
+
+    for ch in notify_channels:
+        try:
+            client.chat_postMessage(channel=ch, text=success_message)
+        except Exception:
+            logger.exception(
+                "Failed to post statuspage success message for incident %s to %s (%s)",
+                incident.id,
+                ch,
+                success_message,
+            )
 
     try:
         from firetower.incidents.hooks import (  # noqa: PLC0415

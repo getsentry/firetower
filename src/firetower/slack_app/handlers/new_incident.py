@@ -32,9 +32,6 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
     impact_summary = form_data.get("impact_summary", "")
     captain_slack_id = form_data.get("captain_slack_id")
     is_private = form_data.get("is_private", False)
-    impact_type_tags = form_data.get("impact_type_tags", [])
-    affected_service_tags = form_data.get("affected_service_tags", [])
-    affected_region_tags = form_data.get("affected_region_tags", [])
 
     channel_name = f"{settings.PROJECT_KEY.lower()}-{uuid.uuid4().hex[:8]}"
 
@@ -65,12 +62,6 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
         metadata_lines.append(f"Captain: <@{captain_slack_id}>")
     metadata_lines.append(f"Reporter: <@{slack_user_id}>")
     metadata_lines.append(f"Private: {'yes' if is_private else 'no'}")
-    if impact_type_tags:
-        metadata_lines.append(f"Impact Types: {', '.join(impact_type_tags)}")
-    if affected_service_tags:
-        metadata_lines.append(f"Affected Services: {', '.join(affected_service_tags)}")
-    if affected_region_tags:
-        metadata_lines.append(f"Affected Regions: {', '.join(affected_region_tags)}")
 
     metadata_text = "\n".join(metadata_lines)
     try:
@@ -252,12 +243,6 @@ def _create_incident_via_db(
         "reporter": user.email,
         "is_private": is_private,
     }
-    if form["impact_type_tags"]:
-        data["impact_type_tags"] = form["impact_type_tags"]
-    if form["affected_service_tags"]:
-        data["affected_service_tags"] = form["affected_service_tags"]
-    if form["affected_region_tags"]:
-        data["affected_region_tags"] = form["affected_region_tags"]
 
     serializer = IncidentWriteSerializer(data=data)
     if not serializer.is_valid():
@@ -307,9 +292,6 @@ def handle_new_incident_submission(
             "impact_summary": form["impact_summary"],
             "captain_slack_id": form["captain_slack_id"],
             "is_private": is_private,
-            "impact_type_tags": form.get("impact_type_tags", []),
-            "affected_service_tags": form.get("affected_service_tags", []),
-            "affected_region_tags": form.get("affected_region_tags", []),
         }
         _create_fallback_channel(client, slack_user_id, form_data)
         return
