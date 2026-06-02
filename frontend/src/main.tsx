@@ -15,7 +15,12 @@ if (import.meta.env.MODE != 'development') {
       Sentry.feedbackIntegration({
         colorScheme: 'system',
       }),
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration(),
     ],
+    tracesSampleRate: 1.0,
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
   });
 }
 

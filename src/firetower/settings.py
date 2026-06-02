@@ -55,6 +55,8 @@ if not env_is_dev():
         dsn=config.sentry_dsn,
         send_default_pii=False,
         environment=os.environ.get("DJANGO_ENV", "unknown"),
+        traces_sample_rate=1.0,
+        enable_logs=True,
     )
 
 
