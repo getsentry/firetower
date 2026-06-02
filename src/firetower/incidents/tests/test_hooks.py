@@ -22,6 +22,7 @@ from firetower.incidents.hooks import (
     create_linear_parent_issue,
     on_captain_changed,
     on_incident_created,
+    on_incident_updated,
     on_severity_changed,
     on_status_changed,
     on_title_changed,
@@ -3199,3 +3200,284 @@ class TestCreateLinearParentIssueBookmark:
         create_linear_parent_issue(incident, channel_id="C99999")
 
         mock_slack.add_bookmark.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestOnIncidentUpdated:
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "severity": IncidentSeverity.P2,
+            "status": IncidentStatus.ACTIVE,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def _link_slack(self, incident, channel_id="C12345"):
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url=f"https://slack.com/archives/{channel_id}",
+        )
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_single_message_for_multiple_changes(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="cap@example.com",
+            email="cap@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAP",
+        )
+        incident = self._make_incident(
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.MITIGATED,
+            captain=captain,
+        )
+        self._link_slack(incident)
+
+        on_incident_updated(
+            incident,
+            old_status=IncidentStatus.ACTIVE,
+            old_severity=IncidentSeverity.P2,
+            captain_changed=True,
+        )
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "- Status:" in msg
+        assert "- Severity:" in msg
+        assert "- Captain: <@U_CAP>" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_bullet_for_single_change(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "- Status: Active -> Mitigated" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_includes_actor_attribution(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        actor = User.objects.create_user(
+            username="actor@example.com", email="actor@example.com"
+        )
+        ExternalProfile.objects.create(
+            user=actor,
+            type=ExternalProfileType.SLACK,
+            external_id="U_ACTOR",
+        )
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE, actor=actor)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "<@U_ACTOR>" in msg
+        assert "updated incident:" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_actor_name_fallback_when_no_slack_profile(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        actor = User.objects.create_user(
+            username="actor@example.com",
+            email="actor@example.com",
+            first_name="Alice",
+            last_name="Smith",
+        )
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE, actor=actor)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "Alice Smith updated incident:" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_actor_falls_back_to_generic_header(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert msg.startswith("Incident updated:")
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_sets_topic_once_when_severity_and_captain_change(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="cap2@example.com",
+            email="cap2@example.com",
+            first_name="Bob",
+            last_name="Lead",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAP2",
+        )
+        incident = self._make_incident(severity=IncidentSeverity.P3, captain=captain)
+        self._link_slack(incident)
+
+        on_incident_updated(
+            incident, old_severity=IncidentSeverity.P4, captain_changed=True
+        )
+
+        mock_slack.set_channel_topic.assert_called_once()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_message_when_nothing_changed(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident()
+        self._link_slack(incident)
+
+        on_incident_updated(incident)
+
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_message_without_slack_link(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = None
+
+        incident = self._make_incident()
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_captain_name_fallback_when_no_slack_profile(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="cap3@example.com",
+            email="cap3@example.com",
+            first_name="Carol",
+            last_name="Jones",
+        )
+        incident = self._make_incident(captain=captain)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, captain_changed=True)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "Carol Jones" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_captain_line_when_captain_cleared(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(captain=None)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, captain_changed=True)
+
+        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_triggers_slack_dump_on_resolved_status(
+        self, mock_slack, mock_bolt, mock_dump_async
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_client = MagicMock()
+        mock_bolt.return_value.client = mock_client
+
+        incident = self._make_incident(status=IncidentStatus.POSTMORTEM)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
+
+        mock_dump_async.assert_called_once_with(mock_client, "C12345", incident)
+
+    @patch("firetower.incidents.hooks.schedule_statuspage_followup_reminder")
+    @patch("firetower.incidents.hooks._schedule_statuspage_reminder")
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_severity_escalation_side_effects(
+        self,
+        mock_slack,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+        mock_statuspage,
+        mock_followup,
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0,
+            status=IncidentStatus.ACTIVE,
+        )
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_severity=IncidentSeverity.P2)
+
+        mock_page.assert_called_once()
+        mock_invite_oncall.assert_called_once()
+        mock_status_channel.assert_called_once()
+        mock_statuspage.assert_called_once()
+        mock_followup.assert_called_once()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_captain_invited_to_channel(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="cap4@example.com",
+            email="cap4@example.com",
+            first_name="Dave",
+            last_name="Lead",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAP4",
+        )
+        incident = self._make_incident(captain=captain)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, captain_changed=True)
+
+        mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_CAP4"])
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_visibility_posted_separately(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.MITIGATED, is_private=True)
+        self._link_slack(incident)
+
+        on_incident_updated(
+            incident,
+            old_status=IncidentStatus.ACTIVE,
+            visibility_changed=True,
+        )
+
+        assert mock_slack.post_message.call_count == 2
+        messages = [c[0][1] for c in mock_slack.post_message.call_args_list]
+        assert any("- Status:" in m for m in messages)
+        assert any("private" in m for m in messages)
