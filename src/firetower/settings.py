@@ -18,6 +18,7 @@ from typing import Any, TypedDict
 from datadog import initialize
 from datadog.dogstatsd.base import statsd
 
+from corsheaders.defaults import default_headers
 from firetower.config import ConfigFile, DummyConfigFile
 
 
@@ -104,6 +105,12 @@ CSRF_TRUSTED_ORIGINS = [
     "https://firetower.getsentry.net",
     "https://test.firetower.getsentry.net",
 ]
+
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "sentry-trace",
+    "baggage",
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
