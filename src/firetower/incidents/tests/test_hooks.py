@@ -3220,9 +3220,15 @@ class TestOnIncidentUpdated:
             url=f"https://slack.com/archives/{channel_id}",
         )
 
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_single_message_for_multiple_changes(self, mock_slack):
+    def test_posts_single_message_for_multiple_changes(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+    ):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_page.return_value = set()
 
         captain = User.objects.create_user(
             username="cap@example.com",
