@@ -6,7 +6,6 @@ from typing import Any, Protocol
 
 from datadog import statsd
 from django.conf import settings
-from django.db.models import Q
 from django.utils import timezone
 from django_q.tasks import Schedule
 
@@ -303,9 +302,7 @@ def send_action_item_reminder() -> None:
         created_at__gte=min_age,
         created_at__lte=max_age,
         severity__in=HIGH_SEVERITIES,
-    ).exclude(
-        Q(status=IncidentStatus.CANCELED) | Q(root_cause_tags__name="false-alarm")
-    )
+    ).exclude(status=IncidentStatus.CANCELED)
 
     for incident in incidents:
         try:

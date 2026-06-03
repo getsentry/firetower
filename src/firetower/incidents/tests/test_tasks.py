@@ -14,8 +14,6 @@ from firetower.incidents.models import (
     Incident,
     IncidentSeverity,
     IncidentStatus,
-    Tag,
-    TagType,
 )
 from firetower.incidents.tasks import (
     STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE,
@@ -708,15 +706,6 @@ class TestSendActionItemReminder:
     def test_skips_canceled_incident(self, mock_sync):
         self._make_incident(status=IncidentStatus.CANCELED)
         send_action_item_reminder()
-        mock_sync.assert_not_called()
-
-    def test_skips_incident_tagged_false_alarm(self, mock_sync):
-        incident = self._make_incident()
-        tag = Tag.objects.create(name="false-alarm", type=TagType.ROOT_CAUSE)
-        incident.root_cause_tags.add(tag)
-
-        send_action_item_reminder()
-
         mock_sync.assert_not_called()
 
     def test_continues_when_sync_fails_for_one_incident(self, mock_sync, mock_linear):
