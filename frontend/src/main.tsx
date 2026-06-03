@@ -6,25 +6,6 @@ import {createRouter, RouterProvider} from '@tanstack/react-router';
 
 import {routeTree} from './routeTree.gen';
 
-if (import.meta.env.MODE != 'development') {
-  Sentry.init({
-    dsn: 'https://82cb16514b69a48430dc945408138e0d@o1.ingest.us.sentry.io/4510076293283840',
-    sendDefaultPii: false,
-    environment: String(import.meta.env.MODE),
-    integrations: [
-      Sentry.feedbackIntegration({
-        colorScheme: 'system',
-      }),
-      Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration(),
-    ],
-    tracesSampleRate: 1.0,
-    tracePropagationTargets: [/^\//, /^https:\/\/(test\.)?firetower\.getsentry\.net/],
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
-  });
-}
-
 const queryClient = new QueryClient();
 const router = createRouter({
   routeTree,
@@ -41,6 +22,25 @@ const router = createRouter({
   defaultErrorComponent: () => <p>Error</p>,
   defaultPendingComponent: () => <p>Loading</p>,
 });
+
+if (import.meta.env.MODE != 'development') {
+  Sentry.init({
+    dsn: 'https://82cb16514b69a48430dc945408138e0d@o1.ingest.us.sentry.io/4510076293283840',
+    sendDefaultPii: false,
+    environment: String(import.meta.env.MODE),
+    integrations: [
+      Sentry.feedbackIntegration({
+        colorScheme: 'system',
+      }),
+      Sentry.tanstackRouterBrowserTracingIntegration(router),
+      Sentry.replayIntegration(),
+    ],
+    tracesSampleRate: 1.0,
+    tracePropagationTargets: [/^\//, /^https:\/\/(test\.)?firetower\.getsentry\.net/],
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
+  });
+}
 
 declare module '@tanstack/react-router' {
   interface Register {
