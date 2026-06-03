@@ -19,3 +19,5 @@ config.toml
 .env.development.local
 .env.production.local
 .warden/logs/
+
+.claude/
