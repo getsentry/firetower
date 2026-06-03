@@ -1,3 +1,4 @@
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import path from 'path';
 
 import tailwindcss from '@tailwindcss/vite';
@@ -7,15 +8,15 @@ import {defineConfig} from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    tanstackRouter({
-      target: 'react',
-      autoCodeSplitting: true,
-      routeFileIgnorePattern: 'queries|components|types|utils|.*.test.tsx?',
-    }),
-    tailwindcss(),
-    react(),
-  ],
+  plugins: [tanstackRouter({
+    target: 'react',
+    autoCodeSplitting: true,
+    routeFileIgnorePattern: 'queries|components|types|utils|.*.test.tsx?',
+  }), tailwindcss(), react(), sentryVitePlugin({
+    org: "sentry",
+    project: "firetower-frontend"
+  })],
+
   resolve: {
     alias: {
       components: path.resolve(__dirname, './src/components'),
@@ -23,7 +24,12 @@ export default defineConfig({
       api: path.resolve(__dirname, './src/api.ts'),
     },
   },
+
   test: {
     setupFiles: ['./utils/happydom.ts', './utils/testing-library.ts'],
   },
+
+  build: {
+    sourcemap: true
+  }
 });
