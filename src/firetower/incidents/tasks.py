@@ -110,8 +110,9 @@ def _build_ic_mention(incident: Incident) -> str:
     slack_id = get_slack_user_id(incident.captain)
     if slack_id:
         return f"\n<@{slack_id}>"
-    name = incident.captain.get_full_name() or incident.captain.username
-    return f"\n{escape_slack_text(name)}"
+
+    # If no slack handle, just return empty since we wouldn't be pinging them anyways.
+    return ""
 
 
 @datadog_log
