@@ -826,6 +826,23 @@ class TestSendActionItemReminder:
         ):
             yield mock
 
+    @pytest.fixture(autouse=True)
+    def mock_slack(self):
+        mock = MagicMock()
+        mock.post_message.return_value = "1.0"
+        with patch("firetower.incidents.tasks.SlackService", return_value=mock):
+            yield mock
+
+    def _make_user(self, name: str, slack_id: str | None = None) -> User:
+        user = User.objects.create_user(username=name, email=f"{name}@example.com")
+        if slack_id is not None:
+            ExternalProfile.objects.create(
+                user=user,
+                type=ExternalProfileType.SLACK,
+                external_id=slack_id,
+            )
+        return user
+
     def _make_incident(self, days_old: int = 45, **kwargs) -> Incident:
         defaults = {
             "title": "Test Incident",
@@ -1084,3 +1101,58 @@ class TestSendActionItemReminder:
         mock_linear.create_comment.assert_not_called()
         action_item.refresh_from_db()
         assert action_item.last_nag is None
+
+    def test_dms_assignee_when_action_item_owned(self, mock_linear, mock_slack):
+        assignee = self._make_user("alice", slack_id="U_ALICE")
+        captain = self._make_user("bob", slack_id="U_BOB")
+        incident = self._make_incident(captain=captain)
+        action_item = self._make_action_item(incident, assignee=assignee)
+
+        send_action_item_reminder()
+
+        expected = (
+            f"<{action_item.url}|{action_item.linear_identifier}>: "
+            f"{action_item.title}\n\n{self.CONFIGURED_HIGH_PRIORITY_COMMENT}"
+        )
+        mock_slack.post_message.assert_called_once_with("U_ALICE", expected)
+
+    def test_dms_captain_when_action_item_unowned(self, mock_linear, mock_slack):
+        captain = self._make_user("bob", slack_id="U_BOB")
+        incident = self._make_incident(captain=captain)
+        action_item = self._make_action_item(incident)
+
+        send_action_item_reminder()
+
+        expected = (
+            f"<{action_item.url}|{action_item.linear_identifier}>: "
+            f"{action_item.title}\n\n{self.CONFIGURED_HIGH_PRIORITY_COMMENT}"
+        )
+        mock_slack.post_message.assert_called_once_with("U_BOB", expected)
+
+    def test_no_dm_when_no_assignee_and_no_captain(self, mock_linear, mock_slack):
+        incident = self._make_incident()
+        self._make_action_item(incident)
+
+        send_action_item_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_no_dm_when_recipient_has_no_slack_profile(self, mock_linear, mock_slack):
+        assignee = self._make_user("alice")
+        incident = self._make_incident()
+        self._make_action_item(incident, assignee=assignee)
+
+        send_action_item_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_slack_failure_does_not_block_last_nag(self, mock_linear, mock_slack):
+        assignee = self._make_user("alice", slack_id="U_ALICE")
+        incident = self._make_incident()
+        action_item = self._make_action_item(incident, assignee=assignee)
+        mock_slack.post_message.side_effect = RuntimeError("slack down")
+
+        send_action_item_reminder()
+
+        action_item.refresh_from_db()
+        assert action_item.last_nag is not None
