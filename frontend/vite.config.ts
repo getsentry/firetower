@@ -19,6 +19,10 @@ export default defineConfig({
     sentryVitePlugin({
       org: 'sentry',
       project: 'firetower-frontend',
+      disable: !process.env.SENTRY_AUTH_TOKEN,
+      sourcemaps: {
+        filesToDeleteAfterUpload: ['./dist/**/*.map'],
+      },
     }),
   ],
 
