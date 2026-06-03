@@ -15,10 +15,10 @@ import sys
 from pathlib import Path
 from typing import Any, TypedDict
 
+from corsheaders.defaults import default_headers
 from datadog import initialize
 from datadog.dogstatsd.base import statsd
 
-from corsheaders.defaults import default_headers
 from firetower.config import ConfigFile, DummyConfigFile
 
 
