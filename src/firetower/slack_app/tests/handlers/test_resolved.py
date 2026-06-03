@@ -108,7 +108,6 @@ class TestResolvedModal:
             "captain_block",
             "severity_block",
             "title_block",
-            "description_block",
             "impact_summary_block",
             "impact_type_block",
             "affected_service_block",
@@ -120,6 +119,11 @@ class TestResolvedModal:
         modal = _build_resolved_modal(incident, CHANNEL_ID)
         by_id = {b["block_id"]: b for b in modal["blocks"] if "block_id" in b}
         assert by_id["service_tier_block"].get("optional") is True
+
+    def test_description_block_is_optional(self, incident):
+        modal = _build_resolved_modal(incident, CHANNEL_ID)
+        by_id = {b["block_id"]: b for b in modal["blocks"] if "block_id" in b}
+        assert by_id["description_block"].get("optional") is True
 
     def test_contains_context_message(self, incident):
         modal = _build_resolved_modal(incident, CHANNEL_ID)
@@ -285,18 +289,32 @@ class TestResolvedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "captain_block" in call_kwargs["errors"]
 
-    def test_missing_description_returns_error(self, incident):
+    @patch("firetower.incidents.serializers.on_status_changed")
+    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
+    def test_missing_description_succeeds(
+        self,
+        mock_get_user,
+        mock_title_hook,
+        mock_status_hook,
+        user,
+        incident,
+        impact_type_tag,
+        affected_service_tag,
+        affected_region_tag,
+    ):
+        mock_get_user.return_value = user
         ack = MagicMock()
         client = MagicMock()
         body = {"user": {"id": "U_CAPTAIN"}}
-        view = _make_resolved_view(description="")
+        view = _make_resolved_view(severity="P3", description="")
 
         handle_resolved_submission(ack, body, view, client)
 
-        ack.assert_called_once()
-        call_kwargs = ack.call_args[1]
-        assert call_kwargs["response_action"] == "errors"
-        assert "description_block" in call_kwargs["errors"]
+        ack.assert_called_once_with()
+        incident.refresh_from_db()
+        assert incident.status == IncidentStatus.DONE
+        assert incident.description == ""
 
     def test_missing_impact_summary_returns_error(self, incident):
         ack = MagicMock()
