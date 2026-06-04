@@ -201,7 +201,7 @@ def build_channel_name(incident: Incident) -> str:
 SLACK_TOPIC_MAX_LENGTH = 250
 
 
-def _get_slack_user_id(user: User) -> str | None:
+def get_slack_user_id(user: User) -> str | None:
     profile = user.external_profiles.filter(type=ExternalProfileType.SLACK).first()
     return profile.external_id if profile else None
 
@@ -215,7 +215,7 @@ def build_channel_topic(incident: Incident, captain_slack_id: str | None = None)
         slack_id = (
             captain_slack_id
             if captain_slack_id is not None
-            else _get_slack_user_id(incident.captain)
+            else get_slack_user_id(incident.captain)
         )
         if slack_id:
             ic_part = f" | IC: <@{slack_id}>"
@@ -511,11 +511,9 @@ def _create_status_channel_for_context(
 
 
 def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
-    captain_slack_id = (
-        _get_slack_user_id(incident.captain) if incident.captain else None
-    )
+    captain_slack_id = get_slack_user_id(incident.captain) if incident.captain else None
     reporter_slack_id = (
-        _get_slack_user_id(incident.reporter) if incident.reporter else None
+        get_slack_user_id(incident.reporter) if incident.reporter else None
     )
     ctx = ChannelSetupContext(
         channel_id=main_channel_id,
@@ -1212,7 +1210,7 @@ def on_incident_created(incident: Incident) -> None:
 
     if channel_id:
         captain_slack_id = (
-            _get_slack_user_id(incident.captain) if incident.captain else None
+            get_slack_user_id(incident.captain) if incident.captain else None
         )
 
         try:
@@ -1234,7 +1232,7 @@ def on_incident_created(incident: Incident) -> None:
             captain_name = incident.captain.get_full_name() or incident.captain.username
 
         reporter_slack_id = (
-            _get_slack_user_id(incident.reporter) if incident.reporter else None
+            get_slack_user_id(incident.reporter) if incident.reporter else None
         )
 
         ctx = ChannelSetupContext(
@@ -1414,7 +1412,7 @@ def on_captain_changed(incident: Incident) -> None:
 
         incident_url = _build_incident_url(incident)
         if incident.captain:
-            slack_id = _get_slack_user_id(incident.captain)
+            slack_id = get_slack_user_id(incident.captain)
             if slack_id:
                 captain_ref = f"<@{slack_id}>"
             else:
