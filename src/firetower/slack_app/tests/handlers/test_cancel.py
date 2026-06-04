@@ -29,10 +29,9 @@ class TestCancelCommand:
         assert view["private_metadata"] == CHANNEL_ID
 
     @patch("firetower.slack_app.bolt.get_bolt_app")
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     def test_already_canceled_does_not_open_modal(
-        self, mock_title_hook, mock_status_hook, mock_get_bolt_app, incident
+        self, mock_updated_hook, mock_get_bolt_app, incident
     ):
         incident.status = IncidentStatus.CANCELED
         incident.save()
@@ -63,9 +62,8 @@ class TestCancelCommand:
 
 @pytest.mark.django_db
 class TestCancelSubmission:
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
-    def test_transitions_to_canceled(self, mock_title_hook, mock_status_hook, incident):
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_transitions_to_canceled(self, mock_updated_hook, incident):
         ack = MagicMock()
         client = MagicMock()
         body = {"user": {"id": "U_CAPTAIN"}}
@@ -112,11 +110,8 @@ class TestCancelSubmission:
         assert incident.status != IncidentStatus.CANCELED
         client.chat_postMessage.assert_not_called()
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
-    def test_already_canceled_is_noop(
-        self, mock_title_hook, mock_status_hook, incident
-    ):
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_already_canceled_is_noop(self, mock_updated_hook, incident):
         incident.status = IncidentStatus.CANCELED
         incident.save()
 
@@ -139,11 +134,10 @@ class TestCancelSubmission:
         assert incident.status == IncidentStatus.CANCELED
         client.chat_postMessage.assert_not_called()
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.cancel.IncidentWriteSerializer")
     def test_invalid_serializer_posts_failure(
-        self, mock_serializer_cls, mock_title_hook, mock_status_hook, incident
+        self, mock_serializer_cls, mock_updated_hook, incident
     ):
         serializer = mock_serializer_cls.return_value
         serializer.is_valid.return_value = False

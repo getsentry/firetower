@@ -279,14 +279,12 @@ class TestResolvedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "captain_block" in call_kwargs["errors"]
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_missing_description_succeeds(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
+        mock_updated_hook,
         user,
         incident,
         impact_type_tag,
