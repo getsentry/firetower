@@ -196,7 +196,7 @@ def _update_parent_issue_status(
         return
 
     statuses = list(incident.action_items.values_list("status", flat=True))
-    incident_done = incident.status == IncidentStatus.DONE
+    incident_done = incident.status in (IncidentStatus.DONE, IncidentStatus.CANCELED)
     all_complete = incident_done and (
         not statuses or all(s in COMPLETED_STATUSES for s in statuses)
     )
