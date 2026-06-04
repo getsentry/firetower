@@ -29,7 +29,7 @@ from firetower.incidents.tasks import (
 
 
 class TestDatadogLogTaskName:
-    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.decorators.statsd")
     def test_replaces_invalid_chars_with_underscore(self, mock_statsd):
         def f_with_bad_chars() -> None:
             pass
@@ -41,7 +41,7 @@ class TestDatadogLogTaskName:
         expected_tags = ["task:task_with_spaces___symbols_"]
         mock_statsd.increment.assert_any_call("django_q.task.run", 1, expected_tags)
 
-    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.decorators.statsd")
     def test_preserves_alphanumerics_dash_underscore_dot_slash(self, mock_statsd):
         def f() -> None:
             pass
@@ -53,7 +53,7 @@ class TestDatadogLogTaskName:
         expected_tags = ["task:namespace/sub-task_v1.2"]
         mock_statsd.increment.assert_any_call("django_q.task.run", 1, expected_tags)
 
-    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.decorators.statsd")
     def test_replaces_consecutive_invalid_chars_individually(self, mock_statsd):
         def f() -> None:
             pass
@@ -67,7 +67,7 @@ class TestDatadogLogTaskName:
 
 
 class TestDatadogLogStatsdIncrements:
-    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.decorators.statsd")
     def test_increments_run_and_success_on_normal_completion(self, mock_statsd):
         def f() -> None:
             pass
@@ -82,7 +82,7 @@ class TestDatadogLogStatsdIncrements:
             call("django_q.task.success", 1, tags),
         ]
 
-    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.decorators.statsd")
     def test_increments_run_and_error_when_function_raises(self, mock_statsd):
         def f() -> None:
             raise ValueError("boom")
@@ -98,7 +98,7 @@ class TestDatadogLogStatsdIncrements:
             call("django_q.task.error", 1, tags),
         ]
 
-    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.decorators.statsd")
     def test_does_not_increment_success_when_function_raises(self, mock_statsd):
         def f() -> None:
             raise RuntimeError("nope")
@@ -115,7 +115,7 @@ class TestDatadogLogStatsdIncrements:
         ]
         assert success_calls == []
 
-    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.decorators.statsd")
     def test_re_raises_exception_from_wrapped_function(self, mock_statsd):
         def f() -> None:
             raise ValueError("should propagate")
@@ -128,7 +128,7 @@ class TestDatadogLogStatsdIncrements:
 
 
 class TestScheduleDemoPrivateIncident:
-    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.decorators.statsd")
     @patch("firetower.incidents.tasks.Incident")
     def test_masks_title_for_private_incident(self, mock_incident_cls, mock_statsd):
         mock_incident = MagicMock()
@@ -146,7 +146,7 @@ class TestScheduleDemoPrivateIncident:
         assert "Private Incident" in logged
         assert "Secret outage details" not in logged
 
-    @patch("firetower.incidents.tasks.statsd")
+    @patch("firetower.incidents.tasks.decorators.statsd")
     @patch("firetower.incidents.tasks.Incident")
     def test_shows_title_for_public_incident(self, mock_incident_cls, mock_statsd):
         mock_incident = MagicMock()
@@ -749,14 +749,19 @@ class TestSendActionItemReminder:
 
     @pytest.fixture(autouse=True)
     def mock_sync(self):
-        with patch("firetower.incidents.tasks.sync_action_items_from_linear") as m:
+        with patch(
+            "firetower.incidents.tasks.action_items.sync_action_items_from_linear"
+        ) as m:
             yield m
 
     @pytest.fixture
     def mock_linear(self):
         mock = MagicMock()
         mock.create_comment.return_value = True
-        with patch("firetower.incidents.tasks.LinearService", return_value=mock):
+        with patch(
+            "firetower.incidents.tasks.action_items.LinearService",
+            return_value=mock,
+        ):
             yield mock
 
     def _make_incident(self, days_old: int = 45, **kwargs) -> Incident:
@@ -921,7 +926,9 @@ class TestSendActionItemReminder:
 
         with (
             patch.object(settings, "LINEAR", None),
-            patch("firetower.incidents.tasks.LinearService") as mock_service,
+            patch(
+                "firetower.incidents.tasks.action_items.LinearService"
+            ) as mock_service,
         ):
             send_action_item_reminder()
 
