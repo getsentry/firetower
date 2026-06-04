@@ -82,7 +82,10 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
 
     data = build_incident_update_data(form, target_status, captain_user.email)
 
-    serializer = IncidentWriteSerializer(instance=incident, data=data, partial=True)
+    acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
+    serializer = IncidentWriteSerializer(
+        instance=incident, data=data, partial=True, context={"acting_user": acting_user}
+    )
     if not serializer.is_valid():
         logger.error("Resolved update failed: %s", serializer.errors)
         client.chat_postMessage(

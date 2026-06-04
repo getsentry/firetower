@@ -183,8 +183,8 @@ class TestIncidentWriteSerializerHooks:
         incident = serializer.save()
         mock_hook.assert_called_once_with(incident)
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    def test_update_calls_on_status_changed(self, mock_hook):
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_update_calls_on_incident_updated_with_status(self, mock_hook):
         incident = Incident.objects.create(
             title="Test",
             severity=IncidentSeverity.P1,
@@ -199,10 +199,18 @@ class TestIncidentWriteSerializerHooks:
         )
         assert serializer.is_valid(), serializer.errors
         serializer.save()
-        mock_hook.assert_called_once_with(incident, IncidentStatus.ACTIVE)
+        mock_hook.assert_called_once_with(
+            incident,
+            old_title=None,
+            old_status=IncidentStatus.ACTIVE,
+            old_severity=None,
+            captain_changed=False,
+            visibility_changed=False,
+            actor=None,
+        )
 
-    @patch("firetower.incidents.serializers.on_severity_changed")
-    def test_update_calls_on_severity_changed(self, mock_hook):
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_update_calls_on_incident_updated_with_severity(self, mock_hook):
         incident = Incident.objects.create(
             title="Test",
             severity=IncidentSeverity.P2,
@@ -216,10 +224,18 @@ class TestIncidentWriteSerializerHooks:
         )
         assert serializer.is_valid(), serializer.errors
         serializer.save()
-        mock_hook.assert_called_once_with(incident, IncidentSeverity.P2)
+        mock_hook.assert_called_once_with(
+            incident,
+            old_title=None,
+            old_status=None,
+            old_severity=IncidentSeverity.P2,
+            captain_changed=False,
+            visibility_changed=False,
+            actor=None,
+        )
 
-    @patch("firetower.incidents.serializers.on_captain_changed")
-    def test_update_calls_on_captain_changed(self, mock_hook):
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_update_calls_on_incident_updated_with_captain(self, mock_hook):
         incident = Incident.objects.create(
             title="Test",
             severity=IncidentSeverity.P1,
@@ -237,14 +253,18 @@ class TestIncidentWriteSerializerHooks:
         )
         assert serializer.is_valid(), serializer.errors
         serializer.save()
-        mock_hook.assert_called_once_with(incident)
+        mock_hook.assert_called_once_with(
+            incident,
+            old_title=None,
+            old_status=None,
+            old_severity=None,
+            captain_changed=True,
+            visibility_changed=False,
+            actor=None,
+        )
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_severity_changed")
-    @patch("firetower.incidents.serializers.on_captain_changed")
-    def test_update_no_hooks_when_fields_unchanged(
-        self, mock_captain, mock_severity, mock_status
-    ):
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_update_no_hook_when_fields_unchanged(self, mock_hook):
         incident = Incident.objects.create(
             title="Test",
             severity=IncidentSeverity.P1,
@@ -258,9 +278,56 @@ class TestIncidentWriteSerializerHooks:
         )
         assert serializer.is_valid(), serializer.errors
         serializer.save()
-        mock_status.assert_not_called()
-        mock_severity.assert_not_called()
-        mock_captain.assert_not_called()
+        mock_hook.assert_called_once_with(
+            incident,
+            old_title="Test",
+            old_status=None,
+            old_severity=None,
+            captain_changed=False,
+            visibility_changed=False,
+            actor=None,
+        )
+
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_update_passes_actor_from_request(self, mock_hook):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        mock_request = type("Request", (), {"user": self.captain})()
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"status": "Mitigated"},
+            partial=True,
+            context={"request": mock_request},
+        )
+        assert serializer.is_valid(), serializer.errors
+        serializer.save()
+        mock_hook.assert_called_once()
+        assert mock_hook.call_args[1]["actor"] == self.captain
+
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_update_passes_actor_from_acting_user_context(self, mock_hook):
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.ACTIVE,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"status": "Mitigated"},
+            partial=True,
+            context={"acting_user": self.reporter},
+        )
+        assert serializer.is_valid(), serializer.errors
+        serializer.save()
+        mock_hook.assert_called_once()
+        assert mock_hook.call_args[1]["actor"] == self.reporter
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_update_same_status_string_does_not_fire_hook(self, mock_slack):
