@@ -4,10 +4,13 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.utils import timezone
 from django_q.models import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import (
+    ActionItem,
+    ActionItemStatus,
     ExternalLink,
     ExternalLinkType,
     Incident,
@@ -19,6 +22,7 @@ from firetower.incidents.tasks import (
     STATUSPAGE_REMINDER_MESSAGE,
     datadog_log,
     schedule_demo,
+    send_action_item_reminder,
     send_statuspage_followup_reminder,
     send_statuspage_reminder,
 )
@@ -422,7 +426,7 @@ class TestSendStatuspageReminder:
         msg = mock_slack.post_message.call_args[0][1]
         assert "\n<@U_CAPTAIN>" in msg
 
-    def test_includes_ic_name_without_slack_profile(self):
+    def test_omits_ic_without_slack_profile(self):
         captain = User.objects.create_user(
             username="captain@example.com",
             email="captain@example.com",
@@ -439,26 +443,7 @@ class TestSendStatuspageReminder:
             send_statuspage_reminder(incident.id)
 
         msg = mock_slack.post_message.call_args[0][1]
-        assert "\nJane Doe" in msg
-
-    def test_escapes_ic_name_for_slack(self):
-        captain = User.objects.create_user(
-            username="captain@example.com",
-            email="captain@example.com",
-            first_name="Jane <script>",
-            last_name="O'Doe & Co",
-        )
-        incident = self._make_incident(severity=IncidentSeverity.P0, captain=captain)
-        self._make_link(incident, ExternalLinkType.SLACK)
-
-        mock_slack = MagicMock()
-        mock_slack.parse_channel_id_from_url.return_value = "C12345"
-
-        with patch("firetower.incidents.tasks.SlackService", return_value=mock_slack):
-            send_statuspage_reminder(incident.id)
-
-        msg = mock_slack.post_message.call_args[0][1]
-        assert "Jane &lt;script&gt; O'Doe &amp; Co" in msg
+        assert "Jane Doe" not in msg
 
 
 @pytest.mark.django_db
@@ -711,7 +696,7 @@ class TestSendStatuspageFollowupReminder:
         msg = mock_slack.post_message.call_args[0][1]
         assert "\n<@U_CAPTAIN>" in msg
 
-    def test_includes_ic_name_without_slack_profile(self):
+    def test_omits_ic_without_slack_profile(self):
         captain = User.objects.create_user(
             username="captain@example.com",
             email="captain@example.com",
@@ -739,34 +724,243 @@ class TestSendStatuspageFollowupReminder:
             send_statuspage_followup_reminder(incident.id)
 
         msg = mock_slack.post_message.call_args[0][1]
-        assert "\nJane Doe" in msg
+        assert "Jane Doe" not in msg
 
-    def test_escapes_ic_name_for_slack(self):
-        captain = User.objects.create_user(
-            username="captain@example.com",
-            email="captain@example.com",
-            first_name="Jane <script>",
-            last_name="O'Doe & Co",
-        )
-        incident = self._make_incident(severity=IncidentSeverity.P0, captain=captain)
-        self._make_link(incident, ExternalLinkType.SLACK)
-        self._make_link(
-            incident,
-            ExternalLinkType.STATUSPAGE,
-            url="https://manage.statuspage.io/incidents/abc123",
+
+@pytest.mark.django_db
+class TestSendActionItemReminder:
+    CONFIGURED_HIGH_PRIORITY_COMMENT = "P0/P1 nag: this action item is overdue."
+    CONFIGURED_MEDIUM_PRIORITY_COMMENT = "P2 nag: this action item is overdue."
+
+    @pytest.fixture(autouse=True)
+    def _configure_linear(self):
+        linear_settings = {
+            "CLIENT_ID": "test",
+            "CLIENT_SECRET": "test",
+            "API_KEY": "test",
+            "TEAM_ID": "test",
+            "PROJECT_ID": "test",
+            "SYNC_IDENTIFIERS": False,
+            "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": self.CONFIGURED_HIGH_PRIORITY_COMMENT,
+            "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": self.CONFIGURED_MEDIUM_PRIORITY_COMMENT,
+        }
+        with patch.object(settings, "LINEAR", linear_settings):
+            yield
+
+    @pytest.fixture(autouse=True)
+    def mock_sync(self):
+        with patch("firetower.incidents.tasks.sync_action_items_from_linear") as m:
+            yield m
+
+    @pytest.fixture
+    def mock_linear(self):
+        mock = MagicMock()
+        mock.create_comment.return_value = True
+        with patch("firetower.incidents.tasks.LinearService", return_value=mock):
+            yield mock
+
+    def _make_incident(self, days_old: int = 45, **kwargs) -> Incident:
+        defaults = {
+            "title": "Test Incident",
+            "status": IncidentStatus.DONE,
+            "severity": IncidentSeverity.P0,
+        }
+        defaults.update(kwargs)
+        incident = Incident.objects.create(**defaults)
+        backdated = timezone.now() - timedelta(days=days_old)
+        Incident.objects.filter(pk=incident.pk).update(created_at=backdated)
+        incident.refresh_from_db()
+        return incident
+
+    def _make_action_item(self, incident: Incident, **kwargs) -> ActionItem:
+        title = kwargs.pop("title", "Stale work")
+        defaults = {
+            "linear_issue_id": f"issue-{title}",
+            "linear_identifier": f"ENG-{title}",
+            "title": title,
+            "status": ActionItemStatus.TODO,
+            "priority": 1,
+            "url": f"https://linear.app/team/issue/{title}",
+        }
+        defaults.update(kwargs)
+        return ActionItem.objects.create(incident=incident, **defaults)
+
+    def test_processes_incident_in_age_window(self, mock_sync):
+        incident = self._make_incident(days_old=45)
+        send_action_item_reminder()
+        synced_ids = {c.args[0].id for c in mock_sync.call_args_list}
+        assert synced_ids == {incident.id}
+
+    def test_skips_incident_younger_than_global_floor(self, mock_sync):
+        self._make_incident(days_old=5)
+        send_action_item_reminder()
+        mock_sync.assert_not_called()
+
+    def test_skips_incident_older_than_max_age(self, mock_sync):
+        self._make_incident(days_old=120)
+        send_action_item_reminder()
+        mock_sync.assert_not_called()
+
+    def test_skips_low_severity_incident(self, mock_sync):
+        self._make_incident(severity=IncidentSeverity.P2)
+        send_action_item_reminder()
+        mock_sync.assert_not_called()
+
+    def test_skips_canceled_incident(self, mock_sync):
+        self._make_incident(status=IncidentStatus.CANCELED)
+        send_action_item_reminder()
+        mock_sync.assert_not_called()
+
+    def test_continues_when_sync_fails_for_one_incident(self, mock_sync, mock_linear):
+        failing = self._make_incident(days_old=30)
+        succeeding = self._make_incident(days_old=60)
+        self._make_action_item(failing, title="should-not-nag")
+        succeeding_item = self._make_action_item(succeeding, title="should-nag")
+
+        def fake_sync(incident):
+            if incident.id == failing.id:
+                raise RuntimeError("linear is down")
+
+        mock_sync.side_effect = fake_sync
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            succeeding_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
 
-        mock_slack = MagicMock()
-        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+    def test_posts_high_priority_comment_for_p0(self, mock_linear):
+        incident = self._make_incident()
+        action_item = self._make_action_item(incident, priority=1)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
+        action_item.refresh_from_db()
+        assert action_item.last_nag is not None
+
+    def test_posts_high_priority_comment_for_p1(self, mock_linear):
+        incident = self._make_incident()
+        action_item = self._make_action_item(incident, priority=2)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
+
+    def test_posts_medium_priority_comment_for_p2(self, mock_linear):
+        incident = self._make_incident(days_old=30)
+        action_item = self._make_action_item(incident, priority=3)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_MEDIUM_PRIORITY_COMMENT
+        )
+
+    def test_nags_high_priority_at_seven_days(self, mock_linear):
+        incident = self._make_incident(days_old=8)
+        action_item = self._make_action_item(incident, priority=1)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
+
+    def test_skips_medium_priority_under_twenty_one_days(self, mock_linear):
+        incident = self._make_incident(days_old=10)
+        self._make_action_item(incident, priority=3)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_not_called()
+
+    def test_runs_when_only_high_priority_comment_set(self, mock_linear):
+        linear_only_high = {
+            "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": self.CONFIGURED_HIGH_PRIORITY_COMMENT,
+            "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": "",
+        }
+        incident = self._make_incident(days_old=30)
+        urgent = self._make_action_item(incident, title="urgent", priority=1)
+        self._make_action_item(incident, title="medium", priority=3)
+
+        with patch.object(settings, "LINEAR", linear_only_high):
+            send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            urgent.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
+
+    def test_does_not_stamp_when_comment_returns_failure(self, mock_linear):
+        incident = self._make_incident()
+        action_item = self._make_action_item(incident)
+        mock_linear.create_comment.return_value = False
+
+        send_action_item_reminder()
+
+        action_item.refresh_from_db()
+        assert action_item.last_nag is None
+
+    def test_does_not_stamp_when_create_comment_raises(self, mock_linear):
+        incident = self._make_incident()
+        action_item = self._make_action_item(incident)
+        mock_linear.create_comment.side_effect = RuntimeError("linear is down")
+
+        send_action_item_reminder()
+
+        action_item.refresh_from_db()
+        assert action_item.last_nag is None
+
+    def test_skips_job_when_no_comment_configured(self, mock_sync):
+        incident = self._make_incident()
+        self._make_action_item(incident)
 
         with (
-            patch("firetower.incidents.tasks.SlackService", return_value=mock_slack),
-            patch(
-                "firetower.incidents.tasks.get_statuspage_followup_reminder_delay_minutes",
-                return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
-            ),
+            patch.object(settings, "LINEAR", None),
+            patch("firetower.incidents.tasks.LinearService") as mock_service,
         ):
-            send_statuspage_followup_reminder(incident.id)
+            send_action_item_reminder()
 
-        msg = mock_slack.post_message.call_args[0][1]
-        assert "Jane &lt;script&gt; O'Doe &amp; Co" in msg
+        mock_sync.assert_not_called()
+        mock_service.assert_not_called()
+
+    def test_skips_done_action_item(self, mock_linear):
+        incident = self._make_incident()
+        self._make_action_item(incident, status=ActionItemStatus.DONE)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_not_called()
+
+    @pytest.mark.parametrize("priority", [0, 4])
+    def test_skips_unranked_or_low_priority_action_item(self, mock_linear, priority):
+        incident = self._make_incident()
+        self._make_action_item(incident, priority=priority)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_not_called()
+
+    def test_skips_recently_nagged_action_item(self, mock_linear):
+        incident = self._make_incident()
+        recent = timezone.now() - timedelta(days=2)
+        self._make_action_item(incident, last_nag=recent)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_not_called()
+
+    def test_processes_action_item_nagged_long_ago(self, mock_linear):
+        incident = self._make_incident()
+        stale = timezone.now() - timedelta(days=14)
+        action_item = self._make_action_item(incident, last_nag=stale)
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
