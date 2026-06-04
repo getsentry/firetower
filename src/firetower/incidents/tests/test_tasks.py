@@ -830,7 +830,10 @@ class TestSendActionItemReminder:
     def mock_slack(self):
         mock = MagicMock()
         mock.post_message.return_value = "1.0"
-        with patch("firetower.incidents.tasks.SlackService", return_value=mock):
+        with patch(
+            "firetower.incidents.tasks.action_items.SlackService",
+            return_value=mock,
+        ):
             yield mock
 
     def _make_user(self, name: str, slack_id: str | None = None) -> User:
