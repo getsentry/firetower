@@ -292,6 +292,23 @@ class LinearService:
 
         return data.get("attachmentCreate", {}).get("success", False)
 
+    def create_comment(self, issue_id: str, body: str) -> bool:
+        mutation = """
+        mutation($input: CommentCreateInput!) {
+            commentCreate(input: $input) {
+                success
+            }
+        }
+        """
+        data = self._graphql(
+            mutation,
+            {"input": {"issueId": issue_id, "body": body}},
+        )
+        if not data:
+            return False
+
+        return data.get("commentCreate", {}).get("success", False)
+
     def update_issue(
         self,
         issue_id: str,
