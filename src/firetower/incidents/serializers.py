@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
@@ -666,9 +667,17 @@ class TagCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(e.message_dict)
 
 
+def _get_action_item_slo_days() -> dict[int, int]:
+    linear = getattr(settings, "LINEAR", None) or {}
+    high = linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 14)
+    medium = linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 28)
+    return {1: high, 2: high, 3: medium}
+
+
 class ActionItemSerializer(serializers.ModelSerializer):
     assignee_name = serializers.SerializerMethodField()
     assignee_avatar_url = serializers.SerializerMethodField()
+    slo_deadline = serializers.SerializerMethodField()
 
     class Meta:
         model = ActionItem
@@ -681,6 +690,7 @@ class ActionItemSerializer(serializers.ModelSerializer):
             "assignee_name",
             "assignee_avatar_url",
             "url",
+            "slo_deadline",
         ]
 
     def get_assignee_name(self, obj: ActionItem) -> str | None:
@@ -692,6 +702,13 @@ class ActionItemSerializer(serializers.ModelSerializer):
         if obj.assignee and hasattr(obj.assignee, "userprofile"):
             return obj.assignee.userprofile.avatar_url or None
         return None
+
+    def get_slo_deadline(self, obj: ActionItem) -> str | None:
+        slo_days = _get_action_item_slo_days().get(obj.priority)
+        if slo_days is None:
+            return None
+        deadline = obj.incident.created_at + timedelta(days=slo_days)
+        return deadline.isoformat()
 
 
 class IncidentOrRedirectReadSerializer(serializers.Serializer):

@@ -24,7 +24,35 @@ const BORDER_CLASS: Record<ActionItemStatus, string> = {
   Canceled: 'border-neutral-muted',
 };
 
+function getSloLabel(deadline: string): {text: string; className: string} | null {
+  const now = new Date();
+  const due = new Date(deadline);
+  const diffMs = due.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return {
+      text: `${Math.abs(diffDays)}d overdue`,
+      className: 'text-content-danger',
+    };
+  }
+  if (diffDays <= 3) {
+    return {
+      text: `${diffDays}d left`,
+      className: 'text-content-warning',
+    };
+  }
+  return {
+    text: `${diffDays}d left`,
+    className: 'text-content-secondary',
+  };
+}
+
 function ActionItemCard({item}: {item: ActionItem}) {
+  const isTerminal = item.status === 'Done' || item.status === 'Canceled';
+  const slo =
+    item.slo_deadline && !isTerminal ? getSloLabel(item.slo_deadline) : null;
+
   return (
     <a
       href={item.url}
@@ -52,6 +80,12 @@ function ActionItemCard({item}: {item: ActionItem}) {
                 />
                 {item.assignee_name}
               </span>
+            </>
+          ) : null}
+          {slo ? (
+            <>
+              <span aria-hidden="true">&middot;</span>
+              <span className={slo.className}>{slo.text}</span>
             </>
           ) : null}
         </div>

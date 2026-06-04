@@ -1258,6 +1258,57 @@ class TestActionItemViews:
         assert response.data[0]["linear_identifier"] == "ENG-1"
         assert response.data[0]["title"] == "Task 1"
         assert response.data[0]["relation_type"] == "child"
+        assert response.data[0]["slo_deadline"] is None
+
+    def test_list_action_items_includes_slo_deadline(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-1",
+            linear_identifier="ENG-1",
+            title="High priority task",
+            status=ActionItemStatus.TODO,
+            priority=2,
+            url="https://linear.app/t/ENG-1",
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-2",
+            linear_identifier="ENG-2",
+            title="Medium priority task",
+            status=ActionItemStatus.TODO,
+            priority=3,
+            url="https://linear.app/t/ENG-2",
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-3",
+            linear_identifier="ENG-3",
+            title="Low priority task",
+            status=ActionItemStatus.TODO,
+            priority=4,
+            url="https://linear.app/t/ENG-3",
+        )
+
+        with patch("firetower.incidents.views.sync_action_items_from_linear"):
+            response = self.client.get(
+                f"/api/ui/incidents/{incident.incident_number}/action-items/"
+            )
+
+        assert response.status_code == 200
+        items = {item["linear_identifier"]: item for item in response.data}
+
+        expected_high = (incident.created_at + timedelta(days=14)).isoformat()
+        assert items["ENG-1"]["slo_deadline"] == expected_high
+
+        expected_medium = (incident.created_at + timedelta(days=28)).isoformat()
+        assert items["ENG-2"]["slo_deadline"] == expected_medium
+
+        assert items["ENG-3"]["slo_deadline"] is None
 
     def test_list_action_items_includes_assignee_info(self):
         user = User.objects.create_user(

@@ -79,6 +79,8 @@ class LinearConfig:
     api_key: str = ""
     action_item_nag_comment_high_priority: str = ""
     action_item_nag_comment_medium_priority: str = ""
+    action_item_slo_days_high_priority: int = 14
+    action_item_slo_days_medium_priority: int = 28
 
 
 @deserialize

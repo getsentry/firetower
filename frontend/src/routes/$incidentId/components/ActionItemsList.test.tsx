@@ -43,6 +43,7 @@ const mockActionItems: ActionItem[] = [
     assignee_name: 'Alice Smith',
     assignee_avatar_url: null,
     url: 'https://linear.app/team/issue/TEAM-101',
+    slo_deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     linear_identifier: 'TEAM-102',
@@ -52,6 +53,7 @@ const mockActionItems: ActionItem[] = [
     assignee_name: null,
     assignee_avatar_url: null,
     url: 'https://linear.app/team/issue/TEAM-102',
+    slo_deadline: null,
   },
 ];
 
