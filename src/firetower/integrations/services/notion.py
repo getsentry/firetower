@@ -366,7 +366,7 @@ class NotionService:
         if after.strip():
             segments.append({"type": "markdown", "content": after})
 
-        return segments or [{"type": "markdown", "content": ""}]
+        return segments
 
     def _send_markdown(self, page_id: str, content: str, max_retries: int = 3) -> bool:
         # notion-client v3 does not wrap the Markdown API endpoint, so we call it directly.

@@ -408,6 +408,12 @@ class TestRenderTemplate:
             {"type": "markdown", "content": "\n\n## Timeline"},
         ]
 
+    def test_bare_placeholder_no_linear_link_returns_empty(self):
+        incident = MagicMock()
+        incident.external_links_dict = {}
+        result = NotionService._render_template("{linear_url}", incident)
+        assert result == []
+
     def test_no_placeholder_passes_through(self):
         incident = MagicMock()
         incident.external_links_dict = {
@@ -484,6 +490,26 @@ class TestApplyTemplate:
             "type": "embed",
             "embed": {"url": "https://linear.app/team/issue/INC-42"},
         }
+
+    def test_bare_placeholder_no_linear_link_skips_markdown(self):
+        svc = NotionService(
+            integration_token="test-key",
+            database_id="db-id",
+            template_markdown="{linear_url}",
+        )
+        svc.client = MagicMock()
+        svc.client.blocks.children.append.return_value = {
+            "results": [{"id": "toggle-id"}]
+        }
+        incident = MagicMock()
+        incident.external_links_dict = {}
+
+        with patch.object(svc, "_send_markdown") as mock_md:
+            svc.apply_template(
+                "page-id", messages=[], update_slack=False, incident=incident
+            )
+
+        mock_md.assert_not_called()
 
     def test_update_slack_skips_markdown_template(self, notion):
         notion.client.blocks.children.append.return_value = self._make_append_response(
