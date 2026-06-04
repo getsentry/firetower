@@ -17,7 +17,7 @@ from firetower.incidents.models import (
 from firetower.incidents.services import sync_action_items_from_linear
 from firetower.incidents.tasks.decorators import datadog_log
 from firetower.integrations.services.linear import LinearService
-from firetower.integrations.services.slack import SlackService
+from firetower.integrations.services.slack import SlackService, escape_slack_text
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ def send_action_item_reminder() -> None:
 
         slack_message = (
             f"<{action_item.url}|{action_item.linear_identifier}>: "
-            f"{action_item.title}\n\n{message}"
+            f"{escape_slack_text(action_item.title)}\n\n{message}"
         )
 
         try:
