@@ -36,18 +36,35 @@ class NagTier:
 
 
 def _build_nag_tiers(linear: dict) -> dict[int, NagTier]:
-    high_tier = NagTier(
-        slo_days=linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 14),
-        comment_setting_key="ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY",
-    )
-    medium_tier = NagTier(
-        slo_days=linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 30),
-        comment_setting_key="ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY",
-    )
-    return {
-        **dict.fromkeys(HIGH_PRIORITY_VALUES, high_tier),
-        **dict.fromkeys(MEDIUM_PRIORITY_VALUES, medium_tier),
-    }
+    candidates: list[tuple[tuple[int, ...], NagTier]] = [
+        (
+            HIGH_PRIORITY_VALUES,
+            NagTier(
+                slo_days=linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 14),
+                comment_setting_key="ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY",
+            ),
+        ),
+        (
+            MEDIUM_PRIORITY_VALUES,
+            NagTier(
+                slo_days=linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 30),
+                comment_setting_key="ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY",
+            ),
+        ),
+    ]
+    tiers: dict[int, NagTier] = {}
+    for priorities, tier in candidates:
+        if tier.slo_days < ACTION_ITEM_REMINDER_NAG_EVERY_DAYS:
+            logger.warning(
+                "Skipping %s nag tier: configured SLO of %d day(s) is below "
+                "the %d-day nag cadence",
+                tier.comment_setting_key,
+                tier.slo_days,
+                ACTION_ITEM_REMINDER_NAG_EVERY_DAYS,
+            )
+            continue
+        tiers.update(dict.fromkeys(priorities, tier))
+    return tiers
 
 
 _NAG_TEMPLATE_ENV = Environment(autoescape=False)
