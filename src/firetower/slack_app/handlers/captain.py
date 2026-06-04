@@ -103,8 +103,12 @@ def handle_captain_submission(ack: Any, body: dict, view: dict, client: Any) -> 
         )
         return
 
+    acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
     serializer = IncidentWriteSerializer(
-        instance=incident, data={"captain": captain_user.email}, partial=True
+        instance=incident,
+        data={"captain": captain_user.email},
+        partial=True,
+        context={"acting_user": acting_user},
     )
     if not serializer.is_valid():
         logger.error("Captain update failed: %s", serializer.errors)

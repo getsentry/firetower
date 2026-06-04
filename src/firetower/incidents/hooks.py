@@ -1433,3 +1433,185 @@ def on_captain_changed(incident: Incident) -> None:
                     )
     except Exception:
         logger.exception(f"Error in on_captain_changed for incident {incident.id}")
+
+
+def on_incident_updated(
+    incident: Incident,
+    *,
+    old_title: str | None = None,
+    old_status: str | None = None,
+    old_severity: str | None = None,
+    captain_changed: bool = False,
+    visibility_changed: bool = False,
+    actor: User | None = None,
+) -> None:
+    channel_id: str | None = None
+    try:
+        channel_id = _get_channel_id(incident)
+    except Exception:
+        logger.exception(
+            f"Error getting channel id in on_incident_updated for incident {incident.id}"
+        )
+
+    # --- Set topic once if any topic-relevant field changed ---
+    if channel_id and (
+        old_title is not None or old_severity is not None or captain_changed
+    ):
+        try:
+            _slack_service.set_channel_topic(channel_id, build_channel_topic(incident))
+        except Exception:
+            logger.exception(
+                f"Error setting channel topic in on_incident_updated for incident {incident.id}"
+            )
+
+    # --- Build combined notification lines ---
+    lines: list[str] = []
+
+    if old_status is not None:
+        lines.append(f"- Status: {old_status} -> {incident.status}")
+
+    if old_severity is not None:
+        lines.append(f"- Severity: {old_severity} -> {incident.severity}")
+
+    if captain_changed and incident.captain is not None:
+        slack_id = _get_slack_user_id(incident.captain)
+        if slack_id:
+            captain_ref = f"<@{slack_id}>"
+        else:
+            captain_ref = escape_slack_text(
+                incident.captain.get_full_name() or incident.captain.username
+            )
+        lines.append(f"- Captain: {captain_ref}")
+
+    if lines and channel_id:
+        # Build header
+        if actor and actor.is_authenticated:
+            actor_slack_id = _get_slack_user_id(actor)
+            if actor_slack_id:
+                header = f"<@{actor_slack_id}> updated incident:"
+            else:
+                actor_name = escape_slack_text(actor.get_full_name() or actor.username)
+                header = f"{actor_name} updated incident:"
+        else:
+            header = "Incident updated:"
+
+        incident_url = _build_incident_url(incident)
+        body = "\n".join(lines)
+        message = f"{header}\n{body}\n<{incident_url}|View in Firetower>"
+        try:
+            _slack_service.post_message(channel_id, message)
+        except Exception:
+            logger.exception(
+                f"Error posting combined message in on_incident_updated for incident {incident.id}"
+            )
+
+    # --- Visibility gets its own separate message (same as on_visibility_changed) ---
+    if visibility_changed and channel_id:
+        try:
+            visibility = "private" if incident.is_private else "public"
+            incident_url = _build_incident_url(incident)
+            vis_message = (
+                f"This incident has been marked as *{visibility}* in Firetower. "
+                f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
+                f"<{incident_url}|View in Firetower>"
+            )
+            _slack_service.post_message(channel_id, vis_message)
+        except Exception:
+            logger.exception(
+                f"Error posting visibility message in on_incident_updated for incident {incident.id}"
+            )
+
+    # --- Side effects ---
+
+    # Status change: trigger slack dump for resolve-like statuses
+    if (
+        old_status is not None
+        and incident.status
+        in (IncidentStatus.MITIGATED, IncidentStatus.DONE, IncidentStatus.POSTMORTEM)
+        and channel_id
+    ):
+        try:
+            from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
+            from firetower.slack_app.handlers.dumpslack import (  # noqa: PLC0415
+                trigger_slack_dump_async,
+            )
+
+            trigger_slack_dump_async(get_bolt_app().client, channel_id, incident)
+        except Exception:
+            logger.exception(
+                f"Failed to trigger slack dump in on_incident_updated for incident {incident.id}"
+            )
+
+    # Severity escalation: page, invite oncall, create status channel, schedule reminders
+    if (
+        old_severity is not None
+        and old_severity not in HIGH_SEVERITIES
+        and incident.severity in HIGH_SEVERITIES
+        and incident.status in ACTIVE_STATUSES
+    ):
+        paged_policies: set[str] = set()
+        try:
+            paged_policies = _page_if_needed(incident, channel_id=channel_id)
+        except Exception:
+            logger.exception(
+                f"Failed to page in on_incident_updated for incident {incident.id}"
+            )
+
+        if channel_id:
+            try:
+                _invite_oncall_users(
+                    incident, channel_id, paged_policies=paged_policies
+                )
+            except Exception:
+                logger.exception(
+                    f"Failed to invite oncall users in on_incident_updated for incident {incident.id}"
+                )
+
+            try:
+                _create_status_channel(incident, channel_id)
+            except Exception:
+                logger.exception(
+                    f"Failed to create status channel in on_incident_updated for incident {incident.id}"
+                )
+
+        try:
+            _schedule_statuspage_reminder(
+                incident, reference_time=timezone.now(), allow_update=True
+            )
+        except Exception:
+            logger.exception(
+                f"Failed to schedule statuspage reminder in on_incident_updated for incident {incident.id}"
+            )
+
+        try:
+            schedule_statuspage_followup_reminder(incident)
+        except Exception:
+            logger.exception(
+                f"Failed to schedule statuspage followup in on_incident_updated for incident {incident.id}"
+            )
+
+    # Captain change: invite captain to channels
+    if captain_changed and incident.captain is not None and channel_id:
+        try:
+            _invite_user_to_channel(channel_id, incident.captain)
+        except Exception:
+            logger.exception(
+                f"Failed to invite captain in on_incident_updated for incident {incident.id}"
+            )
+
+        if incident.severity in HIGH_SEVERITIES:
+            try:
+                status_channel_id = _get_status_channel_id(incident)
+                if status_channel_id:
+                    slack_id = _get_slack_user_id(incident.captain)
+                    _invite_user_to_channel(
+                        status_channel_id, incident.captain, slack_user_id=slack_id
+                    )
+            except Exception:
+                logger.exception(
+                    f"Failed to invite captain to status channel in on_incident_updated for incident {incident.id}"
+                )
+
+    # Title or visibility change: sync linear
+    if old_title is not None or visibility_changed:
+        _sync_linear_title(incident)
