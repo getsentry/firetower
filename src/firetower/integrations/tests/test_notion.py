@@ -359,9 +359,9 @@ class TestCreateImageBlock:
 class TestRenderTemplate:
     def test_returns_template_unchanged_when_no_incident(self):
         result = NotionService._render_template("# Title\n{linear_url}", None)
-        assert result == "# Title\n{linear_url}"
+        assert result == [{"type": "markdown", "content": "# Title\n{linear_url}"}]
 
-    def test_replaces_linear_url_placeholder(self):
+    def test_returns_embed_segment_for_markdown_link(self):
         incident = MagicMock()
         incident.external_links_dict = {
             "linear": "https://linear.app/team/issue/INC-100"
@@ -369,15 +369,44 @@ class TestRenderTemplate:
         result = NotionService._render_template(
             "[Action Items]({linear_url})", incident
         )
-        assert result == "[Action Items](https://linear.app/team/issue/INC-100)"
+        assert result == [
+            {"type": "embed", "url": "https://linear.app/team/issue/INC-100"}
+        ]
 
-    def test_replaces_with_empty_string_when_no_linear_link(self):
+    def test_returns_embed_segment_for_bare_placeholder(self):
+        incident = MagicMock()
+        incident.external_links_dict = {
+            "linear": "https://linear.app/team/issue/INC-100"
+        }
+        result = NotionService._render_template("{linear_url}", incident)
+        assert result == [
+            {"type": "embed", "url": "https://linear.app/team/issue/INC-100"}
+        ]
+
+    def test_splits_template_around_placeholder(self):
+        incident = MagicMock()
+        incident.external_links_dict = {
+            "linear": "https://linear.app/team/issue/INC-42"
+        }
+        result = NotionService._render_template(
+            "# PM\n[Action Items]({linear_url})\n\n## Timeline", incident
+        )
+        assert result == [
+            {"type": "markdown", "content": "# PM\n"},
+            {"type": "embed", "url": "https://linear.app/team/issue/INC-42"},
+            {"type": "markdown", "content": "\n\n## Timeline"},
+        ]
+
+    def test_strips_placeholder_when_no_linear_link(self):
         incident = MagicMock()
         incident.external_links_dict = {}
         result = NotionService._render_template(
-            "[Action Items]({linear_url})", incident
+            "# PM\n[Action Items]({linear_url})\n\n## Timeline", incident
         )
-        assert result == "[Action Items]()"
+        assert result == [
+            {"type": "markdown", "content": "# PM\n"},
+            {"type": "markdown", "content": "\n\n## Timeline"},
+        ]
 
     def test_no_placeholder_passes_through(self):
         incident = MagicMock()
@@ -385,7 +414,7 @@ class TestRenderTemplate:
             "linear": "https://linear.app/team/issue/INC-100"
         }
         result = NotionService._render_template("# No placeholders here", incident)
-        assert result == "# No placeholders here"
+        assert result == [{"type": "markdown", "content": "# No placeholders here"}]
 
 
 class TestApplyTemplate:
@@ -433,9 +462,10 @@ class TestApplyTemplate:
             template_markdown="# PM\n[Action Items]({linear_url})",
         )
         svc.client = MagicMock()
-        svc.client.blocks.children.append.return_value = self._make_append_response(
-            "toggle-id"
-        )
+        svc.client.blocks.children.append.side_effect = [
+            self._make_append_response("embed-resp"),
+            self._make_append_response("toggle-id"),
+        ]
         incident = MagicMock()
         incident.external_links_dict = {
             "linear": "https://linear.app/team/issue/INC-42"
@@ -446,9 +476,14 @@ class TestApplyTemplate:
                 "page-id", messages=[], update_slack=False, incident=incident
             )
 
-        mock_md.assert_called_once_with(
-            "page-id", "# PM\n[Action Items](https://linear.app/team/issue/INC-42)"
-        )
+        mock_md.assert_called_once_with("page-id", "# PM\n")
+        embed_call = svc.client.blocks.children.append.call_args_list[0]
+        embed_children = embed_call.kwargs["children"]
+        assert len(embed_children) == 1
+        assert embed_children[0] == {
+            "type": "embed",
+            "embed": {"url": "https://linear.app/team/issue/INC-42"},
+        }
 
     def test_update_slack_skips_markdown_template(self, notion):
         notion.client.blocks.children.append.return_value = self._make_append_response(

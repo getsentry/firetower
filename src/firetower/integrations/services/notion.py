@@ -21,6 +21,8 @@ _MARKDOWN_NOTION_VERSION = "2026-03-11"
 _BLOCK_CHILD_LIMIT = 85  # Notion enforces a hard limit of 100; stay below for safety
 _NOTION_RICH_TEXT_LIMIT = 2000
 
+_LINEAR_URL_PATTERN = re.compile(r"\[[^\]]*\]\(\{linear_url\}\)|\{linear_url\}")
+
 # Module-level cache so the full user-list pagination (7+ pages for large workspaces)
 # only runs once per process rather than once per command invocation.
 _users_cache: dict[str, dict[str, dict[str, str]]] = {}
@@ -248,11 +250,22 @@ class NotionService:
         incident: Any | None = None,
     ) -> None:
         if not update_slack and self.template_markdown:
-            content = self._render_template(self.template_markdown, incident)
-            if not self._send_markdown(page_id, content):
-                raise RuntimeError(
-                    f"Failed to apply markdown template to Notion page {page_id}"
-                )
+            segments = self._render_template(self.template_markdown, incident)
+            for segment in segments:
+                if segment["type"] == "markdown":
+                    if not self._send_markdown(page_id, segment["content"]):
+                        raise RuntimeError(
+                            f"Failed to apply markdown template to Notion page {page_id}"
+                        )
+                elif segment["type"] == "embed":
+                    embed_block = {
+                        "type": "embed",
+                        "embed": {"url": segment["url"]},
+                    }
+                    if self._append_children(page_id, [embed_block]) is None:
+                        raise RuntimeError(
+                            f"Failed to append embed to Notion page {page_id}"
+                        )
 
         timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         toggle: dict[str, Any] = {
@@ -333,11 +346,27 @@ class NotionService:
             index = stopping_index
 
     @staticmethod
-    def _render_template(template: str, incident: Any | None) -> str:
-        if incident is None:
-            return template
+    def _render_template(template: str, incident: Any | None) -> list[dict[str, str]]:
+        if incident is None or "{linear_url}" not in template:
+            return [{"type": "markdown", "content": template}]
+
         linear_url = incident.external_links_dict.get("linear", "")
-        return template.replace("{linear_url}", linear_url)
+
+        segments: list[dict[str, str]] = []
+        last_end = 0
+        for match in _LINEAR_URL_PATTERN.finditer(template):
+            before = template[last_end : match.start()]
+            if before.strip():
+                segments.append({"type": "markdown", "content": before})
+            if linear_url:
+                segments.append({"type": "embed", "url": linear_url})
+            last_end = match.end()
+
+        after = template[last_end:]
+        if after.strip():
+            segments.append({"type": "markdown", "content": after})
+
+        return segments or [{"type": "markdown", "content": ""}]
 
     def _send_markdown(self, page_id: str, content: str, max_retries: int = 3) -> bool:
         # notion-client v3 does not wrap the Markdown API endpoint, so we call it directly.
