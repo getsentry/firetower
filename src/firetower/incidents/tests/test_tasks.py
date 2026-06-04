@@ -1050,7 +1050,7 @@ class TestSendActionItemReminder:
             send_action_item_reminder()
 
         expected = (
-            f"SLO=7 age=10 past=3 left=0 passed=True "
+            f"SLO=14 age=10 past=0 left=4 passed=False "
             f"id={action_item.linear_identifier} title=Some outage"
         )
         mock_linear.create_comment.assert_called_once_with(
@@ -1062,13 +1062,13 @@ class TestSendActionItemReminder:
         with patch.dict(
             settings.LINEAR, {"ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": template}
         ):
-            incident = self._make_incident(days_old=30)
+            incident = self._make_incident(days_old=35)
             action_item = self._make_action_item(incident, priority=3)
 
             send_action_item_reminder()
 
         mock_linear.create_comment.assert_called_once_with(
-            action_item.linear_issue_id, "SLO=21 past=9"
+            action_item.linear_issue_id, "SLO=30 past=5"
         )
 
     def test_skips_when_template_has_syntax_error(self, mock_linear):
