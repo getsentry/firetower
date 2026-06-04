@@ -12,6 +12,7 @@ from django_q.tasks import Schedule
 from firetower.incidents.hooks import (
     ACTIVE_STATUSES,
     HIGH_SEVERITIES,
+    get_slack_user_id,
     get_statuspage_followup_reminder_delay_minutes,
     get_statuspage_initial_reminder_delay_minutes,
 )
@@ -106,6 +107,7 @@ STATUSPAGE_REMINDER_MESSAGE = (
     "The SLO will be violated in *{minutes_remaining} minutes*.\n\n"
     "No Statuspage update has been posted yet. "
     "Please run `{slash_command} statuspage` to create a Statuspage incident now."
+    "{ic_mention}"
 )
 
 STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE = (
@@ -113,7 +115,19 @@ STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE = (
     "This is a *{severity}* incident. The next Statuspage update "
     "is due in *{minutes_until_due} minutes*.\n\n"
     "Please run `{slash_command} statuspage` to post a Statuspage update."
+    "{ic_mention}"
 )
+
+
+def _build_ic_mention(incident: Incident) -> str:
+    if not incident.captain:
+        return ""
+    slack_id = get_slack_user_id(incident.captain)
+    if slack_id:
+        return f"\n<@{slack_id}>"
+
+    # If no slack handle, just return empty since we wouldn't be pinging them anyways.
+    return ""
 
 
 @datadog_log
@@ -167,6 +181,7 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
         slash_command=slash_command,
         slo_minutes=slo_minutes,
         minutes_remaining=minutes_remaining,
+        ic_mention=_build_ic_mention(incident),
     )
     slack.post_message(channel_id, message)
 
@@ -226,6 +241,7 @@ def send_statuspage_followup_reminder(
         severity=incident.severity,
         slash_command=slash_command,
         minutes_until_due=minutes_until_due,
+        ic_mention=_build_ic_mention(incident),
     )
     try:
         slack.post_message(channel_id, message)

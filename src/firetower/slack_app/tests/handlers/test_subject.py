@@ -9,8 +9,8 @@ from .conftest import CHANNEL_ID
 
 @pytest.mark.django_db
 class TestSubjectCommand:
-    @patch("firetower.incidents.serializers.on_title_changed")
-    def test_updates_title(self, mock_title_hook, incident):
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_updates_title(self, mock_hook, incident):
         ack = MagicMock()
         body = {"channel_id": CHANNEL_ID}
         command = {"command": "/ft"}
