@@ -133,7 +133,9 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
     messages = _get_channel_messages(slack_service, channel_id)
 
     try:
-        notion.apply_template(page_id, messages, update_slack=update_slack)
+        notion.apply_template(
+            page_id, messages, update_slack=update_slack, incident=incident
+        )
     except Exception:
         logger.exception("Failed to populate Notion page %s", page_id)
         try:
