@@ -1474,7 +1474,7 @@ def on_incident_updated(
         lines.append(f"- Severity: {old_severity} -> {incident.severity}")
 
     if captain_changed and incident.captain is not None:
-        slack_id = _get_slack_user_id(incident.captain)
+        slack_id = get_slack_user_id(incident.captain)
         if slack_id:
             captain_ref = f"<@{slack_id}>"
         else:
@@ -1486,7 +1486,7 @@ def on_incident_updated(
     if lines and channel_id:
         # Build header
         if actor and actor.is_authenticated:
-            actor_slack_id = _get_slack_user_id(actor)
+            actor_slack_id = get_slack_user_id(actor)
             if actor_slack_id:
                 header = f"<@{actor_slack_id}> updated incident:"
             else:
@@ -1603,7 +1603,7 @@ def on_incident_updated(
             try:
                 status_channel_id = _get_status_channel_id(incident)
                 if status_channel_id:
-                    slack_id = _get_slack_user_id(incident.captain)
+                    slack_id = get_slack_user_id(incident.captain)
                     _invite_user_to_channel(
                         status_channel_id, incident.captain, slack_user_id=slack_id
                     )
