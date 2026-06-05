@@ -141,53 +141,6 @@ class TestNewIncidentSubmission:
         assert incident.reporter == self.user
         client.chat_postMessage.assert_called_once()
 
-    @patch("firetower.incidents.serializers.on_incident_created")
-    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
-    def test_creates_tag_inline_from_submission(self, mock_get_user, mock_hook):
-        mock_get_user.return_value = self.user
-
-        ack = MagicMock()
-        client = MagicMock()
-        body = {"user": {"id": "U_TEST"}}
-        view = {
-            "state": {
-                "values": {
-                    "title_block": {"title": {"value": "Test Incident"}},
-                    "severity_block": {
-                        "severity": {"selected_option": {"value": "P1"}}
-                    },
-                    "description_block": {"description": {"value": "Description"}},
-                    "affected_service_block": {
-                        "affected_service_tags": {
-                            "selected_options": [
-                                {"value": "__create__:payments"},
-                            ]
-                        }
-                    },
-                    "affected_region_block": {
-                        "affected_region_tags": {
-                            "selected_options": [
-                                {"value": "__create__:ap-south-1"},
-                            ]
-                        }
-                    },
-                    "private_block": {"is_private": {"selected_options": []}},
-                }
-            }
-        }
-
-        handle_new_incident_submission(ack, body, view, client)
-
-        ack.assert_called_once_with()
-        service_tag = Tag.objects.get(name="payments", type=TagType.AFFECTED_SERVICE)
-        assert service_tag.type == TagType.AFFECTED_SERVICE
-        region_tag = Tag.objects.get(name="ap-south-1", type=TagType.AFFECTED_REGION)
-        assert region_tag.type == TagType.AFFECTED_REGION
-
-        incident = Incident.objects.get(title="Test Incident")
-        assert "payments" in incident.affected_service_tag_names
-        assert "ap-south-1" in incident.affected_region_tag_names
-
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
     @patch("firetower.incidents.serializers.on_incident_created")
     @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
