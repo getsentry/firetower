@@ -1511,14 +1511,14 @@ def on_incident_updated(
                 f"Error setting channel topic in on_incident_updated for incident {incident.id}"
             )
 
-        status_channel_id = _get_status_channel_id(incident)
-        if status_channel_id:
-            try:
+        try:
+            status_channel_id = _get_status_channel_id(incident)
+            if status_channel_id:
                 _slack_service.set_channel_topic(status_channel_id, topic)
-            except Exception:
-                logger.exception(
-                    f"Error setting status channel topic in on_incident_updated for incident {incident.id}"
-                )
+        except Exception:
+            logger.exception(
+                f"Error setting status channel topic in on_incident_updated for incident {incident.id}"
+            )
 
     # --- Build combined notification lines ---
     lines: list[str] = []
