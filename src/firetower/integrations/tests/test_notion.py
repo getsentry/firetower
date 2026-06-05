@@ -356,6 +356,38 @@ class TestCreateImageBlock:
         assert "caption" not in block["image"]
 
 
+class TestRenderTemplate:
+    def test_returns_template_unchanged_when_no_incident(self):
+        result = NotionService._render_template("# Title\n{linear_url}", None)
+        assert result == "# Title\n{linear_url}"
+
+    def test_replaces_linear_url_placeholder(self):
+        incident = MagicMock()
+        incident.external_links_dict = {
+            "linear": "https://linear.app/team/issue/INC-100"
+        }
+        result = NotionService._render_template(
+            "[Action Items]({linear_url})", incident
+        )
+        assert result == "[Action Items](https://linear.app/team/issue/INC-100)"
+
+    def test_replaces_with_empty_string_when_no_linear_link(self):
+        incident = MagicMock()
+        incident.external_links_dict = {}
+        result = NotionService._render_template(
+            "[Action Items]({linear_url})", incident
+        )
+        assert result == "[Action Items]()"
+
+    def test_no_placeholder_passes_through(self):
+        incident = MagicMock()
+        incident.external_links_dict = {
+            "linear": "https://linear.app/team/issue/INC-100"
+        }
+        result = NotionService._render_template("# No placeholders here", incident)
+        assert result == "# No placeholders here"
+
+
 class TestApplyTemplate:
     def _make_append_response(self, block_id: str) -> dict:
         return {"results": [{"id": block_id}]}
@@ -393,6 +425,30 @@ class TestApplyTemplate:
             pytest.raises(RuntimeError, match="toggle"),
         ):
             notion.apply_template("page-id", messages=[], update_slack=False)
+
+    def test_interpolates_incident_into_template(self):
+        svc = NotionService(
+            integration_token="test-key",
+            database_id="db-id",
+            template_markdown="# PM\n[Action Items]({linear_url})",
+        )
+        svc.client = MagicMock()
+        svc.client.blocks.children.append.return_value = self._make_append_response(
+            "toggle-id"
+        )
+        incident = MagicMock()
+        incident.external_links_dict = {
+            "linear": "https://linear.app/team/issue/INC-42"
+        }
+
+        with patch.object(svc, "_send_markdown", return_value=True) as mock_md:
+            svc.apply_template(
+                "page-id", messages=[], update_slack=False, incident=incident
+            )
+
+        mock_md.assert_called_once_with(
+            "page-id", "# PM\n[Action Items](https://linear.app/team/issue/INC-42)"
+        )
 
     def test_update_slack_skips_markdown_template(self, notion):
         notion.client.blocks.children.append.return_value = self._make_append_response(

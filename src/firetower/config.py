@@ -64,6 +64,7 @@ class StatuspageConfig:
     page_id: str
     url: str
     initial_reminder_delay_minutes: int | None = None
+    followup_reminder_delay_minutes: int | None = None
     warning_buffer_minutes: int = 0
 
 
@@ -76,6 +77,8 @@ class LinearConfig:
     project_id: str = ""
     sync_identifiers: bool = False
     api_key: str = ""
+    action_item_nag_comment_high_priority: str = ""
+    action_item_nag_comment_medium_priority: str = ""
 
 
 @deserialize
@@ -102,6 +105,7 @@ class ConfigFile:
     django_secret_key: str
     salt_key: str
     sentry_dsn: str
+    service_registry_url: str | None = None
     notion: NotionConfig | None = None
     genai: GenAIConfig | None = None
     log_level: str = "INFO"
@@ -174,6 +178,7 @@ class DummyConfigFile(ConfigFile):
         self.django_secret_key = "dummy_value_DO_NOT_USE"
         self.salt_key = ""
         self.sentry_dsn = ""
+        self.service_registry_url = None
         self.region_grouping: list[list[str]] = []
         self.log_level = "INFO"
         self.hooks_enabled = False

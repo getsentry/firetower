@@ -70,6 +70,7 @@ def _coerce_region_grouping(raw: list[Any]) -> list[list[str]]:
 PROJECT_KEY = config.project_key
 REGION_GROUPING = _coerce_region_grouping(config.region_grouping)
 FIRETOWER_BASE_URL = config.firetower_base_url
+SERVICE_REGISTRY_URL = config.service_registry_url
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -250,6 +251,7 @@ class StatuspageSettings(TypedDict):
     PAGE_ID: str
     URL: str
     INITIAL_REMINDER_DELAY_MINUTES: int | None
+    FOLLOWUP_REMINDER_DELAY_MINUTES: int | None
     WARNING_BUFFER_MINUTES: int
 
 
@@ -259,6 +261,7 @@ STATUSPAGE: StatuspageSettings | None = (
         "PAGE_ID": config.statuspage.page_id,
         "URL": config.statuspage.url,
         "INITIAL_REMINDER_DELAY_MINUTES": config.statuspage.initial_reminder_delay_minutes,
+        "FOLLOWUP_REMINDER_DELAY_MINUTES": config.statuspage.followup_reminder_delay_minutes,
         "WARNING_BUFFER_MINUTES": config.statuspage.warning_buffer_minutes,
     }
     if config.statuspage
@@ -310,6 +313,8 @@ LINEAR: dict | None = (
         "TEAM_ID": config.linear.team_id,
         "PROJECT_ID": config.linear.project_id,
         "SYNC_IDENTIFIERS": config.linear.sync_identifiers,
+        "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": config.linear.action_item_nag_comment_high_priority,
+        "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": config.linear.action_item_nag_comment_medium_priority,
     }
     if config.linear
     else None

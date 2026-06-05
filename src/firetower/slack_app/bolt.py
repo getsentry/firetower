@@ -12,6 +12,10 @@ from firetower.slack_app.handlers.backfill_incident import (
     handle_backfill_command,
     handle_backfill_submission,
 )
+from firetower.slack_app.handlers.cancel import (
+    handle_cancel_command,
+    handle_cancel_submission,
+)
 from firetower.slack_app.handlers.captain import (
     handle_captain_command,
     handle_captain_submission,
@@ -34,6 +38,7 @@ from firetower.slack_app.handlers.resolved import (
     handle_resolved_submission,
 )
 from firetower.slack_app.handlers.severity import handle_severity_command
+from firetower.slack_app.handlers.status import handle_status_command
 from firetower.slack_app.handlers.statuspage import (
     handle_component_impact_select,
     handle_statuspage_command,
@@ -60,6 +65,7 @@ KNOWN_SUBCOMMANDS = {
     "resolved",
     "fixed",
     "reopen",
+    "cancel",
     "list",
     "ls",
     "severity",
@@ -71,6 +77,7 @@ KNOWN_SUBCOMMANDS = {
     "edit",
     "captain",
     "ic",
+    "status",
     "statuspage",
     "dumpslack",
 }
@@ -142,6 +149,8 @@ def handle_command(
             handle_resolved_command(ack, body, command, respond)
         elif subcommand == "reopen":
             handle_reopen_command(ack, body, command, respond)
+        elif subcommand == "cancel":
+            handle_cancel_command(ack, body, command, respond)
         elif subcommand in ("list", "ls"):
             handle_list_command(ack, body, command, respond, client=client)
         elif subcommand in ("severity", "sev", "setseverity"):
@@ -162,6 +171,8 @@ def handle_command(
                 handle_subject_command(ack, body, command, respond, new_subject=args)
         elif subcommand in ("captain", "ic"):
             handle_captain_command(ack, body, command, respond)
+        elif subcommand == "status":
+            handle_status_command(ack, body, command, respond)
         elif subcommand == "statuspage":
             handle_statuspage_command(ack, body, command, respond)
         elif subcommand == "dumpslack":
@@ -215,6 +226,9 @@ def _register_views(app: App) -> None:
     )
     app.view("mitigated_incident_modal")(
         _with_metrics("mitigated_incident_modal")(handle_mitigated_submission)
+    )
+    app.view("cancel_incident_modal")(
+        _with_metrics("cancel_incident_modal")(handle_cancel_submission)
     )
     app.view("resolved_incident_modal")(
         _with_metrics("resolved_incident_modal")(handle_resolved_submission)

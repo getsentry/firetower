@@ -5,6 +5,8 @@ django_secret_key = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d
 salt_key = ""
 sentry_dsn = "https://your-sentry-dsn@o1.ingest.us.sentry.io/project-id"
 firetower_base_url = "http://localhost:5173"
+# Optional: link rendered in /inc mitigated and /inc resolved modals to help users pick service_tier/affected_service.
+service_registry_url = "https://your-service-registry.example.com"
 region_grouping = [["region-a", "region-b"], ["region-c", "region-d"]]
 
 [postgres]
@@ -65,3 +67,4 @@ url = "https://your-page.statuspage.io/"
 warning_buffer_minutes = 5
 # Set to enable statuspage reminders; omit to disable them
 # initial_reminder_delay_minutes = 20
+# followup_reminder_delay_minutes = 60

@@ -44,13 +44,12 @@ function IncidentsLayout({children}: {children: React.ReactNode}) {
   const [open, setOpen] = useState(activeCount > 0);
 
   return (
-    <div className="gap-space-sm flex flex-col">
+    <div className="gap-space-lg flex flex-col">
       <div className="flex items-center justify-between">
         <StatusFilter />
         <FilterTrigger open={open} onToggle={() => setOpen(prev => !prev)} />
       </div>
       {open ? <FilterPanel /> : null}
-      <hr className="border-secondary" />
       {children}
     </div>
   );

@@ -245,9 +245,11 @@ class NotionService:
         page_id: str,
         messages: list[dict[str, Any]],
         update_slack: bool = False,
+        incident: Any | None = None,
     ) -> None:
         if not update_slack and self.template_markdown:
-            if not self._send_markdown(page_id, self.template_markdown):
+            content = self._render_template(self.template_markdown, incident)
+            if not self._send_markdown(page_id, content):
                 raise RuntimeError(
                     f"Failed to apply markdown template to Notion page {page_id}"
                 )
@@ -329,6 +331,13 @@ class NotionService:
                     slack_index += 1
                     notion_index += 1
             index = stopping_index
+
+    @staticmethod
+    def _render_template(template: str, incident: Any | None) -> str:
+        if incident is None:
+            return template
+        linear_url = incident.external_links_dict.get("linear", "")
+        return template.replace("{linear_url}", linear_url)
 
     def _send_markdown(self, page_id: str, content: str, max_retries: int = 3) -> bool:
         # notion-client v3 does not wrap the Markdown API endpoint, so we call it directly.

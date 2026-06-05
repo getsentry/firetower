@@ -10,11 +10,8 @@ from .conftest import CHANNEL_ID
 
 @pytest.mark.django_db
 class TestReopenCommand:
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
-    def test_reopens_mitigated_incident(
-        self, mock_title_hook, mock_status_hook, incident
-    ):
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_reopens_mitigated_incident(self, mock_hook, incident):
         incident.status = IncidentStatus.MITIGATED
         incident.save()
 

@@ -17,6 +17,7 @@ from firetower.incidents.models import (
     ActionItemStatus,
     ExternalLinkType,
     Incident,
+    IncidentStatus,
 )
 from firetower.integrations.services import LinearService, SlackService
 
@@ -195,7 +196,10 @@ def _update_parent_issue_status(
         return
 
     statuses = list(incident.action_items.values_list("status", flat=True))
-    all_complete = not statuses or all(s in COMPLETED_STATUSES for s in statuses)
+    incident_done = incident.status in (IncidentStatus.DONE, IncidentStatus.CANCELED)
+    all_complete = incident_done and (
+        not statuses or all(s in COMPLETED_STATUSES for s in statuses)
+    )
 
     states = linear_service.get_workflow_states(team_id)
     if not states:

@@ -163,8 +163,8 @@ class TestUpdateIncidentModal:
 
 @pytest.mark.django_db
 class TestUpdateIncidentSubmission:
-    @patch("firetower.incidents.serializers.on_title_changed")
-    def test_updates_incident(self, mock_title_hook, incident):
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    def test_updates_incident(self, mock_hook, incident):
         ack = MagicMock()
         client = MagicMock()
         body = {"user": {"id": "U_CAPTAIN"}}

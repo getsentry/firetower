@@ -10,7 +10,7 @@ const RootLayout = () => (
   <TooltipProvider delayDuration={200}>
     <div className="bg-background-tertiary text-content-primary leading-default min-h-screen">
       <Header />
-      <main className="px-space-md py-space-xl md:px-space-xl mx-auto max-w-6xl">
+      <main className="px-space-md py-space-lg md:px-space-lg mx-auto max-w-6xl">
         <Outlet />
       </main>
       <TanStackRouterDevtools />

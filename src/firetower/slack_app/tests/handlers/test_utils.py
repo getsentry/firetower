@@ -1,11 +1,15 @@
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
-from .conftest import CHANNEL_ID
+from .conftest import CHANNEL_ID, STATUS_CHANNEL_ID
 
 
 class TestGetIncidentFromChannel:
     def test_returns_incident(self, incident):
         result = get_incident_from_channel(CHANNEL_ID)
+        assert result == incident
+
+    def test_returns_incident_from_status_channel(self, incident):
+        result = get_incident_from_channel(STATUS_CHANNEL_ID)
         assert result == incident
 
     def test_returns_none_for_unknown_channel(self, db):

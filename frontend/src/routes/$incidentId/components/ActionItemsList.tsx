@@ -31,8 +31,8 @@ function ActionItemCard({item}: {item: ActionItem}) {
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'flex items-center gap-space-lg rounded-radius-md border-l-4 p-space-lg no-underline transition-all duration-200',
-        'hover:-translate-y-0.5 hover:shadow-md',
+        'flex items-center gap-space-lg rounded-radius-md border-l-4 p-space-lg no-underline transition-colors duration-200',
+        'hover:bg-background-transparent-neutral-muted',
         BORDER_CLASS[item.status]
       )}
     >

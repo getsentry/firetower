@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import IncidentSeverity
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import get_incident_from_channel
@@ -26,8 +27,12 @@ def handle_severity_command(
         respond(f"Invalid severity `{new_severity}`. Must be one of: {valid}")
         return
 
+    acting_user = get_or_create_user_from_slack_id(body.get("user_id", ""))
     serializer = IncidentWriteSerializer(
-        instance=incident, data={"severity": normalized}, partial=True
+        instance=incident,
+        data={"severity": normalized},
+        partial=True,
+        context={"acting_user": acting_user},
     )
     if serializer.is_valid():
         serializer.save()
