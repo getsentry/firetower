@@ -152,6 +152,11 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             "Failed to create Notion postmortem page for %s",
             incident.incident_number,
         )
+        ExternalLink.objects.filter(
+            incident=incident,
+            type=ExternalLinkType.NOTION,
+            url="",
+        ).delete()
         try:
             client.chat_postMessage(
                 channel=channel_id,
