@@ -1,5 +1,6 @@
 import path from 'path';
 
+import {sentryVitePlugin} from '@sentry/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import {tanstackRouter} from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react-swc';
@@ -15,7 +16,16 @@ export default defineConfig({
     }),
     tailwindcss(),
     react(),
+    sentryVitePlugin({
+      org: 'sentry',
+      project: 'firetower-frontend',
+      disable: !process.env.SENTRY_AUTH_TOKEN,
+      sourcemaps: {
+        filesToDeleteAfterUpload: ['./dist/**/*.map'],
+      },
+    }),
   ],
+
   resolve: {
     alias: {
       components: path.resolve(__dirname, './src/components'),
@@ -23,7 +33,12 @@ export default defineConfig({
       api: path.resolve(__dirname, './src/api.ts'),
     },
   },
+
   test: {
     setupFiles: ['./utils/happydom.ts', './utils/testing-library.ts'],
+  },
+
+  build: {
+    sourcemap: true,
   },
 });

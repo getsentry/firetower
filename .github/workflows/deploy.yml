@@ -47,6 +47,8 @@ jobs:
           push: true
           tags: ${{ env.STATIC_IMAGE_REF }}
           file: docker/static.Dockerfile
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any, TypedDict
 
+from corsheaders.defaults import default_headers
 from datadog import initialize
 from datadog.dogstatsd.base import statsd
 
@@ -55,6 +56,9 @@ if not env_is_dev():
         dsn=config.sentry_dsn,
         send_default_pii=False,
         environment=os.environ.get("DJANGO_ENV", "unknown"),
+        traces_sample_rate=1.0,
+        enable_logs=True,
+        trace_propagation_targets=[],
     )
 
 
@@ -102,6 +106,12 @@ CSRF_TRUSTED_ORIGINS = [
     "https://firetower.getsentry.net",
     "https://test.firetower.getsentry.net",
 ]
+
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "sentry-trace",
+    "baggage",
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
