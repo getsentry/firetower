@@ -1333,7 +1333,12 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         channel_id = _get_channel_id(incident)
         if channel_id:
             topic = build_channel_topic(incident)
-            _slack_service.set_channel_topic(channel_id, topic)
+            try:
+                _slack_service.set_channel_topic(channel_id, topic)
+            except Exception:
+                logger.exception(
+                    f"Failed to set main channel topic in on_severity_changed for incident {incident.id}"
+                )
             try:
                 status_channel_id = _get_status_channel_id(incident)
                 if status_channel_id:
@@ -1406,7 +1411,12 @@ def on_title_changed(incident: Incident) -> None:
         channel_id = _get_channel_id(incident)
         if channel_id:
             topic = build_channel_topic(incident)
-            _slack_service.set_channel_topic(channel_id, topic)
+            try:
+                _slack_service.set_channel_topic(channel_id, topic)
+            except Exception:
+                logger.exception(
+                    f"Failed to set main channel topic in on_title_changed for incident {incident.id}"
+                )
             try:
                 status_channel_id = _get_status_channel_id(incident)
                 if status_channel_id:
@@ -1505,14 +1515,19 @@ def on_incident_updated(
     ):
         try:
             topic = build_channel_topic(incident)
-            _slack_service.set_channel_topic(channel_id, topic)
         except Exception:
             topic = None
             logger.exception(
-                f"Error setting channel topic in on_incident_updated for incident {incident.id}"
+                f"Error building channel topic in on_incident_updated for incident {incident.id}"
             )
 
         if topic:
+            try:
+                _slack_service.set_channel_topic(channel_id, topic)
+            except Exception:
+                logger.exception(
+                    f"Error setting channel topic in on_incident_updated for incident {incident.id}"
+                )
             try:
                 status_channel_id = _get_status_channel_id(incident)
                 if status_channel_id:
