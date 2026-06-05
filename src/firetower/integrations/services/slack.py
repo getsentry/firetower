@@ -230,6 +230,9 @@ class SlackService:
     def set_all_channel_topics(
         self, channel_ids: list[str], topic: str
     ) -> dict[str, bool]:
+        if not self.client:
+            logger.warning("Cannot set topics - Slack client not initialized")
+            return dict.fromkeys(channel_ids, False)
         return {cid: self.set_channel_topic(cid, topic) for cid in channel_ids}
 
     def invite_to_channel(self, channel_id: str, user_ids: list[str]) -> bool:
