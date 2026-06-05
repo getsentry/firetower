@@ -1334,9 +1334,14 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         if channel_id:
             topic = build_channel_topic(incident)
             _slack_service.set_channel_topic(channel_id, topic)
-            status_channel_id = _get_status_channel_id(incident)
-            if status_channel_id:
-                _slack_service.set_channel_topic(status_channel_id, topic)
+            try:
+                status_channel_id = _get_status_channel_id(incident)
+                if status_channel_id:
+                    _slack_service.set_channel_topic(status_channel_id, topic)
+            except Exception:
+                logger.exception(
+                    f"Failed to set status channel topic in on_severity_changed for incident {incident.id}"
+                )
             incident_url = _build_incident_url(incident)
             _slack_service.post_message(
                 channel_id,
@@ -1402,9 +1407,14 @@ def on_title_changed(incident: Incident) -> None:
         if channel_id:
             topic = build_channel_topic(incident)
             _slack_service.set_channel_topic(channel_id, topic)
-            status_channel_id = _get_status_channel_id(incident)
-            if status_channel_id:
-                _slack_service.set_channel_topic(status_channel_id, topic)
+            try:
+                status_channel_id = _get_status_channel_id(incident)
+                if status_channel_id:
+                    _slack_service.set_channel_topic(status_channel_id, topic)
+            except Exception:
+                logger.exception(
+                    f"Failed to set status channel topic in on_title_changed for incident {incident.id}"
+                )
     except Exception:
         logger.exception(f"Error in on_title_changed for incident {incident.id}")
 
@@ -1437,9 +1447,14 @@ def on_captain_changed(incident: Incident) -> None:
 
         topic = build_channel_topic(incident)
         _slack_service.set_channel_topic(channel_id, topic)
-        status_channel_id = _get_status_channel_id(incident)
-        if status_channel_id:
-            _slack_service.set_channel_topic(status_channel_id, topic)
+        try:
+            status_channel_id = _get_status_channel_id(incident)
+            if status_channel_id:
+                _slack_service.set_channel_topic(status_channel_id, topic)
+        except Exception:
+            logger.exception(
+                f"Failed to set status channel topic in on_captain_changed for incident {incident.id}"
+            )
 
         incident_url = _build_incident_url(incident)
         if incident.captain:
