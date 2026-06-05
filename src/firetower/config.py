@@ -77,8 +77,22 @@ class LinearConfig:
     project_id: str = ""
     sync_identifiers: bool = False
     api_key: str = ""
-    action_item_nag_comment_high_priority: str = ""
-    action_item_nag_comment_medium_priority: str = ""
+    action_item_slo_days_high_priority: int = 14
+    action_item_slo_days_medium_priority: int = 30
+    action_item_nag_comment_high_priority: str = (
+        "{% if days_past_due > 0 %}This action item is **{{ days_past_due }} day(s) "
+        "past due**. {% endif %}"
+        "The SLO for completing P0/P1 incident action items is {{ slo_days }} "
+        "days from incident creation. Please prioritize this work or close "
+        "out the issue if it is no longer relevant."
+    )
+    action_item_nag_comment_medium_priority: str = (
+        "{% if days_past_due > 0 %}This action item is **{{ days_past_due }} day(s) "
+        "past due**. {% endif %}"
+        "The SLO for completing P2 incident action items is {{ slo_days }} "
+        "days from incident creation. Please prioritize this work or close "
+        "out the issue if it is no longer relevant."
+    )
 
 
 @deserialize

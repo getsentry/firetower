@@ -1033,3 +1033,54 @@ class TestSendActionItemReminder:
         mock_linear.create_comment.assert_called_once_with(
             action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
+
+    def test_renders_template_variables(self, mock_linear):
+        template = (
+            "SLO={{ slo_days }} age={{ incident_age_days }} "
+            "past={{ days_past_due }} left={{ days_left }} "
+            "passed={{ slo_passed }} id={{ action_item.linear_identifier }} "
+            "title={{ incident.title }}"
+        )
+        with patch.dict(
+            settings.LINEAR, {"ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": template}
+        ):
+            incident = self._make_incident(days_old=10, title="Some outage")
+            action_item = self._make_action_item(incident, priority=1)
+
+            send_action_item_reminder()
+
+        expected = (
+            f"SLO=14 age=10 past=0 left=4 passed=False "
+            f"id={action_item.linear_identifier} title=Some outage"
+        )
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, expected
+        )
+
+    def test_renders_medium_tier_variables(self, mock_linear):
+        template = "SLO={{ slo_days }} past={{ days_past_due }}"
+        with patch.dict(
+            settings.LINEAR, {"ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": template}
+        ):
+            incident = self._make_incident(days_old=35)
+            action_item = self._make_action_item(incident, priority=3)
+
+            send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, "SLO=30 past=5"
+        )
+
+    def test_skips_when_template_has_syntax_error(self, mock_linear):
+        with patch.dict(
+            settings.LINEAR,
+            {"ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": "{{ unterminated "},
+        ):
+            incident = self._make_incident()
+            action_item = self._make_action_item(incident, priority=1)
+
+            send_action_item_reminder()
+
+        mock_linear.create_comment.assert_not_called()
+        action_item.refresh_from_db()
+        assert action_item.last_nag is None
