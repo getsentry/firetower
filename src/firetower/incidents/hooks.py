@@ -1456,7 +1456,12 @@ def on_captain_changed(incident: Incident) -> None:
             return
 
         topic = build_channel_topic(incident)
-        _slack_service.set_channel_topic(channel_id, topic)
+        try:
+            _slack_service.set_channel_topic(channel_id, topic)
+        except Exception:
+            logger.exception(
+                f"Failed to set main channel topic in on_captain_changed for incident {incident.id}"
+            )
         try:
             status_channel_id = _get_status_channel_id(incident)
             if status_channel_id:
