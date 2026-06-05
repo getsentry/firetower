@@ -6,6 +6,7 @@ from django.conf import settings
 from django.utils import timezone
 from jinja2 import Environment, TemplateError
 
+from firetower.auth.models import ExternalProfileType
 from firetower.incidents.hooks import HIGH_SEVERITIES
 from firetower.incidents.models import (
     ActionItem,
@@ -16,6 +17,7 @@ from firetower.incidents.models import (
 from firetower.incidents.services import sync_action_items_from_linear
 from firetower.incidents.tasks.decorators import datadog_log
 from firetower.integrations.services.linear import LinearService
+from firetower.integrations.services.slack import SlackService, escape_slack_text
 
 logger = logging.getLogger(__name__)
 
@@ -110,17 +112,53 @@ def send_action_item_reminder() -> None:
             now - timedelta(days=ACTION_ITEM_REMINDER_NAG_EVERY_DAYS)
         )
 
+    def _send_slack_nag_dm(
+        action_item: ActionItem, incident: Incident, message: str
+    ) -> None:
+        recipient = action_item.assignee or incident.captain
+        if recipient is None:
+            logger.info(
+                "No assignee or captain for action item %s, skipping Slack DM",
+                action_item.linear_identifier,
+            )
+            return
+
+        profile = recipient.external_profiles.filter(
+            type=ExternalProfileType.SLACK
+        ).first()
+        if profile is None:
+            logger.info(
+                "No Slack profile for user %s, skipping DM for action item %s",
+                recipient.email or recipient.username,
+                action_item.linear_identifier,
+            )
+            return
+
+        slack_message = (
+            f"<{action_item.url}|{action_item.linear_identifier}>: "
+            f"{escape_slack_text(action_item.title)}\n\n{message}"
+        )
+
+        try:
+            SlackService().post_message(profile.external_id, slack_message)
+        except Exception:
+            logger.exception(
+                "Failed to send Slack nag DM for action item %s",
+                action_item.linear_identifier,
+            )
+
     def _nag(action_item: ActionItem, incident: Incident) -> None:
         template_source = comments_by_priority[action_item.priority]
         tier = nag_tiers[action_item.priority]
         incident_age_days = (timezone.now() - incident.created_at).days
+        slo_passed = incident_age_days >= tier.slo_days
         try:
             comment = _NAG_TEMPLATE_ENV.from_string(template_source).render(
                 slo_days=tier.slo_days,
                 incident_age_days=incident_age_days,
                 days_past_due=max(0, incident_age_days - tier.slo_days),
                 days_left=max(0, tier.slo_days - incident_age_days),
-                slo_passed=incident_age_days >= tier.slo_days,
+                slo_passed=slo_passed,
                 action_item=action_item,
                 incident=incident,
             )
@@ -138,9 +176,14 @@ def send_action_item_reminder() -> None:
                 f"Failed to post nag comment for action item {action_item.linear_identifier}"
             )
             return
-        if success:
-            action_item.last_nag = timezone.now()
-            action_item.save(update_fields=["last_nag"])
+        if not success:
+            return
+
+        if slo_passed:
+            _send_slack_nag_dm(action_item, incident, comment)
+
+        action_item.last_nag = timezone.now()
+        action_item.save(update_fields=["last_nag"])
 
     incidents = Incident.objects.filter(
         created_at__gte=min_age,
