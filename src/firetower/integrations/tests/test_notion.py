@@ -152,6 +152,22 @@ class TestGetUsers:
         assert users == {"a@sentry.io": {"name": "", "id": "U1"}}
 
 
+class TestArchivePage:
+    def test_archives_page_successfully(self, notion):
+        notion.archive_page("page-123")
+
+        notion.client.pages.update.assert_called_once_with(
+            page_id="page-123", archived=True
+        )
+
+    def test_logs_and_swallows_exception(self, notion):
+        notion.client.pages.update.side_effect = Exception("API error")
+
+        notion.archive_page("page-123")
+
+        notion.client.pages.update.assert_called_once()
+
+
 class TestSendMarkdown:
     def test_sends_insert_content_patch(self, notion):
         with patch(

@@ -153,6 +153,12 @@ class NotionService:
         self._users = users
         return users
 
+    def archive_page(self, page_id: str) -> None:
+        try:
+            self.client.pages.update(page_id=page_id, archived=True)
+        except Exception:
+            logger.exception("Failed to archive orphaned Notion page %s", page_id)
+
     def create_postmortem_page(
         self,
         incident_number: str,

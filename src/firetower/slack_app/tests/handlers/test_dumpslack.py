@@ -700,7 +700,7 @@ class TestTriggerSlackDump:
         assert "Updated" in posted
         assert existing_url in posted
 
-    def test_race_loser_adopts_winner_page_and_populates(self):
+    def test_race_loser_adopts_winner_page_and_archives_orphan(self):
         winner_url = "https://notion.so/12345678-1234-1234-1234-123456789abc"
         client = MagicMock()
         mock_incident = MagicMock(is_private=False)
@@ -734,6 +734,7 @@ class TestTriggerSlackDump:
             )
             _trigger_slack_dump(client, "C123", mock_incident)
 
+        mock_notion.archive_page.assert_called_once_with("our-page")
         mock_notion.apply_template.assert_called_once()
         call_args = mock_notion.apply_template.call_args
         assert call_args[0][0] == "12345678-1234-1234-1234-123456789abc"

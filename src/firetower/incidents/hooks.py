@@ -763,15 +763,19 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
 
 def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
     try:
-        if incident.is_private:
-            logger.info("Skipping postmortem doc for private incident %s", incident.id)
-            return
-
         if not NotionService.is_configured():
             logger.info(
                 "Notion not configured, skipping postmortem doc for incident %s",
                 incident.id,
             )
+            return
+
+        notion = NotionService.from_settings()
+        if not notion:
+            return
+
+        if incident.is_private:
+            logger.info("Skipping postmortem doc for private incident %s", incident.id)
             return
 
         with transaction.atomic():
@@ -792,15 +796,6 @@ def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
                         incident.id,
                     )
                 return
-
-        notion = NotionService.from_settings()
-        if not notion:
-            ExternalLink.objects.filter(
-                incident=incident,
-                type=ExternalLinkType.NOTION,
-                url="",
-            ).delete()
-            return
 
         incident_url = _build_incident_url(incident)
         captain_email = incident.captain.email if incident.captain else None
@@ -824,19 +819,28 @@ def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
             ).delete()
             return
 
-        with transaction.atomic():
-            link = ExternalLink.objects.select_for_update().get(
-                incident=incident,
-                type=ExternalLinkType.NOTION,
-            )
-            if link.url:
-                logger.warning(
-                    "Race condition: concurrent call already created postmortem doc for %s",
-                    incident.incident_number,
+        try:
+            with transaction.atomic():
+                link = ExternalLink.objects.select_for_update().get(
+                    incident=incident,
+                    type=ExternalLinkType.NOTION,
                 )
-                return
-            link.url = page["url"]
-            link.save(update_fields=["url"])
+                if link.url:
+                    logger.warning(
+                        "Race condition: concurrent call already created postmortem doc for %s",
+                        incident.incident_number,
+                    )
+                    notion.archive_page(page["id"])
+                    return
+                link.url = page["url"]
+                link.save(update_fields=["url"])
+        except ExternalLink.DoesNotExist:
+            logger.warning(
+                "Placeholder deleted before postmortem URL could be saved for %s",
+                incident.incident_number,
+            )
+            notion.archive_page(page["id"])
+            return
 
         try:
             _slack_service.add_bookmark(channel_id, "Postmortem Doc", page["url"])
