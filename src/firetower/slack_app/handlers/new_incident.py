@@ -280,8 +280,6 @@ def _create_incident_via_db(
 def handle_new_incident_submission(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
-    form = parse_incident_form_values(view)
-
     values = view.get("state", {}).get("values", {})
     private_selections = (
         values.get("private_block", {}).get("is_private", {}).get("selected_options")
@@ -289,7 +287,8 @@ def handle_new_incident_submission(
     )
     is_private = any(opt.get("value") == "private" for opt in private_selections)
 
-    if not form["title"]:
+    title = values.get("title_block", {}).get("title", {}).get("value", "").strip()
+    if not title:
         ack(
             response_action="errors",
             errors={"title_block": "This field is required."},
@@ -301,11 +300,13 @@ def handle_new_incident_submission(
     slack_user_id = body.get("user", {}).get("id", "")
 
     try:
+        form = parse_incident_form_values(view)
         incident = _create_incident_via_db(form, slack_user_id, is_private, client)
     except (OperationalError, InterfaceError):
         logger.exception(
             "Database unreachable during incident creation from Slack modal"
         )
+        form = parse_incident_form_values(view, resolve_tags=False)
         form_data = {
             "title": form["title"],
             "severity": form["severity"] or _DEFAULT_SEVERITY.value,

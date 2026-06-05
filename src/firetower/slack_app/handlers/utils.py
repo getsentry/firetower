@@ -22,12 +22,16 @@ _DEFAULT_SEVERITY = IncidentSeverity.P3
 CREATE_TAG_PREFIX = "__create__:"
 
 
-def _resolve_tag_values(values: list[str], tag_type: TagType) -> list[str]:
+def _resolve_tag_values(
+    values: list[str], tag_type: TagType, resolve_tags: bool = True
+) -> list[str]:
     """Resolve selected tag values, creating any prefixed with CREATE_TAG_PREFIX.
 
     Values prefixed with ``__create__:`` are stripped and get_or_create'd as Tags
     of the given type; everything else passes through unchanged. The returned list
-    preserves order and is de-duplicated case-insensitively.
+    preserves order and is de-duplicated case-insensitively. When ``resolve_tags``
+    is False, prefixed values are stripped to their raw name without touching the
+    database (used for degraded-mode fallbacks when the DB is unreachable).
     """
     resolved: list[str] = []
     seen: set[str] = set()
@@ -37,14 +41,17 @@ def _resolve_tag_values(values: list[str], tag_type: TagType) -> list[str]:
             name = value[len(CREATE_TAG_PREFIX) :].strip()
             if not name:
                 continue
-            tag, created = Tag.objects.get_or_create(
-                name__iexact=name,
-                type=tag_type,
-                defaults={"name": name, "type": tag_type},
-            )
-            if created:
-                logger.info("Created %s tag %r from Slack modal", tag_type, tag.name)
-            name = tag.name
+            if resolve_tags:
+                tag, created = Tag.objects.get_or_create(
+                    name__iexact=name,
+                    type=tag_type,
+                    defaults={"name": name, "type": tag_type},
+                )
+                if created:
+                    logger.info(
+                        "Created %s tag %r from Slack modal", tag_type, tag.name
+                    )
+                name = tag.name
         key = name.lower()
         if key in seen:
             continue
@@ -151,7 +158,7 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
     ]
 
 
-def parse_incident_form_values(view: dict) -> dict[str, Any]:
+def parse_incident_form_values(view: dict, resolve_tags: bool = True) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
 
     title = values.get("title_block", {}).get("title", {}).get("value", "").strip()
@@ -191,6 +198,7 @@ def parse_incident_form_values(view: dict) -> dict[str, Any]:
     affected_service_tags = _resolve_tag_values(
         [opt["value"] for opt in affected_service_selections],
         TagType.AFFECTED_SERVICE,
+        resolve_tags=resolve_tags,
     )
 
     affected_region_selections = (
@@ -202,6 +210,7 @@ def parse_incident_form_values(view: dict) -> dict[str, Any]:
     affected_region_tags = _resolve_tag_values(
         [opt["value"] for opt in affected_region_selections],
         TagType.AFFECTED_REGION,
+        resolve_tags=resolve_tags,
     )
 
     captain_slack_id = (
