@@ -1503,22 +1503,24 @@ def on_incident_updated(
     if channel_id and (
         old_title is not None or old_severity is not None or captain_changed
     ):
-        topic = build_channel_topic(incident)
         try:
+            topic = build_channel_topic(incident)
             _slack_service.set_channel_topic(channel_id, topic)
         except Exception:
+            topic = None
             logger.exception(
                 f"Error setting channel topic in on_incident_updated for incident {incident.id}"
             )
 
-        try:
-            status_channel_id = _get_status_channel_id(incident)
-            if status_channel_id:
-                _slack_service.set_channel_topic(status_channel_id, topic)
-        except Exception:
-            logger.exception(
-                f"Error setting status channel topic in on_incident_updated for incident {incident.id}"
-            )
+        if topic:
+            try:
+                status_channel_id = _get_status_channel_id(incident)
+                if status_channel_id:
+                    _slack_service.set_channel_topic(status_channel_id, topic)
+            except Exception:
+                logger.exception(
+                    f"Error setting status channel topic in on_incident_updated for incident {incident.id}"
+                )
 
     # --- Build combined notification lines ---
     lines: list[str] = []
