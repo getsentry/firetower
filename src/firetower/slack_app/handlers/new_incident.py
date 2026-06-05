@@ -18,6 +18,7 @@ from firetower.integrations.services.slack import escape_slack_text
 from firetower.slack_app.handlers.utils import (
     _DEFAULT_SEVERITY,
     CREATE_TAG_PREFIX,
+    _extract_title,
     build_incident_form_blocks,
     parse_incident_form_values,
 )
@@ -198,7 +199,7 @@ def handle_tag_options(ack: Any, payload: dict) -> None:
 
     stripped = keyword.strip()
     if tag_type in INLINE_CREATABLE_TAG_TYPES and stripped:
-        exact_match = any(tag.name.lower() == stripped.lower() for tag in matches)
+        exact_match = Tag.objects.filter(type=tag_type, name__iexact=stripped).exists()
         if not exact_match:
             options.append(
                 {
@@ -287,7 +288,7 @@ def handle_new_incident_submission(
     )
     is_private = any(opt.get("value") == "private" for opt in private_selections)
 
-    title = values.get("title_block", {}).get("title", {}).get("value", "").strip()
+    title = _extract_title(view)
     if not title:
         ack(
             response_action="errors",

@@ -2,6 +2,8 @@ import logging
 from typing import Any
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 
 from firetower.auth.models import ExternalProfileType
 from firetower.incidents.models import (
@@ -42,16 +44,25 @@ def _resolve_tag_values(
             if not name:
                 continue
             if resolve_tags:
-                tag, created = Tag.objects.get_or_create(
-                    name__iexact=name,
-                    type=tag_type,
-                    defaults={"name": name, "type": tag_type},
-                )
-                if created:
-                    logger.info(
-                        "Created %s tag %r from Slack modal", tag_type, tag.name
-                    )
-                name = tag.name
+                existing = Tag.objects.filter(type=tag_type, name__iexact=name).first()
+                if existing:
+                    name = existing.name
+                else:
+                    try:
+                        # Inline-created tags are intentionally left
+                        # approved=False so they surface for admin audit.
+                        tag = Tag.objects.create(name=name, type=tag_type)
+                        logger.info(
+                            "Created %s tag %r from Slack modal", tag_type, tag.name
+                        )
+                        name = tag.name
+                    except (ValidationError, IntegrityError):
+                        existing = Tag.objects.filter(
+                            type=tag_type, name__iexact=name
+                        ).first()
+                        if existing is None:
+                            raise
+                        name = existing.name
         key = name.lower()
         if key in seen:
             continue
@@ -158,10 +169,15 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
     ]
 
 
+def _extract_title(view: dict) -> str:
+    values = view.get("state", {}).get("values", {})
+    return values.get("title_block", {}).get("title", {}).get("value", "").strip()
+
+
 def parse_incident_form_values(view: dict, resolve_tags: bool = True) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
 
-    title = values.get("title_block", {}).get("title", {}).get("value", "").strip()
+    title = _extract_title(view)
     severity_block = values.get("severity_block", {})
     selected_option = severity_block.get("severity", {}).get(
         "selected_option"

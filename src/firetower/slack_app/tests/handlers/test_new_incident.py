@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import OperationalError
+from django.db import IntegrityError, OperationalError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import Incident, IncidentSeverity, Tag, TagType
@@ -14,6 +14,7 @@ from firetower.slack_app.handlers.new_incident import (
     handle_new_incident_submission,
     handle_tag_options,
 )
+from firetower.slack_app.handlers.utils import _resolve_tag_values
 
 
 @pytest.mark.django_db
@@ -737,3 +738,81 @@ class TestFallbackChannel:
         assert len(feed_calls) == 1
         assert "degraded mode" in feed_calls[0][0][1]
         assert "DB is on fire" in feed_calls[0][0][1]
+
+
+@pytest.mark.django_db
+class TestResolveTagValues:
+    def test_collapses_existing_and_create_of_same_name(self):
+        Tag.objects.create(name="Payments", type=TagType.AFFECTED_SERVICE)
+
+        resolved = _resolve_tag_values(
+            ["Payments", "__create__:payments"],
+            TagType.AFFECTED_SERVICE,
+        )
+
+        assert resolved == ["Payments"]
+
+    def test_collapses_create_values_differing_only_in_case(self):
+        resolved = _resolve_tag_values(
+            ["__create__:Payments", "__create__:payments"],
+            TagType.AFFECTED_SERVICE,
+        )
+
+        assert resolved == ["Payments"]
+        assert (
+            Tag.objects.filter(
+                type=TagType.AFFECTED_SERVICE, name__iexact="payments"
+            ).count()
+            == 1
+        )
+
+    def test_preserves_order(self):
+        resolved = _resolve_tag_values(
+            ["__create__:beta", "__create__:alpha"],
+            TagType.AFFECTED_SERVICE,
+        )
+
+        assert resolved == ["beta", "alpha"]
+
+    def test_resolve_false_strips_prefix_without_db(self):
+        resolved = _resolve_tag_values(
+            ["__create__:payments", "us-east-1", "__create__:   "],
+            TagType.AFFECTED_SERVICE,
+            resolve_tags=False,
+        )
+
+        assert resolved == ["payments", "us-east-1"]
+        assert not Tag.objects.exists()
+
+    def test_skips_empty_after_strip(self):
+        resolved = _resolve_tag_values(
+            ["__create__:   ", "__create__:payments"],
+            TagType.AFFECTED_SERVICE,
+        )
+
+        assert resolved == ["payments"]
+
+    def test_recovers_existing_tag_when_create_races(self):
+        Tag.objects.create(name="Payments", type=TagType.AFFECTED_SERVICE)
+
+        with patch(
+            "firetower.slack_app.handlers.utils.Tag.objects.create",
+            side_effect=IntegrityError("duplicate key"),
+        ):
+            resolved = _resolve_tag_values(
+                ["__create__:payments"],
+                TagType.AFFECTED_SERVICE,
+            )
+
+        assert resolved == ["Payments"]
+
+    def test_reraises_when_create_fails_and_no_existing_tag(self):
+        with patch(
+            "firetower.slack_app.handlers.utils.Tag.objects.create",
+            side_effect=IntegrityError("boom"),
+        ):
+            with pytest.raises(IntegrityError):
+                _resolve_tag_values(
+                    ["__create__:payments"],
+                    TagType.AFFECTED_SERVICE,
+                )
