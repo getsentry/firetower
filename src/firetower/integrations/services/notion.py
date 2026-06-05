@@ -257,14 +257,14 @@ class NotionService:
                         raise RuntimeError(
                             f"Failed to apply markdown template to Notion page {page_id}"
                         )
-                elif segment["type"] == "embed":
-                    embed_block = {
-                        "type": "embed",
-                        "embed": {"url": segment["url"]},
+                elif segment["type"] == "bookmark":
+                    bookmark_block = {
+                        "type": "bookmark",
+                        "bookmark": {"url": segment["url"]},
                     }
-                    if self._append_children(page_id, [embed_block]) is None:
+                    if self._append_children(page_id, [bookmark_block]) is None:
                         raise RuntimeError(
-                            f"Failed to append embed to Notion page {page_id}"
+                            f"Failed to append bookmark to Notion page {page_id}"
                         )
 
         timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -359,7 +359,7 @@ class NotionService:
             if before.strip():
                 segments.append({"type": "markdown", "content": before})
             if linear_url:
-                segments.append({"type": "embed", "url": linear_url})
+                segments.append({"type": "bookmark", "url": linear_url})
             last_end = match.end()
 
         after = template[last_end:]

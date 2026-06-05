@@ -361,7 +361,7 @@ class TestRenderTemplate:
         result = NotionService._render_template("# Title\n{linear_url}", None)
         assert result == [{"type": "markdown", "content": "# Title\n{linear_url}"}]
 
-    def test_returns_embed_segment_for_markdown_link(self):
+    def test_returns_bookmark_segment_for_markdown_link(self):
         incident = MagicMock()
         incident.external_links_dict = {
             "linear": "https://linear.app/team/issue/INC-100"
@@ -370,17 +370,17 @@ class TestRenderTemplate:
             "[Action Items]({linear_url})", incident
         )
         assert result == [
-            {"type": "embed", "url": "https://linear.app/team/issue/INC-100"}
+            {"type": "bookmark", "url": "https://linear.app/team/issue/INC-100"}
         ]
 
-    def test_returns_embed_segment_for_bare_placeholder(self):
+    def test_returns_bookmark_segment_for_bare_placeholder(self):
         incident = MagicMock()
         incident.external_links_dict = {
             "linear": "https://linear.app/team/issue/INC-100"
         }
         result = NotionService._render_template("{linear_url}", incident)
         assert result == [
-            {"type": "embed", "url": "https://linear.app/team/issue/INC-100"}
+            {"type": "bookmark", "url": "https://linear.app/team/issue/INC-100"}
         ]
 
     def test_splits_template_around_placeholder(self):
@@ -393,7 +393,7 @@ class TestRenderTemplate:
         )
         assert result == [
             {"type": "markdown", "content": "# PM\n"},
-            {"type": "embed", "url": "https://linear.app/team/issue/INC-42"},
+            {"type": "bookmark", "url": "https://linear.app/team/issue/INC-42"},
             {"type": "markdown", "content": "\n\n## Timeline"},
         ]
 
@@ -483,12 +483,12 @@ class TestApplyTemplate:
             )
 
         mock_md.assert_called_once_with("page-id", "# PM\n")
-        embed_call = svc.client.blocks.children.append.call_args_list[0]
-        embed_children = embed_call.kwargs["children"]
-        assert len(embed_children) == 1
-        assert embed_children[0] == {
-            "type": "embed",
-            "embed": {"url": "https://linear.app/team/issue/INC-42"},
+        bookmark_call = svc.client.blocks.children.append.call_args_list[0]
+        bookmark_children = bookmark_call.kwargs["children"]
+        assert len(bookmark_children) == 1
+        assert bookmark_children[0] == {
+            "type": "bookmark",
+            "bookmark": {"url": "https://linear.app/team/issue/INC-42"},
         }
 
     def test_bare_placeholder_no_linear_link_skips_markdown(self):
