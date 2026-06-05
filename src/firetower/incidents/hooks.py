@@ -96,6 +96,7 @@ class ChannelSetupContext:
     description: str | None = None
     incident_url: str | None = None
     incident_number: str | None = None
+    topic: str | None = None
 
 
 def page_for_channel(
@@ -256,6 +257,24 @@ def _get_status_channel_id(incident: Incident) -> str | None:
     if not slack_link:
         return None
     return _slack_service.parse_channel_id_from_url(slack_link.url)
+
+
+def _set_topic_on_all_channels(incident: Incident, topic: str) -> None:
+    channel_ids: list[str] = []
+    try:
+        channel_id = _get_channel_id(incident)
+        if channel_id:
+            channel_ids.append(channel_id)
+    except Exception:
+        logger.exception(f"Failed to get channel id for incident {incident.id}")
+    try:
+        status_channel_id = _get_status_channel_id(incident)
+        if status_channel_id:
+            channel_ids.append(status_channel_id)
+    except Exception:
+        logger.exception(f"Failed to get status channel id for incident {incident.id}")
+    if channel_ids:
+        _slack_service.set_all_channel_topics(channel_ids, topic)
 
 
 def _invite_user_to_channel(
@@ -438,8 +457,6 @@ def _save_status_channel_link(incident: Incident, status_channel_id: str) -> Non
 def _create_status_channel_for_context(
     ctx: ChannelSetupContext,
     slack_service: SlackService,
-    *,
-    topic: str | None = None,
 ) -> str | None:
     """Create a companion status channel. No DB access.
 
@@ -466,9 +483,9 @@ def _create_status_channel_for_context(
         )
         return None
 
-    if topic:
+    if ctx.topic:
         try:
-            slack_service.set_channel_topic(status_channel_id, topic)
+            slack_service.set_channel_topic(status_channel_id, ctx.topic)
         except Exception:
             logger.exception(
                 f"Failed to set topic on status channel {status_channel_name}"
@@ -536,11 +553,9 @@ def _create_status_channel(incident: Incident, main_channel_id: str) -> None:
         reporter_slack_id=reporter_slack_id,
         incident_url=_build_incident_url(incident),
         incident_number=incident.incident_number,
+        topic=build_channel_topic(incident, captain_slack_id),
     )
-    topic = build_channel_topic(incident, captain_slack_id)
-    status_channel_id = _create_status_channel_for_context(
-        ctx, _slack_service, topic=topic
-    )
+    status_channel_id = _create_status_channel_for_context(ctx, _slack_service)
     if status_channel_id:
         _save_status_channel_link(incident, status_channel_id)
 
@@ -782,7 +797,6 @@ def decorate_incident_channel(
     skip_datadog: bool = False,
     skip_notion: bool = False,
     paged_policies: set[str] | None = None,
-    status_channel_topic: str | None = None,
 ) -> str | None:
     """
     Shared channel setup called by both the normal and fallback creation paths.
@@ -904,9 +918,7 @@ def decorate_incident_channel(
 
     status_channel_id: str | None = None
     try:
-        status_channel_id = _create_status_channel_for_context(
-            ctx, slack_service, topic=status_channel_topic
-        )
+        status_channel_id = _create_status_channel_for_context(ctx, slack_service)
     except Exception:
         logger.exception(f"Failed to create status channel for {ctx.channel_name}")
 
@@ -1264,15 +1276,14 @@ def on_incident_created(incident: Incident) -> None:
             description=incident.description,
             incident_url=incident_url,
             incident_number=incident.incident_number,
+            topic=build_channel_topic(incident, captain_slack_id),
         )
-        channel_topic = build_channel_topic(incident, captain_slack_id)
         status_channel_id = decorate_incident_channel(
             ctx,
             _slack_service,
             skip_datadog=True,
             skip_notion=True,
             paged_policies=paged_policies,
-            status_channel_topic=channel_topic,
         )
         if status_channel_id:
             _save_status_channel_link(incident, status_channel_id)
@@ -1333,20 +1344,7 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
         channel_id = _get_channel_id(incident)
         if channel_id:
             topic = build_channel_topic(incident)
-            try:
-                _slack_service.set_channel_topic(channel_id, topic)
-            except Exception:
-                logger.exception(
-                    f"Failed to set main channel topic in on_severity_changed for incident {incident.id}"
-                )
-            try:
-                status_channel_id = _get_status_channel_id(incident)
-                if status_channel_id:
-                    _slack_service.set_channel_topic(status_channel_id, topic)
-            except Exception:
-                logger.exception(
-                    f"Failed to set status channel topic in on_severity_changed for incident {incident.id}"
-                )
+            _set_topic_on_all_channels(incident, topic)
             incident_url = _build_incident_url(incident)
             _slack_service.post_message(
                 channel_id,
@@ -1411,20 +1409,7 @@ def on_title_changed(incident: Incident) -> None:
         channel_id = _get_channel_id(incident)
         if channel_id:
             topic = build_channel_topic(incident)
-            try:
-                _slack_service.set_channel_topic(channel_id, topic)
-            except Exception:
-                logger.exception(
-                    f"Failed to set main channel topic in on_title_changed for incident {incident.id}"
-                )
-            try:
-                status_channel_id = _get_status_channel_id(incident)
-                if status_channel_id:
-                    _slack_service.set_channel_topic(status_channel_id, topic)
-            except Exception:
-                logger.exception(
-                    f"Failed to set status channel topic in on_title_changed for incident {incident.id}"
-                )
+            _set_topic_on_all_channels(incident, topic)
     except Exception:
         logger.exception(f"Error in on_title_changed for incident {incident.id}")
 
@@ -1456,20 +1441,7 @@ def on_captain_changed(incident: Incident) -> None:
             return
 
         topic = build_channel_topic(incident)
-        try:
-            _slack_service.set_channel_topic(channel_id, topic)
-        except Exception:
-            logger.exception(
-                f"Failed to set main channel topic in on_captain_changed for incident {incident.id}"
-            )
-        try:
-            status_channel_id = _get_status_channel_id(incident)
-            if status_channel_id:
-                _slack_service.set_channel_topic(status_channel_id, topic)
-        except Exception:
-            logger.exception(
-                f"Failed to set status channel topic in on_captain_changed for incident {incident.id}"
-            )
+        _set_topic_on_all_channels(incident, topic)
 
         incident_url = _build_incident_url(incident)
         if incident.captain:
@@ -1527,20 +1499,7 @@ def on_incident_updated(
             )
 
         if topic:
-            try:
-                _slack_service.set_channel_topic(channel_id, topic)
-            except Exception:
-                logger.exception(
-                    f"Error setting channel topic in on_incident_updated for incident {incident.id}"
-                )
-            try:
-                status_channel_id = _get_status_channel_id(incident)
-                if status_channel_id:
-                    _slack_service.set_channel_topic(status_channel_id, topic)
-            except Exception:
-                logger.exception(
-                    f"Error setting status channel topic in on_incident_updated for incident {incident.id}"
-                )
+            _set_topic_on_all_channels(incident, topic)
 
     # --- Build combined notification lines ---
     lines: list[str] = []
