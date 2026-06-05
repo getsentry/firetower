@@ -1343,8 +1343,13 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
     try:
         channel_id = _get_channel_id(incident)
         if channel_id:
-            topic = build_channel_topic(incident)
-            _set_topic_on_all_channels(incident, topic)
+            try:
+                topic = build_channel_topic(incident)
+                _set_topic_on_all_channels(incident, topic)
+            except Exception:
+                logger.exception(
+                    f"Failed to set channel topic for incident {incident.id}"
+                )
             incident_url = _build_incident_url(incident)
             _slack_service.post_message(
                 channel_id,
