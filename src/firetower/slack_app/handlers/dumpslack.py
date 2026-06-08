@@ -49,8 +49,8 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
 
     page_id: str | None = None
     page_url: str = ""
-    update_slack: bool = False
     notion_page_created: bool = False
+    created_page_id: str | None = None
 
     try:
         with transaction.atomic():
@@ -110,7 +110,6 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                     )
                 return
             page_url = existing_url
-            update_slack = True
         else:
             base_url = settings.FIRETOWER_BASE_URL
             incident_url = f"{base_url}/{incident.incident_number}"
@@ -125,6 +124,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             )
             page_id = page["id"]
             page_url = page["url"]
+            created_page_id = page["id"]
             # Re-acquire lock before saving to detect concurrent callers that
             # also saw url="" and raced to create a page. The loser adopts the
             # winner's page so apply_template still populates it.
@@ -151,12 +151,18 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                 notion.archive_page(orphan_page_id)
                 if not page_id:
                     return
-                update_slack = True
     except Exception:
         logger.exception(
             "Failed to create Notion postmortem page for %s",
             incident.incident_number,
         )
+        if created_page_id and not notion_page_created:
+            try:
+                notion.archive_page(created_page_id)
+            except Exception:
+                logger.exception(
+                    "Failed to archive orphaned Notion page %s", created_page_id
+                )
         ExternalLink.objects.filter(
             incident=incident,
             type=ExternalLinkType.NOTION,
@@ -181,9 +187,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
     messages = _get_channel_messages(slack_service, channel_id)
 
     try:
-        notion.apply_template(
-            page_id, messages, update_slack=update_slack, incident=incident
-        )
+        notion.apply_template(page_id, messages, incident=incident)
     except Exception:
         logger.exception("Failed to populate Notion page %s", page_id)
         try:
@@ -210,7 +214,12 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         logger.exception("Failed to add AI timeline to Notion page %s", page_id)
 
     try:
-        slack_service.add_bookmark(channel_id, "Postmortem Doc", page_url)
+        existing = slack_service.client.bookmarks_list(channel_id=channel_id)
+        has_bookmark = any(
+            b.get("title") == "Postmortem Doc" for b in existing.get("bookmarks", [])
+        )
+        if not has_bookmark:
+            slack_service.add_bookmark(channel_id, "Postmortem Doc", page_url)
     except Exception:
         logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
 

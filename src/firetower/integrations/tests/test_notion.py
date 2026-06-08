@@ -409,12 +409,13 @@ class TestApplyTemplate:
         return {"results": [{"id": block_id}]}
 
     def test_new_page_sends_markdown_then_slack_blocks(self, notion):
+        notion.client.blocks.children.list.return_value = {"results": []}
         notion.client.blocks.children.append.return_value = self._make_append_response(
             "toggle-id"
         )
 
         with patch.object(notion, "_send_markdown", return_value=True) as mock_md:
-            notion.apply_template("page-id", messages=[], update_slack=False)
+            notion.apply_template("page-id", messages=[])
 
         mock_md.assert_called_once_with("page-id", "# Template\n\nSome content.")
         notion.client.blocks.children.append.assert_called_once()
@@ -424,6 +425,7 @@ class TestApplyTemplate:
         assert toggle_block["type"] == "toggle"
 
     def test_raises_when_send_markdown_fails(self, notion):
+        notion.client.blocks.children.list.return_value = {"results": []}
         notion.client.blocks.children.append.return_value = self._make_append_response(
             "toggle-id"
         )
@@ -432,15 +434,16 @@ class TestApplyTemplate:
             patch.object(notion, "_send_markdown", return_value=False),
             pytest.raises(RuntimeError, match="template"),
         ):
-            notion.apply_template("page-id", messages=[], update_slack=False)
+            notion.apply_template("page-id", messages=[])
 
     def test_raises_when_toggle_creation_fails(self, notion):
+        notion.client.blocks.children.list.return_value = {"results": []}
         with (
             patch.object(notion, "_send_markdown", return_value=True),
             patch.object(notion, "_append_children", return_value=None),
             pytest.raises(RuntimeError, match="toggle"),
         ):
-            notion.apply_template("page-id", messages=[], update_slack=False)
+            notion.apply_template("page-id", messages=[])
 
     def test_interpolates_incident_into_template(self):
         svc = NotionService(
@@ -449,6 +452,7 @@ class TestApplyTemplate:
             template_markdown="# PM\n[Action Items]({linear_url})",
         )
         svc.client = MagicMock()
+        svc.client.blocks.children.list.return_value = {"results": []}
         svc.client.blocks.children.append.return_value = self._make_append_response(
             "toggle-id"
         )
@@ -458,21 +462,22 @@ class TestApplyTemplate:
         }
 
         with patch.object(svc, "_send_markdown", return_value=True) as mock_md:
-            svc.apply_template(
-                "page-id", messages=[], update_slack=False, incident=incident
-            )
+            svc.apply_template("page-id", messages=[], incident=incident)
 
         mock_md.assert_called_once_with(
             "page-id", "# PM\n[Action Items](https://linear.app/team/issue/INC-42)"
         )
 
-    def test_update_slack_skips_markdown_template(self, notion):
+    def test_skips_template_when_page_has_content(self, notion):
+        notion.client.blocks.children.list.return_value = {
+            "results": [{"id": "existing-block"}]
+        }
         notion.client.blocks.children.append.return_value = self._make_append_response(
             "toggle-id"
         )
 
         with patch.object(notion, "_send_markdown", return_value=True) as mock_md:
-            notion.apply_template("page-id", messages=[], update_slack=True)
+            notion.apply_template("page-id", messages=[])
 
         mock_md.assert_not_called()
 
@@ -499,7 +504,10 @@ class TestApplyTemplate:
         ]
 
         with patch.object(notion, "_send_markdown", return_value=True):
-            notion.apply_template("page-id", messages=messages, update_slack=True)
+            notion.apply_template(
+                "page-id",
+                messages=messages,
+            )
 
         reply_call = notion.client.blocks.children.append.call_args_list[2]
         assert reply_call.kwargs["block_id"] == "bullet-id"
@@ -534,7 +542,10 @@ class TestApplyTemplate:
             patch.object(notion, "_send_markdown", return_value=True),
             patch.object(notion, "_create_image_block", return_value=image_block),
         ):
-            notion.apply_template("page-id", messages=messages, update_slack=True)
+            notion.apply_template(
+                "page-id",
+                messages=messages,
+            )
 
         children_call = notion.client.blocks.children.append.call_args_list[2]
         assert children_call.kwargs["block_id"] == "bullet-id"
@@ -561,7 +572,10 @@ class TestApplyTemplate:
             patch.object(notion, "_send_markdown", return_value=True),
             patch.object(notion, "_create_image_block", return_value=None),
         ):
-            notion.apply_template("page-id", messages=messages, update_slack=True)
+            notion.apply_template(
+                "page-id",
+                messages=messages,
+            )
 
         # Only 2 appends: toggle creation + bullet batch. No children call since image failed.
         assert notion.client.blocks.children.append.call_count == 2
@@ -589,7 +603,10 @@ class TestApplyTemplate:
         ]
 
         with patch.object(notion, "_send_markdown", return_value=True):
-            notion.apply_template("page-id", messages=messages, update_slack=True)
+            notion.apply_template(
+                "page-id",
+                messages=messages,
+            )
 
         # 4 total: toggle, bullet batch, first 85 replies, last 5 replies
         assert notion.client.blocks.children.append.call_count == 4
@@ -650,7 +667,10 @@ class TestApplyTemplate:
             patch.object(notion, "_send_markdown", return_value=True),
             patch("firetower.integrations.services.notion.logger") as mock_logger,
         ):
-            notion.apply_template("page-id", messages=messages, update_slack=True)
+            notion.apply_template(
+                "page-id",
+                messages=messages,
+            )
 
         # Confirm the mismatch warning was emitted.
         warning_args = [call[0][0] for call in mock_logger.warning.call_args_list]
@@ -681,7 +701,10 @@ class TestApplyTemplate:
             ),
             patch("firetower.integrations.services.notion.logger") as mock_logger,
         ):
-            notion.apply_template("page-id", messages=messages, update_slack=True)
+            notion.apply_template(
+                "page-id",
+                messages=messages,
+            )
 
         error_args = [call[0][0] for call in mock_logger.error.call_args_list]
         assert any("no progress" in msg for msg in error_args)
@@ -708,7 +731,10 @@ class TestApplyTemplate:
             patch.object(notion, "_send_markdown", return_value=True),
             patch("firetower.integrations.services.notion.logger") as mock_logger,
         ):
-            notion.apply_template("page-id", messages=messages, update_slack=True)
+            notion.apply_template(
+                "page-id",
+                messages=messages,
+            )
 
         warning_args = [call[0][0] for call in mock_logger.warning.call_args_list]
         assert any("absent from the Notion dump" in msg for msg in warning_args)

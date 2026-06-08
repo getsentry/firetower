@@ -2746,38 +2746,6 @@ class TestCreatePostmortemDoc:
 
     @patch("firetower.incidents.hooks.NotionService")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_applies_postmortem_template_after_creation(
-        self, mock_slack, mock_notion_cls, settings
-    ):
-        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
-        mock_notion_cls.is_configured.return_value = True
-        mock_service = MagicMock()
-        mock_service.template_markdown = "# Postmortem\n{linear_url}"
-        mock_service.create_postmortem_page.return_value = {
-            "id": "page-456",
-            "url": "https://notion.so/page-456",
-        }
-        mock_notion_cls.from_settings.return_value = mock_service
-        mock_notion_cls._render_template.return_value = (
-            "# Postmortem\nhttps://linear.app/issue"
-        )
-
-        incident = Incident.objects.create(
-            title="Production is down",
-            severity=IncidentSeverity.P1,
-        )
-
-        _create_postmortem_doc(incident, "C99999")
-
-        mock_notion_cls._render_template.assert_called_once_with(
-            "# Postmortem\n{linear_url}", incident
-        )
-        mock_service._send_markdown.assert_called_once_with(
-            "page-456", "# Postmortem\nhttps://linear.app/issue"
-        )
-
-    @patch("firetower.incidents.hooks.NotionService")
-    @patch("firetower.incidents.hooks._slack_service")
     def test_skips_when_not_configured(self, mock_slack, mock_notion_cls):
         mock_notion_cls.is_configured.return_value = False
 

@@ -847,14 +847,6 @@ def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
             notion.archive_page(orphan_page_id)
             return
 
-        if notion.template_markdown:
-            content = NotionService._render_template(notion.template_markdown, incident)
-            if not notion._send_markdown(page["id"], content):
-                logger.error(
-                    "Failed to apply postmortem template to page %s",
-                    page["id"],
-                )
-
         try:
             _slack_service.add_bookmark(channel_id, "Postmortem Doc", page["url"])
         except Exception:

@@ -250,15 +250,20 @@ class NotionService:
         self,
         page_id: str,
         messages: list[dict[str, Any]],
-        update_slack: bool = False,
         incident: Any | None = None,
     ) -> None:
-        if not update_slack and self.template_markdown:
-            content = self._render_template(self.template_markdown, incident)
-            if not self._send_markdown(page_id, content):
-                raise RuntimeError(
-                    f"Failed to apply markdown template to Notion page {page_id}"
-                )
+        if self.template_markdown:
+            try:
+                existing = self.client.blocks.children.list(block_id=page_id)
+                has_content = bool(existing.get("results"))
+            except Exception:
+                has_content = False
+            if not has_content:
+                content = self._render_template(self.template_markdown, incident)
+                if not self._send_markdown(page_id, content):
+                    raise RuntimeError(
+                        f"Failed to apply markdown template to Notion page {page_id}"
+                    )
 
         timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         toggle: dict[str, Any] = {
