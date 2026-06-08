@@ -327,8 +327,6 @@ LINEAR: dict | None = (
         "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": config.linear.action_item_slo_days_medium_priority,
         "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": config.linear.action_item_nag_comment_high_priority,
         "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": config.linear.action_item_nag_comment_medium_priority,
-        "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": config.linear.action_item_slo_days_high_priority,
-        "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": config.linear.action_item_slo_days_medium_priority,
     }
     if config.linear
     else None

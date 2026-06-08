@@ -27,9 +27,7 @@ const BORDER_CLASS: Record<ActionItemStatus, string> = {
 function getSloLabel(deadline: string): {text: string; className: string} | null {
   const now = new Date();
   const due = new Date(deadline);
-  const diffDays = Math.floor(
-    (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const diffDays = Math.floor((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {
     const absDays = Math.abs(diffDays);
@@ -52,8 +50,7 @@ function getSloLabel(deadline: string): {text: string; className: string} | null
 
 function ActionItemCard({item}: {item: ActionItem}) {
   const isTerminal = item.status === 'Done' || item.status === 'Canceled';
-  const slo =
-    item.slo_deadline && !isTerminal ? getSloLabel(item.slo_deadline) : null;
+  const slo = item.slo_deadline && !isTerminal ? getSloLabel(item.slo_deadline) : null;
 
   return (
     <a
