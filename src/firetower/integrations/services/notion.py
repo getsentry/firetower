@@ -254,10 +254,17 @@ class NotionService:
     ) -> None:
         if self.template_markdown:
             try:
-                existing = self.client.blocks.children.list(block_id=page_id)
+                existing = cast(
+                    dict[str, Any],
+                    self.client.blocks.children.list(block_id=page_id),
+                )
                 has_content = bool(existing.get("results"))
             except Exception:
-                has_content = False
+                logger.warning(
+                    "Failed to check existing content for page %s, skipping template",
+                    page_id,
+                )
+                has_content = True
             if not has_content:
                 content = self._render_template(self.template_markdown, incident)
                 if not self._send_markdown(page_id, content):

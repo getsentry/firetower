@@ -481,6 +481,17 @@ class TestApplyTemplate:
 
         mock_md.assert_not_called()
 
+    def test_skips_template_on_transient_api_error(self, notion):
+        notion.client.blocks.children.list.side_effect = Exception("connection reset")
+        notion.client.blocks.children.append.return_value = self._make_append_response(
+            "toggle-id"
+        )
+
+        with patch.object(notion, "_send_markdown", return_value=True) as mock_md:
+            notion.apply_template("page-id", messages=[])
+
+        mock_md.assert_not_called()
+
     def test_appends_replies_as_children_of_parent_bullet(self, notion):
         notion.client.blocks.children.append.side_effect = [
             {"results": [{"id": "toggle-id"}]},

@@ -762,6 +762,8 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
 
 
 def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
+    notion = None
+    page = None
     try:
         if not NotionService.is_configured():
             logger.info(
@@ -856,6 +858,15 @@ def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
             )
     except Exception:
         logger.exception("Failed to create postmortem doc for incident %s", incident.id)
+        if notion and page and page.get("id"):
+            try:
+                notion.archive_page(page["id"])
+            except Exception:
+                logger.exception(
+                    "Failed to archive orphaned Notion page %s for incident %s",
+                    page["id"],
+                    incident.id,
+                )
         ExternalLink.objects.filter(
             incident=incident,
             type=ExternalLinkType.NOTION,

@@ -2853,6 +2853,35 @@ class TestCreatePostmortemDoc:
 
     @patch("firetower.incidents.hooks.NotionService")
     @patch("firetower.incidents.hooks._slack_service")
+    def test_db_error_archives_orphan_notion_page(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_postmortem_page.return_value = {
+            "id": "orphan-page-id",
+            "url": "https://notion.so/orphan-page",
+        }
+        mock_notion_cls.from_settings.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION
+        ).delete()
+
+        _create_postmortem_doc(incident, "C99999")
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION
+        ).exists()
+        mock_service.archive_page.assert_called_once_with("orphan-page-id")
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
     def test_bookmark_failure_does_not_propagate(
         self, mock_slack, mock_notion_cls, settings
     ):
