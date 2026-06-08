@@ -2,6 +2,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -1294,6 +1295,11 @@ class TestActionItemViews:
             url="https://linear.app/t/ENG-3",
         )
 
+        settings.LINEAR = {
+            "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": 14,
+            "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": 30,
+        }
+
         with patch("firetower.incidents.views.sync_action_items_from_linear"):
             response = self.client.get(
                 f"/api/ui/incidents/{incident.incident_number}/action-items/"
@@ -1309,6 +1315,30 @@ class TestActionItemViews:
         assert items["ENG-2"]["slo_deadline"] == expected_medium
 
         assert items["ENG-3"]["slo_deadline"] is None
+
+    def test_list_action_items_no_slo_deadline_without_linear(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-1",
+            linear_identifier="ENG-1",
+            title="High priority task",
+            status=ActionItemStatus.TODO,
+            priority=2,
+            url="https://linear.app/t/ENG-1",
+        )
+
+        with patch("firetower.incidents.views.sync_action_items_from_linear"):
+            response = self.client.get(
+                f"/api/ui/incidents/{incident.incident_number}/action-items/"
+            )
+
+        assert response.status_code == 200
+        assert response.data[0]["slo_deadline"] is None
 
     def test_list_action_items_includes_assignee_info(self):
         user = User.objects.create_user(
