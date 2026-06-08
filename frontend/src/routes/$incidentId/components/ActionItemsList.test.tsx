@@ -129,7 +129,7 @@ describe('ActionItemsList', () => {
     expect(screen.getByText('TEAM-102')).toBeInTheDocument();
   });
 
-  it('shows "due today" when slo_deadline is less than a day overdue', async () => {
+  it('shows overdue label when slo_deadline is less than a day overdue', async () => {
     const halfDayAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
     mockApiGet.mockResolvedValue([
       {
@@ -146,7 +146,7 @@ describe('ActionItemsList', () => {
       />
     );
 
-    expect(await screen.findByText('due today')).toBeInTheDocument();
+    expect(await screen.findByText('1d overdue')).toBeInTheDocument();
   });
 
   it('shows overdue label when slo_deadline is more than a day overdue', async () => {
@@ -207,7 +207,6 @@ describe('ActionItemsList', () => {
     );
 
     await screen.findByText('Investigate slow query');
-    expect(screen.queryByText('due today')).not.toBeInTheDocument();
     expect(screen.queryByText(/overdue/)).not.toBeInTheDocument();
   });
 

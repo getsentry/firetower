@@ -27,18 +27,14 @@ const BORDER_CLASS: Record<ActionItemStatus, string> = {
 function getSloLabel(deadline: string): {text: string; className: string} | null {
   const now = new Date();
   const due = new Date(deadline);
-  const diffMs = due.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor(
+    (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+  );
 
   if (diffDays < 0) {
+    const absDays = Math.abs(diffDays);
     return {
-      text: `${Math.abs(diffDays)}d overdue`,
-      className: 'text-content-danger',
-    };
-  }
-  if (diffMs <= 0) {
-    return {
-      text: 'due today',
+      text: `${absDays}d overdue`,
       className: 'text-content-danger',
     };
   }
