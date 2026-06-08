@@ -2,8 +2,8 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
-from django.conf import settings
 from django.contrib.auth.models import User
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -1295,12 +1295,15 @@ class TestActionItemViews:
             url="https://linear.app/t/ENG-3",
         )
 
-        settings.LINEAR = {
+        linear_settings = {
             "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": 14,
             "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": 30,
         }
 
-        with patch("firetower.incidents.views.sync_action_items_from_linear"):
+        with (
+            override_settings(LINEAR=linear_settings),
+            patch("firetower.incidents.views.sync_action_items_from_linear"),
+        ):
             response = self.client.get(
                 f"/api/ui/incidents/{incident.incident_number}/action-items/"
             )
