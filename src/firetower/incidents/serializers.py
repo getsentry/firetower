@@ -9,6 +9,7 @@ from django.db.models.functions import Lower
 from rest_framework import serializers
 
 from firetower.auth.services import get_or_create_user_from_email
+from firetower.config import LinearConfig
 
 from .hooks import (
     on_incident_created,
@@ -670,8 +671,14 @@ class TagCreateSerializer(serializers.ModelSerializer):
 
 def _get_action_item_slo_days() -> dict[int, int]:
     linear = getattr(settings, "LINEAR", None) or {}
-    high = linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 14)
-    medium = linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 30)
+    high = linear.get(
+        "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY",
+        LinearConfig.action_item_slo_days_high_priority,
+    )
+    medium = linear.get(
+        "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY",
+        LinearConfig.action_item_slo_days_medium_priority,
+    )
     return {1: high, 2: high, 3: medium}
 
 
