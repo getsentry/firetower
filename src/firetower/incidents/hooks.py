@@ -819,6 +819,7 @@ def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
             ).delete()
             return
 
+        orphan_page_id = None
         try:
             with transaction.atomic():
                 link = ExternalLink.objects.select_for_update().get(
@@ -830,10 +831,10 @@ def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
                         "Race condition: concurrent call already created postmortem doc for %s",
                         incident.incident_number,
                     )
-                    notion.archive_page(page["id"])
-                    return
-                link.url = page["url"]
-                link.save(update_fields=["url"])
+                    orphan_page_id = page["id"]
+                else:
+                    link.url = page["url"]
+                    link.save(update_fields=["url"])
         except ExternalLink.DoesNotExist:
             logger.warning(
                 "Placeholder deleted before postmortem URL could be saved for %s",
@@ -841,6 +842,18 @@ def _create_postmortem_doc(incident: Incident, channel_id: str) -> None:
             )
             notion.archive_page(page["id"])
             return
+
+        if orphan_page_id:
+            notion.archive_page(orphan_page_id)
+            return
+
+        if notion.template_markdown:
+            content = NotionService._render_template(notion.template_markdown, incident)
+            if not notion._send_markdown(page["id"], content):
+                logger.error(
+                    "Failed to apply postmortem template to page %s",
+                    page["id"],
+                )
 
         try:
             _slack_service.add_bookmark(channel_id, "Postmortem Doc", page["url"])

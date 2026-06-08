@@ -672,6 +672,7 @@ class TestTriggerSlackDump:
         mock_incident.captain = None
         mock_notion_link = MagicMock(url=existing_url)
         mock_notion = MagicMock()
+        mock_slack_service = MagicMock()
 
         with (
             patch(
@@ -684,6 +685,10 @@ class TestTriggerSlackDump:
             ),
             patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
             patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch(
+                "firetower.slack_app.handlers.dumpslack.SlackService",
+                return_value=mock_slack_service,
+            ),
         ):
             mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
                 mock_notion_link,
@@ -696,6 +701,9 @@ class TestTriggerSlackDump:
         call_args = mock_notion.apply_template.call_args
         assert call_args[0][0] == "12345678-1234-1234-1234-123456789abc"
         assert call_args[1]["update_slack"] is True
+        mock_slack_service.add_bookmark.assert_called_once_with(
+            "C123", "Postmortem Doc", existing_url
+        )
         posted = client.chat_postMessage.call_args[1]["text"]
         assert "Updated" in posted
         assert existing_url in posted
