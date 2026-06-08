@@ -175,6 +175,8 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
 
     action = "Created" if notion_page_created else "Updated"
 
+    assert page_id is not None
+
     slack_service = SlackService()
     messages = _get_channel_messages(slack_service, channel_id)
 
