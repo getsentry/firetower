@@ -77,15 +77,6 @@ class LinearConfig:
     project_id: str = ""
     sync_identifiers: bool = False
     api_key: str = ""
-<<<<<<< HEAD
-    action_item_nag_comment_high_priority: str = ""
-    action_item_nag_comment_medium_priority: str = ""
-    action_item_slo_days_high_priority: int = 14
-    action_item_slo_days_medium_priority: int = 28
-||||||| f7852f4
-    action_item_nag_comment_high_priority: str = ""
-    action_item_nag_comment_medium_priority: str = ""
-=======
     action_item_slo_days_high_priority: int = 14
     action_item_slo_days_medium_priority: int = 30
     action_item_nag_comment_high_priority: str = (
@@ -102,7 +93,6 @@ class LinearConfig:
         "days from incident creation. Please prioritize this work or close "
         "out the issue if it is no longer relevant."
     )
->>>>>>> main
 
 
 @deserialize

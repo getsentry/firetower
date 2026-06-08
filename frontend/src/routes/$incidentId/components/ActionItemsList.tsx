@@ -36,6 +36,12 @@ function getSloLabel(deadline: string): {text: string; className: string} | null
       className: 'text-content-danger',
     };
   }
+  if (diffMs <= 0) {
+    return {
+      text: 'due today',
+      className: 'text-content-danger',
+    };
+  }
   if (diffDays <= 3) {
     return {
       text: `${diffDays}d left`,

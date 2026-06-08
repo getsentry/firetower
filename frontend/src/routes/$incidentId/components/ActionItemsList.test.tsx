@@ -129,6 +129,88 @@ describe('ActionItemsList', () => {
     expect(screen.getByText('TEAM-102')).toBeInTheDocument();
   });
 
+  it('shows "due today" when slo_deadline is less than a day overdue', async () => {
+    const halfDayAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+    mockApiGet.mockResolvedValue([
+      {
+        ...mockActionItems[0],
+        slo_deadline: halfDayAgo,
+        status: 'Todo',
+      },
+    ]);
+
+    renderWithProviders(
+      <ActionItemsList
+        incidentId="INC-1"
+        linearUrl="https://linear.app/team/issue/INC-1"
+      />
+    );
+
+    expect(await screen.findByText('due today')).toBeInTheDocument();
+  });
+
+  it('shows overdue label when slo_deadline is more than a day overdue', async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    mockApiGet.mockResolvedValue([
+      {
+        ...mockActionItems[0],
+        slo_deadline: twoDaysAgo,
+        status: 'Todo',
+      },
+    ]);
+
+    renderWithProviders(
+      <ActionItemsList
+        incidentId="INC-1"
+        linearUrl="https://linear.app/team/issue/INC-1"
+      />
+    );
+
+    expect(await screen.findByText(/overdue/)).toBeInTheDocument();
+  });
+
+  it('shows warning-styled days left when slo_deadline is within 3 days', async () => {
+    const twoDaysFromNow = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    mockApiGet.mockResolvedValue([
+      {
+        ...mockActionItems[0],
+        slo_deadline: twoDaysFromNow,
+        status: 'Todo',
+      },
+    ]);
+
+    renderWithProviders(
+      <ActionItemsList
+        incidentId="INC-1"
+        linearUrl="https://linear.app/team/issue/INC-1"
+      />
+    );
+
+    expect(await screen.findByText(/\dd left/)).toBeInTheDocument();
+  });
+
+  it('does not show slo label for terminal action items', async () => {
+    const halfDayAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+    mockApiGet.mockResolvedValue([
+      {
+        ...mockActionItems[0],
+        slo_deadline: halfDayAgo,
+        status: 'Done',
+      },
+    ]);
+
+    renderWithProviders(
+      <ActionItemsList
+        incidentId="INC-1"
+        linearUrl="https://linear.app/team/issue/INC-1"
+      />
+    );
+
+    await screen.findByText('Investigate slow query');
+    expect(screen.queryByText('due today')).not.toBeInTheDocument();
+    expect(screen.queryByText(/overdue/)).not.toBeInTheDocument();
+  });
+
   it('renders fallback when the action items query fails, with header + sync button still visible', async () => {
     mockApiGet.mockRejectedValue(new Error('boom'));
 
