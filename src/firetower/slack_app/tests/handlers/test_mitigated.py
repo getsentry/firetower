@@ -156,14 +156,12 @@ class TestMitigatedModal:
 
 @pytest.mark.django_db
 class TestMitigatedSubmission:
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.mitigated.get_or_create_user_from_slack_id")
     def test_transitions_to_mitigated(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
+        mock_hook,
         user,
         incident,
         impact_type_tag,
@@ -240,14 +238,12 @@ class TestMitigatedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "impact_type_block" in call_kwargs["errors"]
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.mitigated.get_or_create_user_from_slack_id")
     def test_missing_service_tier_succeeds(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
+        mock_hook,
         user,
         incident,
         impact_type_tag,
@@ -267,14 +263,12 @@ class TestMitigatedSubmission:
         assert incident.status == IncidentStatus.MITIGATED
         assert incident.service_tier is None
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.mitigated.get_or_create_user_from_slack_id")
     def test_missing_description_succeeds(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
+        mock_updated_hook,
         user,
         incident,
         impact_type_tag,
@@ -307,14 +301,12 @@ class TestMitigatedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "impact_summary_block" in call_kwargs["errors"]
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.mitigated.get_or_create_user_from_slack_id")
     def test_whitespace_only_description_succeeds(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
+        mock_updated_hook,
         user,
         incident,
         impact_type_tag,

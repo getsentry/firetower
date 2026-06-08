@@ -80,7 +80,10 @@ def handle_mitigated_submission(ack: Any, body: dict, view: dict, client: Any) -
         form, IncidentStatus.MITIGATED, captain_user.email
     )
 
-    serializer = IncidentWriteSerializer(instance=incident, data=data, partial=True)
+    acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
+    serializer = IncidentWriteSerializer(
+        instance=incident, data=data, partial=True, context={"acting_user": acting_user}
+    )
     if not serializer.is_valid():
         logger.error("Mitigated update failed: %s", serializer.errors)
         client.chat_postMessage(

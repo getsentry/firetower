@@ -11,12 +11,8 @@ from rest_framework import serializers
 from firetower.auth.services import get_or_create_user_from_email
 
 from .hooks import (
-    on_captain_changed,
     on_incident_created,
-    on_severity_changed,
-    on_status_changed,
-    on_title_changed,
-    on_visibility_changed,
+    on_incident_updated,
 )
 from .models import (
     USER_ADDABLE_TAG_TYPES,
@@ -625,16 +621,21 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         self._auto_compute_downtime(instance, validated_data)
 
         if settings.HOOKS_ENABLED:
-            if instance.title != old_title:
-                on_title_changed(instance)
-            if instance.status != old_status:
-                on_status_changed(instance, old_status)
-            if instance.severity != old_severity:
-                on_severity_changed(instance, old_severity)
-            if instance.captain_id != old_captain_id:
-                on_captain_changed(instance)
-            if instance.is_private != old_is_private:
-                on_visibility_changed(instance)
+            request = self.context.get("request")
+            actor = self.context.get("acting_user") or (
+                request.user if request else None
+            )
+            on_incident_updated(
+                instance,
+                old_title=old_title if instance.title != old_title else None,
+                old_status=old_status if instance.status != old_status else None,
+                old_severity=old_severity
+                if instance.severity != old_severity
+                else None,
+                captain_changed=instance.captain_id != old_captain_id,
+                visibility_changed=instance.is_private != old_is_private,
+                actor=actor,
+            )
 
         return instance
 

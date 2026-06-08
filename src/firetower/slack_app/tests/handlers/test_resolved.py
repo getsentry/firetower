@@ -188,18 +188,12 @@ def affected_region_tag(db):
 
 @pytest.mark.django_db
 class TestResolvedSubmission:
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_severity_changed")
-    @patch("firetower.incidents.serializers.on_captain_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_p1_goes_to_postmortem(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_captain_hook,
-        mock_sev_hook,
-        mock_status_hook,
+        mock_hook,
         user,
         incident,
         impact_type_tag,
@@ -221,14 +215,12 @@ class TestResolvedSubmission:
         client.chat_postMessage.assert_called_once()
         assert "Postmortem" in client.chat_postMessage.call_args[1]["text"]
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_p4_goes_to_done(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
+        mock_hook,
         user,
         incident,
         impact_type_tag,
@@ -247,14 +239,12 @@ class TestResolvedSubmission:
         incident.refresh_from_db()
         assert incident.status == IncidentStatus.DONE
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_saves_metadata_fields(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
+        mock_hook,
         user,
         incident,
         impact_type_tag,
@@ -289,14 +279,12 @@ class TestResolvedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "captain_block" in call_kwargs["errors"]
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_missing_description_succeeds(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
+        mock_updated_hook,
         user,
         incident,
         impact_type_tag,
@@ -342,14 +330,12 @@ class TestResolvedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "impact_type_block" in call_kwargs["errors"]
 
-    @patch("firetower.incidents.serializers.on_status_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_missing_service_tier_succeeds(
         self,
         mock_get_user,
-        mock_title_hook,
-        mock_status_hook,
+        mock_hook,
         user,
         incident,
         impact_type_tag,

@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
@@ -17,8 +18,12 @@ def handle_subject_command(
         respond("Could not find an incident associated with this channel.")
         return
 
+    acting_user = get_or_create_user_from_slack_id(body.get("user_id", ""))
     serializer = IncidentWriteSerializer(
-        instance=incident, data={"title": new_subject}, partial=True
+        instance=incident,
+        data={"title": new_subject},
+        partial=True,
+        context={"acting_user": acting_user},
     )
     if serializer.is_valid():
         serializer.save()

@@ -37,7 +37,14 @@ COPY frontend/src ./src/
 
 ENV VITE_API_URL="/api"
 
-RUN pnpm run build
+RUN --mount=type=secret,id=sentry_auth_token \
+    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)"; \
+    export SENTRY_AUTH_TOKEN; \
+    if [ -z "$SENTRY_AUTH_TOKEN" ]; then \
+        echo "WARNING: SENTRY_AUTH_TOKEN empty -- skipping source map upload"; \
+    fi; \
+    pnpm run build && \
+    find dist -name '*.map' -delete
 
 FROM nginx:1.29.3-alpine3.22
 

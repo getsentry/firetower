@@ -273,7 +273,10 @@ def handle_update_incident_submission(
         if captain_user:
             data["captain"] = captain_user.email
 
-    serializer = IncidentWriteSerializer(instance=incident, data=data, partial=True)
+    acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
+    serializer = IncidentWriteSerializer(
+        instance=incident, data=data, partial=True, context={"acting_user": acting_user}
+    )
     if not serializer.is_valid():
         logger.error("Incident update validation failed: %s", serializer.errors)
         client.chat_postMessage(
