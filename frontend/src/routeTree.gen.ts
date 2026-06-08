@@ -31,8 +31,8 @@ const IncidentIdIndexRoute = IncidentIdIndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/$incidentId': typeof IncidentIdIndexRoute
-  '/availability': typeof AvailabilityIndexRoute
+  '/$incidentId/': typeof IncidentIdIndexRoute
+  '/availability/': typeof AvailabilityIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -47,7 +47,7 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$incidentId' | '/availability'
+  fullPaths: '/' | '/$incidentId/' | '/availability/'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/$incidentId' | '/availability'
   id: '__root__' | '/' | '/$incidentId/' | '/availability/'
@@ -71,14 +71,14 @@ declare module '@tanstack/react-router' {
     '/availability/': {
       id: '/availability/'
       path: '/availability'
-      fullPath: '/availability'
+      fullPath: '/availability/'
       preLoaderRoute: typeof AvailabilityIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$incidentId/': {
       id: '/$incidentId/'
       path: '/$incidentId'
-      fullPath: '/$incidentId'
+      fullPath: '/$incidentId/'
       preLoaderRoute: typeof IncidentIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
