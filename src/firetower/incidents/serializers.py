@@ -671,7 +671,7 @@ class TagCreateSerializer(serializers.ModelSerializer):
 def _get_action_item_slo_days() -> dict[int, int]:
     linear = getattr(settings, "LINEAR", None) or {}
     high = linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 14)
-    medium = linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 28)
+    medium = linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 30)
     return {1: high, 2: high, 3: medium}
 
 

@@ -146,7 +146,7 @@ describe('ActionItemsList', () => {
       />
     );
 
-    expect(await screen.findByText('1d overdue')).toBeInTheDocument();
+    expect(await screen.findByText('0d overdue')).toBeInTheDocument();
   });
 
   it('shows overdue label when slo_deadline is more than a day overdue', async () => {

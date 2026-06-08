@@ -1305,7 +1305,7 @@ class TestActionItemViews:
         expected_high = (incident.created_at + timedelta(days=14)).isoformat()
         assert items["ENG-1"]["slo_deadline"] == expected_high
 
-        expected_medium = (incident.created_at + timedelta(days=28)).isoformat()
+        expected_medium = (incident.created_at + timedelta(days=30)).isoformat()
         assert items["ENG-2"]["slo_deadline"] == expected_medium
 
         assert items["ENG-3"]["slo_deadline"] is None
