@@ -261,10 +261,10 @@ class NotionService:
                 has_content = bool(existing.get("results"))
             except Exception:
                 logger.warning(
-                    "Failed to check existing content for page %s, skipping template",
+                    "Failed to check existing content for page %s",
                     page_id,
                 )
-                has_content = True
+                raise
             if not has_content:
                 content = self._render_template(self.template_markdown, incident)
                 if not self._send_markdown(page_id, content):

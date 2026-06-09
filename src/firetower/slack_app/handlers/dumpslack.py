@@ -217,9 +217,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         if slack_service.client:
             existing = slack_service.client.bookmarks_list(channel_id=channel_id)
             bookmarks: list[dict[str, Any]] = existing.get("bookmarks", [])
-            has_bookmark = any(
-                b.get("title") == "Postmortem Doc" for b in bookmarks
-            )
+            has_bookmark = any(b.get("title") == "Postmortem Doc" for b in bookmarks)
             if not has_bookmark:
                 slack_service.add_bookmark(channel_id, "Postmortem Doc", page_url)
     except Exception:

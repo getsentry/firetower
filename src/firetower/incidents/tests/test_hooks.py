@@ -2869,11 +2869,16 @@ class TestCreatePostmortemDoc:
             title="Test",
             severity=IncidentSeverity.P1,
         )
-        ExternalLink.objects.filter(
-            incident=incident, type=ExternalLinkType.NOTION
-        ).delete()
 
-        _create_postmortem_doc(incident, "C99999")
+        original_save = ExternalLink.save
+
+        def save_raises_on_url_update(self, *args, **kwargs):
+            if kwargs.get("update_fields") == ["url"]:
+                raise RuntimeError("simulated db error")
+            return original_save(self, *args, **kwargs)
+
+        with patch.object(ExternalLink, "save", save_raises_on_url_update):
+            _create_postmortem_doc(incident, "C99999")
 
         assert not ExternalLink.objects.filter(
             incident=incident, type=ExternalLinkType.NOTION
