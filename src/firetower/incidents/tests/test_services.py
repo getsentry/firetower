@@ -431,11 +431,17 @@ class TestUpdateParentIssueStatus:
             "started": "state-started",
             "completed": "state-completed",
         }
+        svc.update_issue.return_value = True
         return svc
 
     @pytest.fixture(autouse=True)
     def _linear_settings(self, settings):
-        settings.LINEAR = {"TEAM_ID": "team-1", "API_KEY": "key"}
+        settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "API_KEY": "key",
+            "PARENT_STATUS_COMMENT_COMPLETED": "completed comment",
+            "PARENT_STATUS_COMMENT_STARTED": "started comment",
+        }
 
     def test_active_incident_no_action_items_sets_started(self):
         incident = self._make_incident(status=IncidentStatus.ACTIVE)
@@ -444,6 +450,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+        svc.create_comment.assert_called_once()
 
     def test_active_incident_all_items_done_sets_started(self):
         incident = self._make_incident(status=IncidentStatus.ACTIVE)
@@ -460,6 +467,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+        svc.create_comment.assert_called_once()
 
     def test_done_incident_no_action_items_sets_completed(self):
         incident = self._make_incident(status=IncidentStatus.DONE)
@@ -468,6 +476,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+        svc.create_comment.assert_called_once()
 
     def test_done_incident_all_items_done_sets_completed(self):
         incident = self._make_incident(status=IncidentStatus.DONE)
@@ -492,6 +501,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+        svc.create_comment.assert_called_once()
 
     def test_done_incident_incomplete_items_sets_started(self):
         incident = self._make_incident(status=IncidentStatus.DONE)
@@ -516,6 +526,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+        svc.create_comment.assert_called_once()
 
     def test_mitigated_incident_all_items_done_sets_started(self):
         incident = self._make_incident(status=IncidentStatus.MITIGATED)
@@ -532,6 +543,17 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+        svc.create_comment.assert_called_once()
+
+    def test_update_issue_failure_skips_comment(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = self._make_linear_service()
+        svc.update_issue.return_value = False
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+        svc.create_comment.assert_not_called()
 
 
 @pytest.mark.django_db
