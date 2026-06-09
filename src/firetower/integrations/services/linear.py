@@ -140,6 +140,7 @@ class LinearService:
         for attempt in range(LINEAR_MAX_RETRIES):
             is_last_attempt = attempt == LINEAR_MAX_RETRIES - 1
             try:
+                assert access_token is not None
                 response = self._make_graphql_request(query, variables, access_token)
 
                 if response.status_code == 401:
