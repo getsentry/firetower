@@ -62,10 +62,7 @@ function ActionItemCard({item}: {item: ActionItem}) {
   );
 }
 
-function buildLinearCreateUrl(
-  linearUrl: string,
-  parentIssueId: string
-): string | null {
+function buildLinearCreateUrl(linearUrl: string, parentIssueId: string): string | null {
   try {
     const url = new URL(linearUrl);
     const workspace = url.pathname.split('/')[1];
