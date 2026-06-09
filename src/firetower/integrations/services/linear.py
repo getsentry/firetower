@@ -37,8 +37,8 @@ TOKEN_REFRESH_BUFFER = timedelta(days=1)
 # exponential backoff before giving up, so brief upstream blips don't surface
 # as errors.
 LINEAR_RETRYABLE_STATUS_CODES = frozenset({502, 503, 504})
-LINEAR_MAX_RETRIES = 3
-LINEAR_RETRY_BACKOFF_SECONDS = 1.0
+LINEAR_DEFAULT_MAX_RETRIES = 3
+LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS = 1.0
 
 ISSUE_FIELDS = """
     id
@@ -62,6 +62,12 @@ class LinearService:
         self.client_id = settings.LINEAR.get("CLIENT_ID")
         self.client_secret = settings.LINEAR.get("CLIENT_SECRET")
         self.api_key = settings.LINEAR.get("API_KEY")
+        self.max_retries: int = settings.LINEAR.get(
+            "MAX_RETRIES", LINEAR_DEFAULT_MAX_RETRIES
+        )
+        self.retry_backoff_seconds: float = settings.LINEAR.get(
+            "RETRY_BACKOFF_SECONDS", LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS
+        )
         self._workflow_states_cache: dict[str, str] | None = None
 
     def _request_new_token(self) -> str | None:
@@ -142,7 +148,7 @@ class LinearService:
             )
             return None
 
-        max_attempts = LINEAR_MAX_RETRIES if retryable else 1
+        max_attempts = self.max_retries if retryable else 1
         for attempt in range(max_attempts):
             is_last_attempt = attempt == max_attempts - 1
             try:
@@ -199,9 +205,8 @@ class LinearService:
 
         return None
 
-    @staticmethod
-    def _sleep_before_retry(attempt: int) -> None:
-        time.sleep(LINEAR_RETRY_BACKOFF_SECONDS * (2**attempt))
+    def _sleep_before_retry(self, attempt: int) -> None:
+        time.sleep(self.retry_backoff_seconds * (2**attempt))
 
     def _parse_issue(
         self, issue: dict[str, Any], relation_type: str = "child"

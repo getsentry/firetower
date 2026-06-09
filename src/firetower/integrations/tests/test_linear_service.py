@@ -6,7 +6,8 @@ import requests
 from django.utils import timezone
 
 from firetower.integrations.services.linear import (
-    LINEAR_MAX_RETRIES,
+    LINEAR_DEFAULT_MAX_RETRIES,
+    LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS,
     LINEAR_TOKEN_URL,
     LinearService,
 )
@@ -269,8 +270,8 @@ class TestGraphql:
             result = linear_service._graphql("query { viewer { id } }")
 
         assert result is None
-        assert mock_request.call_count == LINEAR_MAX_RETRIES
-        assert mock_sleep.call_count == LINEAR_MAX_RETRIES - 1
+        assert mock_request.call_count == LINEAR_DEFAULT_MAX_RETRIES
+        assert mock_sleep.call_count == LINEAR_DEFAULT_MAX_RETRIES - 1
 
     def test_retries_on_request_exception(self, linear_service):
         success_response = MagicMock()
@@ -315,8 +316,8 @@ class TestGraphql:
             result = linear_service._graphql("query { viewer { id } }")
 
         assert result is None
-        assert mock_request.call_count == LINEAR_MAX_RETRIES
-        assert mock_sleep.call_count == LINEAR_MAX_RETRIES - 1
+        assert mock_request.call_count == LINEAR_DEFAULT_MAX_RETRIES
+        assert mock_sleep.call_count == LINEAR_DEFAULT_MAX_RETRIES - 1
 
     def test_no_retry_when_retryable_is_false(self, linear_service):
         transient_response = MagicMock()
@@ -364,6 +365,67 @@ class TestGraphql:
         assert result is None
         assert mock_request.call_count == 1
         mock_sleep.assert_not_called()
+
+    def test_respects_configured_max_retries(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "id",
+                "CLIENT_SECRET": "secret",
+                "MAX_RETRIES": 5,
+            }
+            svc = LinearService()
+
+        assert svc.max_retries == 5
+
+        transient_response = MagicMock()
+        transient_response.status_code = 502
+        transient_response.ok = False
+        transient_response.text = "Bad Gateway"
+
+        with (
+            patch.object(svc, "_get_access_token", return_value="valid-token"),
+            patch.object(
+                svc,
+                "_make_graphql_request",
+                return_value=transient_response,
+            ) as mock_request,
+            patch.object(svc, "_sleep_before_retry") as mock_sleep,
+        ):
+            result = svc._graphql("query { viewer { id } }")
+
+        assert result is None
+        assert mock_request.call_count == 5
+        assert mock_sleep.call_count == 4
+
+    def test_respects_configured_retry_backoff_seconds(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "id",
+                "CLIENT_SECRET": "secret",
+                "RETRY_BACKOFF_SECONDS": 0.5,
+            }
+            svc = LinearService()
+
+        assert svc.retry_backoff_seconds == 0.5
+
+        with patch("firetower.integrations.services.linear.time.sleep") as mock_sleep:
+            svc._sleep_before_retry(0)
+            mock_sleep.assert_called_once_with(0.5)
+
+            mock_sleep.reset_mock()
+            svc._sleep_before_retry(2)
+            mock_sleep.assert_called_once_with(2.0)
+
+    def test_uses_defaults_when_config_not_provided(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "id",
+                "CLIENT_SECRET": "secret",
+            }
+            svc = LinearService()
+
+        assert svc.max_retries == LINEAR_DEFAULT_MAX_RETRIES
+        assert svc.retry_backoff_seconds == LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS
 
 
 class TestParseIssue:
