@@ -10,6 +10,7 @@ from django_q.models import Schedule
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
     DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
+    _create_postmortem_doc,
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_users,
@@ -2677,6 +2678,344 @@ class TestOnIncidentCreatedTroubleshootingDoc:
         on_incident_created(incident)
 
         mock_create_ts.assert_called_once_with(incident, "C99999")
+
+
+@pytest.mark.django_db
+class TestCreatePostmortemDoc:
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_for_private_incident(self, mock_slack, mock_notion_cls):
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_notion_cls.from_settings.return_value = mock_service
+        incident = Incident.objects.create(
+            title="Sensitive",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        mock_service.create_postmortem_page.assert_not_called()
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION
+        ).exists()
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_creates_doc_and_adds_bookmark_without_message(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_postmortem_page.return_value = {
+            "id": "page-456",
+            "url": "https://notion.so/page-456",
+        }
+        mock_notion_cls.from_settings.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        mock_service.create_postmortem_page.assert_called_once_with(
+            incident_number=incident.incident_number,
+            incident_title=incident.title,
+            incident_url=f"https://firetower.example.com/{incident.incident_number}",
+            incident_date=incident.created_at,
+            severity=incident.severity,
+            captain_email=None,
+        )
+        link = ExternalLink.objects.get(incident=incident, type=ExternalLinkType.NOTION)
+        assert link.url == "https://notion.so/page-456"
+
+        bookmark_calls = [
+            c
+            for c in mock_slack.add_bookmark.call_args_list
+            if c[0][1] == "Postmortem Doc"
+        ]
+        assert len(bookmark_calls) == 1
+        assert bookmark_calls[0][0][2] == "https://notion.so/page-456"
+
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_when_not_configured(self, mock_slack, mock_notion_cls):
+        mock_notion_cls.is_configured.return_value = False
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        mock_notion_cls.from_settings.assert_not_called()
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION
+        ).exists()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_idempotent_when_link_exists(self, mock_slack, mock_notion_cls, settings):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_notion_cls.from_settings.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.NOTION,
+            url="https://notion.so/existing",
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        mock_service.create_postmortem_page.assert_not_called()
+        link = ExternalLink.objects.get(incident=incident, type=ExternalLinkType.NOTION)
+        assert link.url == "https://notion.so/existing"
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_when_placeholder_exists(self, mock_slack, mock_notion_cls, settings):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_notion_cls.from_settings.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.NOTION,
+            url="",
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        mock_service.create_postmortem_page.assert_not_called()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_deletes_placeholder_when_api_returns_no_url(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_postmortem_page.return_value = {"id": "page-456"}
+        mock_notion_cls.from_settings.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION
+        ).exists()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_api_error_cleans_up_placeholder(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_postmortem_page.side_effect = RuntimeError("boom")
+        mock_notion_cls.from_settings.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION
+        ).exists()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_db_error_archives_orphan_notion_page(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_postmortem_page.return_value = {
+            "id": "orphan-page-id",
+            "url": "https://notion.so/orphan-page",
+        }
+        mock_notion_cls.from_settings.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        original_save = ExternalLink.save
+
+        def save_raises_on_url_update(self, *args, **kwargs):
+            if kwargs.get("update_fields") == ["url"]:
+                raise RuntimeError("simulated db error")
+            return original_save(self, *args, **kwargs)
+
+        with patch.object(ExternalLink, "save", save_raises_on_url_update):
+            _create_postmortem_doc(incident, "C99999")
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION
+        ).exists()
+        mock_service.archive_page.assert_called_once_with("orphan-page-id")
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_bookmark_failure_does_not_propagate(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_service.create_postmortem_page.return_value = {
+            "id": "page-456",
+            "url": "https://notion.so/page-456",
+        }
+        mock_notion_cls.from_settings.return_value = mock_service
+        mock_slack.add_bookmark.side_effect = RuntimeError("bookmark boom")
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        link = ExternalLink.objects.get(incident=incident, type=ExternalLinkType.NOTION)
+        assert link.url == "https://notion.so/page-456"
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_when_notion_service_returns_none(self, mock_slack, mock_notion_cls):
+        mock_notion_cls.is_configured.return_value = True
+        mock_notion_cls.from_settings.return_value = None
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        assert not ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.NOTION
+        ).exists()
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_race_loser_archives_orphan_page(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_notion_cls.from_settings.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        def create_page_and_simulate_winner(**kwargs):
+            ExternalLink.objects.filter(
+                incident=incident, type=ExternalLinkType.NOTION, url=""
+            ).update(url="https://notion.so/winner-page")
+            return {"id": "orphan-page", "url": "https://notion.so/orphan-page"}
+
+        mock_service.create_postmortem_page.side_effect = (
+            create_page_and_simulate_winner
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        mock_service.archive_page.assert_called_once_with("orphan-page")
+        link = ExternalLink.objects.get(incident=incident, type=ExternalLinkType.NOTION)
+        assert link.url == "https://notion.so/winner-page"
+
+    @patch("firetower.incidents.hooks.NotionService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_archives_page_when_placeholder_deleted(
+        self, mock_slack, mock_notion_cls, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_notion_cls.is_configured.return_value = True
+        mock_service = MagicMock()
+        mock_notion_cls.from_settings.return_value = mock_service
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+        )
+
+        def create_page_and_delete_placeholder(**kwargs):
+            ExternalLink.objects.filter(
+                incident=incident, type=ExternalLinkType.NOTION, url=""
+            ).delete()
+            return {"id": "orphan-page", "url": "https://notion.so/orphan-page"}
+
+        mock_service.create_postmortem_page.side_effect = (
+            create_page_and_delete_placeholder
+        )
+
+        _create_postmortem_doc(incident, "C99999")
+
+        mock_service.archive_page.assert_called_once_with("orphan-page")
+
+
+@pytest.mark.django_db
+class TestOnIncidentCreatedPostmortemDoc:
+    @patch("firetower.incidents.hooks._create_postmortem_doc")
+    @patch("firetower.incidents.hooks._create_troubleshooting_doc")
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_creates_postmortem_doc(
+        self,
+        mock_slack,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+        mock_create_ts,
+        mock_create_pm,
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Production is down",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        mock_create_pm.assert_called_once_with(incident, "C99999")
 
 
 @pytest.mark.django_db

@@ -1,6 +1,7 @@
 import logging
 import re
 import threading
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -48,8 +49,8 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
 
     page_id: str | None = None
     page_url: str = ""
-    update_slack: bool = False
     notion_page_created: bool = False
+    created_page_id: str | None = None
 
     try:
         with transaction.atomic():
@@ -61,6 +62,36 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                 )
             )
             existing_url = notion_link.url
+
+        # Another process (e.g. _create_postmortem_doc) may have claimed the
+        # placeholder row but not yet saved the Notion URL. Wait for it.
+        if not db_record_created and not existing_url:
+            for _ in range(15):
+                time.sleep(1)
+                try:
+                    notion_link.refresh_from_db()
+                except ExternalLink.DoesNotExist:
+                    break
+                if notion_link.url:
+                    existing_url = notion_link.url
+                    break
+
+            if not existing_url:
+                # Placeholder was deleted (creation failed) or timed out
+                # (process crashed without cleanup). Re-acquire under lock
+                # so we can take over an orphaned placeholder or create a
+                # fresh row.
+                with transaction.atomic():
+                    notion_link, db_record_created = (
+                        ExternalLink.objects.select_for_update().get_or_create(
+                            incident=incident,
+                            type=ExternalLinkType.NOTION,
+                            defaults={"url": ""},
+                        )
+                    )
+                    existing_url = notion_link.url
+                    if not db_record_created and not existing_url:
+                        db_record_created = True
 
         # Notion API calls happen outside the transaction to avoid holding the
         # SELECT FOR UPDATE lock while making slow external requests.
@@ -79,7 +110,6 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                     )
                 return
             page_url = existing_url
-            update_slack = True
         else:
             base_url = settings.FIRETOWER_BASE_URL
             incident_url = f"{base_url}/{incident.incident_number}"
@@ -94,9 +124,12 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
             )
             page_id = page["id"]
             page_url = page["url"]
+            created_page_id = page["id"]
             # Re-acquire lock before saving to detect concurrent callers that
-            # also saw url="" and raced to create a page. The loser exits here;
-            # the winner's URL and apply_template call stand.
+            # also saw url="" and raced to create a page. The loser adopts the
+            # winner's page so apply_template still populates it.
+            orphan_page_id = page["id"]
+            race_lost = False
             with transaction.atomic():
                 notion_link = ExternalLink.objects.select_for_update().get(
                     incident=incident,
@@ -107,15 +140,34 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                         "Race condition: concurrent call already created Notion page for %s",
                         incident.incident_number,
                     )
+                    race_lost = True
+                    page_id = _extract_notion_page_id(notion_link.url)
+                    page_url = notion_link.url
+                else:
+                    notion_link.url = page_url
+                    notion_link.save(update_fields=["url"])
+                    notion_page_created = True
+            if race_lost:
+                notion.archive_page(orphan_page_id)
+                if not page_id:
                     return
-                notion_link.url = page_url
-                notion_link.save(update_fields=["url"])
-            notion_page_created = True
     except Exception:
         logger.exception(
             "Failed to create Notion postmortem page for %s",
             incident.incident_number,
         )
+        if created_page_id and not notion_page_created:
+            try:
+                notion.archive_page(created_page_id)
+            except Exception:
+                logger.exception(
+                    "Failed to archive orphaned Notion page %s", created_page_id
+                )
+        ExternalLink.objects.filter(
+            incident=incident,
+            type=ExternalLinkType.NOTION,
+            url="",
+        ).delete()
         try:
             client.chat_postMessage(
                 channel=channel_id,
@@ -129,13 +181,13 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
 
     action = "Created" if notion_page_created else "Updated"
 
+    assert page_id is not None
+
     slack_service = SlackService()
     messages = _get_channel_messages(slack_service, channel_id)
 
     try:
-        notion.apply_template(
-            page_id, messages, update_slack=update_slack, incident=incident
-        )
+        notion.apply_template(page_id, messages, incident=incident)
     except Exception:
         logger.exception("Failed to populate Notion page %s", page_id)
         try:
@@ -161,11 +213,15 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
     except Exception:
         logger.exception("Failed to add AI timeline to Notion page %s", page_id)
 
-    if notion_page_created:
-        try:
-            slack_service.add_bookmark(channel_id, "Postmortem Doc", page_url)
-        except Exception:
-            logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
+    try:
+        if slack_service.client:
+            existing = slack_service.client.bookmarks_list(channel_id=channel_id)
+            bookmarks: list[dict[str, Any]] = existing.get("bookmarks", [])
+            has_bookmark = any(b.get("title") == "Postmortem Doc" for b in bookmarks)
+            if not has_bookmark:
+                slack_service.add_bookmark(channel_id, "Postmortem Doc", page_url)
+    except Exception:
+        logger.exception("Failed to add Notion bookmark to channel %s", channel_id)
 
     try:
         client.chat_postMessage(
