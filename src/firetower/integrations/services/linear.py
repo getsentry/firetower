@@ -129,7 +129,12 @@ class LinearService:
             timeout=30,
         )
 
-    def _graphql(self, query: str, variables: dict | None = None) -> dict | None:
+    def _graphql(
+        self,
+        query: str,
+        variables: dict | None = None,
+        retryable: bool = True,
+    ) -> dict | None:
         access_token = self._get_access_token()
         if not access_token:
             logger.warning(
@@ -137,8 +142,9 @@ class LinearService:
             )
             return None
 
-        for attempt in range(LINEAR_MAX_RETRIES):
-            is_last_attempt = attempt == LINEAR_MAX_RETRIES - 1
+        max_attempts = LINEAR_MAX_RETRIES if retryable else 1
+        for attempt in range(max_attempts):
+            is_last_attempt = attempt == max_attempts - 1
             try:
                 assert access_token is not None
                 response = self._make_graphql_request(query, variables, access_token)
@@ -159,7 +165,6 @@ class LinearService:
                         query, variables, access_token
                     )
 
-                # Retry transient gateway errors before giving up.
                 if (
                     response.status_code in LINEAR_RETRYABLE_STATUS_CODES
                     and not is_last_attempt
@@ -186,7 +191,6 @@ class LinearService:
 
                 return data.get("data")
             except requests.RequestException:
-                # Retry transient network errors (timeouts, dropped connections).
                 if not is_last_attempt:
                     self._sleep_before_retry(attempt)
                     continue
@@ -288,7 +292,7 @@ class LinearService:
         if assignee_id:
             input_data["assigneeId"] = assignee_id
 
-        data = self._graphql(mutation, {"input": input_data})
+        data = self._graphql(mutation, {"input": input_data}, retryable=False)
         if not data:
             return None
 
@@ -319,6 +323,7 @@ class LinearService:
         data = self._graphql(
             mutation,
             {"input": {"issueId": issue_id, "url": url, "title": title}},
+            retryable=False,
         )
         if not data:
             return False
@@ -336,6 +341,7 @@ class LinearService:
         data = self._graphql(
             mutation,
             {"input": {"issueId": issue_id, "body": body}},
+            retryable=False,
         )
         if not data:
             return False
@@ -370,7 +376,9 @@ class LinearService:
         if not input_data:
             return True
 
-        data = self._graphql(mutation, {"id": issue_id, "input": input_data})
+        data = self._graphql(
+            mutation, {"id": issue_id, "input": input_data}, retryable=False
+        )
         if not data:
             return False
 
