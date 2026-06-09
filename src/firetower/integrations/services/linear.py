@@ -201,6 +201,7 @@ class LinearService:
             "identifier": issue["identifier"],
             "title": issue["title"],
             "url": issue["url"],
+            "state_type": (issue.get("state") or {}).get("type", ""),
         }
 
     def get_user_by_email(self, email: str) -> dict[str, str] | None:
