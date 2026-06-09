@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
+from jinja2 import Environment, TemplateError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import (
@@ -185,6 +186,50 @@ def _resolve_assignees(
 
 COMPLETED_STATUSES = {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
 
+_PARENT_STATUS_TEMPLATE_ENV = Environment(autoescape=False)
+
+
+def _comment_parent_issue_status_change(
+    incident: Incident,
+    linear_service: LinearService,
+    target_state: str,
+    statuses: list[str],
+) -> None:
+    if not settings.LINEAR or not incident.linear_parent_issue_id:
+        return
+
+    template_key = (
+        "PARENT_STATUS_COMMENT_COMPLETED"
+        if target_state == "completed"
+        else "PARENT_STATUS_COMMENT_STARTED"
+    )
+    template_source = settings.LINEAR.get(template_key, "")
+    if not template_source or not template_source.strip():
+        return
+
+    completed_action_items = sum(
+        1 for s in statuses if s in {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
+    )
+    try:
+        comment = _PARENT_STATUS_TEMPLATE_ENV.from_string(template_source).render(
+            incident=incident,
+            total_action_items=len(statuses),
+            completed_action_items=completed_action_items,
+            target_state=target_state,
+        )
+    except TemplateError:
+        logger.exception(
+            f"Failed to render parent status comment template for incident {incident.id}"
+        )
+        return
+
+    try:
+        linear_service.create_comment(incident.linear_parent_issue_id, comment)
+    except Exception:
+        logger.exception(
+            f"Failed to post parent status comment for incident {incident.id}"
+        )
+
 
 def _update_parent_issue_status(
     incident: Incident, linear_service: LinearService
@@ -207,8 +252,12 @@ def _update_parent_issue_status(
 
     target_state = "completed" if all_complete else "started"
     state_id = states.get(target_state)
-    if state_id:
-        linear_service.update_issue(incident.linear_parent_issue_id, state_id=state_id)
+    if state_id and linear_service.update_issue(
+        incident.linear_parent_issue_id, state_id=state_id
+    ):
+        _comment_parent_issue_status_change(
+            incident, linear_service, target_state, statuses
+        )
 
 
 def _sync_parent_assignee(incident: Incident, linear_service: LinearService) -> None:
