@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -32,6 +33,13 @@ LINEAR_RELATION_TYPE_MAP = {
 TOKEN_LIFETIME = timedelta(days=30)
 TOKEN_REFRESH_BUFFER = timedelta(days=1)
 
+# Transient failures (timeouts, gateway errors) from Linear are retried with
+# exponential backoff before giving up, so brief upstream blips don't surface
+# as errors.
+LINEAR_RETRYABLE_STATUS_CODES = frozenset({502, 503, 504})
+LINEAR_DEFAULT_MAX_RETRIES = 3
+LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS = 1.0
+
 ISSUE_FIELDS = """
     id
     identifier
@@ -54,6 +62,12 @@ class LinearService:
         self.client_id = settings.LINEAR.get("CLIENT_ID")
         self.client_secret = settings.LINEAR.get("CLIENT_SECRET")
         self.api_key = settings.LINEAR.get("API_KEY")
+        self.max_retries: int = max(
+            1, settings.LINEAR.get("MAX_RETRIES", LINEAR_DEFAULT_MAX_RETRIES)
+        )
+        self.retry_backoff_seconds: float = settings.LINEAR.get(
+            "RETRY_BACKOFF_SECONDS", LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS
+        )
         self._workflow_states_cache: dict[str, str] | None = None
 
     def _request_new_token(self) -> str | None:
@@ -121,7 +135,12 @@ class LinearService:
             timeout=30,
         )
 
-    def _graphql(self, query: str, variables: dict | None = None) -> dict | None:
+    def _graphql(
+        self,
+        query: str,
+        variables: dict | None = None,
+        retryable: bool = True,
+    ) -> dict | None:
         access_token = self._get_access_token()
         if not access_token:
             logger.warning(
@@ -129,42 +148,65 @@ class LinearService:
             )
             return None
 
-        try:
-            response = self._make_graphql_request(query, variables, access_token)
+        max_attempts = self.max_retries if retryable else 1
+        for attempt in range(max_attempts):
+            is_last_attempt = attempt == max_attempts - 1
+            try:
+                assert access_token is not None
+                response = self._make_graphql_request(query, variables, access_token)
 
-            if response.status_code == 401:
-                if self.api_key:
+                if response.status_code == 401:
+                    if self.api_key:
+                        logger.error(
+                            "Linear API returned 401 with api_key — key is invalid or expired"
+                        )
+                        return None
+
+                    logger.info("Linear token expired, requesting new token")
+                    access_token = self._request_new_token()
+                    if not access_token:
+                        return None
+
+                    response = self._make_graphql_request(
+                        query, variables, access_token
+                    )
+
+                if (
+                    response.status_code in LINEAR_RETRYABLE_STATUS_CODES
+                    and not is_last_attempt
+                ):
+                    self._sleep_before_retry(attempt)
+                    continue
+
+                if not response.ok:
                     logger.error(
-                        "Linear API returned 401 with api_key — key is invalid or expired"
+                        "Linear API returned %d: %s",
+                        response.status_code,
+                        response.text,
                     )
                     return None
 
-                logger.info("Linear token expired, requesting new token")
-                access_token = self._request_new_token()
-                if not access_token:
+                data = response.json()
+
+                if "errors" in data:
+                    logger.error(
+                        "Linear GraphQL errors",
+                        extra={"errors": data["errors"]},
+                    )
                     return None
 
-                response = self._make_graphql_request(query, variables, access_token)
-
-            if not response.ok:
-                logger.error(
-                    "Linear API returned %d: %s", response.status_code, response.text
-                )
+                return data.get("data")
+            except requests.RequestException:
+                if not is_last_attempt:
+                    self._sleep_before_retry(attempt)
+                    continue
+                logger.exception("Linear API request failed")
                 return None
 
-            data = response.json()
+        return None
 
-            if "errors" in data:
-                logger.error(
-                    "Linear GraphQL errors",
-                    extra={"errors": data["errors"]},
-                )
-                return None
-
-            return data.get("data")
-        except requests.RequestException:
-            logger.exception("Linear API request failed")
-            return None
+    def _sleep_before_retry(self, attempt: int) -> None:
+        time.sleep(self.retry_backoff_seconds * (2**attempt))
 
     def _parse_issue(
         self, issue: dict[str, Any], relation_type: str = "child"
@@ -255,7 +297,7 @@ class LinearService:
         if assignee_id:
             input_data["assigneeId"] = assignee_id
 
-        data = self._graphql(mutation, {"input": input_data})
+        data = self._graphql(mutation, {"input": input_data}, retryable=False)
         if not data:
             return None
 
@@ -286,6 +328,7 @@ class LinearService:
         data = self._graphql(
             mutation,
             {"input": {"issueId": issue_id, "url": url, "title": title}},
+            retryable=False,
         )
         if not data:
             return False
@@ -303,6 +346,7 @@ class LinearService:
         data = self._graphql(
             mutation,
             {"input": {"issueId": issue_id, "body": body}},
+            retryable=False,
         )
         if not data:
             return False
@@ -337,7 +381,9 @@ class LinearService:
         if not input_data:
             return True
 
-        data = self._graphql(mutation, {"id": issue_id, "input": input_data})
+        data = self._graphql(
+            mutation, {"id": issue_id, "input": input_data}, retryable=False
+        )
         if not data:
             return False
 
