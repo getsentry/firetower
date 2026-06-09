@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -31,6 +32,13 @@ LINEAR_RELATION_TYPE_MAP = {
 
 TOKEN_LIFETIME = timedelta(days=30)
 TOKEN_REFRESH_BUFFER = timedelta(days=1)
+
+# Transient failures (timeouts, gateway errors) from Linear are retried with
+# exponential backoff before giving up, so brief upstream blips don't surface
+# as errors.
+LINEAR_RETRYABLE_STATUS_CODES = frozenset({502, 503, 504})
+LINEAR_MAX_RETRIES = 3
+LINEAR_RETRY_BACKOFF_SECONDS = 1.0
 
 ISSUE_FIELDS = """
     id
@@ -129,42 +137,66 @@ class LinearService:
             )
             return None
 
-        try:
-            response = self._make_graphql_request(query, variables, access_token)
+        for attempt in range(LINEAR_MAX_RETRIES):
+            is_last_attempt = attempt == LINEAR_MAX_RETRIES - 1
+            try:
+                response = self._make_graphql_request(query, variables, access_token)
 
-            if response.status_code == 401:
-                if self.api_key:
+                if response.status_code == 401:
+                    if self.api_key:
+                        logger.error(
+                            "Linear API returned 401 with api_key — key is invalid or expired"
+                        )
+                        return None
+
+                    logger.info("Linear token expired, requesting new token")
+                    access_token = self._request_new_token()
+                    if not access_token:
+                        return None
+
+                    response = self._make_graphql_request(
+                        query, variables, access_token
+                    )
+
+                # Retry transient gateway errors before giving up.
+                if (
+                    response.status_code in LINEAR_RETRYABLE_STATUS_CODES
+                    and not is_last_attempt
+                ):
+                    self._sleep_before_retry(attempt)
+                    continue
+
+                if not response.ok:
                     logger.error(
-                        "Linear API returned 401 with api_key — key is invalid or expired"
+                        "Linear API returned %d: %s",
+                        response.status_code,
+                        response.text,
                     )
                     return None
 
-                logger.info("Linear token expired, requesting new token")
-                access_token = self._request_new_token()
-                if not access_token:
+                data = response.json()
+
+                if "errors" in data:
+                    logger.error(
+                        "Linear GraphQL errors",
+                        extra={"errors": data["errors"]},
+                    )
                     return None
 
-                response = self._make_graphql_request(query, variables, access_token)
-
-            if not response.ok:
-                logger.error(
-                    "Linear API returned %d: %s", response.status_code, response.text
-                )
+                return data.get("data")
+            except requests.RequestException:
+                # Retry transient network errors (timeouts, dropped connections).
+                if not is_last_attempt:
+                    self._sleep_before_retry(attempt)
+                    continue
+                logger.exception("Linear API request failed")
                 return None
 
-            data = response.json()
+        return None
 
-            if "errors" in data:
-                logger.error(
-                    "Linear GraphQL errors",
-                    extra={"errors": data["errors"]},
-                )
-                return None
-
-            return data.get("data")
-        except requests.RequestException:
-            logger.exception("Linear API request failed")
-            return None
+    @staticmethod
+    def _sleep_before_retry(attempt: int) -> None:
+        time.sleep(LINEAR_RETRY_BACKOFF_SECONDS * (2**attempt))
 
     def _parse_issue(
         self, issue: dict[str, Any], relation_type: str = "child"

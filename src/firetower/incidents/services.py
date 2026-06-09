@@ -256,7 +256,7 @@ def sync_action_items_from_linear(
     children = linear_service.get_child_issues(parent_id)
     if children is None:
         error_msg = f"Failed to fetch child issues for incident {incident.id}"
-        logger.error(error_msg)
+        logger.warning(error_msg)
         stats.errors.append(error_msg)
         incident.action_items_last_synced_at = timezone.now()
         incident.save(update_fields=["action_items_last_synced_at"])
@@ -265,7 +265,7 @@ def sync_action_items_from_linear(
     related = linear_service.get_related_issues(parent_id)
     if related is None:
         error_msg = f"Failed to fetch related issues for incident {incident.id}"
-        logger.error(error_msg)
+        logger.warning(error_msg)
         stats.errors.append(error_msg)
         incident.action_items_last_synced_at = timezone.now()
         incident.save(update_fields=["action_items_last_synced_at"])
