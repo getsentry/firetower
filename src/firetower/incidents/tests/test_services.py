@@ -425,13 +425,14 @@ class TestUpdateParentIssueStatus:
             linear_parent_issue_id="lin-123",
         )
 
-    def _make_linear_service(self):
+    def _make_linear_service(self, current_state_type="unstarted"):
         svc = MagicMock()
         svc.get_workflow_states.return_value = {
             "started": "state-started",
             "completed": "state-completed",
         }
         svc.update_issue.return_value = True
+        svc.get_issue.return_value = {"state_type": current_state_type}
         return svc
 
     @pytest.fixture(autouse=True)
@@ -554,6 +555,34 @@ class TestUpdateParentIssueStatus:
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
         svc.create_comment.assert_not_called()
+
+    def test_skips_update_when_already_in_target_state(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        svc = self._make_linear_service(current_state_type="started")
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_not_called()
+        svc.create_comment.assert_not_called()
+
+    def test_updates_when_in_different_state(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = self._make_linear_service(current_state_type="started")
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+        svc.create_comment.assert_called_once()
+
+    def test_updates_when_get_issue_fails(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        svc = self._make_linear_service()
+        svc.get_issue.return_value = None
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+        svc.create_comment.assert_called_once()
 
 
 @pytest.mark.django_db

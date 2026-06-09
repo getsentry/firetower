@@ -251,6 +251,11 @@ def _update_parent_issue_status(
         return
 
     target_state = "completed" if all_complete else "started"
+
+    parent_issue = linear_service.get_issue(incident.linear_parent_issue_id)
+    if parent_issue and parent_issue.get("state_type") == target_state:
+        return
+
     state_id = states.get(target_state)
     if state_id and linear_service.update_issue(
         incident.linear_parent_issue_id, state_id=state_id
