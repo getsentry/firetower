@@ -62,8 +62,8 @@ class LinearService:
         self.client_id = settings.LINEAR.get("CLIENT_ID")
         self.client_secret = settings.LINEAR.get("CLIENT_SECRET")
         self.api_key = settings.LINEAR.get("API_KEY")
-        self.max_retries: int = settings.LINEAR.get(
-            "MAX_RETRIES", LINEAR_DEFAULT_MAX_RETRIES
+        self.max_retries: int = max(
+            1, settings.LINEAR.get("MAX_RETRIES", LINEAR_DEFAULT_MAX_RETRIES)
         )
         self.retry_backoff_seconds: float = settings.LINEAR.get(
             "RETRY_BACKOFF_SECONDS", LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS

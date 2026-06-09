@@ -427,6 +427,18 @@ class TestGraphql:
         assert svc.max_retries == LINEAR_DEFAULT_MAX_RETRIES
         assert svc.retry_backoff_seconds == LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS
 
+    @pytest.mark.parametrize("configured_value", [0, -1, -10])
+    def test_clamps_max_retries_to_minimum_of_one(self, configured_value):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "id",
+                "CLIENT_SECRET": "secret",
+                "MAX_RETRIES": configured_value,
+            }
+            svc = LinearService()
+
+        assert svc.max_retries == 1
+
 
 class TestParseIssue:
     def test_parses_full_issue(self, linear_service):
