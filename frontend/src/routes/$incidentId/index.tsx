@@ -66,6 +66,7 @@ function Incident() {
           <ActionItemsList
             incidentId={params.incidentId}
             linearUrl={incident.external_links.linear}
+            linearParentIssueId={incident.linear_parent_issue_id}
           />
         </section>
 

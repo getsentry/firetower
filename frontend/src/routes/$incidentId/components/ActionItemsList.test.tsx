@@ -1,5 +1,6 @@
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {render, screen, waitFor} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import {TooltipProvider} from 'components/Tooltip';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
@@ -150,5 +151,50 @@ describe('ActionItemsList', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Sync action items'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Create action item'})).toBeInTheDocument();
+  });
+
+  it('opens Linear create-sub-issue URL when parent issue ID is available', async () => {
+    mockApiGet.mockResolvedValue([]);
+    const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    renderWithProviders(
+      <ActionItemsList
+        incidentId="INC-1"
+        linearUrl="https://linear.app/myworkspace/issue/INC-1"
+        linearParentIssueId="abc-123-def"
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', {name: 'Create action item'}));
+    await userEvent.click(screen.getByRole('button', {name: 'Create in Linear'}));
+
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      'https://linear.app/myworkspace/new?parentId=abc-123-def',
+      '_blank',
+      'noopener,noreferrer'
+    );
+    windowOpenSpy.mockRestore();
+  });
+
+  it('falls back to parent issue URL when parent issue ID is not available', async () => {
+    mockApiGet.mockResolvedValue([]);
+    const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    renderWithProviders(
+      <ActionItemsList
+        incidentId="INC-1"
+        linearUrl="https://linear.app/myworkspace/issue/INC-1"
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', {name: 'Create action item'}));
+    await userEvent.click(screen.getByRole('button', {name: 'Create in Linear'}));
+
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      'https://linear.app/myworkspace/issue/INC-1',
+      '_blank',
+      'noopener,noreferrer'
+    );
+    windowOpenSpy.mockRestore();
   });
 });

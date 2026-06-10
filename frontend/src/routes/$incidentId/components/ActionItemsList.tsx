@@ -62,12 +62,28 @@ function ActionItemCard({item}: {item: ActionItem}) {
   );
 }
 
+function buildLinearCreateUrl(linearUrl: string, parentIssueId: string): string | null {
+  try {
+    const url = new URL(linearUrl);
+    const workspace = url.pathname.split('/')[1];
+    if (!workspace) return null;
+    return `https://linear.app/${workspace}/new?parentId=${parentIssueId}`;
+  } catch {
+    return null;
+  }
+}
+
 interface ActionItemsListProps {
   incidentId: string;
   linearUrl?: string;
+  linearParentIssueId?: string | null;
 }
 
-export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
+export function ActionItemsList({
+  incidentId,
+  linearUrl,
+  linearParentIssueId,
+}: ActionItemsListProps) {
   const queryClient = useQueryClient();
   const syncMutation = useMutation(
     syncActionItemsMutationOptions(queryClient, incidentId)
@@ -127,8 +143,8 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
           title="Create Action Item"
           message={
             <>
-              You'll be taken to the parent Linear issue for the incident. Create your
-              action item as a sub-issue or related issue there.
+              You'll be taken to Linear to create a sub-issue under the parent incident
+              issue.
               <br />
               <br />
               Make sure to assign the issue to the appropriate team as issues in the
@@ -154,9 +170,11 @@ export function ActionItemsList({incidentId, linearUrl}: ActionItemsListProps) {
               </ul>
             </>
           }
-          confirmLabel="Open Linear"
+          confirmLabel="Create in Linear"
           onConfirm={() => {
-            window.open(linearUrl, '_blank', 'noopener,noreferrer');
+            const createUrl =
+              linearParentIssueId && buildLinearCreateUrl(linearUrl, linearParentIssueId);
+            window.open(createUrl || linearUrl, '_blank', 'noopener,noreferrer');
             setShowCreateDialog(false);
           }}
           onCancel={() => setShowCreateDialog(false)}

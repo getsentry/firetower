@@ -148,6 +148,9 @@ class TestIncidentDetailUISerializer:
         assert "linear" not in data["external_links"]  # Not set, so not included
         assert len(data["external_links"]) == 1
 
+        # Check linear_parent_issue_id is exposed (null when not set)
+        assert data["linear_parent_issue_id"] is None
+
 
 @pytest.mark.django_db
 class TestIncidentWriteSerializerHooks:
