@@ -48,6 +48,12 @@ team_id = ""
 project_id = ""
 # When true, claim the Linear issue matching the incident number (e.g. INC-2160) instead of creating a new one.
 sync_identifiers = false
+# SLO deadlines (days from incident creation) for action items by priority tier.
+# High priority covers Linear priorities 1 (Urgent) and 2 (High).
+# Medium priority covers Linear priority 3 (Medium).
+# Priority 4 (Low) and 0 (No priority) have no SLO.
+action_item_slo_days_high_priority = 14
+action_item_slo_days_medium_priority = 28
 
 [notion]
 integration_token = ""
