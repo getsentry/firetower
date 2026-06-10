@@ -114,10 +114,7 @@ def page_for_channel(
     """
     paged: set[str] = set()
 
-    if is_private:
-        return paged
-
-    if severity not in HIGH_SEVERITIES:
+    if is_private or severity not in HIGH_SEVERITIES:
         return paged
 
     pd_config = settings.PAGERDUTY
@@ -294,10 +291,7 @@ def _invite_oncall_to_channel(
     paged_policies: set[str] | None = None,
 ) -> None:
     """Invite on-call users to a channel. No DB access."""
-    if is_private:
-        return
-
-    if severity not in HIGH_SEVERITIES:
+    if is_private or severity not in HIGH_SEVERITIES:
         return
 
     pd_config = settings.PAGERDUTY
