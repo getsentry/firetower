@@ -1101,6 +1101,8 @@ def _schedule_statuspage_reminder(
     reference_time: datetime | None = None,
     allow_update: bool = False,
 ) -> None:
+    if incident.is_private:
+        return
     if incident.severity not in HIGH_SEVERITIES:
         return
 
@@ -1130,6 +1132,8 @@ def _schedule_statuspage_reminder(
 def schedule_statuspage_followup_reminder(
     incident: Incident, *, reschedule_count: int = 0
 ) -> None:
+    if incident.is_private:
+        return
     if incident.severity not in HIGH_SEVERITIES:
         return
     if incident.status not in ACTIVE_STATUSES:
