@@ -940,11 +940,9 @@ class TestPageIfNeeded:
         assert "PROD_ENG" in mock_pd.trigger_incident.call_args[0][1]
 
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_private_incident_pages_only_imoc(self, mock_pd_cls, settings):
+    def test_private_incident_does_not_page(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
-        mock_pd = mock_pd_cls.return_value
-        mock_pd.trigger_incident.return_value = True
 
         incident = Incident.objects.create(
             title="Sensitive issue",
@@ -952,15 +950,10 @@ class TestPageIfNeeded:
             is_private=True,
         )
 
-        _page_if_needed(incident)
+        result = _page_if_needed(incident)
 
-        mock_pd.trigger_incident.assert_called_once()
-        summary = mock_pd.trigger_incident.call_args[0][0]
-        dedup_key = mock_pd.trigger_incident.call_args[0][1]
-        assert "IMOC" in dedup_key
-        assert "PROD_ENG" not in dedup_key
-        assert "Private Incident" in summary
-        assert "Sensitive issue" not in summary
+        mock_pd_cls.assert_not_called()
+        assert result == set()
 
     @patch("firetower.incidents.hooks.PagerDutyService")
     def test_pages_only_configured_policies(self, mock_pd_cls, settings):
@@ -1302,15 +1295,10 @@ class TestInviteOncallUsers:
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_private_incident_invites_only_imoc(
+    def test_private_incident_skips_oncall_invite(
         self, mock_pd_cls, mock_slack, settings
     ):
         settings.PAGERDUTY = MOCK_PD_CONFIG
-        mock_pd = mock_pd_cls.return_value
-        mock_pd.get_oncall_users.return_value = [
-            {"email": "imoc@example.com", "escalation_level": 1},
-        ]
-        mock_slack.get_user_profile_by_email.return_value = {"slack_user_id": "U_IMOC"}
 
         incident = Incident.objects.create(
             title="Sensitive issue",
@@ -1320,11 +1308,9 @@ class TestInviteOncallUsers:
 
         _invite_oncall_users(incident, "C99999")
 
-        mock_pd.get_oncall_users.assert_called_once_with("PIMOC01")
-        mock_slack.invite_to_channel.assert_called_once_with("C99999", ["U_IMOC"])
-        message = mock_slack.post_message.call_args[0][1]
-        assert "On-Call Incident Manager: <@U_IMOC>" in message
-        assert "Prod Eng" not in message
+        mock_pd_cls.assert_not_called()
+        mock_slack.invite_to_channel.assert_not_called()
+        mock_slack.post_message.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")

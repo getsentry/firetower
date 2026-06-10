@@ -114,6 +114,9 @@ def page_for_channel(
     """
     paged: set[str] = set()
 
+    if is_private:
+        return paged
+
     if severity not in HIGH_SEVERITIES:
         return paged
 
@@ -125,12 +128,7 @@ def page_for_channel(
 
     pd_service = None
 
-    policies_to_page = (
-        {"IMOC": PAGING_POLICIES["IMOC"]} if is_private else PAGING_POLICIES
-    )
-    title = "Private Incident" if is_private else title
-
-    for policy_name, policy_info in policies_to_page.items():
+    for policy_name, policy_info in PAGING_POLICIES.items():
         policy = escalation_policies.get(policy_name)
         if not policy:
             logger.info(f"No {policy_name} escalation policy configured, skipping page")
@@ -296,6 +294,9 @@ def _invite_oncall_to_channel(
     paged_policies: set[str] | None = None,
 ) -> None:
     """Invite on-call users to a channel. No DB access."""
+    if is_private:
+        return
+
     if severity not in HIGH_SEVERITIES:
         return
 
@@ -314,13 +315,7 @@ def _invite_oncall_to_channel(
     role_entries: list[tuple[int, int, str]] = []
     users_to_invite: list[tuple[str, str]] = []
 
-    policies_to_invite = (
-        {"IMOC": PAGING_POLICIES["IMOC"]} if is_private else PAGING_POLICIES
-    )
-
-    for policy_index, (policy_name, policy_info) in enumerate(
-        policies_to_invite.items()
-    ):
+    for policy_index, (policy_name, policy_info) in enumerate(PAGING_POLICIES.items()):
         policy_label = policy_info.label
         max_level = policy_info.max_level
         policy = escalation_policies.get(policy_name)
