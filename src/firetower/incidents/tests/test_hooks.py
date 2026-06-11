@@ -403,7 +403,7 @@ class TestOnStatusChanged:
         mock_slack.post_message.assert_called_once()
         assert "Active" in mock_slack.post_message.call_args[0][1]
         assert "Mitigated" in mock_slack.post_message.call_args[0][1]
-        mock_slack.set_channel_topic.assert_not_called()
+        mock_slack.set_all_channel_topics.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -509,7 +509,7 @@ class TestOnSeverityChanged:
         mock_slack.post_message.assert_called_once()
         assert "P2" in mock_slack.post_message.call_args[0][1]
         assert "P0" in mock_slack.post_message.call_args[0][1]
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -541,7 +541,7 @@ class TestOnTitleChanged:
 
         on_title_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -552,7 +552,7 @@ class TestOnTitleChanged:
 
         on_title_changed(incident)
 
-        mock_slack.set_channel_topic.assert_not_called()
+        mock_slack.set_all_channel_topics.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -642,7 +642,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_called_once()
         assert "<@U_NEW>" in mock_slack.post_message.call_args[0][1]
         mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_NEW"])
@@ -671,7 +671,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_called_once()
         assert "New Captain" in mock_slack.post_message.call_args[0][1]
 
@@ -692,7 +692,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
@@ -780,7 +780,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_not_called()
+        mock_slack.set_all_channel_topics.assert_not_called()
 
 
 MOCK_PD_CONFIG = {
@@ -3333,7 +3333,7 @@ class TestOnIncidentUpdated:
             incident, old_severity=IncidentSeverity.P4, captain_changed=True
         )
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_no_message_when_nothing_changed(self, mock_slack):
@@ -3383,7 +3383,7 @@ class TestOnIncidentUpdated:
 
         on_incident_updated(incident, captain_changed=True)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_not_called()
 
     @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
