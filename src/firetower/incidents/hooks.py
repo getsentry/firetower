@@ -1119,7 +1119,7 @@ def _schedule_statuspage_reminder(
     reference_time: datetime | None = None,
     allow_update: bool = False,
 ) -> None:
-    if incident.severity not in HIGH_SEVERITIES:
+    if incident.is_private or incident.severity not in HIGH_SEVERITIES:
         return
 
     delay_minutes = get_statuspage_initial_reminder_delay_minutes()
@@ -1148,9 +1148,11 @@ def _schedule_statuspage_reminder(
 def schedule_statuspage_followup_reminder(
     incident: Incident, *, reschedule_count: int = 0
 ) -> None:
-    if incident.severity not in HIGH_SEVERITIES:
-        return
-    if incident.status not in ACTIVE_STATUSES:
+    if (
+        incident.is_private
+        or incident.severity not in HIGH_SEVERITIES
+        or incident.status not in ACTIVE_STATUSES
+    ):
         return
 
     delay_minutes = get_statuspage_followup_reminder_delay_minutes()

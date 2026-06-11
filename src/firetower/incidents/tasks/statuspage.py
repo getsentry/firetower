@@ -64,9 +64,11 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
         logger.warning(f"Incident {incident_id} not found for statuspage reminder")
         return
 
-    if incident.severity not in HIGH_SEVERITIES:
-        return
-    if incident.status not in ACTIVE_STATUSES:
+    if (
+        incident.is_private
+        or incident.severity not in HIGH_SEVERITIES
+        or incident.status not in ACTIVE_STATUSES
+    ):
         return
 
     has_statuspage = incident.external_links.filter(
@@ -126,9 +128,11 @@ def send_statuspage_followup_reminder(
         )
         return
 
-    if incident.severity not in HIGH_SEVERITIES:
-        return
-    if incident.status not in ACTIVE_STATUSES:
+    if (
+        incident.is_private
+        or incident.severity not in HIGH_SEVERITIES
+        or incident.status not in ACTIVE_STATUSES
+    ):
         return
 
     has_statuspage = incident.external_links.filter(

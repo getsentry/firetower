@@ -2816,6 +2816,14 @@ class TestScheduleStatuspageReminder:
             name=f"statuspage_reminder_{incident.id}"
         ).exists()
 
+    def test_skips_for_private_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0, is_private=True)
+        _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
     def test_skips_for_p2(self):
         incident = self._make_incident(severity=IncidentSeverity.P2)
         _schedule_statuspage_reminder(incident)
@@ -3017,6 +3025,14 @@ class TestScheduleStatuspageFollowupReminder:
         schedule_statuspage_followup_reminder(incident)
 
         assert Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_private_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0, is_private=True)
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
             name=f"statuspage_followup_reminder_{incident.id}"
         ).exists()
 
