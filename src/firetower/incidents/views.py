@@ -365,7 +365,7 @@ class ActionItemListView(generics.ListAPIView):
     def get_queryset(self) -> QuerySet[ActionItem]:
         return (
             self._get_incident()
-            .action_items.select_related("assignee__userprofile")
+            .action_items.select_related("incident", "assignee__userprofile")
             .order_by(
                 Case(When(priority=0, then=5), default=F("priority")), "created_at"
             )
