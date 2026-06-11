@@ -4,7 +4,9 @@ from collections import defaultdict
 from dataclasses import asdict
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db.models import Case, Count, F, QuerySet, When
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, serializers
@@ -77,6 +79,42 @@ def parse_incident_id(incident_id: str) -> int:
     return int(match.group(1))
 
 
+def _get_visible_incident(
+    queryset: QuerySet[Incident], numeric_id: int, user: User
+) -> Incident:
+    """Get an incident, syncing Slack participants first if needed for private incidents.
+
+    Slack commands let channel members interact with private incidents, but
+    the UI requires DB participant records for visibility.  When a channel
+    member hasn't been synced yet, the normal visibility filter returns 404.
+    This helper force-syncs participants on the fallback path so that channel
+    members are recognised on their first UI visit.
+    """
+    visible_qs = filter_visible_to_user(queryset, user)
+    incident = visible_qs.filter(id=numeric_id).first()
+    if incident is not None:
+        return incident
+
+    # Not visible yet -- if the incident exists and is private, the user
+    # might be a Slack channel member who hasn't been synced to the DB.
+    incident = queryset.filter(id=numeric_id).first()
+    if incident is None or not incident.is_private:
+        raise Http404
+
+    try:
+        sync_incident_participants_from_slack(incident, force=True)
+    except Exception:
+        logger.exception(
+            f"Failed to sync participants for incident {incident.id} during visibility check"
+        )
+        raise Http404
+
+    if not incident.is_visible_to_user(user):
+        raise Http404
+
+    return incident
+
+
 class IncidentListUIView(generics.ListAPIView):
     """
     List all incidents from database.
@@ -143,12 +181,9 @@ class IncidentDetailUIView(generics.RetrieveAPIView):
         """
         incident_id = self.kwargs["incident_id"]
         numeric_id = parse_incident_id(incident_id)
-
-        # Get incident by numeric ID
-        queryset = self.get_queryset()
-        queryset = filter_visible_to_user(queryset, self.request.user)
-
-        incident = get_object_or_404(queryset, id=numeric_id)
+        incident = _get_visible_incident(
+            self.get_queryset(), numeric_id, self.request.user
+        )
 
         try:
             sync_incident_participants_from_slack(incident)
@@ -322,9 +357,7 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
         """
         incident_id = self.kwargs["incident_id"]
         numeric_id = parse_incident_id(incident_id)
-        queryset = filter_visible_to_user(self.get_queryset(), self.request.user)
-
-        obj = get_object_or_404(queryset, id=numeric_id)
+        obj = _get_visible_incident(self.get_queryset(), numeric_id, self.request.user)
         self.check_object_permissions(self.request, obj)
 
         return obj
@@ -374,8 +407,9 @@ class ActionItemListView(generics.ListAPIView):
     def _get_incident(self) -> Incident:
         if not hasattr(self, "_incident"):
             numeric_id = parse_incident_id(self.kwargs["incident_id"])
-            queryset = filter_visible_to_user(Incident.objects.all(), self.request.user)
-            self._incident = get_object_or_404(queryset, id=numeric_id)
+            self._incident = _get_visible_incident(
+                Incident.objects.all(), numeric_id, self.request.user
+            )
             self.check_object_permissions(self.request, self._incident)
         return self._incident
 
@@ -401,8 +435,7 @@ class SyncActionItemsView(generics.GenericAPIView):
 
     def get_object(self) -> Incident:
         numeric_id = parse_incident_id(self.kwargs["incident_id"])
-        queryset = filter_visible_to_user(self.get_queryset(), self.request.user)
-        obj = get_object_or_404(queryset, id=numeric_id)
+        obj = _get_visible_incident(self.get_queryset(), numeric_id, self.request.user)
         self.check_object_permissions(self.request, obj)
         return obj
 
