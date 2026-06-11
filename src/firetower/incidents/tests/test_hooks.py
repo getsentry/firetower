@@ -403,7 +403,7 @@ class TestOnStatusChanged:
         mock_slack.post_message.assert_called_once()
         assert "Active" in mock_slack.post_message.call_args[0][1]
         assert "Mitigated" in mock_slack.post_message.call_args[0][1]
-        mock_slack.set_channel_topic.assert_not_called()
+        mock_slack.set_all_channel_topics.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -509,7 +509,7 @@ class TestOnSeverityChanged:
         mock_slack.post_message.assert_called_once()
         assert "P2" in mock_slack.post_message.call_args[0][1]
         assert "P0" in mock_slack.post_message.call_args[0][1]
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -541,7 +541,7 @@ class TestOnTitleChanged:
 
         on_title_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -552,7 +552,7 @@ class TestOnTitleChanged:
 
         on_title_changed(incident)
 
-        mock_slack.set_channel_topic.assert_not_called()
+        mock_slack.set_all_channel_topics.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -642,7 +642,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_called_once()
         assert "<@U_NEW>" in mock_slack.post_message.call_args[0][1]
         mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_NEW"])
@@ -671,7 +671,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_called_once()
         assert "New Captain" in mock_slack.post_message.call_args[0][1]
 
@@ -692,7 +692,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
@@ -780,7 +780,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_not_called()
+        mock_slack.set_all_channel_topics.assert_not_called()
 
 
 MOCK_PD_CONFIG = {
@@ -940,11 +940,9 @@ class TestPageIfNeeded:
         assert "PROD_ENG" in mock_pd.trigger_incident.call_args[0][1]
 
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_private_incident_pages_only_imoc(self, mock_pd_cls, settings):
+    def test_private_incident_does_not_page(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
-        mock_pd = mock_pd_cls.return_value
-        mock_pd.trigger_incident.return_value = True
 
         incident = Incident.objects.create(
             title="Sensitive issue",
@@ -952,15 +950,10 @@ class TestPageIfNeeded:
             is_private=True,
         )
 
-        _page_if_needed(incident)
+        result = _page_if_needed(incident)
 
-        mock_pd.trigger_incident.assert_called_once()
-        summary = mock_pd.trigger_incident.call_args[0][0]
-        dedup_key = mock_pd.trigger_incident.call_args[0][1]
-        assert "IMOC" in dedup_key
-        assert "PROD_ENG" not in dedup_key
-        assert "Private Incident" in summary
-        assert "Sensitive issue" not in summary
+        mock_pd_cls.assert_not_called()
+        assert result == set()
 
     @patch("firetower.incidents.hooks.PagerDutyService")
     def test_pages_only_configured_policies(self, mock_pd_cls, settings):
@@ -1302,15 +1295,10 @@ class TestInviteOncallUsers:
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_private_incident_invites_only_imoc(
+    def test_private_incident_skips_oncall_invite(
         self, mock_pd_cls, mock_slack, settings
     ):
         settings.PAGERDUTY = MOCK_PD_CONFIG
-        mock_pd = mock_pd_cls.return_value
-        mock_pd.get_oncall_users.return_value = [
-            {"email": "imoc@example.com", "escalation_level": 1},
-        ]
-        mock_slack.get_user_profile_by_email.return_value = {"slack_user_id": "U_IMOC"}
 
         incident = Incident.objects.create(
             title="Sensitive issue",
@@ -1320,11 +1308,9 @@ class TestInviteOncallUsers:
 
         _invite_oncall_users(incident, "C99999")
 
-        mock_pd.get_oncall_users.assert_called_once_with("PIMOC01")
-        mock_slack.invite_to_channel.assert_called_once_with("C99999", ["U_IMOC"])
-        message = mock_slack.post_message.call_args[0][1]
-        assert "On-Call Incident Manager: <@U_IMOC>" in message
-        assert "Prod Eng" not in message
+        mock_pd_cls.assert_not_called()
+        mock_slack.invite_to_channel.assert_not_called()
+        mock_slack.post_message.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
@@ -2830,6 +2816,14 @@ class TestScheduleStatuspageReminder:
             name=f"statuspage_reminder_{incident.id}"
         ).exists()
 
+    def test_skips_for_private_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0, is_private=True)
+        _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
     def test_skips_for_p2(self):
         incident = self._make_incident(severity=IncidentSeverity.P2)
         _schedule_statuspage_reminder(incident)
@@ -3031,6 +3025,14 @@ class TestScheduleStatuspageFollowupReminder:
         schedule_statuspage_followup_reminder(incident)
 
         assert Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_private_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0, is_private=True)
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
             name=f"statuspage_followup_reminder_{incident.id}"
         ).exists()
 
@@ -3347,7 +3349,7 @@ class TestOnIncidentUpdated:
             incident, old_severity=IncidentSeverity.P4, captain_changed=True
         )
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_no_message_when_nothing_changed(self, mock_slack):
@@ -3397,7 +3399,7 @@ class TestOnIncidentUpdated:
 
         on_incident_updated(incident, captain_changed=True)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_not_called()
 
     @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
