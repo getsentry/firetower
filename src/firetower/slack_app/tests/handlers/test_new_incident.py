@@ -418,7 +418,7 @@ class TestTagOptions:
         assert len(options) == 3
         names = {o["text"]["text"] for o in options}
         assert names == {"us-east-1", "us-west-2", '+ Create "us"'}
-        assert options[-1]["value"] == "__create__:us"
+        assert options[0]["value"] == "__create__:us"
 
     def test_empty_query_returns_all(self, _mock_close):
         Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
@@ -456,7 +456,7 @@ class TestTagOptions:
         handle_tag_options(ack, payload)
 
         options = ack.call_args[1]["options"]
-        assert options[-1] == {
+        assert options[0] == {
             "text": {"type": "plain_text", "text": '+ Create "payments"'},
             "value": "__create__:payments",
         }
@@ -467,7 +467,7 @@ class TestTagOptions:
         handle_tag_options(ack, payload)
 
         options = ack.call_args[1]["options"]
-        assert options[-1]["value"] == "__create__:ap-south-1"
+        assert options[0]["value"] == "__create__:ap-south-1"
 
     def test_no_create_option_for_impact_type(self, _mock_close):
         ack = MagicMock()
@@ -494,6 +494,18 @@ class TestTagOptions:
 
         options = ack.call_args[1]["options"]
         assert all(not o["value"].startswith("__create__:") for o in options)
+
+    def test_create_option_first_and_capped_at_100(self, _mock_close):
+        for i in range(120):
+            Tag.objects.create(name=f"svc-{i:03d}", type=TagType.AFFECTED_SERVICE)
+
+        ack = MagicMock()
+        payload = {"action_id": "affected_service_tags", "value": "svc"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert len(options) == 100
+        assert options[0]["value"] == "__create__:svc"
 
 
 class TestFallbackChannel:

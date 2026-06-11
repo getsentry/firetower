@@ -201,17 +201,21 @@ def handle_tag_options(ack: Any, payload: dict) -> None:
     if tag_type in INLINE_CREATABLE_TAG_TYPES and stripped:
         exact_match = Tag.objects.filter(type=tag_type, name__iexact=stripped).exists()
         if not exact_match:
-            options.append(
+            # Put "+ Create" first so it survives the 100-option Slack cap even
+            # when the keyword already matches a full page of existing tags.
+            options.insert(
+                0,
                 {
                     "text": {
                         "type": "plain_text",
                         "text": f'+ Create "{stripped}"',
                     },
                     "value": f"{CREATE_TAG_PREFIX}{stripped}",
-                }
+                },
             )
 
-    ack(options=options)
+    # Slack rejects block_suggestion responses with more than 100 options.
+    ack(options=options[:100])
 
 
 def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
