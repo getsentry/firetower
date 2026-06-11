@@ -232,7 +232,8 @@ def handle_update_command(ack: Any, body: dict, command: dict, respond: Any) -> 
 def handle_update_incident_submission(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
-    form = parse_incident_form_values(view)
+    # Parse without resolving tags so validation touches no DB before ack().
+    form = parse_incident_form_values(view, resolve_tags=False)
     channel_id = view.get("private_metadata", "")
 
     values = view.get("state", {}).get("values", {})
@@ -255,6 +256,10 @@ def handle_update_incident_submission(
     if not incident:
         logger.error("Update submission: no incident for channel %s", channel_id)
         return
+
+    # Resolve inline tags only now: after ack() and validation, so a rejected
+    # submission never persists orphaned tags and tag writes can't stall ack().
+    form = parse_incident_form_values(view)
 
     data: dict[str, Any] = {
         "title": form["title"],

@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q, QuerySet
+from django.db.models.functions import Lower
 
 INCIDENT_ID_START = 2000
 
@@ -107,7 +108,13 @@ class Tag(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [("name", "type")]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"),
+                "type",
+                name="unique_tag_name_lower_type",
+            )
+        ]
         ordering = ["name"]
 
     def clean(self) -> None:

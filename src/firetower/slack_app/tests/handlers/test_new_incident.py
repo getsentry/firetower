@@ -746,11 +746,17 @@ class TestResolveTagValues:
         assert resolved == ["payments"]
 
     def test_recovers_existing_tag_when_create_races(self):
-        Tag.objects.create(name="Payments", type=TagType.AFFECTED_SERVICE)
+        # No pre-existing tag, so the initial lookup misses and we enter the
+        # create branch. A concurrent writer inserts the row first (simulated in
+        # the side_effect) and our create() then raises IntegrityError, forcing
+        # the recovery re-query to find the winner.
+        def racing_create(**kwargs):
+            Tag(name="Payments", type=TagType.AFFECTED_SERVICE).save()
+            raise IntegrityError("duplicate key")
 
         with patch(
             "firetower.slack_app.handlers.utils.Tag.objects.create",
-            side_effect=IntegrityError("duplicate key"),
+            side_effect=racing_create,
         ):
             resolved = _resolve_tag_values(
                 ["__create__:payments"],
@@ -758,6 +764,7 @@ class TestResolveTagValues:
             )
 
         assert resolved == ["Payments"]
+        assert Tag.objects.filter(type=TagType.AFFECTED_SERVICE).count() == 1
 
     def test_reraises_when_create_fails_and_no_existing_tag(self):
         with patch(

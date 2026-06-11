@@ -279,6 +279,20 @@ class TestResolvedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "captain_block" in call_kwargs["errors"]
 
+    def test_rejected_submission_creates_no_inline_tags(self, incident):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_resolved_view(
+            captain=None,
+            affected_service_tags=("__create__:payments",),
+        )
+
+        handle_resolved_submission(ack, body, view, client)
+
+        assert ack.call_args[1]["response_action"] == "errors"
+        assert not Tag.objects.filter(name__iexact="payments").exists()
+
     @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_missing_description_succeeds(
