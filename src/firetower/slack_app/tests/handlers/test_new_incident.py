@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import IntegrityError, OperationalError
+from django.db import OperationalError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import Incident, IncidentSeverity, Tag, TagType
@@ -757,45 +757,13 @@ class TestResolveTagValues:
 
         assert resolved == ["payments"]
 
-    def test_recovers_existing_tag_when_create_races(self):
-        # A row already exists; simulate the race where our initial lookup
-        # misses it and our own create() then trips the DB unique constraint
-        # for real. The savepoint must contain that IntegrityError so the
-        # recovery re-query can still run — on PostgreSQL the surrounding
-        # transaction is aborted otherwise and this raises InternalError.
+    def test_reuses_existing_tag_case_insensitively(self):
         Tag.objects.create(name="Payments", type=TagType.AFFECTED_SERVICE)
 
-        real_filter = Tag.objects.filter
-        calls = {"n": 0}
-
-        def racing_filter(*args, **kwargs):
-            calls["n"] += 1
-            if calls["n"] == 1:  # initial existence check misses the row
-                return Tag.objects.none()
-            return real_filter(*args, **kwargs)
-
-        # Skip model validation so the conflict surfaces as a real DB-level
-        # IntegrityError (the savepoint path) rather than a pre-INSERT
-        # ValidationError from full_clean().
-        with (
-            patch.object(Tag, "full_clean", lambda self, *a, **k: None),
-            patch.object(Tag.objects, "filter", side_effect=racing_filter),
-        ):
-            resolved = _resolve_tag_values(
-                ["__create__:Payments"],
-                TagType.AFFECTED_SERVICE,
-            )
+        resolved = _resolve_tag_values(
+            ["__create__:payments"],
+            TagType.AFFECTED_SERVICE,
+        )
 
         assert resolved == ["Payments"]
         assert Tag.objects.filter(type=TagType.AFFECTED_SERVICE).count() == 1
-
-    def test_reraises_when_create_fails_and_no_existing_tag(self):
-        with patch(
-            "firetower.slack_app.handlers.utils.Tag.objects.create",
-            side_effect=IntegrityError("boom"),
-        ):
-            with pytest.raises(IntegrityError):
-                _resolve_tag_values(
-                    ["__create__:payments"],
-                    TagType.AFFECTED_SERVICE,
-                )

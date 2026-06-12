@@ -2,8 +2,6 @@ import logging
 from typing import Any
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
 
 from firetower.auth.models import ExternalProfileType
 from firetower.incidents.models import (
@@ -48,27 +46,16 @@ def _resolve_tag_values(
                 if existing:
                     name = existing.name
                 else:
-                    try:
-                        # Inline-created tags are intentionally left
-                        # approved=False so they surface for admin audit.
-                        # Wrap in a savepoint so a concurrent insert that trips
-                        # the DB uniqueness constraint rolls back only this
-                        # create — on PostgreSQL an IntegrityError otherwise
-                        # aborts the whole transaction and the recovery query
-                        # below would fail.
-                        with transaction.atomic():
-                            tag = Tag.objects.create(name=name, type=tag_type)
-                        logger.info(
-                            "Created %s tag %r from Slack modal", tag_type, tag.name
-                        )
-                        name = tag.name
-                    except (ValidationError, IntegrityError):
-                        existing = Tag.objects.filter(
-                            type=tag_type, name__iexact=name
-                        ).first()
-                        if existing is None:
-                            raise
-                        name = existing.name
+                    # Inline-created tags are intentionally left approved=False
+                    # so they surface for admin audit. Tag.clean() guards
+                    # case-insensitive uniqueness; a rare simultaneous duplicate
+                    # create just errors out and the caller's guard asks the
+                    # user to retry.
+                    tag = Tag.objects.create(name=name, type=tag_type)
+                    logger.info(
+                        "Created %s tag %r from Slack modal", tag_type, tag.name
+                    )
+                    name = tag.name
         key = name.lower()
         if key in seen:
             continue
