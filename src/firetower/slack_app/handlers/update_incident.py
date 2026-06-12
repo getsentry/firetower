@@ -1,6 +1,8 @@
 import logging
 from typing import Any
 
+from django.db import InterfaceError, OperationalError
+
 from firetower.auth.models import ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import Incident, IncidentSeverity
@@ -252,46 +254,57 @@ def handle_update_incident_submission(
 
     ack()
 
-    incident = get_incident_from_channel(channel_id)
-    if not incident:
-        logger.error("Update submission: no incident for channel %s", channel_id)
-        return
+    # All DB work runs after ack(); guard it so a DB error surfaces to the
+    # channel instead of silently dropping the update behind a successful ack.
+    try:
+        incident = get_incident_from_channel(channel_id)
+        if not incident:
+            logger.error("Update submission: no incident for channel %s", channel_id)
+            return
 
-    # Resolve inline tags only now: after ack() and validation, so a rejected
-    # submission never persists orphaned tags and tag writes can't stall ack().
-    form = parse_incident_form_values(view)
+        # Resolve inline tags only now: after ack() and validation, so a
+        # rejected submission never persists orphaned tags.
+        form = parse_incident_form_values(view)
 
-    data: dict[str, Any] = {
-        "title": form["title"],
-        "description": form["description"],
-        "impact_summary": form["impact_summary"],
-        "is_private": is_private,
-        "impact_type_tags": form["impact_type_tags"],
-        "affected_service_tags": form["affected_service_tags"],
-        "affected_region_tags": form["affected_region_tags"],
-    }
-    if form["severity"]:
-        data["severity"] = form["severity"]
+        data: dict[str, Any] = {
+            "title": form["title"],
+            "description": form["description"],
+            "impact_summary": form["impact_summary"],
+            "is_private": is_private,
+            "impact_type_tags": form["impact_type_tags"],
+            "affected_service_tags": form["affected_service_tags"],
+            "affected_region_tags": form["affected_region_tags"],
+        }
+        if form["severity"]:
+            data["severity"] = form["severity"]
 
-    if form["captain_slack_id"]:
-        captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
-        if captain_user:
-            data["captain"] = captain_user.email
+        if form["captain_slack_id"]:
+            captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
+            if captain_user:
+                data["captain"] = captain_user.email
 
-    acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
-    serializer = IncidentWriteSerializer(
-        instance=incident, data=data, partial=True, context={"acting_user": acting_user}
-    )
-    if not serializer.is_valid():
-        logger.error("Incident update validation failed: %s", serializer.errors)
+        acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data=data,
+            partial=True,
+            context={"acting_user": acting_user},
+        )
+        if not serializer.is_valid():
+            logger.error("Incident update validation failed: %s", serializer.errors)
+            client.chat_postMessage(
+                channel=channel_id,
+                text=f"Failed to update incident: {serializer.errors}",
+            )
+            return
+        serializer.save()
+    except (OperationalError, InterfaceError):
+        logger.exception("Database unreachable during incident update")
         client.chat_postMessage(
             channel=channel_id,
-            text=f"Failed to update incident: {serializer.errors}",
+            text="Something went wrong updating the incident (database issue). Please try again.",
         )
         return
-
-    try:
-        serializer.save()
     except Exception:
         logger.exception("Failed to update incident from Slack modal")
         client.chat_postMessage(

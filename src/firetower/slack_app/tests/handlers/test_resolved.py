@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.db import OperationalError
 
 from firetower.incidents.models import IncidentSeverity, IncidentStatus, Tag, TagType
 from firetower.slack_app.handlers.resolved import (
@@ -441,3 +442,20 @@ class TestResolvedSubmission:
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Failed to resolve the selected captain" in msg
+
+    @patch("firetower.slack_app.handlers.resolved.get_incident_from_channel")
+    def test_db_error_after_ack_notifies_channel(self, mock_get_incident):
+        # A DB failure after ack() must surface to the channel, not vanish
+        # behind the successful ack.
+        mock_get_incident.side_effect = OperationalError("db down")
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_resolved_view()
+
+        handle_resolved_submission(ack, body, view, client)
+
+        ack.assert_called_once_with()
+        client.chat_postMessage.assert_called_once()
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "database issue" in msg

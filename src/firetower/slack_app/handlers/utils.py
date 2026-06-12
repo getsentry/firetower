@@ -3,7 +3,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 
 from firetower.auth.models import ExternalProfileType
 from firetower.incidents.models import (
@@ -51,7 +51,13 @@ def _resolve_tag_values(
                     try:
                         # Inline-created tags are intentionally left
                         # approved=False so they surface for admin audit.
-                        tag = Tag.objects.create(name=name, type=tag_type)
+                        # Wrap in a savepoint so a concurrent insert that trips
+                        # the DB uniqueness constraint rolls back only this
+                        # create — on PostgreSQL an IntegrityError otherwise
+                        # aborts the whole transaction and the recovery query
+                        # below would fail.
+                        with transaction.atomic():
+                            tag = Tag.objects.create(name=name, type=tag_type)
                         logger.info(
                             "Created %s tag %r from Slack modal", tag_type, tag.name
                         )

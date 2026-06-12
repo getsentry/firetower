@@ -1,6 +1,8 @@
 import logging
 from typing import Any
 
+from django.db import InterfaceError, OperationalError
+
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import Incident, IncidentStatus
 from firetower.incidents.serializers import IncidentWriteSerializer
@@ -58,47 +60,67 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
 
     ack()
 
-    incident = get_incident_from_channel(channel_id)
-    if not incident:
-        logger.error("Resolved submission: no incident for channel %s", channel_id)
-        return
+    # All DB work runs after ack(); guard it so a DB error surfaces to the
+    # channel instead of silently dropping the update behind a successful ack.
+    try:
+        incident = get_incident_from_channel(channel_id)
+        if not incident:
+            logger.error("Resolved submission: no incident for channel %s", channel_id)
+            return
 
-    captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
-    if not captain_user:
-        logger.error(
-            "Could not resolve Slack user %s to a Firetower user",
-            form["captain_slack_id"],
+        captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
+        if not captain_user:
+            logger.error(
+                "Could not resolve Slack user %s to a Firetower user",
+                form["captain_slack_id"],
+            )
+            client.chat_postMessage(
+                channel=channel_id,
+                text="Failed to resolve the selected captain to a Firetower user.",
+            )
+            return
+
+        # Resolve inline tags only now: after ack() and validation, so a
+        # rejected submission never persists orphaned tags.
+        form = parse_incident_form_values(view)
+
+        severity = form["severity"]
+        if severity in ("P0", "P1", "P2"):
+            target_status = IncidentStatus.POSTMORTEM
+        else:
+            target_status = IncidentStatus.DONE
+
+        data = build_incident_update_data(form, target_status, captain_user.email)
+
+        acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data=data,
+            partial=True,
+            context={"acting_user": acting_user},
         )
+        if not serializer.is_valid():
+            logger.error("Resolved update failed: %s", serializer.errors)
+            client.chat_postMessage(
+                channel=channel_id,
+                text=f"Failed to resolve incident: {serializer.errors}",
+            )
+            return
+        serializer.save()
+    except (OperationalError, InterfaceError):
+        logger.exception("Database unreachable during resolved submission")
         client.chat_postMessage(
             channel=channel_id,
-            text="Failed to resolve the selected captain to a Firetower user.",
+            text="Something went wrong updating the incident (database issue). Please try again.",
         )
         return
-
-    # Resolve inline tags only now: after ack() and validation, so a rejected
-    # submission never persists orphaned tags and tag writes can't stall ack().
-    form = parse_incident_form_values(view)
-
-    severity = form["severity"]
-    if severity in ("P0", "P1", "P2"):
-        target_status = IncidentStatus.POSTMORTEM
-    else:
-        target_status = IncidentStatus.DONE
-
-    data = build_incident_update_data(form, target_status, captain_user.email)
-
-    acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
-    serializer = IncidentWriteSerializer(
-        instance=incident, data=data, partial=True, context={"acting_user": acting_user}
-    )
-    if not serializer.is_valid():
-        logger.error("Resolved update failed: %s", serializer.errors)
+    except Exception:
+        logger.exception("Failed to process resolved submission")
         client.chat_postMessage(
             channel=channel_id,
-            text=f"Failed to resolve incident: {serializer.errors}",
+            text="Something went wrong updating the incident. Please try again.",
         )
         return
-    serializer.save()
 
     client.chat_postMessage(
         channel=channel_id,
