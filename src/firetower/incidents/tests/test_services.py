@@ -16,6 +16,7 @@ from firetower.incidents.models import (
     IncidentStatus,
 )
 from firetower.incidents.services import (
+    _comment_parent_issue_status_change,
     _update_parent_issue_status,
     sync_incident_participants_from_slack,
 )
@@ -424,17 +425,24 @@ class TestUpdateParentIssueStatus:
             linear_parent_issue_id="lin-123",
         )
 
-    def _make_linear_service(self):
+    def _make_linear_service(self, current_state_type="unstarted"):
         svc = MagicMock()
         svc.get_workflow_states.return_value = {
             "started": "state-started",
             "completed": "state-completed",
         }
+        svc.update_issue.return_value = True
+        svc.get_issue.return_value = {"state_type": current_state_type}
         return svc
 
     @pytest.fixture(autouse=True)
     def _linear_settings(self, settings):
-        settings.LINEAR = {"TEAM_ID": "team-1", "API_KEY": "key"}
+        settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "API_KEY": "key",
+            "PARENT_STATUS_COMMENT_COMPLETED": "completed comment",
+            "PARENT_STATUS_COMMENT_STARTED": "started comment",
+        }
 
     def test_active_incident_no_action_items_sets_started(self):
         incident = self._make_incident(status=IncidentStatus.ACTIVE)
@@ -443,6 +451,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+        svc.create_comment.assert_called_once()
 
     def test_active_incident_all_items_done_sets_started(self):
         incident = self._make_incident(status=IncidentStatus.ACTIVE)
@@ -459,6 +468,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+        svc.create_comment.assert_called_once()
 
     def test_done_incident_no_action_items_sets_completed(self):
         incident = self._make_incident(status=IncidentStatus.DONE)
@@ -467,6 +477,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+        svc.create_comment.assert_called_once()
 
     def test_done_incident_all_items_done_sets_completed(self):
         incident = self._make_incident(status=IncidentStatus.DONE)
@@ -491,6 +502,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+        svc.create_comment.assert_called_once()
 
     def test_done_incident_incomplete_items_sets_started(self):
         incident = self._make_incident(status=IncidentStatus.DONE)
@@ -515,6 +527,7 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+        svc.create_comment.assert_called_once()
 
     def test_mitigated_incident_all_items_done_sets_started(self):
         incident = self._make_incident(status=IncidentStatus.MITIGATED)
@@ -531,3 +544,165 @@ class TestUpdateParentIssueStatus:
         _update_parent_issue_status(incident, svc)
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-started")
+        svc.create_comment.assert_called_once()
+
+    def test_update_issue_failure_skips_comment(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = self._make_linear_service()
+        svc.update_issue.return_value = False
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+        svc.create_comment.assert_not_called()
+
+    def test_skips_update_when_already_in_target_state(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        svc = self._make_linear_service(current_state_type="started")
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_not_called()
+        svc.create_comment.assert_not_called()
+
+    def test_updates_when_in_different_state(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = self._make_linear_service(current_state_type="started")
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+        svc.create_comment.assert_called_once()
+
+    def test_skips_update_when_get_issue_fails(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        svc = self._make_linear_service()
+        svc.get_issue.return_value = None
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_not_called()
+        svc.create_comment.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestCommentParentIssueStatusChange:
+    def _make_incident(self, status=IncidentStatus.ACTIVE):
+        return Incident.objects.create(
+            title="Test Incident",
+            status=status,
+            severity=IncidentSeverity.P1,
+            linear_parent_issue_id="lin-123",
+        )
+
+    @pytest.fixture(autouse=True)
+    def _linear_settings(self, settings):
+        settings.LINEAR = {
+            "TEAM_ID": "team-1",
+            "API_KEY": "key",
+            "PARENT_STATUS_COMMENT_COMPLETED": (
+                "Set to Completed. "
+                "Incident {{ incident.incident_number }} is {{ incident.status }}. "
+                "{{ completed_action_items }}/{{ total_action_items }} done."
+            ),
+            "PARENT_STATUS_COMMENT_STARTED": (
+                "Set to Started. "
+                "Incident {{ incident.incident_number }} is {{ incident.status }}. "
+                "{{ completed_action_items }}/{{ total_action_items }} done."
+            ),
+        }
+
+    def test_posts_completed_comment(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = MagicMock()
+
+        _comment_parent_issue_status_change(
+            incident, svc, "completed", ["Done", "Done"]
+        )
+
+        svc.create_comment.assert_called_once_with(
+            "lin-123",
+            f"Set to Completed. Incident {incident.incident_number} is Done. 2/2 done.",
+        )
+
+    def test_posts_started_comment_with_mixed_statuses(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        svc = MagicMock()
+
+        _comment_parent_issue_status_change(
+            incident, svc, "started", ["Done", "In Progress", "Todo"]
+        )
+
+        svc.create_comment.assert_called_once_with(
+            "lin-123",
+            f"Set to Started. Incident {incident.incident_number} is Active. 1/3 done.",
+        )
+
+    def test_counts_canceled_as_completed(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = MagicMock()
+
+        _comment_parent_issue_status_change(
+            incident, svc, "completed", ["Done", "Canceled"]
+        )
+
+        svc.create_comment.assert_called_once_with(
+            "lin-123",
+            f"Set to Completed. Incident {incident.incident_number} is Done. 2/2 done.",
+        )
+
+    def test_empty_template_skips_comment(self, settings):
+        settings.LINEAR["PARENT_STATUS_COMMENT_COMPLETED"] = ""
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = MagicMock()
+
+        _comment_parent_issue_status_change(incident, svc, "completed", ["Done"])
+
+        svc.create_comment.assert_not_called()
+
+    def test_whitespace_only_template_skips_comment(self, settings):
+        settings.LINEAR["PARENT_STATUS_COMMENT_STARTED"] = "   "
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        svc = MagicMock()
+
+        _comment_parent_issue_status_change(incident, svc, "started", ["Todo"])
+
+        svc.create_comment.assert_not_called()
+
+    def test_no_action_items(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = MagicMock()
+
+        _comment_parent_issue_status_change(incident, svc, "completed", [])
+
+        svc.create_comment.assert_called_once_with(
+            "lin-123",
+            f"Set to Completed. Incident {incident.incident_number} is Done. 0/0 done.",
+        )
+
+    def test_create_comment_failure_logs_and_continues(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = MagicMock()
+        svc.create_comment.return_value = False
+
+        _comment_parent_issue_status_change(incident, svc, "completed", ["Done"])
+
+        svc.create_comment.assert_called_once()
+
+    def test_create_comment_exception_logs_and_continues(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = MagicMock()
+        svc.create_comment.side_effect = Exception("API error")
+
+        _comment_parent_issue_status_change(incident, svc, "completed", ["Done"])
+
+        svc.create_comment.assert_called_once()
+
+    def test_template_render_error_logs_and_continues(self, settings):
+        settings.LINEAR["PARENT_STATUS_COMMENT_COMPLETED"] = "{{ unterminated"
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = MagicMock()
+
+        _comment_parent_issue_status_change(incident, svc, "completed", ["Done"])
+
+        svc.create_comment.assert_not_called()
