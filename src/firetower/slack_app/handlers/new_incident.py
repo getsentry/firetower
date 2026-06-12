@@ -273,6 +273,9 @@ def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
     )
     selected_values = {opt.get("value") for opt in prior_selections}
 
+    if severity in HIGH_SEVERITIES and "skip_paging" not in selected_values:
+        selected_values.add("skip_paging")
+
     new_view = _build_new_incident_modal(
         channel_id=channel_id,
         severity=severity,

@@ -173,6 +173,7 @@ class TestSeverityAction:
         client.views_update.assert_called_once()
         updated_view = client.views_update.call_args[1]["view"]
         assert "skip_paging" in _option_values(updated_view)
+        assert "skip_paging" in _initial_values(updated_view)
 
     def test_removes_skip_paging_for_p3(self):
         ack = MagicMock()
