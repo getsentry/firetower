@@ -12,6 +12,7 @@ from firetower.incidents.hooks import (
     DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
     _create_status_channel,
     _create_troubleshooting_doc,
+    _invite_oncall_to_channel,
     _invite_oncall_users,
     _linear_issue_title,
     _page_if_needed,
@@ -956,6 +957,21 @@ class TestPageIfNeeded:
         assert result == set()
 
     @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_skip_paging_does_not_page(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+
+        incident = Incident.objects.create(
+            title="Self-handled outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        result = _page_if_needed(incident, skip_paging=True)
+
+        mock_pd_cls.assert_not_called()
+        assert result == set()
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
     def test_pages_only_configured_policies(self, mock_pd_cls, settings):
         settings.PAGERDUTY = {
             "API_TOKEN": "test-token",
@@ -1029,6 +1045,23 @@ class TestPageForChannelReturnValue:
         assert result == {"IMOC"}
 
     @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_returns_empty_set_when_skip_paging(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_slack = MagicMock()
+
+        result = page_for_channel(
+            IncidentSeverity.P0,
+            "INC-100",
+            "Self-handled outage",
+            mock_slack,
+            channel_id="C12345",
+            skip_paging=True,
+        )
+
+        assert result == set()
+        mock_pd_cls.assert_not_called()
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
     def test_returns_empty_set_for_non_pageable_severity(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
         mock_slack = MagicMock()
@@ -1059,7 +1092,26 @@ class TestOnIncidentCreatedPagerDuty:
 
         on_incident_created(incident)
 
-        mock_page.assert_called_once_with(incident, channel_id="C99999")
+        mock_page.assert_called_once_with(
+            incident, channel_id="C99999", skip_paging=False
+        )
+
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_passes_skip_paging_to_page_if_needed(self, mock_slack, mock_page):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Self-handled outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        on_incident_created(incident, skip_paging=True)
+
+        mock_page.assert_called_once_with(
+            incident, channel_id="C99999", skip_paging=True
+        )
 
     @patch("firetower.incidents.hooks._page_if_needed")
     @patch("firetower.incidents.hooks._slack_service")
@@ -1074,7 +1126,9 @@ class TestOnIncidentCreatedPagerDuty:
 
         on_incident_created(incident)
 
-        mock_page.assert_called_once_with(incident, channel_id="C99999")
+        mock_page.assert_called_once_with(
+            incident, channel_id="C99999", skip_paging=False
+        )
 
     @patch("firetower.incidents.hooks._create_status_channel_for_context")
     @patch("firetower.incidents.hooks._invite_oncall_to_channel")
@@ -1307,6 +1361,22 @@ class TestInviteOncallUsers:
         )
 
         _invite_oncall_users(incident, "C99999")
+
+        mock_pd_cls.assert_not_called()
+        mock_slack.invite_to_channel.assert_not_called()
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_skip_paging_skips_oncall_invite(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+
+        _invite_oncall_to_channel(
+            IncidentSeverity.P0,
+            "C99999",
+            mock_slack,
+            skip_paging=True,
+        )
 
         mock_pd_cls.assert_not_called()
         mock_slack.invite_to_channel.assert_not_called()
@@ -1579,6 +1649,7 @@ class TestInviteOncallUsers:
             "C99999",
             mock_slack,
             is_private=False,
+            skip_paging=False,
             paged_policies=set(),
         )
 
