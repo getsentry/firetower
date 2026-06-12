@@ -2,7 +2,6 @@ import logging
 from typing import Any
 
 from django.conf import settings
-from django.db import InterfaceError, OperationalError
 
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import Incident, IncidentStatus
@@ -11,6 +10,7 @@ from firetower.slack_app.handlers.utils import (
     build_incident_lifecycle_modal,
     build_incident_update_data,
     get_incident_from_channel,
+    notify_submission_error,
     parse_incident_form_values,
     validate_lifecycle_form,
 )
@@ -61,35 +61,28 @@ def handle_mitigated_submission(ack: Any, body: dict, view: dict, client: Any) -
 
     ack()
 
-    # All DB work runs after ack(); guard it so a DB error surfaces to the
-    # channel instead of silently dropping the update behind a successful ack.
+    user_id = body["user"]["id"]
+
+    # Work runs after ack() so the modal closes immediately; any failure is
+    # reported back to the submitter as an ephemeral message.
     try:
         incident = get_incident_from_channel(channel_id)
-        if not incident:
-            logger.error("Mitigated submission: no incident for channel %s", channel_id)
+        captain_user = (
+            get_or_create_user_from_slack_id(form["captain_slack_id"])
+            if incident
+            else None
+        )
+        if incident is None or captain_user is None:
+            notify_submission_error(client, channel_id, user_id)
             return
 
-        captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
-        if not captain_user:
-            logger.error(
-                "Could not resolve Slack user %s to a Firetower user",
-                form["captain_slack_id"],
-            )
-            client.chat_postMessage(
-                channel=channel_id,
-                text="Failed to resolve the selected captain to a Firetower user.",
-            )
-            return
-
-        # Resolve inline tags only now: after ack() and validation, so a
-        # rejected submission never persists orphaned tags.
+        # Resolve/create inline tags only after validation passed.
         form = parse_incident_form_values(view)
 
         data = build_incident_update_data(
             form, IncidentStatus.MITIGATED, captain_user.email
         )
-
-        acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
+        acting_user = get_or_create_user_from_slack_id(user_id)
         serializer = IncidentWriteSerializer(
             instance=incident,
             data=data,
@@ -98,25 +91,12 @@ def handle_mitigated_submission(ack: Any, body: dict, view: dict, client: Any) -
         )
         if not serializer.is_valid():
             logger.error("Mitigated update failed: %s", serializer.errors)
-            client.chat_postMessage(
-                channel=channel_id,
-                text=f"Failed to update incident: {serializer.errors}",
-            )
+            notify_submission_error(client, channel_id, user_id)
             return
         serializer.save()
-    except (OperationalError, InterfaceError):
-        logger.exception("Database unreachable during mitigated submission")
-        client.chat_postMessage(
-            channel=channel_id,
-            text="Something went wrong updating the incident (database issue). Please try again.",
-        )
-        return
     except Exception:
         logger.exception("Failed to process mitigated submission")
-        client.chat_postMessage(
-            channel=channel_id,
-            text="Something went wrong updating the incident. Please try again.",
-        )
+        notify_submission_error(client, channel_id, user_id)
         return
 
     incident_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"

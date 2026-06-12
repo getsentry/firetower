@@ -439,14 +439,14 @@ class TestResolvedSubmission:
         handle_resolved_submission(ack, body, view, client)
 
         ack.assert_called_once_with()
-        client.chat_postMessage.assert_called_once()
-        msg = client.chat_postMessage.call_args[1]["text"]
-        assert "Failed to resolve the selected captain" in msg
+        client.chat_postMessage.assert_not_called()
+        client.chat_postEphemeral.assert_called_once()
+        assert client.chat_postEphemeral.call_args[1]["user"] == "U_CAPTAIN"
 
     @patch("firetower.slack_app.handlers.resolved.get_incident_from_channel")
-    def test_db_error_after_ack_notifies_channel(self, mock_get_incident):
-        # A DB failure after ack() must surface to the channel, not vanish
-        # behind the successful ack.
+    def test_db_error_posts_ephemeral_failure(self, mock_get_incident):
+        # A DB failure must surface to the submitter (ephemerally), not vanish
+        # behind a closed modal.
         mock_get_incident.side_effect = OperationalError("db down")
         ack = MagicMock()
         client = MagicMock()
@@ -456,6 +456,6 @@ class TestResolvedSubmission:
         handle_resolved_submission(ack, body, view, client)
 
         ack.assert_called_once_with()
-        client.chat_postMessage.assert_called_once()
-        msg = client.chat_postMessage.call_args[1]["text"]
-        assert "database issue" in msg
+        client.chat_postMessage.assert_not_called()
+        client.chat_postEphemeral.assert_called_once()
+        assert client.chat_postEphemeral.call_args[1]["user"] == "U_CAPTAIN"

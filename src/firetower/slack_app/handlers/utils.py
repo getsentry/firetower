@@ -78,6 +78,19 @@ def get_incident_from_channel(channel_id: str) -> Incident | None:
     return None
 
 
+def notify_submission_error(
+    client: Any,
+    channel_id: str,
+    user_id: str,
+    text: str = "Something went wrong updating the incident. Please try again.",
+) -> None:
+    """Send the submitting user an ephemeral failure notice (visible only to them)."""
+    try:
+        client.chat_postEphemeral(channel=channel_id, user=user_id, text=text)
+    except Exception:
+        logger.exception("Failed to post ephemeral submission error to %s", channel_id)
+
+
 def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
     severity_options = [
         {

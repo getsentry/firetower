@@ -1,14 +1,13 @@
 import logging
 from typing import Any
 
-from django.db import InterfaceError, OperationalError
-
 from firetower.auth.models import ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import Incident, IncidentSeverity
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import (
     get_incident_from_channel,
+    notify_submission_error,
     parse_incident_form_values,
 )
 
@@ -254,16 +253,17 @@ def handle_update_incident_submission(
 
     ack()
 
-    # All DB work runs after ack(); guard it so a DB error surfaces to the
-    # channel instead of silently dropping the update behind a successful ack.
+    user_id = body["user"]["id"]
+
+    # Work runs after ack() so the modal closes immediately; any failure is
+    # reported back to the submitter as an ephemeral message.
     try:
         incident = get_incident_from_channel(channel_id)
-        if not incident:
-            logger.error("Update submission: no incident for channel %s", channel_id)
+        if incident is None:
+            notify_submission_error(client, channel_id, user_id)
             return
 
-        # Resolve inline tags only now: after ack() and validation, so a
-        # rejected submission never persists orphaned tags.
+        # Resolve/create inline tags only after validation passed.
         form = parse_incident_form_values(view)
 
         data: dict[str, Any] = {
@@ -283,7 +283,7 @@ def handle_update_incident_submission(
             if captain_user:
                 data["captain"] = captain_user.email
 
-        acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
+        acting_user = get_or_create_user_from_slack_id(user_id)
         serializer = IncidentWriteSerializer(
             instance=incident,
             data=data,
@@ -292,25 +292,12 @@ def handle_update_incident_submission(
         )
         if not serializer.is_valid():
             logger.error("Incident update validation failed: %s", serializer.errors)
-            client.chat_postMessage(
-                channel=channel_id,
-                text=f"Failed to update incident: {serializer.errors}",
-            )
+            notify_submission_error(client, channel_id, user_id)
             return
         serializer.save()
-    except (OperationalError, InterfaceError):
-        logger.exception("Database unreachable during incident update")
-        client.chat_postMessage(
-            channel=channel_id,
-            text="Something went wrong updating the incident (database issue). Please try again.",
-        )
-        return
     except Exception:
         logger.exception("Failed to update incident from Slack modal")
-        client.chat_postMessage(
-            channel=channel_id,
-            text="Something went wrong updating the incident. Please try again.",
-        )
+        notify_submission_error(client, channel_id, user_id)
         return
 
     client.chat_postMessage(
