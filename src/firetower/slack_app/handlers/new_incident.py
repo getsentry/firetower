@@ -147,12 +147,19 @@ _SKIP_PAGING_OPTION: dict[str, Any] = {
 }
 
 
-def _build_options_block(severity: str) -> dict[str, Any]:
+def _build_options_block(
+    severity: str, selected_values: set[str] | None = None
+) -> dict[str, Any]:
     options = [_PRIVATE_OPTION]
     initial_options: list[dict[str, Any]] = []
 
-    if severity in HIGH_SEVERITIES:
+    is_high = severity in HIGH_SEVERITIES
+    if is_high:
         options.append(_SKIP_PAGING_OPTION)
+
+    if selected_values is not None:
+        initial_options.extend(o for o in options if o["value"] in selected_values)
+    elif is_high:
         initial_options.append(_SKIP_PAGING_OPTION)
 
     element: dict[str, Any] = {
@@ -173,7 +180,10 @@ def _build_options_block(severity: str) -> dict[str, Any]:
 
 
 def _build_new_incident_modal(
-    channel_id: str = "", user_id: str = "", severity: str = ""
+    channel_id: str = "",
+    user_id: str = "",
+    severity: str = "",
+    selected_options: set[str] | None = None,
 ) -> dict:
     blocks = build_incident_form_blocks(user_id=user_id)
 
@@ -181,7 +191,7 @@ def _build_new_incident_modal(
         if block.get("block_id") == "severity_block":
             block["dispatch_action"] = True
 
-    blocks.append(_build_options_block(severity))
+    blocks.append(_build_options_block(severity, selected_values=selected_options))
 
     modal: dict[str, Any] = {
         "type": "modal",
@@ -255,7 +265,19 @@ def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
     severity = selected_option.get("value") if selected_option else ""
     channel_id = view.get("private_metadata", "")
 
-    new_view = _build_new_incident_modal(channel_id=channel_id, severity=severity)
+    prior_selections = (
+        values.get("options_block", {})
+        .get("incident_options", {})
+        .get("selected_options")
+        or []
+    )
+    selected_values = {opt.get("value") for opt in prior_selections}
+
+    new_view = _build_new_incident_modal(
+        channel_id=channel_id,
+        severity=severity,
+        selected_options=selected_values,
+    )
 
     client.views_update(view_id=view["id"], view=new_view)
 

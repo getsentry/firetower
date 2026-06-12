@@ -117,6 +117,27 @@ class TestBuildNewIncidentModal:
         modal = _build_new_incident_modal()
         assert "private" in _option_values(modal)
 
+    def test_selected_options_preserves_private(self):
+        modal = _build_new_incident_modal(
+            severity="P0", selected_options={"private", "skip_paging"}
+        )
+        assert _initial_values(modal) == {"private", "skip_paging"}
+
+    def test_selected_options_preserves_private_for_low_severity(self):
+        modal = _build_new_incident_modal(severity="P3", selected_options={"private"})
+        assert _initial_values(modal) == {"private"}
+
+    def test_selected_options_drops_skip_paging_for_low_severity(self):
+        modal = _build_new_incident_modal(
+            severity="P3", selected_options={"private", "skip_paging"}
+        )
+        assert "skip_paging" not in _initial_values(modal)
+        assert "private" in _initial_values(modal)
+
+    def test_selected_options_empty_set_clears_defaults(self):
+        modal = _build_new_incident_modal(severity="P0", selected_options=set())
+        assert _initial_values(modal) == set()
+
     def test_severity_block_has_dispatch_action(self):
         modal = _build_new_incident_modal()
         severity_block = next(
@@ -178,6 +199,36 @@ class TestSeverityAction:
         ack.assert_called_once()
         updated_view = client.views_update.call_args[1]["view"]
         assert "skip_paging" not in _option_values(updated_view)
+
+    def test_preserves_private_selection_on_severity_change(self):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {
+            "view": {
+                "id": "V_TEST",
+                "callback_id": "new_incident_modal",
+                "private_metadata": "",
+                "state": {
+                    "values": {
+                        "severity_block": {
+                            "severity": {
+                                "selected_option": {"value": "P1"},
+                            }
+                        },
+                        "options_block": {
+                            "incident_options": {
+                                "selected_options": [{"value": "private"}]
+                            }
+                        },
+                    }
+                },
+            }
+        }
+
+        handle_severity_action(ack, body, client)
+
+        updated_view = client.views_update.call_args[1]["view"]
+        assert "private" in _initial_values(updated_view)
 
     def test_ignores_non_new_incident_modal(self):
         ack = MagicMock()
