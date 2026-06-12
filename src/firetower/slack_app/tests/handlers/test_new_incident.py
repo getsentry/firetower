@@ -231,6 +231,35 @@ class TestSeverityAction:
         updated_view = client.views_update.call_args[1]["view"]
         assert "private" in _initial_values(updated_view)
 
+    def test_preserves_captain_initial_user_on_severity_change(self):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {
+            "user": {"id": "U_OPENER"},
+            "view": {
+                "id": "V_TEST",
+                "callback_id": "new_incident_modal",
+                "private_metadata": "",
+                "state": {
+                    "values": {
+                        "severity_block": {
+                            "severity": {
+                                "selected_option": {"value": "P0"},
+                            }
+                        },
+                    }
+                },
+            },
+        }
+
+        handle_severity_action(ack, body, client)
+
+        updated_view = client.views_update.call_args[1]["view"]
+        captain_block = next(
+            b for b in updated_view["blocks"] if b.get("block_id") == "captain_block"
+        )
+        assert captain_block["element"]["initial_user"] == "U_OPENER"
+
     def test_ignores_non_new_incident_modal(self):
         ack = MagicMock()
         client = MagicMock()

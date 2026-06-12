@@ -264,6 +264,7 @@ def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
     )
     severity = selected_option.get("value") if selected_option else ""
     channel_id = view.get("private_metadata", "")
+    user_id = body.get("user", {}).get("id", "")
 
     prior_selections = (
         values.get("options_block", {})
@@ -278,6 +279,7 @@ def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
 
     new_view = _build_new_incident_modal(
         channel_id=channel_id,
+        user_id=user_id,
         severity=severity,
         selected_options=selected_values,
     )
