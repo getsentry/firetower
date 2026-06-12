@@ -9,9 +9,11 @@ from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import Incident, IncidentSeverity, Tag, TagType
 from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.new_incident import (
+    _build_new_incident_modal,
     _create_fallback_channel,
     handle_new_command,
     handle_new_incident_submission,
+    handle_severity_action,
     handle_tag_options,
 )
 
@@ -75,8 +77,212 @@ class TestNewIncidentModal:
             "title_block",
             "description_block",
             "impact_summary_block",
-            "private_block",
+            "options_block",
         }
+
+
+def _get_options_block(modal: dict) -> dict:
+    return next(b for b in modal["blocks"] if b.get("block_id") == "options_block")
+
+
+def _option_values(modal: dict) -> set[str]:
+    block = _get_options_block(modal)
+    return {o["value"] for o in block["element"]["options"]}
+
+
+def _initial_values(modal: dict) -> set[str]:
+    block = _get_options_block(modal)
+    return {o["value"] for o in block["element"].get("initial_options", [])}
+
+
+class TestBuildNewIncidentModal:
+    def test_skip_paging_option_present_for_p0(self):
+        modal = _build_new_incident_modal(severity="P0")
+        assert "skip_paging" in _option_values(modal)
+        assert "skip_paging" in _initial_values(modal)
+
+    def test_skip_paging_option_present_for_p1(self):
+        modal = _build_new_incident_modal(severity="P1")
+        assert "skip_paging" in _option_values(modal)
+
+    def test_skip_paging_option_absent_for_p3(self):
+        modal = _build_new_incident_modal(severity="P3")
+        assert "skip_paging" not in _option_values(modal)
+
+    def test_skip_paging_option_absent_by_default(self):
+        modal = _build_new_incident_modal()
+        assert "skip_paging" not in _option_values(modal)
+
+    def test_private_option_always_present(self):
+        modal = _build_new_incident_modal()
+        assert "private" in _option_values(modal)
+
+    def test_selected_options_preserves_private(self):
+        modal = _build_new_incident_modal(
+            severity="P0", selected_options={"private", "skip_paging"}
+        )
+        assert _initial_values(modal) == {"private", "skip_paging"}
+
+    def test_selected_options_preserves_private_for_low_severity(self):
+        modal = _build_new_incident_modal(severity="P3", selected_options={"private"})
+        assert _initial_values(modal) == {"private"}
+
+    def test_selected_options_drops_skip_paging_for_low_severity(self):
+        modal = _build_new_incident_modal(
+            severity="P3", selected_options={"private", "skip_paging"}
+        )
+        assert "skip_paging" not in _initial_values(modal)
+        assert "private" in _initial_values(modal)
+
+    def test_selected_options_empty_set_clears_defaults(self):
+        modal = _build_new_incident_modal(severity="P0", selected_options=set())
+        assert _initial_values(modal) == set()
+
+    def test_severity_block_has_dispatch_action(self):
+        modal = _build_new_incident_modal()
+        severity_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "severity_block"
+        )
+        assert severity_block.get("dispatch_action") is True
+
+
+class TestSeverityAction:
+    def test_updates_view_with_skip_paging_for_p0(self):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {
+            "view": {
+                "id": "V_TEST",
+                "callback_id": "new_incident_modal",
+                "private_metadata": "",
+                "state": {
+                    "values": {
+                        "severity_block": {
+                            "severity": {
+                                "selected_option": {"value": "P0"},
+                            }
+                        }
+                    }
+                },
+            }
+        }
+
+        handle_severity_action(ack, body, client)
+
+        ack.assert_called_once()
+        client.views_update.assert_called_once()
+        updated_view = client.views_update.call_args[1]["view"]
+        assert "skip_paging" in _option_values(updated_view)
+        assert "skip_paging" in _initial_values(updated_view)
+
+    def test_removes_skip_paging_for_p3(self):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {
+            "view": {
+                "id": "V_TEST",
+                "callback_id": "new_incident_modal",
+                "private_metadata": "",
+                "state": {
+                    "values": {
+                        "severity_block": {
+                            "severity": {
+                                "selected_option": {"value": "P3"},
+                            }
+                        }
+                    }
+                },
+            }
+        }
+
+        handle_severity_action(ack, body, client)
+
+        ack.assert_called_once()
+        updated_view = client.views_update.call_args[1]["view"]
+        assert "skip_paging" not in _option_values(updated_view)
+
+    def test_preserves_private_selection_on_severity_change(self):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {
+            "view": {
+                "id": "V_TEST",
+                "callback_id": "new_incident_modal",
+                "private_metadata": "",
+                "state": {
+                    "values": {
+                        "severity_block": {
+                            "severity": {
+                                "selected_option": {"value": "P1"},
+                            }
+                        },
+                        "options_block": {
+                            "incident_options": {
+                                "selected_options": [{"value": "private"}]
+                            }
+                        },
+                    }
+                },
+            }
+        }
+
+        handle_severity_action(ack, body, client)
+
+        updated_view = client.views_update.call_args[1]["view"]
+        assert "private" in _initial_values(updated_view)
+
+    def test_preserves_captain_initial_user_on_severity_change(self):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {
+            "user": {"id": "U_OPENER"},
+            "view": {
+                "id": "V_TEST",
+                "callback_id": "new_incident_modal",
+                "private_metadata": "",
+                "state": {
+                    "values": {
+                        "severity_block": {
+                            "severity": {
+                                "selected_option": {"value": "P0"},
+                            }
+                        },
+                    }
+                },
+            },
+        }
+
+        handle_severity_action(ack, body, client)
+
+        updated_view = client.views_update.call_args[1]["view"]
+        captain_block = next(
+            b for b in updated_view["blocks"] if b.get("block_id") == "captain_block"
+        )
+        assert captain_block["element"]["initial_user"] == "U_OPENER"
+
+    def test_ignores_non_new_incident_modal(self):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {
+            "view": {
+                "id": "V_TEST",
+                "callback_id": "other_modal",
+                "state": {
+                    "values": {
+                        "severity_block": {
+                            "severity": {
+                                "selected_option": {"value": "P0"},
+                            }
+                        }
+                    }
+                },
+            }
+        }
+
+        handle_severity_action(ack, body, client)
+
+        ack.assert_called_once()
+        client.views_update.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -112,7 +318,7 @@ class TestNewIncidentSubmission:
                         }
                     },
                     "description_block": {"description": {"value": "Description"}},
-                    "private_block": {"is_private": {"selected_options": []}},
+                    "options_block": {"incident_options": {"selected_options": []}},
                 }
             }
         }
@@ -146,7 +352,7 @@ class TestNewIncidentSubmission:
                         }
                     },
                     "description_block": {"description": {"value": "Description"}},
-                    "private_block": {"is_private": {"selected_options": []}},
+                    "options_block": {"incident_options": {"selected_options": []}},
                 }
             },
         }
@@ -180,8 +386,8 @@ class TestNewIncidentSubmission:
                         }
                     },
                     "description_block": {"description": {"value": "Description"}},
-                    "private_block": {
-                        "is_private": {"selected_options": [{"value": "private"}]}
+                    "options_block": {
+                        "incident_options": {"selected_options": [{"value": "private"}]}
                     },
                 }
             },
@@ -191,6 +397,70 @@ class TestNewIncidentSubmission:
 
         client.chat_postMessage.assert_called_once()
         assert client.chat_postMessage.call_args[1]["channel"] == "U_TEST"
+
+    @patch("firetower.incidents.serializers.on_incident_created")
+    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
+    def test_skip_paging_passed_to_hook(self, mock_get_user, mock_hook, settings):
+        settings.HOOKS_ENABLED = True
+        mock_get_user.return_value = self.user
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "Self-handled P1"}},
+                    "severity_block": {
+                        "severity": {
+                            "selected_option": {"value": "P1"},
+                        }
+                    },
+                    "description_block": {"description": {"value": ""}},
+                    "options_block": {
+                        "incident_options": {
+                            "selected_options": [{"value": "skip_paging"}]
+                        }
+                    },
+                }
+            }
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        mock_hook.assert_called_once()
+        incident = mock_hook.call_args[0][0]
+        assert incident.title == "Self-handled P1"
+        assert mock_hook.call_args[1]["skip_paging"] is True
+
+    @patch("firetower.incidents.serializers.on_incident_created")
+    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
+    def test_skip_paging_default_false(self, mock_get_user, mock_hook, settings):
+        settings.HOOKS_ENABLED = True
+        mock_get_user.return_value = self.user
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "Normal P1"}},
+                    "severity_block": {
+                        "severity": {
+                            "selected_option": {"value": "P1"},
+                        }
+                    },
+                    "description_block": {"description": {"value": ""}},
+                    "options_block": {"incident_options": {"selected_options": []}},
+                }
+            }
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        mock_hook.assert_called_once()
+        assert mock_hook.call_args[1]["skip_paging"] is False
 
     def test_empty_title_returns_modal_error(self):
         ack = MagicMock()
@@ -206,7 +476,7 @@ class TestNewIncidentSubmission:
                         }
                     },
                     "description_block": {"description": {"value": ""}},
-                    "private_block": {"is_private": {"selected_options": []}},
+                    "options_block": {"incident_options": {"selected_options": []}},
                 }
             }
         }
@@ -233,7 +503,7 @@ class TestNewIncidentSubmission:
                         "severity": {"selected_option": {"value": "P1"}}
                     },
                     "description_block": {"description": {"value": ""}},
-                    "private_block": {"is_private": {"selected_options": []}},
+                    "options_block": {"incident_options": {"selected_options": []}},
                 }
             }
         }
@@ -278,7 +548,7 @@ class TestNewIncidentSubmission:
                         "impact_summary": {"value": "Users affected"}
                     },
                     "captain_block": {"captain_select": {"selected_user": "U_CAP"}},
-                    "private_block": {"is_private": {"selected_options": []}},
+                    "options_block": {"incident_options": {"selected_options": []}},
                     "impact_type_block": {"impact_type_tags": {"selected_options": []}},
                     "affected_service_block": {
                         "affected_service_tags": {"selected_options": []}
@@ -328,7 +598,7 @@ class TestNewIncidentSubmission:
                     },
                     "impact_summary_block": {"impact_summary": {"value": "All users"}},
                     "captain_block": {"captain_select": {"selected_user": None}},
-                    "private_block": {"is_private": {"selected_options": []}},
+                    "options_block": {"incident_options": {"selected_options": []}},
                     "impact_type_block": {"impact_type_tags": {"selected_options": []}},
                     "affected_service_block": {
                         "affected_service_tags": {"selected_options": []}
@@ -372,7 +642,7 @@ class TestNewIncidentSubmission:
                         }
                     },
                     "description_block": {"description": {"value": "Description"}},
-                    "private_block": {"is_private": {"selected_options": []}},
+                    "options_block": {"incident_options": {"selected_options": []}},
                 }
             }
         }
@@ -630,3 +900,22 @@ class TestFallbackChannel:
         assert len(feed_calls) == 1
         assert "degraded mode" in feed_calls[0][0][1]
         assert "DB is on fire" in feed_calls[0][0][1]
+
+    @patch("firetower.slack_app.handlers.new_incident.page_for_channel")
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_skip_paging_skips_page_for_channel(self, mock_slack_svc, mock_page):
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        form_data = self._base_form_data()
+        form_data["skip_paging"] = True
+
+        _create_fallback_channel(client, "U_REPORTER", form_data)
+
+        mock_page.assert_called_once()
+        assert mock_page.call_args[1]["skip_paging"] is True

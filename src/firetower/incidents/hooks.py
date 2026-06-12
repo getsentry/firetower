@@ -90,6 +90,7 @@ class ChannelSetupContext:
     title: str
     severity: str
     is_private: bool
+    skip_paging: bool = False
     captain_slack_id: str | None = None
     captain_name: str | None = None
     reporter_slack_id: str | None = None
@@ -108,6 +109,7 @@ def page_for_channel(
     links: list[dict[str, str]] | None = None,
     channel_id: str | None = None,
     is_private: bool = False,
+    skip_paging: bool = False,
 ) -> set[str]:
     """Trigger PD pages for pageable severities. No DB access.
 
@@ -115,7 +117,7 @@ def page_for_channel(
     """
     paged: set[str] = set()
 
-    if is_private or severity not in HIGH_SEVERITIES:
+    if is_private or skip_paging or severity not in HIGH_SEVERITIES:
         return paged
 
     pd_config = settings.PAGERDUTY
@@ -168,7 +170,12 @@ def page_for_channel(
     return paged
 
 
-def _page_if_needed(incident: Incident, channel_id: str | None = None) -> set[str]:
+def _page_if_needed(
+    incident: Incident,
+    channel_id: str | None = None,
+    *,
+    skip_paging: bool = False,
+) -> set[str]:
     links: list[dict[str, str]] = [
         {"href": _build_incident_url(incident), "text": "View in Firetower"}
     ]
@@ -187,6 +194,7 @@ def _page_if_needed(incident: Incident, channel_id: str | None = None) -> set[st
         links=links,
         channel_id=channel_id,
         is_private=incident.is_private,
+        skip_paging=skip_paging,
     )
 
 
@@ -307,10 +315,11 @@ def _invite_oncall_to_channel(
     slack_service: SlackService,
     *,
     is_private: bool = False,
+    skip_paging: bool = False,
     paged_policies: set[str] | None = None,
 ) -> None:
     """Invite on-call users to a channel. No DB access."""
-    if is_private or severity not in HIGH_SEVERITIES:
+    if is_private or skip_paging or severity not in HIGH_SEVERITIES:
         return
 
     pd_config = settings.PAGERDUTY
@@ -900,6 +909,7 @@ def decorate_incident_channel(
             ctx.channel_id,
             slack_service,
             is_private=ctx.is_private,
+            skip_paging=ctx.skip_paging,
             paged_policies=paged_policies,
         )
     except Exception:
@@ -1178,7 +1188,7 @@ def schedule_statuspage_followup_reminder(
     )
 
 
-def on_incident_created(incident: Incident) -> None:
+def on_incident_created(incident: Incident, *, skip_paging: bool = False) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
     # will get created=True; the other bails out without creating a second channel.
@@ -1220,14 +1230,11 @@ def on_incident_created(incident: Incident) -> None:
                 f"Failed to create Slack channel for incident {incident.id}"
             )
 
-    # Page P0/P1 early so on-call responders are alerted before we decorate the
-    # Slack channel. _page_if_needed reads the Slack link URL from the DB
-    # (already saved above), so the PD payload is complete even if channel_id
-    # is None here; channel_id is only used to post a fallback warning back to
-    # Slack if PD fails.
     paged_policies: set[str] = set()
     try:
-        paged_policies = _page_if_needed(incident, channel_id=channel_id)
+        paged_policies = _page_if_needed(
+            incident, channel_id=channel_id, skip_paging=skip_paging
+        )
     except Exception:
         logger.exception(f"Failed to page for incident {incident.id}")
 
@@ -1264,6 +1271,7 @@ def on_incident_created(incident: Incident) -> None:
             title=incident.title,
             severity=incident.severity,
             is_private=incident.is_private,
+            skip_paging=skip_paging,
             captain_slack_id=captain_slack_id,
             captain_name=captain_name,
             reporter_slack_id=reporter_slack_id,

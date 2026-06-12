@@ -30,6 +30,7 @@ from firetower.slack_app.handlers.mitigated import (
 from firetower.slack_app.handlers.new_incident import (
     handle_new_command,
     handle_new_incident_submission,
+    handle_severity_action,
     handle_tag_options,
 )
 from firetower.slack_app.handlers.reopen import handle_reopen_command
@@ -239,6 +240,7 @@ def _register_views(app: App) -> None:
     app.view("statuspage_modal")(
         _with_metrics("statuspage_modal")(handle_statuspage_submission)
     )
+    app.action("severity")(_with_metrics("severity_action")(handle_severity_action))
     app.action("component_impact_select")(
         _with_metrics("component_impact_select")(handle_component_impact_select)
     )

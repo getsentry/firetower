@@ -181,7 +181,7 @@ class TestIncidentWriteSerializerHooks:
         )
         assert serializer.is_valid(), serializer.errors
         incident = serializer.save()
-        mock_hook.assert_called_once_with(incident)
+        mock_hook.assert_called_once_with(incident, skip_paging=False)
 
     @patch("firetower.incidents.serializers.on_incident_updated")
     def test_update_calls_on_incident_updated_with_status(self, mock_hook):

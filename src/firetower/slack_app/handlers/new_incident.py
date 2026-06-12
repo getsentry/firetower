@@ -7,6 +7,7 @@ from django.db import InterfaceError, OperationalError, close_old_connections
 
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.hooks import (
+    HIGH_SEVERITIES,
     ChannelSetupContext,
     decorate_incident_channel,
     page_for_channel,
@@ -32,6 +33,7 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
     impact_summary = form_data.get("impact_summary", "")
     captain_slack_id = form_data.get("captain_slack_id")
     is_private = form_data.get("is_private", False)
+    skip_paging = form_data.get("skip_paging", False)
 
     channel_name = f"{settings.PROJECT_KEY.lower()}-{uuid.uuid4().hex[:8]}"
 
@@ -90,6 +92,7 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
         title=title,
         severity=severity,
         is_private=is_private,
+        skip_paging=skip_paging,
         captain_slack_id=captain_slack_id,
         reporter_slack_id=slack_user_id,
         description=description,
@@ -108,6 +111,7 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
             links=links,
             channel_id=channel_id,
             is_private=is_private,
+            skip_paging=skip_paging,
         )
     except Exception:
         logger.exception(
@@ -129,27 +133,65 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
         logger.exception("Failed to DM user about fallback channel %s", channel_name)
 
 
-def _build_new_incident_modal(channel_id: str = "", user_id: str = "") -> dict:
+_PRIVATE_OPTION: dict[str, Any] = {
+    "text": {"type": "plain_text", "text": "Private incident"},
+    "value": "private",
+}
+
+_SKIP_PAGING_OPTION: dict[str, Any] = {
+    "text": {
+        "type": "plain_text",
+        "text": "Skip paging on-call responders",
+    },
+    "value": "skip_paging",
+}
+
+
+def _build_options_block(
+    severity: str, selected_values: set[str] | None = None
+) -> dict[str, Any]:
+    options = [_PRIVATE_OPTION]
+    initial_options: list[dict[str, Any]] = []
+
+    is_high = severity in HIGH_SEVERITIES
+    if is_high:
+        options.append(_SKIP_PAGING_OPTION)
+
+    if selected_values is not None:
+        initial_options.extend(o for o in options if o["value"] in selected_values)
+    elif is_high:
+        initial_options.append(_SKIP_PAGING_OPTION)
+
+    element: dict[str, Any] = {
+        "type": "checkboxes",
+        "action_id": "incident_options",
+        "options": options,
+    }
+    if initial_options:
+        element["initial_options"] = initial_options
+
+    return {
+        "type": "input",
+        "block_id": "options_block",
+        "optional": True,
+        "element": element,
+        "label": {"type": "plain_text", "text": "Options"},
+    }
+
+
+def _build_new_incident_modal(
+    channel_id: str = "",
+    user_id: str = "",
+    severity: str = "",
+    selected_options: set[str] | None = None,
+) -> dict:
     blocks = build_incident_form_blocks(user_id=user_id)
 
-    blocks.append(
-        {
-            "type": "input",
-            "block_id": "private_block",
-            "optional": True,
-            "element": {
-                "type": "checkboxes",
-                "action_id": "is_private",
-                "options": [
-                    {
-                        "text": {"type": "plain_text", "text": "Private incident"},
-                        "value": "private",
-                    }
-                ],
-            },
-            "label": {"type": "plain_text", "text": "Visibility"},
-        }
-    )
+    for block in blocks:
+        if block.get("block_id") == "severity_block":
+            block["dispatch_action"] = True
+
+    blocks.append(_build_options_block(severity, selected_values=selected_options))
 
     modal: dict[str, Any] = {
         "type": "modal",
@@ -210,8 +252,48 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
     )
 
 
+def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
+    ack()
+    view = body.get("view", {})
+    if view.get("callback_id") != "new_incident_modal":
+        return
+
+    values = view.get("state", {}).get("values", {})
+    selected_option = (
+        values.get("severity_block", {}).get("severity", {}).get("selected_option")
+    )
+    severity = selected_option.get("value") if selected_option else ""
+    channel_id = view.get("private_metadata", "")
+    user_id = body.get("user", {}).get("id", "")
+
+    prior_selections = (
+        values.get("options_block", {})
+        .get("incident_options", {})
+        .get("selected_options")
+        or []
+    )
+    selected_values = {opt.get("value") for opt in prior_selections}
+
+    if severity in HIGH_SEVERITIES and "skip_paging" not in selected_values:
+        selected_values.add("skip_paging")
+
+    new_view = _build_new_incident_modal(
+        channel_id=channel_id,
+        user_id=user_id,
+        severity=severity,
+        selected_options=selected_values,
+    )
+
+    client.views_update(view_id=view["id"], view=new_view)
+
+
 def _create_incident_via_db(
-    form: dict, slack_user_id: str, is_private: bool, client: Any
+    form: dict,
+    slack_user_id: str,
+    is_private: bool,
+    client: Any,
+    *,
+    skip_paging: bool = False,
 ) -> "Incident | None":
     """Run all DB-dependent work to create an incident.
 
@@ -244,7 +326,9 @@ def _create_incident_via_db(
         "is_private": is_private,
     }
 
-    serializer = IncidentWriteSerializer(data=data)
+    serializer = IncidentWriteSerializer(
+        data=data, context={"skip_paging": skip_paging}
+    )
     if not serializer.is_valid():
         logger.error(f"Incident validation failed: {serializer.errors}")
         client.chat_postMessage(
@@ -262,11 +346,15 @@ def handle_new_incident_submission(
     form = parse_incident_form_values(view)
 
     values = view.get("state", {}).get("values", {})
-    private_selections = (
-        values.get("private_block", {}).get("is_private", {}).get("selected_options")
+    option_selections = (
+        values.get("options_block", {})
+        .get("incident_options", {})
+        .get("selected_options")
         or []
     )
-    is_private = any(opt.get("value") == "private" for opt in private_selections)
+    selected_values = {opt.get("value") for opt in option_selections}
+    is_private = "private" in selected_values
+    skip_paging = "skip_paging" in selected_values
 
     if not form["title"]:
         ack(
@@ -280,7 +368,9 @@ def handle_new_incident_submission(
     slack_user_id = body.get("user", {}).get("id", "")
 
     try:
-        incident = _create_incident_via_db(form, slack_user_id, is_private, client)
+        incident = _create_incident_via_db(
+            form, slack_user_id, is_private, client, skip_paging=skip_paging
+        )
     except (OperationalError, InterfaceError):
         logger.exception(
             "Database unreachable during incident creation from Slack modal"
@@ -292,6 +382,7 @@ def handle_new_incident_submission(
             "impact_summary": form["impact_summary"],
             "captain_slack_id": form["captain_slack_id"],
             "is_private": is_private,
+            "skip_paging": skip_paging,
         }
         _create_fallback_channel(client, slack_user_id, form_data)
         return
