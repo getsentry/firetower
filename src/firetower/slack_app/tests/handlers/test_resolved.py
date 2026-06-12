@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.db import OperationalError
 
 from firetower.incidents.models import IncidentSeverity, IncidentStatus, Tag, TagType
 from firetower.slack_app.handlers.resolved import (
@@ -279,6 +280,20 @@ class TestResolvedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "captain_block" in call_kwargs["errors"]
 
+    def test_rejected_submission_creates_no_inline_tags(self, incident):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_resolved_view(
+            captain=None,
+            affected_service_tags=("__create__:payments",),
+        )
+
+        handle_resolved_submission(ack, body, view, client)
+
+        assert ack.call_args[1]["response_action"] == "errors"
+        assert not Tag.objects.filter(name__iexact="payments").exists()
+
     @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_missing_description_succeeds(
@@ -381,6 +396,38 @@ class TestResolvedSubmission:
         assert call_kwargs["response_action"] == "errors"
         assert "affected_region_block" in call_kwargs["errors"]
 
+    @patch("firetower.incidents.serializers.on_incident_updated")
+    @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
+    def test_creates_tag_inline_from_resolved_submission(
+        self,
+        mock_get_user,
+        mock_hook,
+        user,
+        incident,
+        impact_type_tag,
+    ):
+        mock_get_user.return_value = user
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_resolved_view(
+            severity="P1",
+            affected_service_tags=("__create__:payments",),
+            affected_region_tags=("__create__:ap-south-1",),
+        )
+
+        handle_resolved_submission(ack, body, view, client)
+
+        ack.assert_called_once_with()
+        service_tag = Tag.objects.get(name="payments", type=TagType.AFFECTED_SERVICE)
+        assert service_tag.type == TagType.AFFECTED_SERVICE
+        region_tag = Tag.objects.get(name="ap-south-1", type=TagType.AFFECTED_REGION)
+        assert region_tag.type == TagType.AFFECTED_REGION
+
+        incident.refresh_from_db()
+        assert "payments" in incident.affected_service_tag_names
+        assert "ap-south-1" in incident.affected_region_tag_names
+
     @patch("firetower.slack_app.handlers.resolved.get_or_create_user_from_slack_id")
     def test_captain_resolution_failure(self, mock_get_user, incident):
         mock_get_user.return_value = None
@@ -392,6 +439,23 @@ class TestResolvedSubmission:
         handle_resolved_submission(ack, body, view, client)
 
         ack.assert_called_once_with()
-        client.chat_postMessage.assert_called_once()
-        msg = client.chat_postMessage.call_args[1]["text"]
-        assert "Failed to resolve the selected captain" in msg
+        client.chat_postMessage.assert_not_called()
+        client.chat_postEphemeral.assert_called_once()
+        assert client.chat_postEphemeral.call_args[1]["user"] == "U_CAPTAIN"
+
+    @patch("firetower.slack_app.handlers.resolved.get_incident_from_channel")
+    def test_db_error_posts_ephemeral_failure(self, mock_get_incident):
+        # A DB failure must surface to the submitter (ephemerally), not vanish
+        # behind a closed modal.
+        mock_get_incident.side_effect = OperationalError("db down")
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_CAPTAIN"}}
+        view = _make_resolved_view()
+
+        handle_resolved_submission(ack, body, view, client)
+
+        ack.assert_called_once_with()
+        client.chat_postMessage.assert_not_called()
+        client.chat_postEphemeral.assert_called_once()
+        assert client.chat_postEphemeral.call_args[1]["user"] == "U_CAPTAIN"
