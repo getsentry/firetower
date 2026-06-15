@@ -108,6 +108,8 @@ jobs:
             multi_container: false
           - service: firetower-async-test
             multi_container: false
+          - service: firetower-mcp-test
+            multi_container: false
     steps:
       - name: Checkout code
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -148,6 +150,8 @@ jobs:
           - service: firetower-slack-app
             multi_container: false
           - service: firetower-async-prod
+            multi_container: false
+          - service: firetower-mcp
             multi_container: false
     steps:
       - name: Checkout code

@@ -15,7 +15,9 @@ elif [ z"$1" = "zslack-bot" ]; then
     exec /app/.venv/bin/ddtrace-run /app/.venv/bin/django-admin run_slack_bot --settings firetower.settings
 elif [ z"$1" = "zworker" ]; then
     exec /app/.venv/bin/django-admin wrapped_worker --settings firetower.settings
+elif [ z"$1" = "zmcp" ]; then
+    exec /app/.venv/bin/ddtrace-run /app/.venv/bin/python -m firetower.mcp_server.server
 else
-    echo "Usage: $0 (migrate|server|slack-bot|worker)"
+    echo "Usage: $0 (migrate|server|slack-bot|worker|mcp)"
     exit 1
 fi

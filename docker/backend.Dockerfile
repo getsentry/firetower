@@ -15,7 +15,8 @@ COPY pyproject.toml .
 COPY manage.py .
 COPY README.md .
 COPY src/ src/
-RUN uv sync --group prod --no-dev --frozen --compile-bytecode --no-editable
+COPY sdk/ sdk/
+RUN uv sync --group prod --group mcp --no-dev --frozen --compile-bytecode --no-editable
 
 FROM python:3.12.11-alpine3.22
 
