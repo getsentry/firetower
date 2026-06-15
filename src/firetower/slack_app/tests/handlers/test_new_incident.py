@@ -14,6 +14,7 @@ from firetower.slack_app.handlers.new_incident import (
     handle_new_incident_submission,
     handle_tag_options,
 )
+from firetower.slack_app.handlers.utils import _resolve_tag_values
 
 
 @pytest.mark.django_db
@@ -77,6 +78,20 @@ class TestNewIncidentModal:
             "impact_summary_block",
             "private_block",
         }
+
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    def test_modal_omits_incident_page_hint(self, mock_get_bolt_app):
+        ack = MagicMock()
+        body = {"trigger_id": "T12345"}
+        command = {"text": "new"}
+        respond = MagicMock()
+
+        handle_new_command(ack, body, command, respond)
+
+        view = mock_get_bolt_app.return_value.client.views_open.call_args[1]["view"]
+        rendered = str(view["blocks"])
+        assert "incident page" not in rendered
+        assert "Missing a service or region" not in rendered
 
 
 @pytest.mark.django_db
@@ -400,9 +415,10 @@ class TestTagOptions:
 
         ack.assert_called_once()
         options = ack.call_args[1]["options"]
-        assert len(options) == 2
+        assert len(options) == 3
         names = {o["text"]["text"] for o in options}
-        assert names == {"us-east-1", "us-west-2"}
+        assert names == {"us-east-1", "us-west-2", '+ Create "us"'}
+        assert options[0]["value"] == "__create__:us"
 
     def test_empty_query_returns_all(self, _mock_close):
         Tag.objects.create(name="us-east-1", type=TagType.AFFECTED_REGION)
@@ -433,6 +449,63 @@ class TestTagOptions:
         options = ack.call_args[1]["options"]
         assert len(options) == 1
         assert options[0]["text"]["text"] == "us-east-1"
+
+    def test_offers_create_option_for_service(self, _mock_close):
+        ack = MagicMock()
+        payload = {"action_id": "affected_service_tags", "value": "payments"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert options[0] == {
+            "text": {"type": "plain_text", "text": '+ Create "payments"'},
+            "value": "__create__:payments",
+        }
+
+    def test_offers_create_option_for_region(self, _mock_close):
+        ack = MagicMock()
+        payload = {"action_id": "affected_region_tags", "value": "ap-south-1"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert options[0]["value"] == "__create__:ap-south-1"
+
+    def test_no_create_option_for_impact_type(self, _mock_close):
+        ack = MagicMock()
+        payload = {"action_id": "impact_type_tags", "value": "Brand New"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert all(not o["value"].startswith("__create__:") for o in options)
+
+    def test_no_create_option_for_empty_keyword(self, _mock_close):
+        ack = MagicMock()
+        payload = {"action_id": "affected_service_tags", "value": "   "}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert all(not o["value"].startswith("__create__:") for o in options)
+
+    def test_no_create_option_for_exact_match(self, _mock_close):
+        Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+
+        ack = MagicMock()
+        payload = {"action_id": "affected_service_tags", "value": "api"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert all(not o["value"].startswith("__create__:") for o in options)
+
+    def test_create_option_first_and_capped_at_100(self, _mock_close):
+        for i in range(120):
+            Tag.objects.create(name=f"svc-{i:03d}", type=TagType.AFFECTED_SERVICE)
+
+        ack = MagicMock()
+        payload = {"action_id": "affected_service_tags", "value": "svc"}
+        handle_tag_options(ack, payload)
+
+        options = ack.call_args[1]["options"]
+        assert len(options) == 100
+        assert options[0]["value"] == "__create__:svc"
 
 
 class TestFallbackChannel:
@@ -630,3 +703,67 @@ class TestFallbackChannel:
         assert len(feed_calls) == 1
         assert "degraded mode" in feed_calls[0][0][1]
         assert "DB is on fire" in feed_calls[0][0][1]
+
+
+@pytest.mark.django_db
+class TestResolveTagValues:
+    def test_collapses_existing_and_create_of_same_name(self):
+        Tag.objects.create(name="Payments", type=TagType.AFFECTED_SERVICE)
+
+        resolved = _resolve_tag_values(
+            ["Payments", "__create__:payments"],
+            TagType.AFFECTED_SERVICE,
+        )
+
+        assert resolved == ["Payments"]
+
+    def test_collapses_create_values_differing_only_in_case(self):
+        resolved = _resolve_tag_values(
+            ["__create__:Payments", "__create__:payments"],
+            TagType.AFFECTED_SERVICE,
+        )
+
+        assert resolved == ["Payments"]
+        assert (
+            Tag.objects.filter(
+                type=TagType.AFFECTED_SERVICE, name__iexact="payments"
+            ).count()
+            == 1
+        )
+
+    def test_preserves_order(self):
+        resolved = _resolve_tag_values(
+            ["__create__:beta", "__create__:alpha"],
+            TagType.AFFECTED_SERVICE,
+        )
+
+        assert resolved == ["beta", "alpha"]
+
+    def test_resolve_false_strips_prefix_without_db(self):
+        resolved = _resolve_tag_values(
+            ["__create__:payments", "us-east-1", "__create__:   "],
+            TagType.AFFECTED_SERVICE,
+            resolve_tags=False,
+        )
+
+        assert resolved == ["payments", "us-east-1"]
+        assert not Tag.objects.exists()
+
+    def test_skips_empty_after_strip(self):
+        resolved = _resolve_tag_values(
+            ["__create__:   ", "__create__:payments"],
+            TagType.AFFECTED_SERVICE,
+        )
+
+        assert resolved == ["payments"]
+
+    def test_reuses_existing_tag_case_insensitively(self):
+        Tag.objects.create(name="Payments", type=TagType.AFFECTED_SERVICE)
+
+        resolved = _resolve_tag_values(
+            ["__create__:payments"],
+            TagType.AFFECTED_SERVICE,
+        )
+
+        assert resolved == ["Payments"]
+        assert Tag.objects.filter(type=TagType.AFFECTED_SERVICE).count() == 1
