@@ -27,12 +27,10 @@ def create_mcp(config: MCPConfig | None = None) -> FastMCP:
         "jwt_signing_key": config.jwt_signing_key,
         "enable_cimd": True,  # Claude Code / jr register via CIMD
         "require_authorization_consent": True,  # confused-deputy mitigation
+        # Claude.ai connector callback + Claude Code's localhost ports. Required
+        # (see config) so we never fall open to arbitrary redirect URIs.
+        "allowed_client_redirect_uris": list(config.allowed_redirect_uris),
     }
-    if config.allowed_redirect_uris:
-        # Claude.ai connector callback + Claude Code's localhost ports.
-        provider_kwargs["allowed_client_redirect_uris"] = list(
-            config.allowed_redirect_uris
-        )
     auth = SentryGoogleProvider(**provider_kwargs)
     mcp = FastMCP(name="firetower", auth=auth)
     register_tools(mcp)

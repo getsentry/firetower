@@ -19,9 +19,18 @@ _OTHER_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
 def _id_token(
-    signing_key=_KEY, aud=TEST_AUD, iss="https://accounts.google.com", **claims
+    signing_key=_KEY,
+    aud=TEST_AUD,
+    iss="https://accounts.google.com",
+    exp=None,
+    **claims,
 ):
-    payload = {"aud": aud, "iss": iss, "exp": int(time.time()) + 3600, **claims}
+    payload = {
+        "aud": aud,
+        "iss": iss,
+        "exp": exp if exp is not None else int(time.time()) + 3600,
+        **claims,
+    }
     return jwt.encode(payload, signing_key, algorithm="RS256")
 
 
@@ -88,8 +97,73 @@ def test_rejects_wrong_issuer():
         _extract({"id_token": token})
 
 
-def test_tolerates_refresh_without_id_token():
+def test_tolerates_token_set_without_id_token():
+    # A token set with no id_token at all yields no claims (rather than raising).
     assert _extract({}) is None
+
+
+def test_admits_refresh_with_access_token_and_no_id_token():
+    # fastmcp re-extracts on refresh from the merged raw_token_data. A Google
+    # refresh response carries an access_token but no id_token; if the merged set
+    # has no id_token, we must NOT raise (would lock out the user).
+    assert _extract({"access_token": "opaque-google-token"}) is None
+
+
+def test_admits_refresh_with_expired_login_id_token():
+    # The real refresh case: fastmcp merges {**stored, **refresh_response}, so the
+    # ORIGINAL (now-expired) login id_token survives. We must still admit, since
+    # the successful upstream refresh proves liveness and identity is immutable.
+    expired = _id_token(
+        exp=int(time.time()) - 3600,
+        hd="sentry.io",
+        email="a@sentry.io",
+        email_verified=True,
+    )
+    assert _extract({"id_token": expired, "access_token": "opaque"}) == {
+        "hd": "sentry.io",
+        "email": "a@sentry.io",
+        "email_verified": True,
+    }
+
+
+def test_rejects_expired_token_with_bad_signature():
+    # Skipping exp must NOT weaken signature verification: an expired token signed
+    # by the wrong key is still rejected.
+    expired_bad = _id_token(
+        signing_key=_OTHER_KEY,
+        exp=int(time.time()) - 3600,
+        hd="sentry.io",
+        email_verified=True,
+    )
+    with pytest.raises(FastMCPError):
+        _extract({"id_token": expired_bad}, jwks_public_key=_KEY.public_key())
+
+
+def test_rejects_expired_token_for_wrong_domain():
+    # Skipping exp must NOT weaken the domain gate either.
+    expired_evil = _id_token(
+        exp=int(time.time()) - 3600, hd="evil.com", email_verified=True
+    )
+    with pytest.raises(FastMCPError):
+        _extract({"id_token": expired_evil})
+
+
+def test_rejects_when_jwks_fetch_fails():
+    # A transient JWKS fetch failure (or a token kid with no matching key) raises
+    # jwt.PyJWKClientError, which is NOT a subclass of InvalidTokenError. It must
+    # still surface as a controlled FastMCPError, not propagate raw.
+    provider = _provider()
+    provider._jwks_client.get_signing_key_from_jwt.side_effect = jwt.PyJWKClientError(
+        "boom"
+    )
+    token = _id_token(hd="sentry.io", email="a@sentry.io", email_verified=True)
+    with pytest.raises(FastMCPError):
+        asyncio.run(provider._extract_upstream_claims({"id_token": token}))
+
+
+def test_init_requires_client_id():
+    with pytest.raises(ValueError):
+        SentryGoogleProvider(client_id="", client_secret="x", base_url="https://x")
 
 
 class _FakeToken:

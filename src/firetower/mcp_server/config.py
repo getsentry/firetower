@@ -34,18 +34,22 @@ class MCPConfig:
     service_account: str
     firetower_url: str | None
     jwt_signing_key: str | None
-    allowed_redirect_uris: tuple[str, ...] | None
+    allowed_redirect_uris: tuple[str, ...]
     host: str
     port: int
 
     @classmethod
     def from_env(cls) -> "MCPConfig":
-        raw_redirects = os.environ.get("MCP_ALLOWED_REDIRECT_URIS")
-        allowed_redirect_uris = (
-            tuple(u.strip() for u in raw_redirects.split(",") if u.strip())
-            if raw_redirects
-            else None
+        raw_redirects = _require("MCP_ALLOWED_REDIRECT_URIS")
+        allowed_redirect_uris = tuple(
+            u.strip() for u in raw_redirects.split(",") if u.strip()
         )
+        if not allowed_redirect_uris:
+            # An empty/whitespace value would let fastmcp fall open to ANY
+            # redirect URI, so refuse to start for this confidential-data service.
+            raise ConfigError(
+                "MCP_ALLOWED_REDIRECT_URIS must list at least one redirect URI."
+            )
         return cls(
             google_client_id=_require("MCP_GOOGLE_CLIENT_ID"),
             google_client_secret=_require("MCP_GOOGLE_CLIENT_SECRET"),

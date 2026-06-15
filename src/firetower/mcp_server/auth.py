@@ -5,6 +5,16 @@ OAuth client id, issuer = accounts.google.com) and then gated on ``hd ==
 sentry.io`` and ``email_verified`` during the federated login, before FastMCP
 issues its own token. A per-tool fallback re-checks the embedded
 ``upstream_claims`` for defense in depth.
+
+Token refresh note: ``OAuthProxy`` re-calls ``_extract_upstream_claims`` on
+every upstream refresh, passing the *merged* ``raw_token_data``. Google refresh
+responses carry no ``id_token``, but fastmcp merges the refresh response into the
+stored token data (``{**stored, **refresh_response}``), so the original
+login-time ``id_token`` survives. That token's ``exp`` is in the past by then, so
+we re-verify identity (signature, audience, issuer, hd, email_verified) but skip
+expiry/not-before verification: a successful upstream refresh already proves the
+session is live, and the identity facts we gate on are immutable. Verifying
+``exp`` here would lock out legitimate users on their first refresh (~1h).
 """
 
 import logging
@@ -26,27 +36,35 @@ GOOGLE_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
 class SentryGoogleProvider(GoogleProvider):
     """GoogleProvider that only admits verified @sentry.io Workspace accounts."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self._expected_audience = kwargs.get("client_id")
+    def __init__(self, *, client_id: str, **kwargs: Any) -> None:
+        if not client_id:
+            raise ValueError("SentryGoogleProvider requires a non-empty client_id.")
+        super().__init__(client_id=client_id, **kwargs)
+        self._expected_audience = client_id
         self._jwks_client = jwt.PyJWKClient(GOOGLE_JWKS_URI)
 
     async def _extract_upstream_claims(
         self, idp_tokens: dict[str, Any]
     ) -> dict[str, Any] | None:
         id_token = idp_tokens.get("id_token")
-        if id_token is None:  # refresh exchange has no id_token; already gated at login
+        if id_token is None:  # no id_token at all (e.g. non-OIDC refresh)
             return None
 
-        signing_key = self._jwks_client.get_signing_key_from_jwt(id_token)
         try:
+            signing_key = self._jwks_client.get_signing_key_from_jwt(id_token)
             claims = jwt.decode(
                 id_token,
                 signing_key.key,
                 algorithms=["RS256"],
                 audience=self._expected_audience,
+                # On refresh, fastmcp re-extracts from the merged raw_token_data,
+                # which still holds the (now-expired) login-time id_token. Skip
+                # exp/nbf here: the upstream refresh already proved liveness and
+                # the identity facts we gate on are immutable. Signature, aud,
+                # and issuer are still fully verified.
+                options={"verify_exp": False, "verify_nbf": False},
             )
-        except jwt.InvalidTokenError as exc:
+        except (jwt.InvalidTokenError, jwt.PyJWKClientError) as exc:
             logger.info("Rejecting login: invalid Google id token: %s", exc)
             raise FastMCPError("Access denied: invalid Google identity token.") from exc
 
