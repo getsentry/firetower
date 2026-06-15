@@ -234,9 +234,25 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
 - **Reverse-proxy gotcha (FastMCP #2889):** behind a path-rewriting LB/proxy, the RFC 9728
   `resource_metadata` URL in the `WWW-Authenticate` header can come out wrong. Set
   `base_url` correctly and verify the emitted metadata URL against the public origin.
-- Register only `https://<our-origin>/<redirect_path>` as the Google OAuth redirect — the
-  `OAuthProxy` absorbs Claude Code's ephemeral `localhost:*` ports, so those are NOT
-  registered with Google.
+- **OAuth client is console-only — NOT Terraformable.** Verified: there is no Terraform
+  resource for a consumer "Web application" OAuth client (the lookalikes are all wrong —
+  `google_iap_brand`/`google_iap_client` lock redirect URIs to IAP and are deprecated
+  (shutdown Mar 2026); `google_iam_oauth_client`/`gcloud iam oauth-clients` are Workforce
+  Identity Federation; `google_identity_platform_*` consume an existing client). Google
+  exposes no public API for it (TF issues #6074, #16452 closed as not-possible). So:
+  **create the Web OAuth client + consent screen by hand in the console** (consent =
+  Internal → Workspace-gated, a free extra layer), then **store client_id/secret in Secret
+  Manager via Terraform** (`google_secret_manager_secret` + `_version`) and reference from
+  the Cloud Run service. The secret-management half is the only Terraformable part.
+- **Two distinct redirect-URI concerns** (don't conflate):
+  - *Google console* (upstream client): register `https://<our-origin>/auth/callback`
+    (FastMCP default `redirect_path`), plus `https://claude.ai/api/mcp/auth_callback` and
+    `https://claude.com/api/mcp/auth_callback`, plus `https://claude.ai`/`https://claude.com`
+    as Authorized JavaScript origins. Loopback (`localhost`/`127.0.0.1`) needs no port
+    enumeration — Google allows any loopback port.
+  - *`MCP_ALLOWED_REDIRECT_URIS`* (FastMCP `allowed_client_redirect_uris`): validates the
+    *downstream* MCP client callback (claude.ai/.com + localhost). FastMCP ≤3.1.1 had a bug
+    rejecting dynamic-port loopback — watch for it on the pinned version.
 
 ## Open questions / to verify before coding
 
