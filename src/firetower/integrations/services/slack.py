@@ -318,6 +318,11 @@ class SlackService:
                             f"Error posting message after joining channel: {retry_error}",
                             extra={"channel_id": channel_id},
                         )
+                else:
+                    logger.error(
+                        f"Failed to join channel {channel_id} for message retry",
+                        extra={"channel_id": channel_id},
+                    )
             else:
                 logger.error(
                     f"Error posting message: {e}", extra={"channel_id": channel_id}
@@ -373,6 +378,11 @@ class SlackService:
                             f"Error adding bookmark after joining channel: {retry_error}",
                             extra={"channel_id": channel_id},
                         )
+                else:
+                    logger.error(
+                        f"Failed to join channel {channel_id} for bookmark retry",
+                        extra={"channel_id": channel_id},
+                    )
             else:
                 logger.error(
                     f"Error adding bookmark: {e}", extra={"channel_id": channel_id}

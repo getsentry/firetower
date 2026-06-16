@@ -333,7 +333,12 @@ class TestSlackService:
         mock_client.conversations_join.side_effect = SlackApiError(
             "channel_not_found", join_error_response
         )
-        assert service.post_message("C12345", "hello") is None
+        with patch("firetower.integrations.services.slack.logger") as mock_logger:
+            assert service.post_message("C12345", "hello") is None
+            mock_logger.error.assert_any_call(
+                "Failed to join channel C12345 for message retry",
+                extra={"channel_id": "C12345"},
+            )
         mock_client.conversations_join.assert_called_once_with(channel="C12345")
         assert mock_client.chat_postMessage.call_count == 1
 
@@ -397,7 +402,14 @@ class TestSlackService:
         mock_client.conversations_join.side_effect = SlackApiError(
             "channel_not_found", join_error_response
         )
-        assert service.add_bookmark("C12345", "title", "https://example.com") is False
+        with patch("firetower.integrations.services.slack.logger") as mock_logger:
+            assert (
+                service.add_bookmark("C12345", "title", "https://example.com") is False
+            )
+            mock_logger.error.assert_any_call(
+                "Failed to join channel C12345 for bookmark retry",
+                extra={"channel_id": "C12345"},
+            )
         mock_client.conversations_join.assert_called_once_with(channel="C12345")
         assert mock_client.bookmarks_add.call_count == 1
 
