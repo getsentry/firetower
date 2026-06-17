@@ -1,7 +1,8 @@
 # Firetower MCP Server — Design
 
-Status: draft for review (2026-06-15)
-Branch/worktree: `spalmurray/mcp` (`/Users/spencer/code/spalmurray/mcp`)
+Status: design resolved, built + dual-reviewed; pending deploy (2026-06-16)
+Branch/worktree: `spalmurray/mcp` (`/Users/spencer/code/spalmurray/mcp`); terraform on
+`spalmurray/firetower-mcp` in `~/code/ops` (`terraform/eng-tools/firetower/`)
 
 ## Goal
 
@@ -20,6 +21,18 @@ remote MCP server gated to Sentry Google Workspace accounts.
   So the `@sentry.io` gate is a real confidentiality boundary, not a convenience.
 - **Identity:** single service identity for data access (Hop 2). Per-user login only
   gates access + provides an audit trail (Hop 1).
+- **Access & governance (resolved):**
+  - **Open to all verified `@sentry.io` Workspace accounts** — no allowlist beyond the `hd`
+    gate. Non-private incident metadata is data any employee already sees.
+  - **LLM egress is compliance-cleared** — sending this data to Claude (and later other
+    models) raises no new concern beyond existing compliance discussions. No field redaction.
+  - **Per-user audit logging is implemented** (`tools.py::_audit`): logs the verified
+    requester email + tool + non-None params on every call, since firetower's own logs only
+    see the shared SA. This is where per-user attribution lives.
+  - **No per-user revocation mechanism, and none needed** — offboarding via Google account
+    deactivation is the kill switch (sessions die within ~1h once the refresh stops working,
+    see "Auth on key/account loss" below). Revoking the single Google OAuth client / SA
+    revokes everyone at once if ever required.
 
 ## Architecture — two auth hops
 
@@ -75,8 +88,10 @@ What we build on top of the library:
    `email_verified` — the FastMCP token is never minted. Return `{hd, email, email_verified}`
    so it propagates into the issued JWT (`upstream_claims`), readable by a per-tool
    `get_access_token().claims["upstream_claims"]` fallback check (defense in depth).
-   Pin **FastMCP v3.4.1** (auth module is semver-exempt). Caveat: the refresh path has no
-   `id_token` — guard with `if id_token is None: return None` (initial login already gated).
+   Track latest **fastmcp** (`>=3.4.1` floor) — Dependabot opens bump PRs (no auto-merge);
+   re-run the auth tests + a live OAuth/refresh smoke on each bump, since this hook rides
+   `OAuthProxy` internals that are semver-exempt. Caveat: the refresh path has no `id_token`
+   — guard with `if id_token is None: return None` (initial login already gated).
    **Implemented (`auth.py`):** the `id_token` is **signature-verified against Google's JWKS**
    (`jwt.PyJWKClient`), with **`aud` == our client_id** and **`iss` in {accounts.google.com,
    https://accounts.google.com}** checked, *then* the `hd`/`email_verified` gate. Since the
@@ -130,10 +145,17 @@ What we build on top of the library:
 - Static bearer tokens are **not supported** by Claude clients — OAuth (or authless) only.
   Authless loses the gate, so OAuth it is.
 
-## Primary consumer: `jr` (getsentry/junior)
+## Client rollout: Claude first, then jr, then others
 
-The target client is Sentry's internal agent **jr** (Slack bot, Vercel-hosted, headless/
-event-driven). Key facts that shape the design:
+**Rollout order (resolved): start with Claude (Code + claude.ai/Desktop), then expand to
+`jr`, then codex/whatever.** There is no formal phasing gate — adding a client is just an
+edit to `MCP_ALLOWED_REDIRECT_URIS` (+ the Google console redirect URIs), plus, for jr, a
+small plugin PR. The server shape is identical for all of them (OAuth + PKCE).
+
+### Phase 2 client: `jr` (getsentry/junior)
+
+**jr** is Sentry's internal agent (Slack bot, Vercel-hosted, headless/event-driven). It's
+the natural second client; the facts below confirm our server shape already fits it:
 
 - **jr is already a remote MCP client over Streamable HTTP** (`@modelcontextprotocol/sdk`),
   with a **built-in OAuth client**: DCR + PKCE, `token_endpoint_auth_method: none` (public
@@ -227,10 +249,36 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
 - **Not** behind IAP (it has its own OAuth). Confirm ingress/LB wiring.
 - Secrets: Google OAuth client id/secret; the firetower SA credentials for Hop 2.
 - Reuse existing deploy workflow patterns (`.github/workflows/deploy.yml`).
-- **Pin FastMCP to an exact version** — its `fastmcp.server.auth` module is semver-exempt
-  (breaking changes possible even on patch releases).
-- Production `GoogleProvider` config: set `jwt_signing_key` from env + persistent
-  `client_storage` (otherwise tokens/registrations don't survive restarts).
+- **FastMCP dependency policy (resolved): track latest, don't dependency-pin.** Floor at
+  `fastmcp>=3.4.1`; **Dependabot** (uv ecosystem, `.github/dependabot.yml`) opens weekly bump
+  PRs — **no auto-merge**. On each fastmcp bump, re-run the auth unit tests and do a live
+  OAuth + token-refresh smoke, because the `hd` hook depends on `OAuthProxy` internals that
+  are semver-exempt. (Earlier drafts said "pin to an exact version" — reversed: we'd rather
+  stay current and absorb the occasional break behind a reviewed PR than freeze.)
+- **`jwt_signing_key` from env (stable across restarts).** Set it from Secret Manager so a
+  restart doesn't invalidate already-issued FastMCP tokens via a new signing key.
+- **No persistent `client_storage` in v1 — and that's deliberate.** FastMCP reference tokens
+  do a hard `client_storage` lookup on *every* request, so losing the store (in-memory,
+  per-instance) breaks all active sessions immediately, not gracefully. The fix isn't a DB;
+  it's **not redeploying the service.** Today the shared image means every firetower deploy
+  would restart the MCP server and force a re-auth. We solve that with the **deploy gate**
+  (below), so the server only restarts on actual MCP changes — rare. Revisit persistent
+  storage (e.g. the Linear-token DB pattern) only if restart frequency becomes a problem.
+- **Deploy gate (resolved):** `deploy.yml` has a `changes` job that git-diffs MCP-relevant
+  paths (`src/firetower/mcp_server/`, `sdk/`, `docker/entrypoint.sh`, `docker/backend.Dockerfile`,
+  `pyproject.toml`, `uv.lock`); the `firetower-mcp*` services only deploy when `mcp == true`
+  (non-push events still deploy, to keep manual runs working). This keeps the MCP server off
+  the every-firetower-deploy restart treadmill, which is what makes in-memory storage viable.
+- **Observability (resolved):** Datadog via serverless-init (`DD_API_KEY`/`DD_APP_KEY` env on
+  both MCP services, mirroring the slack/async siblings) + Cloud Logging for the structured
+  audit lines. Per-request token validation cost (FastMCP's `client_storage` lookup, and any
+  tokeninfo call) is accepted — the request volume is low.
+- **Cloud Armor (resolved — required, house convention):** a dedicated
+  `google_compute_security_policy "firetower-mcp-security-policy"` attached to *only* the MCP
+  backends — adaptive L7 DDoS protection (PREMIUM), a per-IP rate-limit throttle
+  (10000/10s → deny 429), and a catch-all allow rule at the lowest priority. Public-facing
+  IPs get Cloud Armor per the ⛅ Notion convention; this is the one public firetower surface,
+  so it gets a policy of its own (the IAP-protected services don't need one).
 - **Reverse-proxy gotcha (FastMCP #2889):** behind a path-rewriting LB/proxy, the RFC 9728
   `resource_metadata` URL in the `WWW-Authenticate` header can come out wrong. Set
   `base_url` correctly and verify the emitted metadata URL against the public origin.
@@ -251,8 +299,27 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
     as Authorized JavaScript origins. Loopback (`localhost`/`127.0.0.1`) needs no port
     enumeration — Google allows any loopback port.
   - *`MCP_ALLOWED_REDIRECT_URIS`* (FastMCP `allowed_client_redirect_uris`): validates the
-    *downstream* MCP client callback (claude.ai/.com + localhost). FastMCP ≤3.1.1 had a bug
-    rejecting dynamic-port loopback — watch for it on the pinned version.
+    *downstream* MCP client callback. Set to
+    `https://claude.ai/api/mcp/auth_callback,https://claude.com/api/mcp/auth_callback,http://localhost:*,http://127.0.0.1:*`.
+    **Verified against current FastMCP source:** the matcher is component-wise — port `*`
+    plus root-path-matches-any handles ephemeral-port loopback correctly (an earlier ≤3.1.1
+    bug rejecting dynamic-port loopback is not present on our floor). `None` = allow all,
+    empty = block all; our `config.py` `_require()`s a non-empty value so neither happens by
+    accident.
+
+## Auth on key/account loss (offboarding + kill switches)
+
+- **Offboarding a user:** deactivating their Google Workspace account is the kill switch.
+  Their existing FastMCP token keeps working only until its short TTL expires, and the next
+  upstream refresh fails (Google rejects the deactivated account) → the session dies within
+  **~1h**. No per-user revocation endpoint needed.
+- **Losing the in-memory token store** (instance restart with no persistence): breaks *all*
+  active sessions immediately — every request does a hard `client_storage` lookup. Mitigated
+  by the deploy gate (restarts are rare). Users just re-auth.
+- **Rotating the Google OAuth client secret / SA key:** the client secret rotation forces all
+  clients to re-auth (acceptable, rare); the Hop 2 SA key rotation is transparent to clients.
+- **Global kill switch:** disable the Google OAuth client (or the firetower-api-mcp SA) to cut
+  everyone off at once.
 
 ## Open questions / to verify before coding
 
@@ -263,28 +330,46 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
    indicators **confirmed** (auto-included). RFC 8414 AS metadata is very likely but not
    doc-confirmed — verify by curling `/.well-known/oauth-authorization-server` on a running
    instance.
-3. Hop 2 SA mechanics: how `firetower_sdk` obtains SA creds + the IAP audience today; reuse
-   directly vs. extract the auth into the MCP service.
-4. Cloud Run ingress / load-balancer wiring for a new non-IAP service in the firetower project.
-5. Rate limiting / abuse considerations for the MCP endpoint.
-6. Confirm FastMCP `OAuthProxy` accepts jr's public-client DCR (`token_endpoint_auth_method:
-   none`) + PKCE registration shape.
-7. jr integration PR: declarative `mcp:` plugin in `getsentry/junior` pointing at the
-   deployed server URL + `allowedTools`.
+3. ~~Hop 2 SA mechanics~~ — **resolved:** reuse `firetower_sdk` directly as a uv path dep;
+   it already obtains SA creds + signs the IAP-audience JWT. `firetower.py::get_client()`
+   wraps it.
+4. ~~Cloud Run ingress / LB wiring~~ — **resolved:** terraform in `~/code/ops` adds
+   `firetower-mcp-{test,prod}` (ingress `INTERNAL_LOAD_BALANCER`, no IAP, `allUsers` invoker)
+   behind the external LB with NEG/backend/URL-map/managed-cert/DNS, mirroring siblings.
+5. ~~Rate limiting / abuse~~ — **resolved:** Cloud Armor security policy (adaptive L7 DDoS +
+   per-IP throttle) attached to the MCP backends only. See Deployment.
+6. ~~FastMCP `OAuthProxy` accepts public-client DCR + PKCE~~ — **confirmed** (jr's shape;
+   also how Claude registers).
+7. jr integration PR (phase 2): declarative `mcp:` plugin in `getsentry/junior` pointing at
+   the deployed server URL + `allowedTools`. Deferred until after the Claude rollout.
 
-## Build checklist (phased)
+## Build checklist
 
-- [ ] Spike (Hop 1 only — Hop 2 is proven by existing SA-through-IAP examples): FastMCP
-      server with `GoogleProvider` + Workspace `hd` gate. Acceptance test: a **public-client
-      DCR + PKCE** OAuth flow (jr's shape) completes against Google, a non-`@sentry.io`
-      account is rejected, and an authenticated call reaches a trivial tool. Wire the SA→
-      firetower call after, copying the existing example.
-- [ ] Fill out the read-only tool surface.
-- [ ] Token/audience validation + security checklist hardening.
-- [ ] Cloud Run service + deploy workflow + secrets.
-- [ ] Connect from Claude Code and a Claude.ai connector; verify the claude.ai same-origin
-      behavior.
-- [ ] Docs: how to add the connector.
+Done (built + dual-reviewed on `spalmurray/mcp` and ops `spalmurray/firetower-mcp`):
+
+- [x] `SentryGoogleProvider` (`auth.py`) — JWKS-verified `hd`/`email_verified` gate, refresh
+      survival, per-tool fallback gate, `requester_email()` for audit.
+- [x] Read-only tool surface (`tools.py`) — `list_incidents` + `get_incident`, SDK-only,
+      sanitized errors, `_audit()` per-user logging.
+- [x] Hop 2 via `firetower_sdk` path dep (`firetower.py`); config (`config.py`); server
+      wiring (`server.py`); 30 unit tests passing.
+- [x] Docker entrypoint `mcp` mode + Dockerfile `sdk/` copy + `mcp` uv group; `.env.mcp.example`.
+- [x] Deploy gate (`deploy.yml` `changes` job) + Dependabot (uv).
+- [x] Terraform: Cloud Run `firetower-mcp-{test,prod}`, NEG/backend/URL-map, dedicated test
+      DNS-auth + cert for `mcp.test.firetower.getsentry.net`, Cloud Armor policy, IAM
+      `firetower-api-mcp` SA, secrets scaffolding.
+
+Pending (user-driven, mostly out-of-sandbox):
+
+- [ ] Commit the uncommitted changes on both branches.
+- [ ] Create the Google OAuth client + Internal consent screen by hand in the console
+      (redirect `https://mcp.test.firetower.getsentry.net/auth/callback` + claude.ai/.com).
+- [ ] Populate Secret Manager (client secret, jwt signing key) + `mcp_google_client_id_test`.
+- [ ] Confirm the `allUsers` invoker org policy allows the public MCP service.
+- [ ] `terraform fmt/validate/plan/apply` (cloudrun → frontend → iam); push `spalmurray/mcp`;
+      `gh workflow run deploy.yml --ref spalmurray/mcp -f environment=test`.
+- [ ] Live OAuth test from Claude Code + a claude.ai connector (verify same-origin behavior).
+- [ ] Phase 2: jr plugin PR.
 
 ## References
 
