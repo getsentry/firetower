@@ -101,3 +101,17 @@ def require_sentry_account() -> None:
         raise FastMCPError(
             "Access denied: only verified @sentry.io accounts are allowed."
         )
+
+
+def requester_email() -> str | None:
+    """Verified email of the authenticated requester, for audit logging.
+
+    Returns None outside a request context (e.g. in tests) so callers can log
+    defensively without depending on the gate having run.
+    """
+    try:
+        token = get_access_token()
+    except Exception:
+        return None
+    upstream = token.claims.get("upstream_claims") if token else None
+    return upstream.get("email") if upstream else None

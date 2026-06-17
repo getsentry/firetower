@@ -14,9 +14,19 @@ from fastmcp.exceptions import ToolError
 from firetower_sdk.exceptions import FiretowerError
 
 from firetower.mcp_server import firetower
-from firetower.mcp_server.auth import require_sentry_account
+from firetower.mcp_server.auth import requester_email, require_sentry_account
 
 logger = logging.getLogger(__name__)
+
+
+def _audit(tool: str, **params: Any) -> None:
+    """Per-user audit trail: who called which tool with what filters. firetower's
+    own logs only see the shared service account, so this is where attribution lives.
+    """
+    active = {k: v for k, v in params.items() if v is not None}
+    logger.info(
+        "mcp tool call: tool=%s user=%s params=%s", tool, requester_email(), active
+    )
 
 
 def _sanitized(action: str, error: FiretowerError) -> ToolError:
@@ -57,6 +67,21 @@ def list_incidents(
     put each value in its own list element, not comma-separated. Results are
     paginated; pass ``page`` to fetch more."""
     require_sentry_account()
+    _audit(
+        "list_incidents",
+        status=status,
+        severity=severity,
+        service_tier=service_tier,
+        created_after=created_after,
+        created_before=created_before,
+        affected_service=affected_service,
+        root_cause=root_cause,
+        impact_type=impact_type,
+        affected_region=affected_region,
+        captain=captain,
+        reporter=reporter,
+        page=page,
+    )
     try:
         return firetower.get_client().list_incidents(
             statuses=status,
@@ -80,6 +105,7 @@ def get_incident(incident_id: str) -> dict[str, Any]:
     """Get full detail for a single incident by id (e.g. "INC-2000"), including
     participants, tags, external links, and timeline milestones."""
     require_sentry_account()
+    _audit("get_incident", incident_id=incident_id)
     try:
         return firetower.get_client().get_incident(incident_id)
     except FiretowerError as exc:
