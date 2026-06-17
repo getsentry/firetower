@@ -858,7 +858,7 @@ dev = [
     { name = "ty", specifier = ">=0.0.1a19" },
 ]
 mcp = [
-    { name = "fastmcp", specifier = "==3.4.1" },
+    { name = "fastmcp", specifier = ">=3.4.1" },
     { name = "firetower-sdk", editable = "sdk" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10" },
 ]

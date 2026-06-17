@@ -49,7 +49,7 @@ prod = [
     "sentry-sdk[django]>=2.62.0",
 ]
 mcp = [
-    "fastmcp==3.4.1",
+    "fastmcp>=3.4.1",
     "pyjwt[crypto]>=2.10",
     "firetower-sdk",
 ]
