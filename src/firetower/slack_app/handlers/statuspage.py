@@ -136,6 +136,13 @@ def _build_statuspage_modal(
                 },
             },
             "label": {"type": "plain_text", "text": "Message"},
+            "hint": {
+                "type": "plain_text",
+                "text": (
+                    "If impact is region-specific, mention US1, US2, or 'all US' "
+                    "in your message so customers know which region is affected."
+                ),
+            },
         }
     )
 
