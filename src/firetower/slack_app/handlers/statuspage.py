@@ -136,6 +136,13 @@ def _build_statuspage_modal(
                 },
             },
             "label": {"type": "plain_text", "text": "Message"},
+            "hint": {
+                "type": "plain_text",
+                "text": (
+                    "If impact is specific to US1 or US2 mention that in your message "
+                    "so customers know whether they are affected."
+                ),
+            },
         }
     )
 
