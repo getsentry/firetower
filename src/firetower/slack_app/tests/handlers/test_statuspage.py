@@ -191,7 +191,9 @@ class TestStatuspageCommand:
             ) as MockService,
             patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
         ):
-            mock_app.return_value.client.views_open.return_value = {"view": {"id": "v123"}}
+            mock_app.return_value.client.views_open.return_value = {
+                "view": {"id": "v123"}
+            }
             instance = MockService.return_value
             instance.configured = True
             instance.get_components.return_value = ([], {})
@@ -250,7 +252,9 @@ class TestStatuspageCommand:
             ) as MockService,
             patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
         ):
-            mock_app.return_value.client.views_open.return_value = {"view": {"id": "v123"}}
+            mock_app.return_value.client.views_open.return_value = {
+                "view": {"id": "v123"}
+            }
             instance = MockService.return_value
             instance.configured = True
             instance.extract_incident_id_from_url.return_value = "sp123"

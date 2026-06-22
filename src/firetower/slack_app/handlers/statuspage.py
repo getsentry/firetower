@@ -299,7 +299,10 @@ def handle_statuspage_command(
                 "blocks": [
                     {
                         "type": "section",
-                        "text": {"type": "mrkdwn", "text": "Loading Statuspage data..."},
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "Loading Statuspage data...",
+                        },
                     }
                 ],
             },
