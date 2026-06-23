@@ -333,7 +333,12 @@ class TestSlackService:
         mock_client.conversations_join.side_effect = SlackApiError(
             "channel_not_found", join_error_response
         )
-        assert service.post_message("C12345", "hello") is None
+        with patch("firetower.integrations.services.slack.logger") as mock_logger:
+            assert service.post_message("C12345", "hello") is None
+            mock_logger.error.assert_any_call(
+                "Failed to join channel C12345 for message retry",
+                extra={"channel_id": "C12345"},
+            )
         mock_client.conversations_join.assert_called_once_with(channel="C12345")
         assert mock_client.chat_postMessage.call_count == 1
 
@@ -397,7 +402,14 @@ class TestSlackService:
         mock_client.conversations_join.side_effect = SlackApiError(
             "channel_not_found", join_error_response
         )
-        assert service.add_bookmark("C12345", "title", "https://example.com") is False
+        with patch("firetower.integrations.services.slack.logger") as mock_logger:
+            assert (
+                service.add_bookmark("C12345", "title", "https://example.com") is False
+            )
+            mock_logger.error.assert_any_call(
+                "Failed to join channel C12345 for bookmark retry",
+                extra={"channel_id": "C12345"},
+            )
         mock_client.conversations_join.assert_called_once_with(channel="C12345")
         assert mock_client.bookmarks_add.call_count == 1
 
@@ -590,6 +602,46 @@ class TestSlackService:
         mock_response = MagicMock()
         mock_client.pins_add.side_effect = SlackApiError("error", mock_response)
         assert service.pin_message("C12345", "1234567890.123456") is False
+
+    def _make_archived_error(self):
+        mock_response = MagicMock()
+        mock_response.get.return_value = "is_archived"
+        return SlackApiError("is_archived", mock_response)
+
+    def test_join_channel_archived(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_join.side_effect = self._make_archived_error()
+        assert service.join_channel("C12345") is False
+
+    def test_post_message_archived(self):
+        service, mock_client = self._make_service()
+        mock_client.chat_postMessage.side_effect = self._make_archived_error()
+        assert service.post_message("C12345", "hello") is None
+
+    def test_pin_message_archived(self):
+        service, mock_client = self._make_service()
+        mock_client.pins_add.side_effect = self._make_archived_error()
+        assert service.pin_message("C12345", "1234567890.123456") is False
+
+    def test_add_bookmark_archived(self):
+        service, mock_client = self._make_service()
+        mock_client.bookmarks_add.side_effect = self._make_archived_error()
+        assert service.add_bookmark("C12345", "title", "https://example.com") is False
+
+    def test_invite_to_channel_archived(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_invite.side_effect = self._make_archived_error()
+        assert service.invite_to_channel("C12345", ["U111"]) is False
+
+    def test_rename_channel_archived(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_rename.side_effect = self._make_archived_error()
+        assert service.rename_channel("C12345", "new-name") is False
+
+    def test_set_channel_topic_archived(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_setTopic.side_effect = self._make_archived_error()
+        assert service.set_channel_topic("C12345", "topic") is False
 
 
 class TestIsSlackGuest:

@@ -48,6 +48,15 @@ def _build_backfill_modal(channel_id: str, user_id: str = "") -> dict:
 def _setup_channel_for_incident(
     incident: Any, channel_id: str, notify_user_id: str, client: Any
 ) -> None:
+    channel_info = _slack_service.get_channel_info(channel_id)
+    if channel_info and channel_info.get("is_archived"):
+        logger.warning(
+            "Skipping setup for archived channel %s on incident %s",
+            channel_id,
+            incident.id,
+        )
+        return
+
     joined = _slack_service.join_channel(channel_id)
     if not joined:
         base_url = settings.FIRETOWER_BASE_URL
@@ -70,7 +79,6 @@ def _setup_channel_for_incident(
         return
 
     expected_name = build_channel_name(incident)
-    channel_info = _slack_service.get_channel_info(channel_id)
     if channel_info and channel_info["name"] != expected_name:
         renamed = _slack_service.rename_channel(channel_id, expected_name)
         if not renamed:
