@@ -158,6 +158,7 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
             "root_cause_tags",
             "impact_type_tags",
             "external_links",
+            "linear_parent_issue_id",
             "created_at",
             "updated_at",
             "time_started",
@@ -169,6 +170,7 @@ class IncidentDetailUISerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "linear_parent_issue_id",
             "created_at",
             "updated_at",
             "time_started",

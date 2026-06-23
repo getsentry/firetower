@@ -39,6 +39,7 @@ const IncidentDetailSchema = z.object({
   impact_type_tags: z.array(z.string()),
   participants: z.array(ParticipantSchema),
   external_links: ExternalLinksSchema,
+  linear_parent_issue_id: z.string().nullable(),
   time_started: z.string().nullable(),
   time_detected: z.string().nullable(),
   time_analyzed: z.string().nullable(),
