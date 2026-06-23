@@ -5,7 +5,7 @@ import pytest
 from django.contrib.auth.models import User
 from slack_sdk.errors import SlackApiError
 
-from firetower.incidents.models import Incident, IncidentSeverity
+from firetower.incidents.models import ExternalLinkType, Incident, IncidentSeverity
 from firetower.integrations.services.slack import SlackService, is_slack_url
 from firetower.slack_app.handlers.dumpslack import (
     _backfill_milestones,
@@ -547,6 +547,279 @@ class TestTriggerSlackDump:
             _trigger_slack_dump(client, "C123", mock_incident)
 
         client.chat_postMessage.assert_called()
+
+    def test_waits_for_in_progress_postmortem_doc(self):
+        notion_url = "https://notion.so/12345678-1234-1234-1234-123456789abc"
+        client = MagicMock()
+        mock_incident = MagicMock(is_private=False)
+        mock_incident.captain = None
+        mock_notion_link = MagicMock(url="")
+        mock_notion = MagicMock()
+        call_count = 0
+
+        def simulate_url_appearing():
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 2:
+                mock_notion_link.url = notion_url
+
+        mock_notion_link.refresh_from_db = simulate_url_appearing
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch("firetower.slack_app.handlers.dumpslack.time") as mock_time,
+        ):
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                False,
+            )
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        mock_notion.create_postmortem_page.assert_not_called()
+        mock_time.sleep.assert_called()
+        assert client.chat_postMessage.call_count == 1
+        posted = client.chat_postMessage.call_args[1]["text"]
+        assert notion_url in posted
+
+    def test_times_out_waiting_and_takes_over_orphaned_placeholder(self):
+        client = MagicMock()
+        mock_incident = MagicMock(is_private=False)
+        mock_incident.captain = None
+        mock_notion_link = MagicMock(url="")
+        mock_notion = MagicMock()
+        mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
+        mock_notion.create_postmortem_page.return_value = mock_page
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch("firetower.slack_app.handlers.dumpslack.time") as mock_time,
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+        ):
+            mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                False,
+            )
+            mock_el.objects.select_for_update.return_value.get.return_value = (
+                mock_notion_link
+            )
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        assert mock_time.sleep.call_count == 15
+        mock_notion.create_postmortem_page.assert_called_once()
+
+    def test_recovers_when_placeholder_deleted_during_poll(self):
+        client = MagicMock()
+        mock_incident = MagicMock(is_private=False)
+        mock_incident.captain = None
+        mock_notion_link = MagicMock(url="")
+        fresh_notion_link = MagicMock(url="")
+        mock_notion = MagicMock()
+        mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
+        mock_notion.create_postmortem_page.return_value = mock_page
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch("firetower.slack_app.handlers.dumpslack.time") as mock_time,
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+        ):
+            mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_el.DoesNotExist = type("DoesNotExist", (Exception,), {})
+            mock_notion_link.refresh_from_db.side_effect = mock_el.DoesNotExist
+            mock_el.objects.select_for_update.return_value.get_or_create.side_effect = [
+                (mock_notion_link, False),
+                (fresh_notion_link, True),
+            ]
+            mock_el.objects.select_for_update.return_value.get.return_value = (
+                fresh_notion_link
+            )
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        mock_time.sleep.assert_called_once()
+        mock_notion.create_postmortem_page.assert_called_once()
+
+    def test_uses_existing_url_and_updates_slack(self):
+        existing_url = "https://notion.so/12345678-1234-1234-1234-123456789abc"
+        client = MagicMock()
+        mock_incident = MagicMock(is_private=False)
+        mock_incident.captain = None
+        mock_notion_link = MagicMock(url=existing_url)
+        mock_notion = MagicMock()
+        mock_slack_service = MagicMock()
+        mock_slack_service.client.bookmarks_list.return_value = {"bookmarks": []}
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch(
+                "firetower.slack_app.handlers.dumpslack.SlackService",
+                return_value=mock_slack_service,
+            ),
+        ):
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                False,
+            )
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        mock_notion.create_postmortem_page.assert_not_called()
+        mock_notion.apply_template.assert_called_once()
+        call_args = mock_notion.apply_template.call_args
+        assert call_args[0][0] == "12345678-1234-1234-1234-123456789abc"
+        assert call_args[1]["incident"] == mock_incident
+        mock_slack_service.add_bookmark.assert_called_once_with(
+            "C123", "Postmortem Doc", existing_url
+        )
+        posted = client.chat_postMessage.call_args[1]["text"]
+        assert "Updated" in posted
+        assert existing_url in posted
+
+    def test_skips_bookmark_when_already_exists(self):
+        existing_url = "https://notion.so/12345678-1234-1234-1234-123456789abc"
+        client = MagicMock()
+        mock_incident = MagicMock(is_private=False)
+        mock_incident.captain = None
+        mock_notion_link = MagicMock(url=existing_url)
+        mock_notion = MagicMock()
+        mock_slack_service = MagicMock()
+        mock_slack_service.client.bookmarks_list.return_value = {
+            "bookmarks": [{"title": "Postmortem Doc", "link": existing_url}]
+        }
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch(
+                "firetower.slack_app.handlers.dumpslack.SlackService",
+                return_value=mock_slack_service,
+            ),
+        ):
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                False,
+            )
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        mock_slack_service.add_bookmark.assert_not_called()
+
+    def test_race_loser_adopts_winner_page_and_archives_orphan(self):
+        winner_url = "https://notion.so/12345678-1234-1234-1234-123456789abc"
+        client = MagicMock()
+        mock_incident = MagicMock(is_private=False)
+        mock_incident.captain = None
+        mock_page = {"id": "our-page", "url": "https://notion.so/our-page-id"}
+        mock_notion_link = MagicMock(url="")
+        winner_link = MagicMock(url=winner_url)
+        mock_notion = MagicMock()
+        mock_notion.create_postmortem_page.return_value = mock_page
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+        ):
+            mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                True,
+            )
+            mock_el.objects.select_for_update.return_value.get.return_value = (
+                winner_link
+            )
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        mock_notion.archive_page.assert_called_once_with("our-page")
+        mock_notion.apply_template.assert_called_once()
+        call_args = mock_notion.apply_template.call_args
+        assert call_args[0][0] == "12345678-1234-1234-1234-123456789abc"
+        assert call_args[1]["incident"] == mock_incident
+        posted = client.chat_postMessage.call_args[1]["text"]
+        assert winner_url in posted
+
+    def test_cleans_up_placeholder_on_failure(self):
+        client = MagicMock()
+        mock_incident = MagicMock(is_private=False)
+        mock_incident.captain = None
+        mock_notion_link = MagicMock(url="")
+        mock_notion = MagicMock()
+        mock_notion.create_postmortem_page.side_effect = RuntimeError("API error")
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+        ):
+            mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                True,
+            )
+            mock_el.objects.filter.return_value.delete.return_value = (1, {})
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        mock_el.objects.filter.assert_called_once_with(
+            incident=mock_incident,
+            type=ExternalLinkType.NOTION,
+            url="",
+        )
+        mock_el.objects.filter.return_value.delete.assert_called_once()
+        posted = client.chat_postMessage.call_args[1]["text"]
+        assert "Failed" in posted
 
 
 class TestHandleDumpslackCommand:
