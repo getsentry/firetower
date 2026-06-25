@@ -16,7 +16,9 @@ _bot_user_id: str | None = None
 # Bounded set of recently handled channel_topic event ids, used to drop Slack
 # redeliveries. Socket Mode strips the X-Slack-Retry-Num header (it lives on the
 # envelope, not the event payload Bolt forwards), so we dedup on the event's own
-# id/timestamp instead.
+# id/timestamp instead. This in-memory cache is per-process, so it only dedups
+# correctly while the firetower-slack-app Cloud Run service stays single-instance
+# (max_instance_count = 1); scaling it out would split the cache across replicas.
 _RECENT_EVENT_CACHE_SIZE = 256
 _recent_event_ids: "OrderedDict[str, None]" = OrderedDict()
 # Bolt dispatches event listeners on a thread pool, so guard the cache against
@@ -51,24 +53,6 @@ def _seen_recently(event_id: str) -> bool:
         return False
 
 
-def _is_slack_retry(request: Any) -> bool:
-    """Best-effort detection of a Slack event redelivery.
-
-    Works in HTTP mode where Bolt exposes the X-Slack-Retry-Num header. Under
-    Socket Mode (how Firetower runs) the header is absent, so callers must also
-    rely on the event-id dedup cache.
-    """
-    if request is None:
-        return False
-    headers = getattr(request, "headers", None)
-    if not headers:
-        return False
-    value = headers.get("x-slack-retry-num")
-    if isinstance(value, (list, tuple)):
-        value = value[0] if value else None
-    return bool(value)
-
-
 def _build_reset_message(attempted: str) -> str:
     lines = [
         "Channel topics here are managed by Firetower and reflect the incident's "
@@ -86,12 +70,12 @@ def _build_reset_message(attempted: str) -> str:
     return "\n\n".join(lines)
 
 
-def handle_channel_topic_change(event: dict, client: Any, request: Any = None) -> None:
+def handle_channel_topic_change(event: dict, client: Any) -> None:
     """Reset manual incident-channel topic edits and nudge the editor.
 
     Slack emits a ``channel_topic`` message event whenever a channel's topic
     changes, including when Firetower sets it. The bot-author guard prevents an
-    infinite reset loop on our own edits, and a retry/dedup guard prevents a
+    infinite reset loop on our own edits, and the event-id dedup guard prevents a
     second reset and ephemeral when Slack redelivers the event.
     """
     if event.get("user") == _get_bot_user_id(client):
@@ -102,7 +86,7 @@ def handle_channel_topic_change(event: dict, client: Any, request: Any = None) -
         return
 
     event_id = _event_id(event)
-    if _is_slack_retry(request) or (event_id is not None and _seen_recently(event_id)):
+    if event_id is not None and _seen_recently(event_id):
         logger.info("Skipping duplicate channel_topic event for channel %s", channel_id)
         return
 

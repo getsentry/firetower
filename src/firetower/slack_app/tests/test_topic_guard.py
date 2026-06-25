@@ -175,20 +175,3 @@ def test_duplicate_event_id_is_skipped(
 
     mock_slack_service.set_channel_topic.assert_called_once()
     client.chat_postEphemeral.assert_called_once()
-
-
-@patch("firetower.slack_app.handlers.topic_guard._slack_service")
-@patch("firetower.slack_app.handlers.topic_guard.build_channel_topic")
-@patch("firetower.slack_app.handlers.topic_guard.get_incident_from_channel")
-def test_slack_retry_header_is_skipped(
-    mock_get_incident, mock_build_topic, mock_slack_service, client
-):
-    mock_get_incident.return_value = MagicMock()
-    mock_build_topic.return_value = CANONICAL
-    request = MagicMock()
-    request.headers = {"x-slack-retry-num": ["1"]}
-
-    handle_channel_topic_change(_event(), client, request=request)
-
-    mock_slack_service.set_channel_topic.assert_not_called()
-    client.chat_postEphemeral.assert_not_called()
