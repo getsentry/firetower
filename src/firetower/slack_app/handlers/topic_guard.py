@@ -65,7 +65,7 @@ def _build_reset_message(attempted: str) -> str:
         lines.append(f"You tried to set:\n{quoted}")
     lines.append(
         "To change incident details (which update the topic automatically), use "
-        "`/ft subject <title>`, `/ft severity <P0-P4>`, or `/ft captain @user`."
+        "`/ft subject <title>`, `/ft severity <P0-P4>`, or `/ft captain`."
     )
     return "\n\n".join(lines)
 
