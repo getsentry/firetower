@@ -215,6 +215,33 @@ def _with_metrics(callback_id: str) -> Callable[..., Callable[..., Any]]:
     return decorator
 
 
+def _with_event_metrics(event_type: str) -> Callable[..., Callable[..., Any]]:
+    """Wrap a Bolt event handler to emit submitted/completed/failed metrics.
+
+    Uses a ``slack_app.events`` namespace so event volume does not pollute the
+    ``slack_app.views`` dashboards.
+    """
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            close_old_connections()
+            tags = [f"event_type:{event_type}"]
+            statsd.increment("slack_app.events.submitted", tags=tags)
+            try:
+                result = func(*args, **kwargs)
+                statsd.increment("slack_app.events.completed", tags=tags)
+                return result
+            except Exception:
+                logger.exception("Event handler failed: %s", event_type)
+                statsd.increment("slack_app.events.failed", tags=tags)
+                raise
+
+        return wrapper
+
+    return decorator
+
+
 def _register_views(app: App) -> None:
     """Register view handlers (modals, etc.) on the Bolt app."""
     app.view("backfill_incident_modal")(
@@ -260,8 +287,21 @@ def _register_views(app: App) -> None:
         app.options(action_id)(handle_tag_options)
 
 
+def _ignore_message_event(ack: Any) -> None:
+    """No-op catch-all for message events.
+
+    Subscribing to message.channels/message.groups opts the bot into the full
+    message firehose. Without a catch-all listener Bolt logs an "Unhandled
+    request" warning for every non-topic message. This listener is registered
+    after the channel_topic handler, so for topic changes the specific handler
+    runs first and returns before this one is reached.
+    """
+    ack()
+
+
 def _register_event_handlers(app: App) -> None:
     """Register Slack event subscriptions on the Bolt app."""
     app.event({"type": "message", "subtype": "channel_topic"})(
-        _with_metrics("channel_topic")(handle_channel_topic_change)
+        _with_event_metrics("channel_topic")(handle_channel_topic_change)
     )
+    app.event("message")(_ignore_message_event)
