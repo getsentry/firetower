@@ -77,6 +77,27 @@ def test_non_incident_channel_is_noop(mock_get_incident, mock_slack_service, cli
 @patch("firetower.slack_app.handlers.topic_guard._slack_service")
 @patch("firetower.slack_app.handlers.topic_guard.build_channel_topic")
 @patch("firetower.slack_app.handlers.topic_guard.get_incident_from_channel")
+def test_attempted_topic_is_escaped(
+    mock_get_incident, mock_build_topic, mock_slack_service, client
+):
+    mock_get_incident.return_value = MagicMock()
+    mock_build_topic.return_value = CANONICAL
+
+    handle_channel_topic_change(
+        _event(topic="<!channel> see <https://evil|here> & <@U999>"), client
+    )
+
+    text = client.chat_postEphemeral.call_args[1]["text"]
+    assert "<!channel>" not in text
+    assert "<@U999>" not in text
+    assert "<https://evil|here>" not in text
+    assert "&lt;!channel&gt;" in text
+    assert "&amp;" in text
+
+
+@patch("firetower.slack_app.handlers.topic_guard._slack_service")
+@patch("firetower.slack_app.handlers.topic_guard.build_channel_topic")
+@patch("firetower.slack_app.handlers.topic_guard.get_incident_from_channel")
 def test_topic_already_canonical_is_noop(
     mock_get_incident, mock_build_topic, mock_slack_service, client
 ):

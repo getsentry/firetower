@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from firetower.incidents.hooks import _slack_service, build_channel_topic
+from firetower.integrations.services.slack import escape_slack_text
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,9 @@ def _build_reset_message(attempted: str) -> str:
         "current status, so I reset it.",
     ]
     if attempted:
-        quoted = "\n".join(f"> {line}" for line in attempted.splitlines())
+        quoted = "\n".join(
+            f"> {escape_slack_text(line)}" for line in attempted.splitlines()
+        )
         lines.append(f"You tried to set:\n{quoted}")
     lines.append(
         "To change incident details (which update the topic automatically), use "
