@@ -246,22 +246,23 @@ def _update_parent_issue_status(
         not statuses or all(s in COMPLETED_STATUSES for s in statuses)
     )
 
+    if not all_complete:
+        return
+
     states = linear_service.get_workflow_states(team_id)
     if not states:
         return
 
-    target_state = "completed" if all_complete else "started"
-
     parent_issue = linear_service.get_issue(incident.linear_parent_issue_id)
-    if not parent_issue or parent_issue.get("state_type") == target_state:
+    if not parent_issue or parent_issue.get("state_type") == "completed":
         return
 
-    state_id = states.get(target_state)
+    state_id = states.get("completed")
     if state_id and linear_service.update_issue(
         incident.linear_parent_issue_id, state_id=state_id
     ):
         _comment_parent_issue_status_change(
-            incident, linear_service, target_state, statuses
+            incident, linear_service, "completed", statuses
         )
 
 

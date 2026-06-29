@@ -435,7 +435,7 @@ class TestSyncActionItemsFromLinear:
                 "parent-issue-id", state_id="state-done"
             )
 
-    def test_sets_parent_to_started_when_incomplete_items(self, settings):
+    def test_does_not_change_parent_state_when_incomplete_items(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
         incident = self._make_incident()
 
@@ -460,9 +460,8 @@ class TestSyncActionItemsFromLinear:
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", state_id="state-started"
-            )
+            for call in mock_service.update_issue.call_args_list:
+                assert "state_id" not in call.kwargs
 
     def test_completes_parent_when_no_action_items(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
