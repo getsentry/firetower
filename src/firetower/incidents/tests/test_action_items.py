@@ -437,14 +437,14 @@ class TestSyncActionItemsFromLinear:
 
     def test_does_not_change_parent_state_when_incomplete_items(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident()
+        incident = self._make_incident(status=IncidentStatus.DONE)
 
         children = [
             _make_linear_issue(
                 id="id-1", identifier="ENG-1", title="T1", status="Done"
             ),
             _make_linear_issue(
-                id="id-2", identifier="ENG-2", title="T2", status="Todo"
+                id="id-2", identifier="ENG-2", title="T2", status="In Progress"
             ),
         ]
 

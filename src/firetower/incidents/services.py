@@ -209,7 +209,6 @@ def _comment_parent_issue_completed(
             incident=incident,
             total_action_items=len(statuses),
             completed_action_items=completed_action_items,
-            target_state="completed",
         )
     except TemplateError:
         logger.exception(
