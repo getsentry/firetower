@@ -3491,3 +3491,66 @@ class TestOnIncidentUpdated:
         messages = [c[0][1] for c in mock_slack.post_message.call_args_list]
         assert any("- Status:" in m for m in messages)
         assert any("private" in m for m in messages)
+
+    @patch("firetower.incidents.hooks._get_linear_service")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_syncs_linear_assignee_on_captain_change(
+        self, mock_slack, mock_get_linear, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_slack.parse_channel_id_from_url.return_value = None
+        mock_service = mock_get_linear.return_value
+        mock_service.update_issue.return_value = True
+
+        captain = User.objects.create_user(
+            username="cap@example.com", email="cap@example.com"
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.LINEAR,
+            external_id="linear-captain-id",
+        )
+        incident = self._make_incident(
+            captain=captain, linear_parent_issue_id="linear-issue-id"
+        )
+
+        on_incident_updated(incident, captain_changed=True)
+
+        mock_service.update_issue.assert_any_call(
+            "linear-issue-id", assignee_id="linear-captain-id"
+        )
+
+    @patch("firetower.incidents.hooks._get_linear_service")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_unassigns_linear_parent_when_no_captain(
+        self, mock_slack, mock_get_linear, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_slack.parse_channel_id_from_url.return_value = None
+        mock_service = mock_get_linear.return_value
+        mock_service.update_issue.return_value = True
+
+        incident = self._make_incident(
+            captain=None, linear_parent_issue_id="linear-issue-id"
+        )
+
+        on_incident_updated(incident, captain_changed=True)
+
+        mock_service.update_issue.assert_any_call("linear-issue-id", assignee_id=None)
+
+    @patch("firetower.incidents.hooks._get_linear_service")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_sync_linear_assignee_without_captain_change(
+        self, mock_slack, mock_get_linear, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_slack.parse_channel_id_from_url.return_value = None
+
+        incident = self._make_incident(
+            status=IncidentStatus.MITIGATED,
+            linear_parent_issue_id="linear-issue-id",
+        )
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        mock_get_linear.return_value.update_issue.assert_not_called()
