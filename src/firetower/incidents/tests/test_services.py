@@ -16,7 +16,7 @@ from firetower.incidents.models import (
     IncidentStatus,
 )
 from firetower.incidents.services import (
-    _comment_parent_issue_status_change,
+    _comment_parent_issue_completed,
     _update_parent_issue_status,
     sync_incident_participants_from_slack,
 )
@@ -441,7 +441,6 @@ class TestUpdateParentIssueStatus:
             "TEAM_ID": "team-1",
             "API_KEY": "key",
             "PARENT_STATUS_COMMENT_COMPLETED": "completed comment",
-            "PARENT_STATUS_COMMENT_STARTED": "started comment",
         }
 
     def _add_item(self, incident, status, suffix="1"):
@@ -575,8 +574,8 @@ class TestUpdateParentIssueStatus:
 
 
 @pytest.mark.django_db
-class TestCommentParentIssueStatusChange:
-    def _make_incident(self, status=IncidentStatus.ACTIVE):
+class TestCommentParentIssueCompleted:
+    def _make_incident(self, status=IncidentStatus.DONE):
         return Incident.objects.create(
             title="Test Incident",
             status=status,
@@ -594,46 +593,24 @@ class TestCommentParentIssueStatusChange:
                 "Incident {{ incident.incident_number }} is {{ incident.status }}. "
                 "{{ completed_action_items }}/{{ total_action_items }} done."
             ),
-            "PARENT_STATUS_COMMENT_STARTED": (
-                "Set to Started. "
-                "Incident {{ incident.incident_number }} is {{ incident.status }}. "
-                "{{ completed_action_items }}/{{ total_action_items }} done."
-            ),
         }
 
     def test_posts_completed_comment(self):
         incident = self._make_incident(status=IncidentStatus.DONE)
         svc = MagicMock()
 
-        _comment_parent_issue_status_change(
-            incident, svc, "completed", ["Done", "Done"]
-        )
+        _comment_parent_issue_completed(incident, svc, ["Done", "Done"])
 
         svc.create_comment.assert_called_once_with(
             "lin-123",
             f"Set to Completed. Incident {incident.incident_number} is Done. 2/2 done.",
         )
 
-    def test_posts_started_comment_with_mixed_statuses(self):
-        incident = self._make_incident(status=IncidentStatus.ACTIVE)
-        svc = MagicMock()
-
-        _comment_parent_issue_status_change(
-            incident, svc, "started", ["Done", "In Progress", "Todo"]
-        )
-
-        svc.create_comment.assert_called_once_with(
-            "lin-123",
-            f"Set to Started. Incident {incident.incident_number} is Active. 1/3 done.",
-        )
-
     def test_counts_canceled_as_completed(self):
         incident = self._make_incident(status=IncidentStatus.DONE)
         svc = MagicMock()
 
-        _comment_parent_issue_status_change(
-            incident, svc, "completed", ["Done", "Canceled"]
-        )
+        _comment_parent_issue_completed(incident, svc, ["Done", "Canceled"])
 
         svc.create_comment.assert_called_once_with(
             "lin-123",
@@ -645,16 +622,16 @@ class TestCommentParentIssueStatusChange:
         incident = self._make_incident(status=IncidentStatus.DONE)
         svc = MagicMock()
 
-        _comment_parent_issue_status_change(incident, svc, "completed", ["Done"])
+        _comment_parent_issue_completed(incident, svc, ["Done"])
 
         svc.create_comment.assert_not_called()
 
     def test_whitespace_only_template_skips_comment(self, settings):
-        settings.LINEAR["PARENT_STATUS_COMMENT_STARTED"] = "   "
-        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        settings.LINEAR["PARENT_STATUS_COMMENT_COMPLETED"] = "   "
+        incident = self._make_incident(status=IncidentStatus.DONE)
         svc = MagicMock()
 
-        _comment_parent_issue_status_change(incident, svc, "started", ["Todo"])
+        _comment_parent_issue_completed(incident, svc, ["Done"])
 
         svc.create_comment.assert_not_called()
 
@@ -662,7 +639,7 @@ class TestCommentParentIssueStatusChange:
         incident = self._make_incident(status=IncidentStatus.DONE)
         svc = MagicMock()
 
-        _comment_parent_issue_status_change(incident, svc, "completed", [])
+        _comment_parent_issue_completed(incident, svc, [])
 
         svc.create_comment.assert_called_once_with(
             "lin-123",
@@ -674,7 +651,7 @@ class TestCommentParentIssueStatusChange:
         svc = MagicMock()
         svc.create_comment.return_value = False
 
-        _comment_parent_issue_status_change(incident, svc, "completed", ["Done"])
+        _comment_parent_issue_completed(incident, svc, ["Done"])
 
         svc.create_comment.assert_called_once()
 
@@ -683,7 +660,7 @@ class TestCommentParentIssueStatusChange:
         svc = MagicMock()
         svc.create_comment.side_effect = Exception("API error")
 
-        _comment_parent_issue_status_change(incident, svc, "completed", ["Done"])
+        _comment_parent_issue_completed(incident, svc, ["Done"])
 
         svc.create_comment.assert_called_once()
 
@@ -692,6 +669,6 @@ class TestCommentParentIssueStatusChange:
         incident = self._make_incident(status=IncidentStatus.DONE)
         svc = MagicMock()
 
-        _comment_parent_issue_status_change(incident, svc, "completed", ["Done"])
+        _comment_parent_issue_completed(incident, svc, ["Done"])
 
         svc.create_comment.assert_not_called()

@@ -483,7 +483,7 @@ class TestSyncActionItemsFromLinear:
                 "parent-issue-id", state_id="state-done"
             )
 
-    def test_syncs_captain_as_parent_assignee(self, settings):
+    def test_does_not_push_parent_assignee_on_sync(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
         captain = User.objects.create_user(
             username="captain@example.com",
@@ -505,26 +505,8 @@ class TestSyncActionItemsFromLinear:
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", assignee_id="linear-captain-id"
-            )
-
-    def test_unassigns_parent_when_no_captain(self, settings):
-        settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident(captain=None)
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_service = mock_get.return_value
-            mock_service.get_child_issues.return_value = []
-            mock_service.get_related_issues.return_value = []
-            mock_service.get_workflow_states.return_value = None
-            mock_service.update_issue.return_value = True
-
-            sync_action_items_from_linear(incident, force=True)
-
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", assignee_id=None
-            )
+            for call in mock_service.update_issue.call_args_list:
+                assert "assignee_id" not in call.kwargs
 
 
 @pytest.mark.django_db
