@@ -1002,7 +1002,7 @@ LINEAR_PARENT_DESCRIPTION = (
     "Child issues or other relations (related, blocking, etc.) will all work. "
     "Do not update title, status or captain here, use Firetower for that.\n\n"
     "Firetower will mark this ticket completed once the incident is resolved and "
-    "all action items are done. It will not reopen it after that. "
+    "all action items are done."
     "If you have questions, please reach out to #team-sre."
 )
 
