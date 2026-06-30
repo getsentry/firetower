@@ -207,9 +207,7 @@ def _comment_parent_issue_status_change(
     if not template_source or not template_source.strip():
         return
 
-    completed_action_items = sum(
-        1 for s in statuses if s in {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
-    )
+    completed_action_items = sum(1 for s in statuses if s in COMPLETED_STATUSES)
     try:
         comment = _PARENT_STATUS_TEMPLATE_ENV.from_string(template_source).render(
             incident=incident,

@@ -103,8 +103,9 @@ class LinearConfig:
     parent_status_comment_started: str = (
         "Firetower set this issue to **Started**. "
         "Incident {{ incident.incident_number }} is {{ incident.status }}. "
-        "{{ completed_action_items }} of {{ total_action_items }} action "
-        "item{% if total_action_items != 1 %}s{% endif %} complete."
+        "{% if total_action_items == 0 %}There are no action items."
+        "{% else %}{{ completed_action_items }} of {{ total_action_items }} action "
+        "item{% if total_action_items != 1 %}s{% endif %} complete.{% endif %}"
     )
 
 

@@ -504,6 +504,31 @@ class TestUpdateParentIssueStatus:
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
         svc.create_comment.assert_called_once()
 
+    def test_canceled_incident_all_items_done_sets_completed(self):
+        incident = self._make_incident(status=IncidentStatus.CANCELED)
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="li-1",
+            linear_identifier="INC-1",
+            title="Item 1",
+            status=ActionItemStatus.DONE,
+            url="https://linear.app/issue/1",
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="li-2",
+            linear_identifier="INC-2",
+            title="Item 2",
+            status=ActionItemStatus.CANCELED,
+            url="https://linear.app/issue/2",
+        )
+        svc = self._make_linear_service()
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
+        svc.create_comment.assert_called_once()
+
     def test_done_incident_incomplete_items_sets_started(self):
         incident = self._make_incident(status=IncidentStatus.DONE)
         ActionItem.objects.create(
