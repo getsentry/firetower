@@ -998,11 +998,11 @@ def _sync_linear_assignee(incident: Incident) -> None:
 
 
 LINEAR_PARENT_DESCRIPTION = (
-    "Relate action items to this ticket to have them tracked by Firetower. "
-    "Child issues or other relations (related, blocking, etc.) will all work. "
+    "Add action items as sub-issues (child issues) of this ticket to have "
+    "them tracked by Firetower. "
     "Do not update title, status or captain here, use Firetower for that.\n\n"
-    "Firetower will mark this ticket completed once the incident is resolved and "
-    "all action items are done. "
+    "Firetower will reopen this ticket if the incident is reopened, or if "
+    "there are still unfinished action items. "
     "If you have questions, please reach out to #team-sre."
 )
 
