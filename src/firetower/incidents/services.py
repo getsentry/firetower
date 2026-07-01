@@ -251,7 +251,15 @@ def _update_parent_issue_status(
     target_state = "completed" if all_complete else "started"
 
     parent_issue = linear_service.get_issue(incident.linear_parent_issue_id)
-    if not parent_issue or parent_issue.get("state_type") == target_state:
+    if not parent_issue:
+        return
+
+    # Never override a manually-cancelled parent issue. Firetower only ever
+    # drives the parent to "started" or "completed", so a "canceled" state
+    # reflects a deliberate human decision and must not be reopened to
+    # "started" (or forced to "completed") on subsequent syncs.
+    current_state_type = parent_issue.get("state_type")
+    if current_state_type in ("canceled", target_state):
         return
 
     state_id = states.get(target_state)

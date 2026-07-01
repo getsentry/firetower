@@ -599,6 +599,24 @@ class TestUpdateParentIssueStatus:
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
         svc.create_comment.assert_called_once()
 
+    def test_does_not_reopen_manually_cancelled_parent(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        svc = self._make_linear_service(current_state_type="canceled")
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_not_called()
+        svc.create_comment.assert_not_called()
+
+    def test_does_not_complete_manually_cancelled_parent(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = self._make_linear_service(current_state_type="canceled")
+
+        _update_parent_issue_status(incident, svc)
+
+        svc.update_issue.assert_not_called()
+        svc.create_comment.assert_not_called()
+
     def test_skips_update_when_get_issue_fails(self):
         incident = self._make_incident(status=IncidentStatus.ACTIVE)
         svc = self._make_linear_service()
