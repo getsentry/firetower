@@ -33,6 +33,7 @@ if (import.meta.env.MODE != 'development') {
     sendDefaultPii: false,
     environment: getSentryEnvironment(),
     integrations: [
+      Sentry.spanStreamingIntegration(),
       Sentry.feedbackIntegration({
         colorScheme: 'system',
       }),
