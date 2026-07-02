@@ -1,10 +1,11 @@
 import {useEffect, useRef, useState} from 'react';
-import {useInfiniteQuery} from '@tanstack/react-query';
+import {useInfiniteQuery, useQuery} from '@tanstack/react-query';
 import {Button} from 'components/Button';
 import {Tag} from 'components/Tag';
 import {Pencil, XIcon} from 'lucide-react';
 import {cn} from 'utils/cn';
 
+import {currentUserQueryOptions} from '../../queries/currentUserQueryOptions';
 import {usersInfiniteQueryOptions} from '../../queries/usersQueryOptions';
 import {type ArrayFilterKey} from '../useActiveFilters';
 
@@ -130,6 +131,8 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
     onOpen: () => setDebouncedSearch(''),
   });
 
+  const {data: currentUser} = useQuery(currentUserQueryOptions());
+
   const {
     data: users = [],
     fetchNextPage,
@@ -140,7 +143,13 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
     enabled: isEditing,
   });
 
-  const available = users.filter(u => !selected.includes(u.email));
+  const available = users
+    .filter(u => !selected.includes(u.email))
+    .sort((a, b) => {
+      if (currentUser && a.email === currentUser.email) return -1;
+      if (currentUser && b.email === currentUser.email) return 1;
+      return 0;
+    });
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(inputValue), 300);
