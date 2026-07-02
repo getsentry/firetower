@@ -110,7 +110,7 @@ def handle_captain_submission(ack: Any, body: dict, view: dict, client: Any) -> 
         client.chat_postEphemeral(
             channel=channel_id,
             user=submitter_slack_id,
-            text="Captain cannot be a bot user.",
+            text="Captain cannot be a bot user, please try again.",
         )
         return
 
