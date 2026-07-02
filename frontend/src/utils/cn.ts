@@ -1,4 +1,4 @@
-import classNames from 'classnames';
+import {clsx, type ClassValue} from 'cnfast';
 import {extendTailwindMerge} from 'tailwind-merge';
 
 // Create custom Tailwind Merge instance with design token class groups
@@ -164,6 +164,6 @@ const twMerge = extendTailwindMerge({
 
 // Combines the features of classnames and tailwind-merge into one, easy-to-use
 // utility. Drop in replacement for both classnames and tailwind-merge.
-export function cn(...inputs: classNames.ArgumentArray) {
-  return twMerge(classNames(inputs));
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }
