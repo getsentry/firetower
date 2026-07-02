@@ -4,6 +4,7 @@ from typing import Any
 from firetower.auth.models import ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.serializers import IncidentWriteSerializer
+from firetower.integrations.services import SlackService
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,14 @@ def handle_captain_submission(ack: Any, body: dict, view: dict, client: Any) -> 
         client.chat_postMessage(
             channel=channel_id,
             text=f"*{incident.incident_number}* captain was not changed.",
+        )
+        return
+
+    slack_user_info = SlackService().get_user_info(captain_slack_id)
+    if slack_user_info and slack_user_info.get("is_bot"):
+        client.chat_postMessage(
+            channel=channel_id,
+            text="Captain cannot be a bot user.",
         )
         return
 

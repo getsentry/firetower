@@ -114,6 +114,28 @@ class TestCaptainSubmission:
         ack.assert_called_once()
         assert "Failed to resolve" in client.chat_postMessage.call_args[1]["text"]
 
+    @patch("firetower.slack_app.handlers.captain.SlackService")
+    @patch("firetower.slack_app.handlers.captain.get_or_create_user_from_slack_id")
+    def test_rejects_bot_user(self, mock_get_user, mock_slack_service, incident):
+        mock_slack_service.return_value.get_user_info.return_value = {"is_bot": True}
+        ack = MagicMock()
+        body = {"user": {"id": "U_SUBMITTER"}}
+        view = {
+            "state": {
+                "values": {
+                    "captain_block": {"captain_select": {"selected_user": "U_BOT"}}
+                }
+            },
+            "private_metadata": CHANNEL_ID,
+        }
+        client = MagicMock()
+
+        handle_captain_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        assert "bot user" in client.chat_postMessage.call_args[1]["text"]
+        mock_get_user.assert_not_called()
+
     def test_no_captain_selected(self, incident):
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
