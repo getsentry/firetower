@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {useInfiniteQuery, useQuery} from '@tanstack/react-query';
 import {Button} from 'components/Button';
 import {Tag} from 'components/Tag';
@@ -143,13 +143,25 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
     enabled: isEditing,
   });
 
-  const available = users
-    .filter(u => !selected.includes(u.email))
-    .sort((a, b) => {
-      if (currentUser && a.email === currentUser.email) return -1;
-      if (currentUser && b.email === currentUser.email) return 1;
-      return 0;
-    });
+  const available = useMemo(() => {
+    const notSelected = users.filter(u => !selected.includes(u.email));
+
+    if (!currentUser || selected.includes(currentUser.email)) {
+      return notSelected;
+    }
+
+    const matchesSearch =
+      !debouncedSearch ||
+      currentUser.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      currentUser.email.toLowerCase().includes(debouncedSearch.toLowerCase());
+
+    if (!matchesSearch) return notSelected;
+
+    // Always prepend the active user regardless of pagination position,
+    // removing any duplicate that may have loaded from the paginated list.
+    const rest = notSelected.filter(u => u.email !== currentUser.email);
+    return [currentUser, ...rest];
+  }, [users, selected, currentUser, debouncedSearch]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(inputValue), 300);
