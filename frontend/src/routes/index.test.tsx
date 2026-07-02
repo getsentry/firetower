@@ -50,6 +50,7 @@ const mockIncidents: PaginatedIncidents = {
 };
 
 const mockCurrentUser: CurrentUser = {
+  email: 'test.user@example.com',
   name: 'Test User',
   avatar_url: null,
 };

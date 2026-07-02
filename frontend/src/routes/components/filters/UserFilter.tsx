@@ -1,10 +1,11 @@
-import {useEffect, useRef, useState} from 'react';
-import {useInfiniteQuery} from '@tanstack/react-query';
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {useInfiniteQuery, useQuery} from '@tanstack/react-query';
 import {Button} from 'components/Button';
 import {Tag} from 'components/Tag';
 import {Pencil, XIcon} from 'lucide-react';
 import {cn} from 'utils/cn';
 
+import {currentUserQueryOptions} from '../../queries/currentUserQueryOptions';
 import {usersInfiniteQueryOptions} from '../../queries/usersQueryOptions';
 import {type ArrayFilterKey} from '../useActiveFilters';
 
@@ -130,6 +131,8 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
     onOpen: () => setDebouncedSearch(''),
   });
 
+  const {data: currentUser} = useQuery(currentUserQueryOptions());
+
   const {
     data: users = [],
     fetchNextPage,
@@ -140,7 +143,25 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
     enabled: isEditing,
   });
 
-  const available = users.filter(u => !selected.includes(u.email));
+  const available = useMemo(() => {
+    const notSelected = users.filter(u => !selected.includes(u.email));
+
+    if (!currentUser || selected.includes(currentUser.email)) {
+      return notSelected;
+    }
+
+    const matchesSearch =
+      !debouncedSearch ||
+      currentUser.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      currentUser.email.toLowerCase().includes(debouncedSearch.toLowerCase());
+
+    if (!matchesSearch) return notSelected;
+
+    // Always prepend the active user regardless of pagination position,
+    // removing any duplicate that may have loaded from the paginated list.
+    const rest = notSelected.filter(u => u.email !== currentUser.email);
+    return [currentUser, ...rest];
+  }, [users, selected, currentUser, debouncedSearch]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(inputValue), 300);
