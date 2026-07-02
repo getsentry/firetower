@@ -93,10 +93,23 @@ def handle_captain_submission(ack: Any, body: dict, view: dict, client: Any) -> 
         )
         return
 
+    submitter_slack_id = body["user"]["id"]
     slack_user_info = SlackService().get_user_info(captain_slack_id)
-    if slack_user_info and slack_user_info.get("is_bot"):
-        client.chat_postMessage(
+    if not slack_user_info:
+        logger.error(
+            "Could not fetch Slack info for selected captain %s", captain_slack_id
+        )
+        client.chat_postEphemeral(
             channel=channel_id,
+            user=submitter_slack_id,
+            text="Could not verify the selected user with Slack; "
+            "captain was not changed.",
+        )
+        return
+    if slack_user_info.get("is_bot"):
+        client.chat_postEphemeral(
+            channel=channel_id,
+            user=submitter_slack_id,
             text="Captain cannot be a bot user.",
         )
         return
