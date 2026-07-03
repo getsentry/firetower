@@ -14,7 +14,7 @@ def handle_help_command(ack: Any, command: dict, respond: Any) -> None:
         f"  `{cmd} captain` - Set incident captain (alias: `{cmd} ic`)\n"
         f"  `{cmd} dumpslack` - Update slack transcript in postmortem doc\n"
         f"  `{cmd} list` - List active and mitigated incidents (alias: `{cmd} ls`)\n"
-        f"  `{cmd} mitigated` - Mark incident as mitigated (alias: `{cmd} mit`)\n"
+        f"  `{cmd} mitigated` - Mark incident as mitigated (aliases: `{cmd} mit`, `{cmd} mitigate`)\n"
         f"  `{cmd} resolved` - Mark incident as resolved (alias: `{cmd} fixed`)\n"
         f"  `{cmd} reopen` - Reopen an incident\n"
         f"  `{cmd} cancel` - Cancel an incident\n"

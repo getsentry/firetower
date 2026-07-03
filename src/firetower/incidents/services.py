@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
+from jinja2 import Environment, TemplateError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import (
@@ -185,6 +186,43 @@ def _resolve_assignees(
 
 COMPLETED_STATUSES = {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
 
+_PARENT_STATUS_TEMPLATE_ENV = Environment(autoescape=False)
+
+
+def _comment_parent_issue_completed(
+    incident: Incident,
+    linear_service: LinearService,
+    statuses: list[str],
+) -> None:
+    if not settings.LINEAR or not incident.linear_parent_issue_id:
+        return
+
+    template_source = settings.LINEAR.get("PARENT_STATUS_COMMENT_COMPLETED", "")
+    if not template_source or not template_source.strip():
+        return
+
+    completed_action_items = sum(
+        1 for s in statuses if s in {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
+    )
+    try:
+        comment = _PARENT_STATUS_TEMPLATE_ENV.from_string(template_source).render(
+            incident=incident,
+            total_action_items=len(statuses),
+            completed_action_items=completed_action_items,
+        )
+    except TemplateError:
+        logger.exception(
+            f"Failed to render parent status comment template for incident {incident.id}"
+        )
+        return
+
+    try:
+        linear_service.create_comment(incident.linear_parent_issue_id, comment)
+    except Exception:
+        logger.exception(
+            f"Failed to post parent status comment for incident {incident.id}"
+        )
+
 
 def _update_parent_issue_status(
     incident: Incident, linear_service: LinearService
@@ -201,25 +239,22 @@ def _update_parent_issue_status(
         not statuses or all(s in COMPLETED_STATUSES for s in statuses)
     )
 
+    if not all_complete:
+        return
+
     states = linear_service.get_workflow_states(team_id)
     if not states:
         return
 
-    target_state = "completed" if all_complete else "started"
-    state_id = states.get(target_state)
-    if state_id:
-        linear_service.update_issue(incident.linear_parent_issue_id, state_id=state_id)
-
-
-def _sync_parent_assignee(incident: Incident, linear_service: LinearService) -> None:
-    if not incident.linear_parent_issue_id:
+    parent_issue = linear_service.get_issue(incident.linear_parent_issue_id)
+    if not parent_issue or parent_issue.get("state_type") == "completed":
         return
-    from firetower.incidents.hooks import _resolve_linear_user_id  # noqa: PLC0415
 
-    captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
-    linear_service.update_issue(
-        incident.linear_parent_issue_id, assignee_id=captain_linear_id
-    )
+    state_id = states.get("completed")
+    if state_id and linear_service.update_issue(
+        incident.linear_parent_issue_id, state_id=state_id
+    ):
+        _comment_parent_issue_completed(incident, linear_service, statuses)
 
 
 def sync_action_items_from_linear(
@@ -351,13 +386,6 @@ def sync_action_items_from_linear(
     except Exception:
         logger.exception(
             f"Failed to update Linear parent issue status for incident {incident.id}"
-        )
-
-    try:
-        _sync_parent_assignee(incident, linear_service)
-    except Exception:
-        logger.exception(
-            f"Failed to sync Linear parent assignee for incident {incident.id}"
         )
 
     logger.info(

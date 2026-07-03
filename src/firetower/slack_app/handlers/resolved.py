@@ -8,6 +8,7 @@ from firetower.slack_app.handlers.utils import (
     build_incident_lifecycle_modal,
     build_incident_update_data,
     get_incident_from_channel,
+    notify_submission_error,
     parse_incident_form_values,
     validate_lifecycle_form,
 )
@@ -47,7 +48,8 @@ def handle_resolved_command(ack: Any, body: dict, command: dict, respond: Any) -
 
 
 def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
-    form = parse_incident_form_values(view)
+    # Parse without resolving tags so validation touches no DB before ack().
+    form = parse_incident_form_values(view, resolve_tags=False)
     channel_id = view.get("private_metadata", "")
 
     errors = validate_lifecycle_form(form)
@@ -57,43 +59,47 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
 
     ack()
 
-    incident = get_incident_from_channel(channel_id)
-    if not incident:
-        logger.error("Resolved submission: no incident for channel %s", channel_id)
-        return
+    user_id = body["user"]["id"]
 
-    captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
-    if not captain_user:
-        logger.error(
-            "Could not resolve Slack user %s to a Firetower user",
-            form["captain_slack_id"],
+    # Work runs after ack() so the modal closes immediately; any failure is
+    # reported back to the submitter as an ephemeral message.
+    try:
+        incident = get_incident_from_channel(channel_id)
+        captain_user = (
+            get_or_create_user_from_slack_id(form["captain_slack_id"])
+            if incident
+            else None
         )
-        client.chat_postMessage(
-            channel=channel_id,
-            text="Failed to resolve the selected captain to a Firetower user.",
+        if incident is None or captain_user is None:
+            notify_submission_error(client, channel_id, user_id)
+            return
+
+        # Resolve/create inline tags only after validation passed.
+        form = parse_incident_form_values(view)
+
+        severity = form["severity"]
+        if severity in ("P0", "P1", "P2"):
+            target_status = IncidentStatus.POSTMORTEM
+        else:
+            target_status = IncidentStatus.DONE
+
+        data = build_incident_update_data(form, target_status, captain_user.email)
+        acting_user = get_or_create_user_from_slack_id(user_id)
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data=data,
+            partial=True,
+            context={"acting_user": acting_user},
         )
+        if not serializer.is_valid():
+            logger.error("Resolved update failed: %s", serializer.errors)
+            notify_submission_error(client, channel_id, user_id)
+            return
+        serializer.save()
+    except Exception:
+        logger.exception("Failed to process resolved submission")
+        notify_submission_error(client, channel_id, user_id)
         return
-
-    severity = form["severity"]
-    if severity in ("P0", "P1", "P2"):
-        target_status = IncidentStatus.POSTMORTEM
-    else:
-        target_status = IncidentStatus.DONE
-
-    data = build_incident_update_data(form, target_status, captain_user.email)
-
-    acting_user = get_or_create_user_from_slack_id(body["user"]["id"])
-    serializer = IncidentWriteSerializer(
-        instance=incident, data=data, partial=True, context={"acting_user": acting_user}
-    )
-    if not serializer.is_valid():
-        logger.error("Resolved update failed: %s", serializer.errors)
-        client.chat_postMessage(
-            channel=channel_id,
-            text=f"Failed to resolve incident: {serializer.errors}",
-        )
-        return
-    serializer.save()
 
     client.chat_postMessage(
         channel=channel_id,
