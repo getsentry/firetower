@@ -59,6 +59,9 @@ if not env_is_dev():
         traces_sample_rate=1.0,
         enable_logs=True,
         trace_propagation_targets=[],
+        _experiments={
+            "trace_lifecycle": "stream",
+        },
     )
 
 
