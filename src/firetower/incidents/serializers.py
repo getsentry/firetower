@@ -537,7 +537,9 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         self._auto_compute_downtime(incident, validated_data)
 
         if settings.HOOKS_ENABLED and not self.context.get("skip_hooks"):
-            on_incident_created(incident)
+            on_incident_created(
+                incident, skip_paging=self.context.get("skip_paging", False)
+            )
 
         return incident
 
