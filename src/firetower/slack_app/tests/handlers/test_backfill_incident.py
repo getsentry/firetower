@@ -497,6 +497,7 @@ class TestBackfillSubmission:
         )
         mock_slack_svc.get_channel_info.side_effect = [
             None,
+            None,
             {
                 "id": "C_TEST",
                 "name": "wrong-name",
@@ -515,7 +516,7 @@ class TestBackfillSubmission:
         incident = Incident.objects.get(title="Test Backfill")
         expected_name = incident.incident_number.lower()
         mock_slack_svc.rename_channel.assert_called_once_with("C_TEST", expected_name)
-        assert mock_slack_svc.get_channel_info.call_count == 2
+        assert mock_slack_svc.get_channel_info.call_count == 3
 
     def test_empty_title_returns_modal_error(self):
         ack = MagicMock()
