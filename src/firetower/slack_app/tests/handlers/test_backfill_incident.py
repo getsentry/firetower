@@ -306,6 +306,39 @@ class TestBackfillSubmission:
         assert "could not join" in msg
         assert "/ft backfill" in msg
 
+    @patch("firetower.slack_app.handlers.backfill_incident._slack_service")
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.get_or_create_user_from_slack_id"
+    )
+    @patch("firetower.incidents.serializers.on_incident_created")
+    def test_skips_setup_for_archived_channel(
+        self, mock_hook, mock_get_user, mock_slack_svc
+    ):
+        mock_get_user.return_value = self.user
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://T0000.slack.com/archives/C_TEST"
+        )
+        mock_slack_svc.get_channel_info.return_value = {
+            "id": "C_TEST",
+            "name": f"{settings.PROJECT_KEY.lower()}-2050",
+            "is_private": False,
+            "is_archived": True,
+        }
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+
+        handle_backfill_submission(ack, body, self._build_view(), client)
+
+        incident = Incident.objects.get(title="Test Backfill")
+        assert incident is not None
+
+        mock_slack_svc.join_channel.assert_not_called()
+        mock_slack_svc.set_channel_topic.assert_not_called()
+        mock_slack_svc.add_bookmark.assert_not_called()
+        client.chat_postMessage.assert_not_called()
+
     @patch(
         "firetower.slack_app.handlers.backfill_incident.sync_incident_participants_from_slack"
     )
@@ -446,6 +479,44 @@ class TestBackfillSubmission:
 
         incident = Incident.objects.get(title="Test Backfill")
         assert incident.is_private is True
+
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.sync_incident_participants_from_slack"
+    )
+    @patch("firetower.slack_app.handlers.backfill_incident._slack_service")
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.get_or_create_user_from_slack_id"
+    )
+    @patch("firetower.incidents.serializers.on_incident_created")
+    def test_retries_channel_info_after_join_when_initial_fetch_failed(
+        self, mock_hook, mock_get_user, mock_slack_svc, mock_sync
+    ):
+        mock_get_user.return_value = self.user
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://T0000.slack.com/archives/C_TEST"
+        )
+        mock_slack_svc.get_channel_info.side_effect = [
+            None,
+            None,
+            {
+                "id": "C_TEST",
+                "name": "wrong-name",
+                "is_private": False,
+            },
+        ]
+        mock_slack_svc.join_channel.return_value = True
+        mock_slack_svc.rename_channel.return_value = True
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+
+        handle_backfill_submission(ack, body, self._build_view(), client)
+
+        incident = Incident.objects.get(title="Test Backfill")
+        expected_name = incident.incident_number.lower()
+        mock_slack_svc.rename_channel.assert_called_once_with("C_TEST", expected_name)
+        assert mock_slack_svc.get_channel_info.call_count == 3
 
     def test_empty_title_returns_modal_error(self):
         ack = MagicMock()
