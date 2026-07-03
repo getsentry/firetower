@@ -143,7 +143,7 @@ _PRIVATE_OPTION: dict[str, Any] = {
 _SKIP_PAGING_OPTION: dict[str, Any] = {
     "text": {
         "type": "plain_text",
-        "text": "Skip paging on-call responders",
+        "text": "Skip paging IMOC/Prod Eng",
     },
     "value": "skip_paging",
 }
