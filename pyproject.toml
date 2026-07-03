@@ -22,7 +22,7 @@ dependencies = [
     "django-q2>=1.7.4",
     "slack-bolt>=1.27.0",
     "slack-sdk>=3.31.0",
-    "sentry-sdk>=2.47.0",
+    "sentry-sdk>=2.62.0",
 ]
 
 [build-system]
@@ -46,7 +46,7 @@ dev = [
 prod = [
     "ddtrace>=3.18.1",
     "granian>=2.6.0",
-    "sentry-sdk[django]>=2.47.0",
+    "sentry-sdk[django]>=2.62.0",
 ]
 
 [tool.pytest.ini_options]

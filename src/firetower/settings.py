@@ -57,8 +57,12 @@ if not env_is_dev():
         send_default_pii=False,
         environment=os.environ.get("DJANGO_ENV", "unknown"),
         traces_sample_rate=1.0,
+        profiles_sample_rate=0.25,
         enable_logs=True,
         trace_propagation_targets=[],
+        _experiments={
+            "trace_lifecycle": "stream",
+        },
     )
 
 
