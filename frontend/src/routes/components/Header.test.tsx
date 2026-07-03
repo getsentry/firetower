@@ -273,6 +273,35 @@ describe('Header - Incident Detail Route', () => {
     expect(href).toContain('Postmortem');
   });
 
+  it('back button excludes non-status params from sessionStorage', async () => {
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        status: ['Any'],
+        affected_region: ['us'],
+        created_after: '2026-04-01',
+        created_before: '2026-04-30',
+        service_tier: ['T0'],
+        impact_type: ['availability'],
+      })
+    );
+
+    renderRoute('/INC-1247');
+
+    await screen.findByText('Database Connection Pool Exhausted');
+
+    const backButton = screen.getByText('All Incidents').closest('a');
+    const href = backButton?.getAttribute('href');
+
+    expect(href).toContain('status');
+    expect(href).toContain('Any');
+    expect(href).not.toContain('affected_region');
+    expect(href).not.toContain('created_after');
+    expect(href).not.toContain('created_before');
+    expect(href).not.toContain('service_tier');
+    expect(href).not.toContain('impact_type');
+  });
+
   it('navigates back to list with preserved filters', async () => {
     const user = userEvent.setup();
     renderRoute('/');

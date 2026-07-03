@@ -27,7 +27,11 @@ export const Header = () => {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.status)) {
+          return {status: parsed.status};
+        }
+        return undefined;
       } catch {
         return undefined;
       }

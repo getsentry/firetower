@@ -125,10 +125,12 @@ function Index() {
 
   const observerTarget = useRef<HTMLDivElement>(null);
 
-  // Store current search params in sessionStorage whenever they change
   useEffect(() => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(params));
-  }, [params]);
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(params.status ? {status: params.status} : {})
+    );
+  }, [params.status]);
 
   // Infinite scroll observer
   useEffect(() => {
