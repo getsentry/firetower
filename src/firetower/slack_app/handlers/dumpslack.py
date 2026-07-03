@@ -12,6 +12,7 @@ from django.db import transaction
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
+from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.integrations.services.genai import GenAIService, parse_key_timestamps
 from firetower.integrations.services.notion import NotionService
 from firetower.integrations.services.slack import SlackService, is_slack_url
@@ -132,7 +133,9 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
     messages = _get_channel_messages(slack_service, channel_id)
 
     try:
-        notion.apply_template(page_id, messages, update_slack=update_slack)
+        notion.apply_template(
+            page_id, messages, update_slack=update_slack, incident=incident
+        )
     except Exception:
         logger.exception("Failed to populate Notion page %s", page_id)
         try:
@@ -181,28 +184,31 @@ def _backfill_milestones(incident: Any, timeline_md: str) -> None:
     if not timestamps:
         return
 
-    fields_updated: list[str] = []
-    for field, value in timestamps.items():
-        try:
-            # Atomic conditional update: only set the field if it is still NULL
-            # in the database, avoiding a TOCTOU race with user-set values.
-            updated = Incident.objects.filter(
-                pk=incident.pk,
-                **{f"{field}__isnull": True},
-            ).update(**{field: value})
-            if updated:
-                fields_updated.append(field)
-        except Exception:
-            logger.exception(
-                "Failed to backfill %s for incident %s",
-                field,
-                incident.incident_number,
-            )
+    try:
+        with transaction.atomic():
+            # Lock the row to prevent a TOCTOU race with concurrent user edits.
+            incident = Incident.objects.select_for_update().get(pk=incident.pk)
+            data = {
+                field: value
+                for field, value in timestamps.items()
+                if getattr(incident, field) is None
+            }
+            if not data:
+                return
 
-    if fields_updated:
+            serializer = IncidentWriteSerializer(
+                instance=incident, data=data, partial=True
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
         logger.debug(
             "Backfilled milestone fields %s for incident %s",
-            fields_updated,
+            list(data.keys()),
+            incident.incident_number,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to backfill milestones for incident %s",
             incident.incident_number,
         )
 

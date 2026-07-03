@@ -41,6 +41,7 @@ class SlackConfig:
     incident_feed_channel_id: str = ""
     always_invited_ids: list[str] = field(default_factory=list)
     incident_guide_message: str = ""
+    slash_command: str = "/inc"
 
 
 @deserialize
@@ -62,16 +63,50 @@ class StatuspageConfig:
     api_key: str
     page_id: str
     url: str
+    initial_reminder_delay_minutes: int | None = None
+    followup_reminder_delay_minutes: int | None = None
+    warning_buffer_minutes: int = 0
 
 
 @deserialize
 class LinearConfig:
-    client_id: str
-    client_secret: str
-    action_item_sync_throttle_seconds: int
+    client_id: str = ""
+    client_secret: str = ""
+    action_item_sync_throttle_seconds: int = 300
     team_id: str = ""
     project_id: str = ""
     sync_identifiers: bool = False
+    api_key: str = ""
+    action_item_slo_days_high_priority: int = 14
+    action_item_slo_days_medium_priority: int = 30
+    action_item_nag_comment_high_priority: str = (
+        "{% if days_past_due > 0 %}This action item is **{{ days_past_due }} "
+        "day{% if days_past_due != 1 %}s{% endif %} past due**. {% endif %}"
+        "The SLO for completing P0/P1 incident action items is {{ slo_days }} "
+        "days from incident creation. Please prioritize this work or close "
+        "out the issue if it is no longer relevant."
+    )
+    action_item_nag_comment_medium_priority: str = (
+        "{% if days_past_due > 0 %}This action item is **{{ days_past_due }} "
+        "day{% if days_past_due != 1 %}s{% endif %} past due**. {% endif %}"
+        "The SLO for completing P2 incident action items is {{ slo_days }} "
+        "days from incident creation. Please prioritize this work or close "
+        "out the issue if it is no longer relevant."
+    )
+    parent_status_comment_completed: str = (
+        "Firetower set this issue to **Completed**. "
+        "Incident {{ incident.incident_number }} is {{ incident.status }} "
+        "and {% if total_action_items == 0 %}there are no action items."
+        "{% else %}all {{ total_action_items }} action "
+        "item{% if total_action_items != 1 %}s{% endif %} are complete.{% endif %}"
+    )
+    parent_status_comment_started: str = (
+        "Firetower set this issue to **Started**. "
+        "Incident {{ incident.incident_number }} is {{ incident.status }}. "
+        "{% if total_action_items == 0 %}There are no action items."
+        "{% else %}{{ completed_action_items }} of {{ total_action_items }} action "
+        "item{% if total_action_items != 1 %}s{% endif %} complete.{% endif %}"
+    )
 
 
 @deserialize
@@ -98,6 +133,7 @@ class ConfigFile:
     django_secret_key: str
     salt_key: str
     sentry_dsn: str
+    service_registry_url: str | None = None
     notion: NotionConfig | None = None
     genai: GenAIConfig | None = None
     log_level: str = "INFO"
@@ -170,6 +206,7 @@ class DummyConfigFile(ConfigFile):
         self.django_secret_key = "dummy_value_DO_NOT_USE"
         self.salt_key = ""
         self.sentry_dsn = ""
+        self.service_registry_url = None
         self.region_grouping: list[list[str]] = []
         self.log_level = "INFO"
         self.hooks_enabled = False

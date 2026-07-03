@@ -1,26 +1,34 @@
+import ast
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth.models import User
+from django.utils import timezone
+from django_q.models import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
+    DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_users,
     _linear_issue_title,
     _page_if_needed,
     _resolve_linear_user_id,
+    _schedule_statuspage_reminder,
     build_channel_name,
     build_channel_topic,
     create_linear_parent_issue,
     on_captain_changed,
     on_incident_created,
+    on_incident_updated,
     on_severity_changed,
     on_status_changed,
     on_title_changed,
     on_visibility_changed,
     page_for_channel,
+    schedule_statuspage_followup_reminder,
 )
 from firetower.incidents.models import (
     ExternalLink,
@@ -395,7 +403,7 @@ class TestOnStatusChanged:
         mock_slack.post_message.assert_called_once()
         assert "Active" in mock_slack.post_message.call_args[0][1]
         assert "Mitigated" in mock_slack.post_message.call_args[0][1]
-        mock_slack.set_channel_topic.assert_not_called()
+        mock_slack.set_all_channel_topics.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -442,7 +450,7 @@ class TestOnStatusChanged:
     def test_does_not_trigger_dump_on_other_statuses(self, mock_slack, mock_dump_async):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
-        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELLED):
+        for status in (IncidentStatus.ACTIVE, IncidentStatus.CANCELED):
             incident = Incident.objects.create(
                 title="Test",
                 severity=IncidentSeverity.P1,
@@ -501,7 +509,7 @@ class TestOnSeverityChanged:
         mock_slack.post_message.assert_called_once()
         assert "P2" in mock_slack.post_message.call_args[0][1]
         assert "P0" in mock_slack.post_message.call_args[0][1]
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -533,7 +541,7 @@ class TestOnTitleChanged:
 
         on_title_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -544,7 +552,7 @@ class TestOnTitleChanged:
 
         on_title_changed(incident)
 
-        mock_slack.set_channel_topic.assert_not_called()
+        mock_slack.set_all_channel_topics.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -634,7 +642,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_called_once()
         assert "<@U_NEW>" in mock_slack.post_message.call_args[0][1]
         mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_NEW"])
@@ -663,7 +671,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_called_once()
         assert "New Captain" in mock_slack.post_message.call_args[0][1]
 
@@ -684,8 +692,84 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_called_once()
+        mock_slack.set_all_channel_topics.assert_called_once()
         mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_invites_captain_to_status_channel_for_high_severity(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.side_effect = (
+            lambda url: "C12345" if "C12345" in url else "CSTATUS"
+        )
+
+        captain = User.objects.create_user(
+            username="newcaptain@example.com",
+            email="newcaptain@example.com",
+            first_name="New",
+            last_name="Captain",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_NEW",
+        )
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=captain,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK_STATUS,
+            url="https://slack.com/archives/CSTATUS",
+        )
+
+        on_captain_changed(incident)
+
+        assert mock_slack.invite_to_channel.call_count == 2
+        mock_slack.invite_to_channel.assert_any_call("C12345", ["U_NEW"])
+        mock_slack.invite_to_channel.assert_any_call("CSTATUS", ["U_NEW"])
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_status_channel_invite_for_low_severity(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="newcaptain@example.com",
+            email="newcaptain@example.com",
+            first_name="New",
+            last_name="Captain",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_NEW",
+        )
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P3,
+            captain=captain,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK_STATUS,
+            url="https://slack.com/archives/CSTATUS",
+        )
+
+        on_captain_changed(incident)
+
+        mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_NEW"])
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -696,7 +780,7 @@ class TestOnCaptainChanged:
 
         on_captain_changed(incident)
 
-        mock_slack.set_channel_topic.assert_not_called()
+        mock_slack.set_all_channel_topics.assert_not_called()
 
 
 MOCK_PD_CONFIG = {
@@ -856,11 +940,9 @@ class TestPageIfNeeded:
         assert "PROD_ENG" in mock_pd.trigger_incident.call_args[0][1]
 
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_private_incident_pages_only_imoc(self, mock_pd_cls, settings):
+    def test_private_incident_does_not_page(self, mock_pd_cls, settings):
         settings.PAGERDUTY = MOCK_PD_CONFIG
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
-        mock_pd = mock_pd_cls.return_value
-        mock_pd.trigger_incident.return_value = True
 
         incident = Incident.objects.create(
             title="Sensitive issue",
@@ -868,15 +950,10 @@ class TestPageIfNeeded:
             is_private=True,
         )
 
-        _page_if_needed(incident)
+        result = _page_if_needed(incident)
 
-        mock_pd.trigger_incident.assert_called_once()
-        summary = mock_pd.trigger_incident.call_args[0][0]
-        dedup_key = mock_pd.trigger_incident.call_args[0][1]
-        assert "IMOC" in dedup_key
-        assert "PROD_ENG" not in dedup_key
-        assert "Private Incident" in summary
-        assert "Sensitive issue" not in summary
+        mock_pd_cls.assert_not_called()
+        assert result == set()
 
     @patch("firetower.incidents.hooks.PagerDutyService")
     def test_pages_only_configured_policies(self, mock_pd_cls, settings):
@@ -1218,15 +1295,10 @@ class TestInviteOncallUsers:
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
-    def test_private_incident_invites_only_imoc(
+    def test_private_incident_skips_oncall_invite(
         self, mock_pd_cls, mock_slack, settings
     ):
         settings.PAGERDUTY = MOCK_PD_CONFIG
-        mock_pd = mock_pd_cls.return_value
-        mock_pd.get_oncall_users.return_value = [
-            {"email": "imoc@example.com", "escalation_level": 1},
-        ]
-        mock_slack.get_user_profile_by_email.return_value = {"slack_user_id": "U_IMOC"}
 
         incident = Incident.objects.create(
             title="Sensitive issue",
@@ -1236,11 +1308,9 @@ class TestInviteOncallUsers:
 
         _invite_oncall_users(incident, "C99999")
 
-        mock_pd.get_oncall_users.assert_called_once_with("PIMOC01")
-        mock_slack.invite_to_channel.assert_called_once_with("C99999", ["U_IMOC"])
-        message = mock_slack.post_message.call_args[0][1]
-        assert "On-Call Incident Manager: <@U_IMOC>" in message
-        assert "Prod Eng" not in message
+        mock_pd_cls.assert_not_called()
+        mock_slack.invite_to_channel.assert_not_called()
+        mock_slack.post_message.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
     @patch("firetower.incidents.hooks.PagerDutyService")
@@ -1907,6 +1977,9 @@ class TestCreateStatusChannel:
     def test_creates_public_channel_for_public_incident(self, mock_slack, settings):
         settings.SLACK = {"ALWAYS_INVITED_IDS": []}
         mock_slack.create_channel.return_value = "C_STATUS"
+        mock_slack.build_channel_url.return_value = (
+            "https://slack.com/archives/C_STATUS"
+        )
         incident = Incident.objects.create(
             title="Public outage",
             severity=IncidentSeverity.P0,
@@ -2703,14 +2776,355 @@ class TestResolveLinearUserId:
 
 
 @pytest.mark.django_db
+class TestScheduleStatuspageReminder:
+    CONFIGURED_DELAY_MINUTES = 15
+
+    @pytest.fixture(autouse=True)
+    def _configure_reminder_delay(self):
+        with patch(
+            "firetower.incidents.hooks.get_statuspage_initial_reminder_delay_minutes",
+            return_value=self.CONFIGURED_DELAY_MINUTES,
+        ):
+            yield
+
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "status": IncidentStatus.ACTIVE,
+            "severity": IncidentSeverity.P0,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def test_creates_schedule_for_p0(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+
+        schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        assert schedule.func == "firetower.incidents.tasks.send_statuspage_reminder"
+        stored_kwargs = ast.literal_eval(schedule.kwargs)
+        assert stored_kwargs["incident_id"] == incident.id
+        assert stored_kwargs["scheduled_at"] == incident.created_at.isoformat()
+        assert schedule.schedule_type == Schedule.ONCE
+        assert schedule.repeats == -1
+
+    def test_creates_schedule_for_p1(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        _schedule_statuspage_reminder(incident)
+
+        assert Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_private_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0, is_private=True)
+        _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_p2(self):
+        incident = self._make_incident(severity=IncidentSeverity.P2)
+        _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_p3(self):
+        incident = self._make_incident(severity=IncidentSeverity.P3)
+        _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    def test_does_not_duplicate_schedule(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+        _schedule_statuspage_reminder(incident)
+
+        assert (
+            Schedule.objects.filter(name=f"statuspage_reminder_{incident.id}").count()
+            == 1
+        )
+
+    def test_concurrent_creation_preserves_original_next_run(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+        original = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        original_next_run = original.next_run
+
+        _schedule_statuspage_reminder(incident)
+        original.refresh_from_db()
+        assert original.next_run == original_next_run
+
+    def test_schedule_next_run_uses_configured_delay_from_created_at(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+
+        schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        offset = max(
+            0,
+            self.CONFIGURED_DELAY_MINUTES - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
+        )
+        expected = incident.created_at + timedelta(minutes=offset)
+        assert schedule.next_run == expected
+
+    def test_re_escalation_updates_existing_schedule(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        _schedule_statuspage_reminder(incident)
+        original = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        original_next_run = original.next_run
+
+        ref = timezone.now() + timedelta(hours=1)
+        _schedule_statuspage_reminder(incident, reference_time=ref, allow_update=True)
+
+        original.refresh_from_db()
+        assert original.next_run != original_next_run
+        offset = max(
+            0,
+            self.CONFIGURED_DELAY_MINUTES - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
+        )
+        assert original.next_run == ref + timedelta(minutes=offset)
+
+    def test_schedule_clamps_negative_buffer_offset(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        with patch(
+            "firetower.incidents.hooks.get_statuspage_warning_buffer_minutes",
+            return_value=self.CONFIGURED_DELAY_MINUTES + 10,
+        ):
+            _schedule_statuspage_reminder(incident)
+
+        schedule = Schedule.objects.get(name=f"statuspage_reminder_{incident.id}")
+        assert schedule.next_run == incident.created_at
+
+    def test_skips_when_delay_not_configured(self):
+        with patch(
+            "firetower.incidents.hooks.get_statuspage_initial_reminder_delay_minutes",
+            return_value=None,
+        ):
+            incident = self._make_incident(severity=IncidentSeverity.P0)
+            _schedule_statuspage_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._create_status_channel_for_context")
+    @patch("firetower.incidents.hooks._invite_oncall_to_channel")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_on_incident_created_schedules_reminder(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+    ):
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="P0 outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        on_incident_created(incident)
+
+        assert Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_on_severity_changed_schedules_reminder(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+    ):
+        incident = Incident.objects.create(
+            title="Minor issue",
+            severity=IncidentSeverity.P3,
+            status=IncidentStatus.ACTIVE,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C99999",
+        )
+        mock_slack.parse_channel_id_from_url.return_value = "C99999"
+
+        incident.severity = IncidentSeverity.P0
+        incident.save()
+        on_severity_changed(incident, IncidentSeverity.P3)
+
+        assert Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_on_severity_changed_no_reminder_for_downgrade(self, mock_slack):
+        incident = Incident.objects.create(
+            title="Big issue downgraded",
+            severity=IncidentSeverity.P2,
+            status=IncidentStatus.ACTIVE,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C99999",
+        )
+        mock_slack.parse_channel_id_from_url.return_value = "C99999"
+
+        on_severity_changed(incident, IncidentSeverity.P0)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_reminder_{incident.id}"
+        ).exists()
+
+
+@pytest.mark.django_db
+class TestScheduleStatuspageFollowupReminder:
+    CONFIGURED_FOLLOWUP_DELAY_MINUTES = 30
+
+    @pytest.fixture(autouse=True)
+    def _configure_followup_delay(self):
+        with patch(
+            "firetower.incidents.hooks.get_statuspage_followup_reminder_delay_minutes",
+            return_value=self.CONFIGURED_FOLLOWUP_DELAY_MINUTES,
+        ):
+            yield
+
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "status": IncidentStatus.ACTIVE,
+            "severity": IncidentSeverity.P0,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def test_creates_schedule_for_p0(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        schedule_statuspage_followup_reminder(incident)
+
+        schedule = Schedule.objects.get(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        )
+        assert (
+            schedule.func
+            == "firetower.incidents.tasks.send_statuspage_followup_reminder"
+        )
+        parsed_kwargs = ast.literal_eval(schedule.kwargs)
+        assert parsed_kwargs["incident_id"] == incident.id
+        assert "scheduled_at" in parsed_kwargs
+        assert parsed_kwargs["reschedule_count"] == 0
+        assert schedule.schedule_type == Schedule.ONCE
+        assert schedule.repeats == -1
+
+    def test_creates_schedule_for_p1(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        schedule_statuspage_followup_reminder(incident)
+
+        assert Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_private_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0, is_private=True)
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_p2(self):
+        incident = self._make_incident(severity=IncidentSeverity.P2)
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_done_status(self):
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0, status=IncidentStatus.DONE
+        )
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_skips_for_cancelled_status(self):
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0, status=IncidentStatus.CANCELED
+        )
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_schedule_next_run_uses_configured_delay(self):
+        before = timezone.now()
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        schedule_statuspage_followup_reminder(incident)
+        after = timezone.now()
+
+        schedule = Schedule.objects.get(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        )
+        delay = (
+            self.CONFIGURED_FOLLOWUP_DELAY_MINUTES
+            - DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES
+        )
+        expected_min = before + timedelta(minutes=delay)
+        expected_max = after + timedelta(minutes=delay)
+        assert expected_min <= schedule.next_run <= expected_max
+
+    def test_skips_when_followup_delay_not_configured(self):
+        with patch(
+            "firetower.incidents.hooks.get_statuspage_followup_reminder_delay_minutes",
+            return_value=None,
+        ):
+            incident = self._make_incident(severity=IncidentSeverity.P0)
+            schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_resets_schedule_on_repeated_call(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        schedule_statuspage_followup_reminder(incident)
+
+        first_schedule = Schedule.objects.get(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        )
+        first_next_run = first_schedule.next_run
+
+        schedule_statuspage_followup_reminder(incident)
+
+        assert (
+            Schedule.objects.filter(
+                name=f"statuspage_followup_reminder_{incident.id}"
+            ).count()
+            == 1
+        )
+        updated_schedule = Schedule.objects.get(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        )
+        assert updated_schedule.next_run >= first_next_run
+
+
+@pytest.mark.django_db
 class TestCreateLinearParentIssueBookmark:
     @patch("firetower.incidents.hooks._slack_service")
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     def test_adds_bookmark_when_channel_id_provided(
-        self, mock_linear_cls, mock_slack, settings
+        self, mock_get_linear, mock_slack, settings
     ):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        mock_linear = mock_linear_cls.return_value
+        mock_linear = mock_get_linear.return_value
         mock_linear.create_issue.return_value = {
             "id": "issue-1",
             "url": "https://linear.app/team/issue/ENG-123",
@@ -2728,12 +3142,12 @@ class TestCreateLinearParentIssueBookmark:
         )
 
     @patch("firetower.incidents.hooks._slack_service")
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     def test_no_bookmark_when_no_channel_id(
-        self, mock_linear_cls, mock_slack, settings
+        self, mock_get_linear, mock_slack, settings
     ):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        mock_linear = mock_linear_cls.return_value
+        mock_linear = mock_get_linear.return_value
         mock_linear.create_issue.return_value = {
             "id": "issue-1",
             "url": "https://linear.app/team/issue/ENG-123",
@@ -2749,12 +3163,12 @@ class TestCreateLinearParentIssueBookmark:
         mock_slack.add_bookmark.assert_not_called()
 
     @patch("firetower.incidents.hooks._slack_service")
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     def test_bookmark_failure_does_not_raise(
-        self, mock_linear_cls, mock_slack, settings
+        self, mock_get_linear, mock_slack, settings
     ):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        mock_linear = mock_linear_cls.return_value
+        mock_linear = mock_get_linear.return_value
         mock_linear.create_issue.return_value = {
             "id": "issue-1",
             "url": "https://linear.app/team/issue/ENG-123",
@@ -2772,12 +3186,12 @@ class TestCreateLinearParentIssueBookmark:
         assert link.url == "https://linear.app/team/issue/ENG-123"
 
     @patch("firetower.incidents.hooks._slack_service")
-    @patch("firetower.incidents.hooks.LinearService")
+    @patch("firetower.incidents.hooks._get_linear_service")
     def test_no_bookmark_when_linear_creation_fails(
-        self, mock_linear_cls, mock_slack, settings
+        self, mock_get_linear, mock_slack, settings
     ):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        mock_linear = mock_linear_cls.return_value
+        mock_linear = mock_get_linear.return_value
         mock_linear.create_issue.return_value = None
 
         incident = Incident.objects.create(
@@ -2788,3 +3202,355 @@ class TestCreateLinearParentIssueBookmark:
         create_linear_parent_issue(incident, channel_id="C99999")
 
         mock_slack.add_bookmark.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestOnIncidentUpdated:
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "severity": IncidentSeverity.P2,
+            "status": IncidentStatus.ACTIVE,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def _link_slack(self, incident, channel_id="C12345"):
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url=f"https://slack.com/archives/{channel_id}",
+        )
+
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_single_message_for_multiple_changes(
+        self, mock_slack, mock_page, mock_invite_oncall, mock_status_channel
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_page.return_value = set()
+
+        captain = User.objects.create_user(
+            username="cap@example.com",
+            email="cap@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAP",
+        )
+        incident = self._make_incident(
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.MITIGATED,
+            captain=captain,
+        )
+        self._link_slack(incident)
+
+        on_incident_updated(
+            incident,
+            old_status=IncidentStatus.ACTIVE,
+            old_severity=IncidentSeverity.P2,
+            captain_changed=True,
+        )
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "- Status:" in msg
+        assert "- Severity:" in msg
+        assert "- Captain: <@U_CAP>" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_bullet_for_single_change(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "- Status: Active -> Mitigated" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_includes_actor_attribution(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        actor = User.objects.create_user(
+            username="actor@example.com", email="actor@example.com"
+        )
+        ExternalProfile.objects.create(
+            user=actor,
+            type=ExternalProfileType.SLACK,
+            external_id="U_ACTOR",
+        )
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE, actor=actor)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "<@U_ACTOR>" in msg
+        assert "updated incident:" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_actor_name_fallback_when_no_slack_profile(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        actor = User.objects.create_user(
+            username="actor@example.com",
+            email="actor@example.com",
+            first_name="Alice",
+            last_name="Smith",
+        )
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE, actor=actor)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "Alice Smith updated incident:" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_actor_falls_back_to_generic_header(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert msg.startswith("Incident updated:")
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_sets_topic_once_when_severity_and_captain_change(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="cap2@example.com",
+            email="cap2@example.com",
+            first_name="Bob",
+            last_name="Lead",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAP2",
+        )
+        incident = self._make_incident(severity=IncidentSeverity.P3, captain=captain)
+        self._link_slack(incident)
+
+        on_incident_updated(
+            incident, old_severity=IncidentSeverity.P4, captain_changed=True
+        )
+
+        mock_slack.set_all_channel_topics.assert_called_once()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_message_when_nothing_changed(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident()
+        self._link_slack(incident)
+
+        on_incident_updated(incident)
+
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_message_without_slack_link(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = None
+
+        incident = self._make_incident()
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_captain_name_fallback_when_no_slack_profile(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="cap3@example.com",
+            email="cap3@example.com",
+            first_name="Carol",
+            last_name="Jones",
+        )
+        incident = self._make_incident(captain=captain)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, captain_changed=True)
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "Carol Jones" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_captain_line_when_captain_cleared(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(captain=None)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, captain_changed=True)
+
+        mock_slack.set_all_channel_topics.assert_called_once()
+        mock_slack.post_message.assert_not_called()
+
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_triggers_slack_dump_on_resolved_status(
+        self, mock_slack, mock_bolt, mock_dump_async
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_client = MagicMock()
+        mock_bolt.return_value.client = mock_client
+
+        incident = self._make_incident(status=IncidentStatus.POSTMORTEM)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
+
+        mock_dump_async.assert_called_once_with(mock_client, "C12345", incident)
+
+    @patch("firetower.incidents.hooks.schedule_statuspage_followup_reminder")
+    @patch("firetower.incidents.hooks._schedule_statuspage_reminder")
+    @patch("firetower.incidents.hooks._create_status_channel")
+    @patch("firetower.incidents.hooks._invite_oncall_users")
+    @patch("firetower.incidents.hooks._page_if_needed")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_severity_escalation_side_effects(
+        self,
+        mock_slack,
+        mock_page,
+        mock_invite_oncall,
+        mock_status_channel,
+        mock_statuspage,
+        mock_followup,
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0,
+            status=IncidentStatus.ACTIVE,
+        )
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_severity=IncidentSeverity.P2)
+
+        mock_page.assert_called_once()
+        mock_invite_oncall.assert_called_once()
+        mock_status_channel.assert_called_once()
+        mock_statuspage.assert_called_once()
+        mock_followup.assert_called_once()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_captain_invited_to_channel(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        captain = User.objects.create_user(
+            username="cap4@example.com",
+            email="cap4@example.com",
+            first_name="Dave",
+            last_name="Lead",
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_CAP4",
+        )
+        incident = self._make_incident(captain=captain)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, captain_changed=True)
+
+        mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_CAP4"])
+
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_visibility_posted_separately(self, mock_slack, mock_bolt, mock_dump_async):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.MITIGATED, is_private=True)
+        self._link_slack(incident)
+
+        on_incident_updated(
+            incident,
+            old_status=IncidentStatus.ACTIVE,
+            visibility_changed=True,
+        )
+
+        assert mock_slack.post_message.call_count == 2
+        messages = [c[0][1] for c in mock_slack.post_message.call_args_list]
+        assert any("- Status:" in m for m in messages)
+        assert any("private" in m for m in messages)
+
+    @patch("firetower.incidents.hooks._get_linear_service")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_syncs_linear_assignee_on_captain_change(
+        self, mock_slack, mock_get_linear, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_slack.parse_channel_id_from_url.return_value = None
+        mock_service = mock_get_linear.return_value
+        mock_service.update_issue.return_value = True
+
+        captain = User.objects.create_user(
+            username="cap@example.com", email="cap@example.com"
+        )
+        ExternalProfile.objects.create(
+            user=captain,
+            type=ExternalProfileType.LINEAR,
+            external_id="linear-captain-id",
+        )
+        incident = self._make_incident(
+            captain=captain, linear_parent_issue_id="linear-issue-id"
+        )
+
+        on_incident_updated(incident, captain_changed=True)
+
+        mock_service.update_issue.assert_any_call(
+            "linear-issue-id", assignee_id="linear-captain-id"
+        )
+
+    @patch("firetower.incidents.hooks._get_linear_service")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_unassigns_linear_parent_when_no_captain(
+        self, mock_slack, mock_get_linear, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_slack.parse_channel_id_from_url.return_value = None
+        mock_service = mock_get_linear.return_value
+        mock_service.update_issue.return_value = True
+
+        incident = self._make_incident(
+            captain=None, linear_parent_issue_id="linear-issue-id"
+        )
+
+        on_incident_updated(incident, captain_changed=True)
+
+        mock_service.update_issue.assert_any_call("linear-issue-id", assignee_id=None)
+
+    @patch("firetower.incidents.hooks._get_linear_service")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_sync_linear_assignee_without_captain_change(
+        self, mock_slack, mock_get_linear, settings
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_slack.parse_channel_id_from_url.return_value = None
+
+        incident = self._make_incident(
+            status=IncidentStatus.MITIGATED,
+            linear_parent_issue_id="linear-issue-id",
+        )
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        mock_get_linear.return_value.update_issue.assert_not_called()

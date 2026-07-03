@@ -71,12 +71,9 @@ class TestCaptainCommand:
 
 @pytest.mark.django_db
 class TestCaptainSubmission:
-    @patch("firetower.incidents.serializers.on_captain_changed")
-    @patch("firetower.incidents.serializers.on_title_changed")
+    @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.captain.get_or_create_user_from_slack_id")
-    def test_sets_captain(
-        self, mock_get_user, mock_title_hook, mock_captain_hook, user, incident
-    ):
+    def test_sets_captain(self, mock_get_user, mock_hook, user, incident):
         mock_get_user.return_value = user
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}

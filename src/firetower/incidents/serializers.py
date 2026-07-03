@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
@@ -10,12 +11,8 @@ from rest_framework import serializers
 from firetower.auth.services import get_or_create_user_from_email
 
 from .hooks import (
-    on_captain_changed,
     on_incident_created,
-    on_severity_changed,
-    on_status_changed,
-    on_title_changed,
-    on_visibility_changed,
+    on_incident_updated,
 )
 from .models import (
     USER_ADDABLE_TAG_TYPES,
@@ -624,16 +621,21 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         self._auto_compute_downtime(instance, validated_data)
 
         if settings.HOOKS_ENABLED:
-            if instance.title != old_title:
-                on_title_changed(instance)
-            if instance.status != old_status:
-                on_status_changed(instance, old_status)
-            if instance.severity != old_severity:
-                on_severity_changed(instance, old_severity)
-            if instance.captain_id != old_captain_id:
-                on_captain_changed(instance)
-            if instance.is_private != old_is_private:
-                on_visibility_changed(instance)
+            request = self.context.get("request")
+            actor = self.context.get("acting_user") or (
+                request.user if request else None
+            )
+            on_incident_updated(
+                instance,
+                old_title=old_title if instance.title != old_title else None,
+                old_status=old_status if instance.status != old_status else None,
+                old_severity=old_severity
+                if instance.severity != old_severity
+                else None,
+                captain_changed=instance.captain_id != old_captain_id,
+                visibility_changed=instance.is_private != old_is_private,
+                actor=actor,
+            )
 
         return instance
 
@@ -666,9 +668,17 @@ class TagCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(e.message_dict)
 
 
+def _get_action_item_slo_days() -> dict[int, int]:
+    linear = getattr(settings, "LINEAR", None) or {}
+    high = linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 0)
+    medium = linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 0)
+    return {1: high, 2: high, 3: medium}
+
+
 class ActionItemSerializer(serializers.ModelSerializer):
     assignee_name = serializers.SerializerMethodField()
     assignee_avatar_url = serializers.SerializerMethodField()
+    slo_deadline = serializers.SerializerMethodField()
 
     class Meta:
         model = ActionItem
@@ -676,10 +686,12 @@ class ActionItemSerializer(serializers.ModelSerializer):
             "linear_identifier",
             "title",
             "status",
+            "priority",
             "relation_type",
             "assignee_name",
             "assignee_avatar_url",
             "url",
+            "slo_deadline",
         ]
 
     def get_assignee_name(self, obj: ActionItem) -> str | None:
@@ -691,6 +703,13 @@ class ActionItemSerializer(serializers.ModelSerializer):
         if obj.assignee and hasattr(obj.assignee, "userprofile"):
             return obj.assignee.userprofile.avatar_url or None
         return None
+
+    def get_slo_deadline(self, obj: ActionItem) -> str | None:
+        slo_days = _get_action_item_slo_days().get(obj.priority)
+        if not slo_days:
+            return None
+        deadline = obj.incident.created_at + timedelta(days=slo_days)
+        return deadline.isoformat()
 
 
 class IncidentOrRedirectReadSerializer(serializers.Serializer):

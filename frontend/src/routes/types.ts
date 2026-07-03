@@ -5,7 +5,7 @@ export const StatusSchema = z.enum([
   'Mitigated',
   'Postmortem',
   'Done',
-  'Cancelled',
+  'Canceled',
 ]);
 
 export const SeveritySchema = z.enum(['P0', 'P1', 'P2', 'P3', 'P4']);
@@ -19,6 +19,6 @@ export type StatusFilterValue = IncidentStatus | 'Any';
 export const STATUS_FILTER_GROUPS = {
   active: ['Active', 'Mitigated'] as StatusFilterValue[],
   review: ['Postmortem'] as StatusFilterValue[],
-  closed: ['Done', 'Cancelled'] as StatusFilterValue[],
+  closed: ['Done', 'Canceled'] as StatusFilterValue[],
   all: ['Any'] as StatusFilterValue[],
 };

@@ -50,6 +50,7 @@ const mockIncidents: PaginatedIncidents = {
 };
 
 const mockCurrentUser: CurrentUser = {
+  email: 'test.user@example.com',
   name: 'Test User',
   avatar_url: null,
 };
@@ -236,7 +237,7 @@ describe('StatusFilter', () => {
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/ui/incidents/',
-        query: expect.objectContaining({status: ['Done', 'Cancelled'], page: 1}),
+        query: expect.objectContaining({status: ['Done', 'Canceled'], page: 1}),
       })
     );
   });

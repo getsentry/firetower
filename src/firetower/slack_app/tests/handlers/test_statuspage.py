@@ -13,7 +13,7 @@ from firetower.slack_app.handlers.statuspage import (
     handle_statuspage_submission,
 )
 
-from .conftest import CHANNEL_ID
+from .conftest import CHANNEL_ID, STATUS_CHANNEL_ID
 
 
 class TestBuildStatuspageModal:
@@ -191,6 +191,9 @@ class TestStatuspageCommand:
             ) as MockService,
             patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
         ):
+            mock_app.return_value.client.views_open.return_value = {
+                "view": {"id": "v123"}
+            }
             instance = MockService.return_value
             instance.configured = True
             instance.get_components.return_value = ([], {})
@@ -198,7 +201,8 @@ class TestStatuspageCommand:
 
             ack.assert_called_once()
             mock_app.return_value.client.views_open.assert_called_once()
-            view = mock_app.return_value.client.views_open.call_args[1]["view"]
+            mock_app.return_value.client.views_update.assert_called_once()
+            view = mock_app.return_value.client.views_update.call_args[1]["view"]
             assert view["callback_id"] == "statuspage_modal"
             assert view["title"]["text"] == "New Statuspage Post"
 
@@ -248,6 +252,9 @@ class TestStatuspageCommand:
             ) as MockService,
             patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
         ):
+            mock_app.return_value.client.views_open.return_value = {
+                "view": {"id": "v123"}
+            }
             instance = MockService.return_value
             instance.configured = True
             instance.extract_incident_id_from_url.return_value = "sp123"
@@ -256,7 +263,7 @@ class TestStatuspageCommand:
 
             handle_statuspage_command(ack, body, command, respond)
 
-            view = mock_app.return_value.client.views_open.call_args[1]["view"]
+            view = mock_app.return_value.client.views_update.call_args[1]["view"]
             assert view["title"]["text"] == "Update Statuspage"
 
     def test_no_incident_responds_error(self, db):
@@ -357,6 +364,52 @@ class TestStatuspageSubmission:
         assert link.url == "https://test.statuspage.io/incidents/new_sp_123"
 
         assert "created" in client.chat_postMessage.call_args[1]["text"]
+
+    def test_posts_to_both_incident_and_status_channels(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view()
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.return_value = {"id": "sp_dual"}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/sp_dual"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        posted_channels = {
+            call[1]["channel"] for call in client.chat_postMessage.call_args_list
+        }
+        assert posted_channels == {CHANNEL_ID, STATUS_CHANNEL_ID}
+
+    def test_posts_to_both_channels_when_invoked_from_status_channel(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(channel_id=STATUS_CHANNEL_ID)
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.return_value = {"id": "sp_from_status"}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/sp_from_status"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        posted_channels = {
+            call[1]["channel"] for call in client.chat_postMessage.call_args_list
+        }
+        assert posted_channels == {CHANNEL_ID, STATUS_CHANNEL_ID}
 
     def test_creates_with_components(self, incident):
         ack = MagicMock()

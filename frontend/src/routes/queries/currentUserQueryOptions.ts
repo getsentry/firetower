@@ -3,6 +3,7 @@ import {Api} from 'api';
 import {z} from 'zod';
 
 const CurrentUserSchema = z.object({
+  email: z.string(),
   name: z.string(),
   avatar_url: z.string().nullable(),
 });

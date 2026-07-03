@@ -7,6 +7,7 @@ from firetower.incidents.models import Incident, IncidentSeverity
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import (
     get_incident_from_channel,
+    notify_submission_error,
     parse_incident_form_values,
 )
 
@@ -232,7 +233,8 @@ def handle_update_command(ack: Any, body: dict, command: dict, respond: Any) -> 
 def handle_update_incident_submission(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
-    form = parse_incident_form_values(view)
+    # Parse without resolving tags so validation touches no DB before ack().
+    form = parse_incident_form_values(view, resolve_tags=False)
     channel_id = view.get("private_metadata", "")
 
     values = view.get("state", {}).get("values", {})
@@ -251,45 +253,51 @@ def handle_update_incident_submission(
 
     ack()
 
-    incident = get_incident_from_channel(channel_id)
-    if not incident:
-        logger.error("Update submission: no incident for channel %s", channel_id)
-        return
+    user_id = body["user"]["id"]
 
-    data: dict[str, Any] = {
-        "title": form["title"],
-        "description": form["description"],
-        "impact_summary": form["impact_summary"],
-        "is_private": is_private,
-        "impact_type_tags": form["impact_type_tags"],
-        "affected_service_tags": form["affected_service_tags"],
-        "affected_region_tags": form["affected_region_tags"],
-    }
-    if form["severity"]:
-        data["severity"] = form["severity"]
-
-    if form["captain_slack_id"]:
-        captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
-        if captain_user:
-            data["captain"] = captain_user.email
-
-    serializer = IncidentWriteSerializer(instance=incident, data=data, partial=True)
-    if not serializer.is_valid():
-        logger.error("Incident update validation failed: %s", serializer.errors)
-        client.chat_postMessage(
-            channel=channel_id,
-            text=f"Failed to update incident: {serializer.errors}",
-        )
-        return
-
+    # Work runs after ack() so the modal closes immediately; any failure is
+    # reported back to the submitter as an ephemeral message.
     try:
+        incident = get_incident_from_channel(channel_id)
+        if incident is None:
+            notify_submission_error(client, channel_id, user_id)
+            return
+
+        # Resolve/create inline tags only after validation passed.
+        form = parse_incident_form_values(view)
+
+        data: dict[str, Any] = {
+            "title": form["title"],
+            "description": form["description"],
+            "impact_summary": form["impact_summary"],
+            "is_private": is_private,
+            "impact_type_tags": form["impact_type_tags"],
+            "affected_service_tags": form["affected_service_tags"],
+            "affected_region_tags": form["affected_region_tags"],
+        }
+        if form["severity"]:
+            data["severity"] = form["severity"]
+
+        if form["captain_slack_id"]:
+            captain_user = get_or_create_user_from_slack_id(form["captain_slack_id"])
+            if captain_user:
+                data["captain"] = captain_user.email
+
+        acting_user = get_or_create_user_from_slack_id(user_id)
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data=data,
+            partial=True,
+            context={"acting_user": acting_user},
+        )
+        if not serializer.is_valid():
+            logger.error("Incident update validation failed: %s", serializer.errors)
+            notify_submission_error(client, channel_id, user_id)
+            return
         serializer.save()
     except Exception:
         logger.exception("Failed to update incident from Slack modal")
-        client.chat_postMessage(
-            channel=channel_id,
-            text="Something went wrong updating the incident. Please try again.",
-        )
+        notify_submission_error(client, channel_id, user_id)
         return
 
     client.chat_postMessage(

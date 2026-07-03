@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -19,24 +20,25 @@ LINEAR_STATE_TYPE_MAP = {
     "unstarted": "Todo",
     "started": "In Progress",
     "completed": "Done",
-    "cancelled": "Cancelled",
-}
-
-LINEAR_RELATION_TYPE_MAP = {
-    "related": "related",
-    "blocks": "blocks",
-    "blocked": "blocked_by",
-    "duplicate": "duplicate",
+    "canceled": "Canceled",
 }
 
 TOKEN_LIFETIME = timedelta(days=30)
 TOKEN_REFRESH_BUFFER = timedelta(days=1)
+
+# Transient failures (timeouts, gateway errors) from Linear are retried with
+# exponential backoff before giving up, so brief upstream blips don't surface
+# as errors.
+LINEAR_RETRYABLE_STATUS_CODES = frozenset({502, 503, 504})
+LINEAR_DEFAULT_MAX_RETRIES = 3
+LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS = 1.0
 
 ISSUE_FIELDS = """
     id
     identifier
     title
     url
+    priority
     state {
         type
     }
@@ -52,6 +54,13 @@ class LinearService:
         assert settings.LINEAR is not None
         self.client_id = settings.LINEAR.get("CLIENT_ID")
         self.client_secret = settings.LINEAR.get("CLIENT_SECRET")
+        self.api_key = settings.LINEAR.get("API_KEY")
+        self.max_retries: int = max(
+            1, settings.LINEAR.get("MAX_RETRIES", LINEAR_DEFAULT_MAX_RETRIES)
+        )
+        self.retry_backoff_seconds: float = settings.LINEAR.get(
+            "RETRY_BACKOFF_SECONDS", LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS
+        )
         self._workflow_states_cache: dict[str, str] | None = None
 
     def _request_new_token(self) -> str | None:
@@ -93,6 +102,9 @@ class LinearService:
             return None
 
     def _get_access_token(self) -> str | None:
+        if self.api_key:
+            return self.api_key
+
         if not self.client_id or not self.client_secret:
             return None
 
@@ -105,17 +117,23 @@ class LinearService:
     def _make_graphql_request(
         self, query: str, variables: dict | None, access_token: str
     ) -> requests.Response:
+        auth_value = access_token if self.api_key else f"Bearer {access_token}"
         return requests.post(
             LINEAR_API_URL,
             json={"query": query, "variables": variables or {}},
             headers={
-                "Authorization": f"Bearer {access_token}",
+                "Authorization": auth_value,
                 "Content-Type": "application/json",
             },
             timeout=30,
         )
 
-    def _graphql(self, query: str, variables: dict | None = None) -> dict | None:
+    def _graphql(
+        self,
+        query: str,
+        variables: dict | None = None,
+        retryable: bool = True,
+    ) -> dict | None:
         access_token = self._get_access_token()
         if not access_token:
             logger.warning(
@@ -123,34 +141,65 @@ class LinearService:
             )
             return None
 
-        try:
-            response = self._make_graphql_request(query, variables, access_token)
-
-            if response.status_code == 401:
-                logger.info("Linear token expired, requesting new token")
-                access_token = self._request_new_token()
-                if not access_token:
-                    return None
-
+        max_attempts = self.max_retries if retryable else 1
+        for attempt in range(max_attempts):
+            is_last_attempt = attempt == max_attempts - 1
+            try:
+                assert access_token is not None
                 response = self._make_graphql_request(query, variables, access_token)
 
-            if not response.ok:
-                logger.error("Linear API returned %d", response.status_code)
+                if response.status_code == 401:
+                    if self.api_key:
+                        logger.error(
+                            "Linear API returned 401 with api_key — key is invalid or expired"
+                        )
+                        return None
+
+                    logger.info("Linear token expired, requesting new token")
+                    access_token = self._request_new_token()
+                    if not access_token:
+                        return None
+
+                    response = self._make_graphql_request(
+                        query, variables, access_token
+                    )
+
+                if (
+                    response.status_code in LINEAR_RETRYABLE_STATUS_CODES
+                    and not is_last_attempt
+                ):
+                    self._sleep_before_retry(attempt)
+                    continue
+
+                if not response.ok:
+                    logger.error(
+                        "Linear API returned %d: %s",
+                        response.status_code,
+                        response.text,
+                    )
+                    return None
+
+                data = response.json()
+
+                if "errors" in data:
+                    logger.error(
+                        "Linear GraphQL errors",
+                        extra={"errors": data["errors"]},
+                    )
+                    return None
+
+                return data.get("data")
+            except requests.RequestException:
+                if not is_last_attempt:
+                    self._sleep_before_retry(attempt)
+                    continue
+                logger.exception("Linear API request failed")
                 return None
 
-            data = response.json()
+        return None
 
-            if "errors" in data:
-                logger.error(
-                    "Linear GraphQL errors",
-                    extra={"errors": data["errors"]},
-                )
-                return None
-
-            return data.get("data")
-        except requests.RequestException:
-            logger.exception("Linear API request failed")
-            return None
+    def _sleep_before_retry(self, attempt: int) -> None:
+        time.sleep(self.retry_backoff_seconds * (2**attempt))
 
     def _parse_issue(
         self, issue: dict[str, Any], relation_type: str = "child"
@@ -164,6 +213,7 @@ class LinearService:
             "title": issue["title"],
             "url": issue["url"],
             "status": status,
+            "priority": issue.get("priority", 0),
             "assignee_email": assignee.get("email"),
             "assignee_linear_id": assignee.get("id"),
             "relation_type": relation_type,
@@ -186,6 +236,7 @@ class LinearService:
             "identifier": issue["identifier"],
             "title": issue["title"],
             "url": issue["url"],
+            "state_type": (issue.get("state") or {}).get("type", ""),
         }
 
     def get_user_by_email(self, email: str) -> dict[str, str] | None:
@@ -240,7 +291,7 @@ class LinearService:
         if assignee_id:
             input_data["assigneeId"] = assignee_id
 
-        data = self._graphql(mutation, {"input": input_data})
+        data = self._graphql(mutation, {"input": input_data}, retryable=False)
         if not data:
             return None
 
@@ -271,11 +322,30 @@ class LinearService:
         data = self._graphql(
             mutation,
             {"input": {"issueId": issue_id, "url": url, "title": title}},
+            retryable=False,
         )
         if not data:
             return False
 
         return data.get("attachmentCreate", {}).get("success", False)
+
+    def create_comment(self, issue_id: str, body: str) -> bool:
+        mutation = """
+        mutation($input: CommentCreateInput!) {
+            commentCreate(input: $input) {
+                success
+            }
+        }
+        """
+        data = self._graphql(
+            mutation,
+            {"input": {"issueId": issue_id, "body": body}},
+            retryable=False,
+        )
+        if not data:
+            return False
+
+        return data.get("commentCreate", {}).get("success", False)
 
     def update_issue(
         self,
@@ -305,7 +375,9 @@ class LinearService:
         if not input_data:
             return True
 
-        data = self._graphql(mutation, {"id": issue_id, "input": input_data})
+        data = self._graphql(
+            mutation, {"id": issue_id, "input": input_data}, retryable=False
+        )
         if not data:
             return False
 
@@ -392,81 +464,3 @@ class LinearService:
                 break
 
         return issues
-
-    def _fetch_relations(
-        self,
-        issue_id: str,
-        field: str,
-        issue_key: str,
-        seen_ids: set[str],
-    ) -> list[dict[str, Any]] | None:
-        query = f"""
-        query($issueId: String!, $after: String) {{
-            issue(id: $issueId) {{
-                {field}(first: 50, after: $after) {{
-                    nodes {{
-                        type
-                        {issue_key} {{
-                            {ISSUE_FIELDS}
-                        }}
-                    }}
-                    pageInfo {{
-                        hasNextPage
-                        endCursor
-                    }}
-                }}
-            }}
-        }}
-        """
-
-        issues: list[dict[str, Any]] = []
-        cursor: str | None = None
-        max_pages = 25
-
-        for _ in range(max_pages):
-            variables: dict[str, Any] = {"issueId": issue_id}
-            if cursor is not None:
-                variables["after"] = cursor
-
-            data = self._graphql(query, variables)
-            if data is None:
-                return None
-
-            issue = data.get("issue")
-            if not issue:
-                return None
-
-            relations = issue.get(field, {})
-            for node in relations.get("nodes", []):
-                related_issue = node.get(issue_key)
-                if not related_issue or "id" not in related_issue:
-                    continue
-                if related_issue["id"] in seen_ids:
-                    continue
-                seen_ids.add(related_issue["id"])
-
-                linear_type = node.get("type", "").lower()
-                relation_type = LINEAR_RELATION_TYPE_MAP.get(linear_type, "related")
-                issues.append(self._parse_issue(related_issue, relation_type))
-
-            page_info = relations.get("pageInfo", {})
-            if not page_info.get("hasNextPage"):
-                break
-            cursor = page_info.get("endCursor")
-            if cursor is None:
-                break
-
-        return issues
-
-    def get_related_issues(self, issue_id: str) -> list[dict[str, Any]] | None:
-        seen_ids: set[str] = set()
-
-        forward = self._fetch_relations(issue_id, "relations", "relatedIssue", seen_ids)
-        if forward is None:
-            return None
-
-        inverse = self._fetch_relations(issue_id, "inverseRelations", "issue", seen_ids)
-        if inverse is None:
-            return None
-
-        return forward + inverse

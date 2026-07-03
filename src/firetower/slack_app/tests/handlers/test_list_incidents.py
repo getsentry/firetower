@@ -139,7 +139,7 @@ class TestListCommand:
     def test_done_and_cancelled_excluded(self, db):
         for status in (
             IncidentStatus.DONE,
-            IncidentStatus.CANCELLED,
+            IncidentStatus.CANCELED,
             IncidentStatus.POSTMORTEM,
         ):
             inc = Incident(

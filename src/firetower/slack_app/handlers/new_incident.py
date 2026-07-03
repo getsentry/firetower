@@ -17,6 +17,8 @@ from firetower.integrations.services import SlackService
 from firetower.integrations.services.slack import escape_slack_text
 from firetower.slack_app.handlers.utils import (
     _DEFAULT_SEVERITY,
+    CREATE_TAG_PREFIX,
+    _extract_title,
     build_incident_form_blocks,
     parse_incident_form_values,
 )
@@ -32,9 +34,6 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
     impact_summary = form_data.get("impact_summary", "")
     captain_slack_id = form_data.get("captain_slack_id")
     is_private = form_data.get("is_private", False)
-    impact_type_tags = form_data.get("impact_type_tags", [])
-    affected_service_tags = form_data.get("affected_service_tags", [])
-    affected_region_tags = form_data.get("affected_region_tags", [])
 
     channel_name = f"{settings.PROJECT_KEY.lower()}-{uuid.uuid4().hex[:8]}"
 
@@ -65,12 +64,6 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
         metadata_lines.append(f"Captain: <@{captain_slack_id}>")
     metadata_lines.append(f"Reporter: <@{slack_user_id}>")
     metadata_lines.append(f"Private: {'yes' if is_private else 'no'}")
-    if impact_type_tags:
-        metadata_lines.append(f"Impact Types: {', '.join(impact_type_tags)}")
-    if affected_service_tags:
-        metadata_lines.append(f"Affected Services: {', '.join(affected_service_tags)}")
-    if affected_region_tags:
-        metadata_lines.append(f"Affected Regions: {', '.join(affected_region_tags)}")
 
     metadata_text = "\n".join(metadata_lines)
     try:
@@ -179,6 +172,10 @@ ACTION_ID_TO_TAG_TYPE = {
     "affected_region_tags": TagType.AFFECTED_REGION,
 }
 
+# Tag types users can create inline from the lifecycle modals. impact_type stays
+# curated since it powers dashboards, so it is intentionally excluded.
+INLINE_CREATABLE_TAG_TYPES = {TagType.AFFECTED_SERVICE, TagType.AFFECTED_REGION}
+
 
 def handle_tag_options(ack: Any, payload: dict) -> None:
     close_old_connections()
@@ -194,11 +191,31 @@ def handle_tag_options(ack: Any, payload: dict) -> None:
     if keyword:
         qs = qs.filter(name__icontains=keyword)
 
+    matches = list(qs.order_by("name")[:100])
     options = [
         {"text": {"type": "plain_text", "text": tag.name}, "value": tag.name}
-        for tag in qs.order_by("name")[:100]
+        for tag in matches
     ]
-    ack(options=options)
+
+    stripped = keyword.strip()
+    if tag_type in INLINE_CREATABLE_TAG_TYPES and stripped:
+        exact_match = Tag.objects.filter(type=tag_type, name__iexact=stripped).exists()
+        if not exact_match:
+            # Put "+ Create" first so it survives the 100-option Slack cap even
+            # when the keyword already matches a full page of existing tags.
+            options.insert(
+                0,
+                {
+                    "text": {
+                        "type": "plain_text",
+                        "text": f'+ Create "{stripped}"',
+                    },
+                    "value": f"{CREATE_TAG_PREFIX}{stripped}",
+                },
+            )
+
+    # Slack rejects block_suggestion responses with more than 100 options.
+    ack(options=options[:100])
 
 
 def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
@@ -252,12 +269,6 @@ def _create_incident_via_db(
         "reporter": user.email,
         "is_private": is_private,
     }
-    if form["impact_type_tags"]:
-        data["impact_type_tags"] = form["impact_type_tags"]
-    if form["affected_service_tags"]:
-        data["affected_service_tags"] = form["affected_service_tags"]
-    if form["affected_region_tags"]:
-        data["affected_region_tags"] = form["affected_region_tags"]
 
     serializer = IncidentWriteSerializer(data=data)
     if not serializer.is_valid():
@@ -274,8 +285,6 @@ def _create_incident_via_db(
 def handle_new_incident_submission(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
-    form = parse_incident_form_values(view)
-
     values = view.get("state", {}).get("values", {})
     private_selections = (
         values.get("private_block", {}).get("is_private", {}).get("selected_options")
@@ -283,7 +292,8 @@ def handle_new_incident_submission(
     )
     is_private = any(opt.get("value") == "private" for opt in private_selections)
 
-    if not form["title"]:
+    title = _extract_title(view)
+    if not title:
         ack(
             response_action="errors",
             errors={"title_block": "This field is required."},
@@ -295,11 +305,13 @@ def handle_new_incident_submission(
     slack_user_id = body.get("user", {}).get("id", "")
 
     try:
+        form = parse_incident_form_values(view)
         incident = _create_incident_via_db(form, slack_user_id, is_private, client)
     except (OperationalError, InterfaceError):
         logger.exception(
             "Database unreachable during incident creation from Slack modal"
         )
+        form = parse_incident_form_values(view, resolve_tags=False)
         form_data = {
             "title": form["title"],
             "severity": form["severity"] or _DEFAULT_SEVERITY.value,
@@ -307,9 +319,6 @@ def handle_new_incident_submission(
             "impact_summary": form["impact_summary"],
             "captain_slack_id": form["captain_slack_id"],
             "is_private": is_private,
-            "impact_type_tags": form.get("impact_type_tags", []),
-            "affected_service_tags": form.get("affected_service_tags", []),
-            "affected_region_tags": form.get("affected_region_tags", []),
         }
         _create_fallback_channel(client, slack_user_id, form_data)
         return

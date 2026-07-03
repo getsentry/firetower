@@ -6,6 +6,7 @@ import requests
 from django.db import transaction
 
 from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.integrations.services.slack import SlackService
 from firetower.integrations.services.statuspage import (
     COMPONENT_STATUS_OPTIONS,
     DEFAULT_MESSAGES,
@@ -135,6 +136,13 @@ def _build_statuspage_modal(
                 },
             },
             "label": {"type": "plain_text", "text": "Message"},
+            "hint": {
+                "type": "plain_text",
+                "text": (
+                    "If impact is specific to US or US2 mention that in your message "
+                    "so customers know whether they are affected."
+                ),
+            },
         }
     )
 
@@ -277,6 +285,34 @@ def handle_statuspage_command(
         respond("Statuspage is not configured.")
         return
 
+    from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
+
+    bolt_app = get_bolt_app()
+
+    try:
+        loading_view = bolt_app.client.views_open(
+            trigger_id=trigger_id,
+            view={
+                "type": "modal",
+                "callback_id": "statuspage_modal_loading",
+                "title": {"type": "plain_text", "text": "Loading..."},
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "Loading Statuspage data...",
+                        },
+                    }
+                ],
+            },
+        )
+        view_id = loading_view["view"]["id"]
+    except Exception:
+        logger.exception("Failed to open loading modal")
+        respond("Failed to open modal.")
+        return
+
     statuspage_incident = None
     statuspage_link = incident.external_links.filter(
         type=ExternalLinkType.STATUSPAGE
@@ -291,9 +327,21 @@ def handle_statuspage_command(
                 logger.exception(
                     "Failed to fetch existing statuspage incident %s", sp_id
                 )
-                respond(
-                    "Could not reach Statuspage to load the existing post. "
-                    "Please try again in a moment."
+                bolt_app.client.views_update(
+                    view_id=view_id,
+                    view={
+                        "type": "modal",
+                        "title": {"type": "plain_text", "text": "Error"},
+                        "blocks": [
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": "Could not reach Statuspage to load the existing post. Please try again in a moment.",
+                                },
+                            }
+                        ],
+                    },
                 )
                 return
             if statuspage_incident is None:
@@ -305,10 +353,8 @@ def handle_statuspage_command(
                 )
                 statuspage_link.delete()
 
-    from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
-
-    get_bolt_app().client.views_open(
-        trigger_id=trigger_id,
+    bolt_app.client.views_update(
+        view_id=view_id,
         view=_build_statuspage_modal(
             channel_id=channel_id,
             incident_title=incident.title,
@@ -494,13 +540,36 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
         )
         return False
 
+    notify_channels = {channel_id}
+    slack = SlackService()
+    for link in incident.external_links.filter(
+        type__in=[ExternalLinkType.SLACK, ExternalLinkType.SLACK_STATUS]
+    ):
+        parsed = slack.parse_channel_id_from_url(link.url)
+        if parsed:
+            notify_channels.add(parsed)
+
+    for ch in notify_channels:
+        try:
+            client.chat_postMessage(channel=ch, text=success_message)
+        except Exception:
+            logger.exception(
+                "Failed to post statuspage success message for incident %s to %s (%s)",
+                incident.id,
+                ch,
+                success_message,
+            )
+
     try:
-        client.chat_postMessage(channel=channel_id, text=success_message)
+        from firetower.incidents.hooks import (  # noqa: PLC0415
+            schedule_statuspage_followup_reminder,
+        )
+
+        schedule_statuspage_followup_reminder(incident)
     except Exception:
         logger.exception(
-            "Failed to post statuspage success message for incident %s (%s)",
+            "Failed to schedule statuspage followup reminder for incident %s",
             incident.id,
-            success_message,
         )
 
     return True

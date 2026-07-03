@@ -51,8 +51,8 @@ export const Header = () => {
                   className={cn(
                     'rounded-radius-sm px-space-lg py-space-sm text-size-sm font-medium transition-colors',
                     isActivePage(page.to)
-                      ? 'bg-background-secondary text-content-headings'
-                      : 'text-content-secondary hover:text-content-headings'
+                      ? 'bg-background-secondary hover:bg-background-transparent-neutral-muted text-content-headings'
+                      : 'text-content-secondary hover:bg-background-transparent-neutral-muted hover:text-content-headings'
                   )}
                 >
                   {page.label}

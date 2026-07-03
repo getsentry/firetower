@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any, TypedDict
 
+from corsheaders.defaults import default_headers
 from datadog import initialize
 from datadog.dogstatsd.base import statsd
 
@@ -55,6 +56,9 @@ if not env_is_dev():
         dsn=config.sentry_dsn,
         send_default_pii=False,
         environment=os.environ.get("DJANGO_ENV", "unknown"),
+        traces_sample_rate=1.0,
+        enable_logs=True,
+        trace_propagation_targets=[],
     )
 
 
@@ -70,6 +74,7 @@ def _coerce_region_grouping(raw: list[Any]) -> list[list[str]]:
 PROJECT_KEY = config.project_key
 REGION_GROUPING = _coerce_region_grouping(config.region_grouping)
 FIRETOWER_BASE_URL = config.firetower_base_url
+SERVICE_REGISTRY_URL = config.service_registry_url
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -101,6 +106,12 @@ CSRF_TRUSTED_ORIGINS = [
     "https://firetower.getsentry.net",
     "https://test.firetower.getsentry.net",
 ]
+
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "sentry-trace",
+    "baggage",
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -229,6 +240,7 @@ class SlackSettings(TypedDict):
     INCIDENT_FEED_CHANNEL_ID: str
     ALWAYS_INVITED_IDS: list[str]
     INCIDENT_GUIDE_MESSAGE: str
+    SLASH_COMMAND: str
 
 
 SLACK: SlackSettings = {
@@ -238,6 +250,7 @@ SLACK: SlackSettings = {
     "INCIDENT_FEED_CHANNEL_ID": config.slack.incident_feed_channel_id,
     "ALWAYS_INVITED_IDS": config.slack.always_invited_ids,
     "INCIDENT_GUIDE_MESSAGE": config.slack.incident_guide_message,
+    "SLASH_COMMAND": config.slack.slash_command,
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
@@ -247,6 +260,9 @@ class StatuspageSettings(TypedDict):
     API_KEY: str
     PAGE_ID: str
     URL: str
+    INITIAL_REMINDER_DELAY_MINUTES: int | None
+    FOLLOWUP_REMINDER_DELAY_MINUTES: int | None
+    WARNING_BUFFER_MINUTES: int
 
 
 STATUSPAGE: StatuspageSettings | None = (
@@ -254,6 +270,9 @@ STATUSPAGE: StatuspageSettings | None = (
         "API_KEY": config.statuspage.api_key,
         "PAGE_ID": config.statuspage.page_id,
         "URL": config.statuspage.url,
+        "INITIAL_REMINDER_DELAY_MINUTES": config.statuspage.initial_reminder_delay_minutes,
+        "FOLLOWUP_REMINDER_DELAY_MINUTES": config.statuspage.followup_reminder_delay_minutes,
+        "WARNING_BUFFER_MINUTES": config.statuspage.warning_buffer_minutes,
     }
     if config.statuspage
     else None
@@ -300,9 +319,16 @@ LINEAR: dict | None = (
     {
         "CLIENT_ID": config.linear.client_id,
         "CLIENT_SECRET": config.linear.client_secret,
+        "API_KEY": config.linear.api_key,
         "TEAM_ID": config.linear.team_id,
         "PROJECT_ID": config.linear.project_id,
         "SYNC_IDENTIFIERS": config.linear.sync_identifiers,
+        "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": config.linear.action_item_slo_days_high_priority,
+        "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": config.linear.action_item_slo_days_medium_priority,
+        "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": config.linear.action_item_nag_comment_high_priority,
+        "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": config.linear.action_item_nag_comment_medium_priority,
+        "PARENT_STATUS_COMMENT_COMPLETED": config.linear.parent_status_comment_completed,
+        "PARENT_STATUS_COMMENT_STARTED": config.linear.parent_status_comment_started,
     }
     if config.linear
     else None

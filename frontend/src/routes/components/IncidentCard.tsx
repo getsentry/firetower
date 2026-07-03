@@ -18,15 +18,30 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
       preload={'intent'}
     >
       <div
-        className="bg-background-primary rounded-radius-lg p-space-xl cursor-pointer shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+        className="bg-background-primary hover:bg-background-transparent-neutral-muted rounded-radius-lg p-space-xl cursor-pointer shadow-sm transition-colors duration-200"
         data-testid={`incident-card-${incident.id}`}
       >
-        <div className="gap-space-xl mb-space-md flex flex-wrap items-center md:flex-nowrap">
-          <span className="text-size-md text-content-secondary font-regular gap-space-xs flex items-center leading-none">
-            {incident.is_private && <span aria-label="Private incident">🔒</span>}
-            {incident.id}
-          </span>
-          <div className="text-size-sm text-content-secondary ml-auto text-right md:order-last">
+        <div className="gap-space-xl flex justify-between">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-size-xl text-content-headings select-text font-semibold">
+              {incident.title}
+            </h3>
+            <span className="text-size-lg text-content-secondary mt-space-sm gap-space-xs flex select-text items-center font-regular leading-none">
+              {incident.is_private && <span aria-label="Private incident">🔒</span>}
+              {incident.id}
+            </span>
+            <div className="gap-space-md mt-space-md flex">
+              <Pill variant={incident.severity}>{incident.severity}</Pill>
+              <Pill variant={incident.status}>{incident.status}</Pill>
+              {incident.is_private && <Pill variant="private">Private</Pill>}
+            </div>
+            {incident.description ? (
+              <p className="text-content-secondary text-size-sm leading-comfortable line-clamp-1 mt-space-md select-none">
+                {incident.description}
+              </p>
+            ) : null}
+          </div>
+          <div className="text-size-sm text-content-secondary shrink-0 select-none text-right">
             <time dateTime={incident.created_at}>
               {createdAt.toLocaleDateString('en-US', {
                 month: 'short',
@@ -43,28 +58,11 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
                 timeZoneName: 'short',
               })}
             </p>
+            {incident.captain && (
+              <p className="mt-space-xs">Captain: {incident.captain}</p>
+            )}
           </div>
-          <h3 className="text-size-xl text-content-headings w-full font-semibold md:w-auto md:flex-1">
-            {incident.title}
-          </h3>
         </div>
-
-        <div className="mb-space-lg flex items-center justify-between">
-          <div className="gap-space-md flex">
-            <Pill variant={incident.severity}>{incident.severity}</Pill>
-            <Pill variant={incident.status}>{incident.status}</Pill>
-            {incident.is_private && <Pill variant="private">Private</Pill>}
-          </div>
-          {incident.captain && (
-            <p className="text-content-secondary text-size-sm">
-              Captain: {incident.captain}
-            </p>
-          )}
-        </div>
-
-        <p className="text-content-secondary text-size-sm leading-comfortable">
-          {incident.description}
-        </p>
       </div>
     </Link>
   );
