@@ -328,7 +328,6 @@ LINEAR: dict | None = (
         "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": config.linear.action_item_nag_comment_high_priority,
         "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": config.linear.action_item_nag_comment_medium_priority,
         "PARENT_STATUS_COMMENT_COMPLETED": config.linear.parent_status_comment_completed,
-        "PARENT_STATUS_COMMENT_STARTED": config.linear.parent_status_comment_started,
     }
     if config.linear
     else None
