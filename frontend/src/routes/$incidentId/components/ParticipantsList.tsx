@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {useMutation, useQueryClient} from '@tanstack/react-query';
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {cva} from 'class-variance-authority';
 import {Avatar} from 'components/Avatar';
 import {Button} from 'components/Button';
@@ -7,6 +7,7 @@ import {Card} from 'components/Card';
 import {Pencil, X} from 'lucide-react';
 import {cn} from 'utils/cn';
 
+import {currentUserQueryOptions} from '../../queries/currentUserQueryOptions';
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
@@ -82,6 +83,7 @@ interface ParticipantDropdownProps {
   value: string;
   onChange: (value: string) => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
+  currentUserEmail?: string;
 }
 
 function ParticipantDropdown({
@@ -89,6 +91,7 @@ function ParticipantDropdown({
   value,
   onChange,
   containerRef,
+  currentUserEmail,
 }: ParticipantDropdownProps) {
   const [searchValue, setSearchValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -98,11 +101,16 @@ function ParticipantDropdown({
 
   const selectedParticipant = participants.find(p => p.email === value);
 
-  const filteredParticipants = useMemo(
-    () =>
-      participants.filter(p => p.name.toLowerCase().includes(searchValue.toLowerCase())),
-    [participants, searchValue]
-  );
+  const filteredParticipants = useMemo(() => {
+    const filtered = participants.filter(p =>
+      p.name.toLowerCase().includes(searchValue.toLowerCase())
+    );
+    return filtered.sort((a, b) => {
+      if (currentUserEmail && a.email === currentUserEmail) return -1;
+      if (currentUserEmail && b.email === currentUserEmail) return 1;
+      return 0;
+    });
+  }, [participants, searchValue, currentUserEmail]);
 
   const handleSelect = useCallback(
     (participant: Participant) => {
@@ -230,6 +238,7 @@ interface ParticipantsListProps {
 
 export function ParticipantsList({incidentId, participants}: ParticipantsListProps) {
   const queryClient = useQueryClient();
+  const {data: currentUser} = useQuery(currentUserQueryOptions());
   const updateIncidentField = useMutation(
     updateIncidentFieldMutationOptions(queryClient)
   );
@@ -312,6 +321,7 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
               value={selectedParticipantEmail}
               onChange={handleRoleChange}
               containerRef={containerRef}
+              currentUserEmail={currentUser?.email}
             />
           </div>
           <div className="gap-space-xs flex items-center">
