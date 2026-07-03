@@ -514,7 +514,7 @@ class SlackService:
                 raise RuntimeError(
                     f"conversations_history returned not-ok for channel {channel_id}"
                 )
-            page = response.get("messages", [])
+            page: list[dict[str, Any]] = response.get("messages", [])
             if page:
                 yield page
             metadata: dict[str, Any] = response.get("response_metadata") or {}
