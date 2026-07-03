@@ -33,13 +33,17 @@ if (import.meta.env.MODE != 'development') {
     sendDefaultPii: false,
     environment: getSentryEnvironment(),
     integrations: [
+      Sentry.spanStreamingIntegration(),
       Sentry.feedbackIntegration({
         colorScheme: 'system',
       }),
       Sentry.tanstackRouterBrowserTracingIntegration(router),
+      Sentry.browserProfilingIntegration(),
       Sentry.replayIntegration(),
     ],
     tracesSampleRate: 1.0,
+    profileSessionSampleRate: 1.0,
+    profileLifecycle: 'trace',
     tracePropagationTargets: [/^\//, /^https:\/\/(test\.)?firetower\.getsentry\.net/],
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,

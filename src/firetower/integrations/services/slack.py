@@ -220,10 +220,13 @@ class SlackService:
             self.client.conversations_rename(channel=channel_id, name=name)
             return True
         except SlackApiError as e:
-            logger.error(
-                f"Error renaming channel: {e}",
-                extra={"channel_id": channel_id, "new_name": name},
-            )
+            if e.response.get("error") == "is_archived":
+                logger.warning(f"Cannot rename archived channel {channel_id}, skipping")
+            else:
+                logger.error(
+                    f"Error renaming channel: {e}",
+                    extra={"channel_id": channel_id, "new_name": name},
+                )
             return False
 
     def set_channel_topic(self, channel_id: str, topic: str) -> bool:
@@ -236,10 +239,15 @@ class SlackService:
             self.client.conversations_setTopic(channel=channel_id, topic=topic)
             return True
         except SlackApiError as e:
-            logger.error(
-                f"Error setting channel topic: {e}",
-                extra={"channel_id": channel_id},
-            )
+            if e.response.get("error") == "is_archived":
+                logger.warning(
+                    f"Cannot set topic on archived channel {channel_id}, skipping"
+                )
+            else:
+                logger.error(
+                    f"Error setting channel topic: {e}",
+                    extra={"channel_id": channel_id},
+                )
             return False
 
     def set_all_channel_topics(
@@ -265,10 +273,15 @@ class SlackService:
             if e.response.get("error") == "already_in_channel":
                 logger.info(f"Users already in channel {channel_id}")
                 return True
-            logger.error(
-                f"Error inviting to channel: {e}",
-                extra={"channel_id": channel_id},
-            )
+            if e.response.get("error") == "is_archived":
+                logger.warning(
+                    f"Cannot invite to archived channel {channel_id}, skipping"
+                )
+            else:
+                logger.error(
+                    f"Error inviting to channel: {e}",
+                    extra={"channel_id": channel_id},
+                )
             return False
 
     def join_channel(self, channel_id: str) -> bool:
@@ -281,9 +294,12 @@ class SlackService:
             self.client.conversations_join(channel=channel_id)
             return True
         except SlackApiError as e:
-            logger.error(
-                f"Error joining channel: {e}", extra={"channel_id": channel_id}
-            )
+            if e.response.get("error") == "is_archived":
+                logger.warning(f"Cannot join archived channel {channel_id}, skipping")
+            else:
+                logger.error(
+                    f"Error joining channel: {e}", extra={"channel_id": channel_id}
+                )
             return False
 
     def post_message(
@@ -300,7 +316,11 @@ class SlackService:
             )
             return response.get("ts")
         except SlackApiError as e:
-            if e.response.get("error") == "not_in_channel":
+            if e.response.get("error") == "is_archived":
+                logger.warning(
+                    f"Cannot post to archived channel {channel_id}, skipping"
+                )
+            elif e.response.get("error") == "not_in_channel":
                 logger.info(f"Not in channel {channel_id}, joining and retrying post")
                 if self.join_channel(channel_id):
                     try:
@@ -313,10 +333,15 @@ class SlackService:
                             f"Error posting message after joining channel: {retry_error}",
                             extra={"channel_id": channel_id},
                         )
-                        return None
-            logger.error(
-                f"Error posting message: {e}", extra={"channel_id": channel_id}
-            )
+                else:
+                    logger.error(
+                        f"Failed to join channel {channel_id} for message retry",
+                        extra={"channel_id": channel_id},
+                    )
+            else:
+                logger.error(
+                    f"Error posting message: {e}", extra={"channel_id": channel_id}
+                )
             return None
 
     def pin_message(self, channel_id: str, message_ts: str) -> bool:
@@ -329,9 +354,12 @@ class SlackService:
             self.client.pins_add(channel=channel_id, timestamp=message_ts)
             return True
         except SlackApiError as e:
-            logger.error(
-                f"Error pinning message: {e}", extra={"channel_id": channel_id}
-            )
+            if e.response.get("error") == "is_archived":
+                logger.warning(f"Cannot pin in archived channel {channel_id}, skipping")
+            else:
+                logger.error(
+                    f"Error pinning message: {e}", extra={"channel_id": channel_id}
+                )
             return False
 
     def delete_message(self, channel_id: str, message_ts: str) -> bool:
@@ -361,7 +389,11 @@ class SlackService:
             )
             return True
         except SlackApiError as e:
-            if e.response.get("error") == "not_in_channel":
+            if e.response.get("error") == "is_archived":
+                logger.warning(
+                    f"Cannot bookmark in archived channel {channel_id}, skipping"
+                )
+            elif e.response.get("error") == "not_in_channel":
                 logger.info(
                     f"Not in channel {channel_id}, joining and retrying bookmark"
                 )
@@ -376,10 +408,15 @@ class SlackService:
                             f"Error adding bookmark after joining channel: {retry_error}",
                             extra={"channel_id": channel_id},
                         )
-                        return False
-            logger.error(
-                f"Error adding bookmark: {e}", extra={"channel_id": channel_id}
-            )
+                else:
+                    logger.error(
+                        f"Failed to join channel {channel_id} for bookmark retry",
+                        extra={"channel_id": channel_id},
+                    )
+            else:
+                logger.error(
+                    f"Error adding bookmark: {e}", extra={"channel_id": channel_id}
+                )
             return False
 
     def build_channel_url(self, channel_id: str) -> str:
