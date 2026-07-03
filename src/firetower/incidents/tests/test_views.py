@@ -344,10 +344,11 @@ class TestIncidentViews:
             captain=other_user,
         )
 
-        self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            f"/api/incidents/{incident.incident_number}/sync-participants/"
-        )
+        with patch("firetower.incidents.views.sync_incident_participants_from_slack"):
+            self.client.force_authenticate(user=self.user)
+            response = self.client.post(
+                f"/api/incidents/{incident.incident_number}/sync-participants/"
+            )
 
         assert response.status_code == 404
 
@@ -357,6 +358,216 @@ class TestIncidentViews:
         response = self.client.post("/api/incidents/INVALID-123/sync-participants/")
 
         assert response.status_code == 400
+
+
+@pytest.mark.django_db
+class TestPrivateIncidentVisibilitySync:
+    """Tests that Slack channel members can access private incidents in the UI
+    even before their participant record has been synced to the DB."""
+
+    def setup_method(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="channel_member@example.com",
+            email="channel_member@example.com",
+            password="testpass123",
+        )
+        self.captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            password="testpass123",
+        )
+
+    def _make_private_incident(self) -> Incident:
+        return Incident.objects.create(
+            title="Private Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=self.captain,
+        )
+
+    def test_detail_view_syncs_before_visibility_check(self):
+        """User in Slack channel but not yet synced gets access after force-sync."""
+        incident = self._make_private_incident()
+
+        def sync_adds_user(inc, force=False):
+            inc.participants.add(self.user)
+            return ParticipantsSyncStats(added=1)
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack",
+            side_effect=sync_adds_user,
+        ):
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
+
+        assert response.status_code == 200
+        assert response.data["incident"]["id"] == incident.incident_number
+
+    def test_detail_view_404_when_sync_does_not_add_user(self):
+        """User NOT in Slack channel still gets 404 after sync attempt."""
+        incident = self._make_private_incident()
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack",
+            return_value=ParticipantsSyncStats(),
+        ):
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
+
+        assert response.status_code == 404
+
+    def test_detail_view_404_when_sync_raises(self):
+        """Sync failure on the fallback path results in 404, not 500."""
+        incident = self._make_private_incident()
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack",
+            side_effect=Exception("Slack API error"),
+        ):
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
+
+        assert response.status_code == 404
+
+    def test_detail_view_fast_path_for_existing_participant(self):
+        """User already in participants skips the fallback sync entirely."""
+        incident = self._make_private_incident()
+        incident.participants.add(self.user)
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack"
+        ) as mock_sync:
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
+
+        assert response.status_code == 200
+        # Called once from the view's post-fetch sync, NOT from the helper.
+        mock_sync.assert_called_once_with(incident)
+
+    def test_public_incident_does_not_trigger_fallback_sync(self):
+        """Public incidents never hit the fallback sync path."""
+        incident = Incident.objects.create(
+            title="Public Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack"
+        ) as mock_sync:
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(f"/api/ui/incidents/{incident.incident_number}/")
+
+        assert response.status_code == 200
+        # Only the view's normal post-fetch sync, not a force sync.
+        mock_sync.assert_called_once_with(incident)
+
+    def test_action_items_view_syncs_before_visibility_check(self):
+        """Action items endpoint also syncs participants for private incidents."""
+        incident = self._make_private_incident()
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-1",
+            linear_identifier="ENG-1",
+            title="Fix the bug",
+            status=ActionItemStatus.TODO,
+            url="https://linear.app/team/issue/ENG-1",
+        )
+
+        def sync_adds_user(inc, force=False):
+            inc.participants.add(self.user)
+            return ParticipantsSyncStats(added=1)
+
+        with (
+            patch(
+                "firetower.incidents.views.sync_incident_participants_from_slack",
+                side_effect=sync_adds_user,
+            ),
+            patch(
+                "firetower.incidents.views.sync_action_items_from_linear",
+            ),
+        ):
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(
+                f"/api/ui/incidents/{incident.incident_number}/action-items/"
+            )
+
+        assert response.status_code == 200
+        assert len(response.data) == 1
+        assert response.data[0]["title"] == "Fix the bug"
+
+    def test_action_items_view_404_when_not_in_channel(self):
+        """Action items endpoint returns 404 when user is not a channel member."""
+        incident = self._make_private_incident()
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack",
+            return_value=ParticipantsSyncStats(),
+        ):
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(
+                f"/api/ui/incidents/{incident.incident_number}/action-items/"
+            )
+
+        assert response.status_code == 404
+
+    def test_nonexistent_incident_returns_404(self):
+        """Fallback path does not reveal whether an incident exists."""
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack"
+        ) as mock_sync:
+            self.client.force_authenticate(user=self.user)
+            response = self.client.get(
+                f"/api/ui/incidents/{settings.PROJECT_KEY}-99999/"
+            )
+
+        assert response.status_code == 404
+        mock_sync.assert_not_called()
+
+    def test_sync_participants_endpoint_no_double_sync(self):
+        """Sync-participants endpoint does not re-sync when the visibility
+        check already performed a force sync."""
+        incident = self._make_private_incident()
+
+        def sync_adds_user(inc, force=False):
+            inc.participants.add(self.user)
+            return ParticipantsSyncStats(added=1)
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack",
+            side_effect=sync_adds_user,
+        ) as mock_sync:
+            self.client.force_authenticate(user=self.user)
+            response = self.client.post(
+                f"/api/incidents/{incident.incident_number}/sync-participants/"
+            )
+
+        assert response.status_code == 200
+        assert response.data["success"] is True
+        assert response.data["stats"]["added"] == 1
+        mock_sync.assert_called_once_with(incident, force=True)
+
+    def test_sync_participants_endpoint_syncs_when_already_visible(self):
+        """Sync-participants endpoint performs sync when user is already
+        visible (no fallback path triggered)."""
+        incident = self._make_private_incident()
+        incident.participants.add(self.user)
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack",
+            return_value=ParticipantsSyncStats(added=0, already_existed=5),
+        ) as mock_sync:
+            self.client.force_authenticate(user=self.user)
+            response = self.client.post(
+                f"/api/incidents/{incident.incident_number}/sync-participants/"
+            )
+
+        assert response.status_code == 200
+        assert response.data["stats"]["already_existed"] == 5
+        mock_sync.assert_called_once_with(incident, force=True)
 
 
 @pytest.mark.django_db
@@ -1722,7 +1933,11 @@ class TestActionItemListView:
             url="https://linear.app/team/issue/ENG-99",
         )
 
-        self.client.force_authenticate(user=other_user)
-        response = self.client.get(self._url(private_incident.incident_number))
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack",
+            return_value=ParticipantsSyncStats(),
+        ):
+            self.client.force_authenticate(user=other_user)
+            response = self.client.get(self._url(private_incident.incident_number))
 
         assert response.status_code == 404
