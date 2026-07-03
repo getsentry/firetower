@@ -161,8 +161,6 @@ def _build_options_block(
 
     if selected_values is not None:
         initial_options.extend(o for o in options if o["value"] in selected_values)
-    elif is_high:
-        initial_options.append(_SKIP_PAGING_OPTION)
 
     element: dict[str, Any] = {
         "type": "checkboxes",
@@ -299,9 +297,6 @@ def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
         or []
     )
     selected_values = {opt.get("value") for opt in prior_selections}
-
-    if severity in HIGH_SEVERITIES and "skip_paging" not in selected_values:
-        selected_values.add("skip_paging")
 
     new_view = _build_new_incident_modal(
         channel_id=channel_id,

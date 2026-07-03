@@ -114,7 +114,7 @@ class TestBuildNewIncidentModal:
     def test_skip_paging_option_present_for_p0(self):
         modal = _build_new_incident_modal(severity="P0")
         assert "skip_paging" in _option_values(modal)
-        assert "skip_paging" in _initial_values(modal)
+        assert "skip_paging" not in _initial_values(modal)
 
     def test_skip_paging_option_present_for_p1(self):
         modal = _build_new_incident_modal(severity="P1")
@@ -188,7 +188,7 @@ class TestSeverityAction:
         client.views_update.assert_called_once()
         updated_view = client.views_update.call_args[1]["view"]
         assert "skip_paging" in _option_values(updated_view)
-        assert "skip_paging" in _initial_values(updated_view)
+        assert "skip_paging" not in _initial_values(updated_view)
 
     def test_removes_skip_paging_for_p3(self):
         ack = MagicMock()
