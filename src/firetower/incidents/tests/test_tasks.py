@@ -205,7 +205,7 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = []
+        mock_slack.iter_channel_history.return_value = iter([])
         mock_slack.archive_channel.return_value = True
 
         with patch(
@@ -213,7 +213,7 @@ class TestArchiveStaleChannels:
         ):
             archive_stale_channels.__wrapped__()
 
-        mock_slack.get_channel_history.assert_called_once_with("C_EMPTY")
+        mock_slack.iter_channel_history.assert_called_once_with("C_EMPTY")
         mock_slack.post_message.assert_called_once_with("C_EMPTY", ARCHIVE_NOTICE)
         mock_slack.archive_channel.assert_called_once_with("C_EMPTY")
 
@@ -231,9 +231,9 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = [
-            {"type": "message", "user": "U123", "text": "still here", "ts": "1.0"}
-        ]
+        mock_slack.iter_channel_history.return_value = iter(
+            [[{"type": "message", "user": "U123", "text": "still here", "ts": "1.0"}]]
+        )
 
         with patch(
             "firetower.incidents.tasks.archive.SlackService", return_value=mock_slack
@@ -257,14 +257,18 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = [
-            {
-                "type": "message",
-                "bot_id": self.OWN_BOT_ID,
-                "text": ARCHIVE_NOTICE,
-                "ts": "1.0",
-            }
-        ]
+        mock_slack.iter_channel_history.return_value = iter(
+            [
+                [
+                    {
+                        "type": "message",
+                        "bot_id": self.OWN_BOT_ID,
+                        "text": ARCHIVE_NOTICE,
+                        "ts": "1.0",
+                    }
+                ]
+            ]
+        )
         mock_slack.post_message.return_value = "2.0"
         mock_slack.archive_channel.return_value = True
 
@@ -289,14 +293,18 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = [
-            {
-                "type": "message",
-                "bot_id": "B_SOMEONE_ELSE",
-                "text": "alert from another bot",
-                "ts": "1.0",
-            }
-        ]
+        mock_slack.iter_channel_history.return_value = iter(
+            [
+                [
+                    {
+                        "type": "message",
+                        "bot_id": "B_SOMEONE_ELSE",
+                        "text": "alert from another bot",
+                        "ts": "1.0",
+                    }
+                ]
+            ]
+        )
 
         with patch(
             "firetower.incidents.tasks.archive.SlackService", return_value=mock_slack
@@ -325,7 +333,7 @@ class TestArchiveStaleChannels:
         ):
             archive_stale_channels.__wrapped__()
 
-        mock_slack.get_channel_history.assert_not_called()
+        mock_slack.iter_channel_history.assert_not_called()
         mock_slack.archive_channel.assert_not_called()
 
     def test_skips_channel_on_api_error(self):
@@ -342,7 +350,7 @@ class TestArchiveStaleChannels:
         ):
             archive_stale_channels.__wrapped__()
 
-        mock_slack.get_channel_history.assert_not_called()
+        mock_slack.iter_channel_history.assert_not_called()
         mock_slack.archive_channel.assert_not_called()
 
     def test_disables_schedule_when_no_client(self):
@@ -382,7 +390,7 @@ class TestArchiveStaleChannels:
                 "is_archived": False,
             }
         )
-        mock_slack.get_channel_history.return_value = []
+        mock_slack.iter_channel_history.return_value = iter([])
         mock_slack.archive_channel.return_value = True
 
         with patch(
@@ -406,7 +414,7 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = []
+        mock_slack.iter_channel_history.return_value = iter([])
         mock_slack.post_message.return_value = "1234.5678"
         mock_slack.archive_channel.return_value = False
 
@@ -432,7 +440,7 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.side_effect = Exception("API error")
+        mock_slack.iter_channel_history.side_effect = Exception("API error")
 
         with patch(
             "firetower.incidents.tasks.archive.SlackService", return_value=mock_slack
@@ -456,7 +464,7 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = []
+        mock_slack.iter_channel_history.return_value = iter([])
         mock_slack.post_message.return_value = "99.99"
         mock_slack.archive_channel.side_effect = ConnectionError("network timeout")
 
@@ -481,7 +489,7 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = []
+        mock_slack.iter_channel_history.return_value = iter([])
         mock_slack.post_message.return_value = None
 
         with patch(
@@ -525,7 +533,7 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = []
+        mock_slack.iter_channel_history.return_value = iter([])
         mock_slack.get_thread_replies.return_value = []
         mock_slack.archive_channel.return_value = True
 
@@ -550,26 +558,57 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = [
-            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot1", "ts": "5.0"},
-            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot2", "ts": "4.0"},
-            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot3", "ts": "3.0"},
-            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot4", "ts": "2.0"},
-            {"type": "message", "bot_id": self.OWN_BOT_ID, "text": "bot5", "ts": "1.5"},
-            {
-                "type": "message",
-                "user": "U_HUMAN",
-                "text": "old human msg",
-                "ts": "1.0",
-            },
-        ]
+        mock_slack.iter_channel_history.return_value = iter(
+            [
+                [
+                    {
+                        "type": "message",
+                        "bot_id": self.OWN_BOT_ID,
+                        "text": "bot1",
+                        "ts": "5.0",
+                    },
+                    {
+                        "type": "message",
+                        "bot_id": self.OWN_BOT_ID,
+                        "text": "bot2",
+                        "ts": "4.0",
+                    },
+                    {
+                        "type": "message",
+                        "bot_id": self.OWN_BOT_ID,
+                        "text": "bot3",
+                        "ts": "3.0",
+                    },
+                    {
+                        "type": "message",
+                        "bot_id": self.OWN_BOT_ID,
+                        "text": "bot4",
+                        "ts": "2.0",
+                    },
+                    {
+                        "type": "message",
+                        "bot_id": self.OWN_BOT_ID,
+                        "text": "bot5",
+                        "ts": "1.5",
+                    },
+                ],
+                [
+                    {
+                        "type": "message",
+                        "user": "U_HUMAN",
+                        "text": "old human msg",
+                        "ts": "1.0",
+                    },
+                ],
+            ]
+        )
 
         with patch(
             "firetower.incidents.tasks.archive.SlackService", return_value=mock_slack
         ):
             archive_stale_channels.__wrapped__()
 
-        mock_slack.get_channel_history.assert_called_once_with("C_DEEPHISTORY")
+        mock_slack.iter_channel_history.assert_called_once_with("C_DEEPHISTORY")
         mock_slack.archive_channel.assert_not_called()
 
     def test_skips_channel_with_human_thread_replies(self):
@@ -586,15 +625,19 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = [
-            {
-                "type": "message",
-                "bot_id": self.OWN_BOT_ID,
-                "text": "bot msg with thread",
-                "ts": "1.0",
-                "reply_count": 2,
-            }
-        ]
+        mock_slack.iter_channel_history.return_value = iter(
+            [
+                [
+                    {
+                        "type": "message",
+                        "bot_id": self.OWN_BOT_ID,
+                        "text": "bot msg with thread",
+                        "ts": "1.0",
+                        "reply_count": 2,
+                    }
+                ]
+            ]
+        )
         mock_slack.get_thread_replies.return_value = [
             {"type": "message", "user": "U_HUMAN", "text": "reply", "ts": "1.1"}
         ]
@@ -621,15 +664,19 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = [
-            {
-                "type": "message",
-                "bot_id": self.OWN_BOT_ID,
-                "text": "bot msg",
-                "ts": "1.0",
-                "reply_count": 1,
-            }
-        ]
+        mock_slack.iter_channel_history.return_value = iter(
+            [
+                [
+                    {
+                        "type": "message",
+                        "bot_id": self.OWN_BOT_ID,
+                        "text": "bot msg",
+                        "ts": "1.0",
+                        "reply_count": 1,
+                    }
+                ]
+            ]
+        )
         mock_slack.get_thread_replies.return_value = []
         mock_slack.post_message.return_value = "2.0"
         mock_slack.archive_channel.return_value = True
@@ -655,15 +702,19 @@ class TestArchiveStaleChannels:
             "is_private": False,
             "is_archived": False,
         }
-        mock_slack.get_channel_history.return_value = [
-            {
-                "type": "message",
-                "bot_id": self.OWN_BOT_ID,
-                "text": "bot msg",
-                "ts": "1.0",
-                "reply_count": 1,
-            }
-        ]
+        mock_slack.iter_channel_history.return_value = iter(
+            [
+                [
+                    {
+                        "type": "message",
+                        "bot_id": self.OWN_BOT_ID,
+                        "text": "bot msg",
+                        "ts": "1.0",
+                        "reply_count": 1,
+                    }
+                ]
+            ]
+        )
         mock_slack.get_thread_replies.side_effect = Exception("API error")
 
         with patch(

@@ -72,22 +72,27 @@ def archive_stale_channels() -> None:
                 skipped += 1
                 continue
 
-            messages = slack.get_channel_history(channel_id)
-            non_own_messages = [
-                msg for msg in messages if msg.get("bot_id") != own_bot_id
-            ]
-            if non_own_messages:
+            has_activity = False
+            own_messages: list[dict] = []
+            for page in slack.iter_channel_history(channel_id):
+                for msg in page:
+                    if msg.get("bot_id") != own_bot_id:
+                        has_activity = True
+                        break
+                    own_messages.append(msg)
+                if has_activity:
+                    break
+            if has_activity:
                 skipped += 1
                 continue
 
-            has_thread_activity = False
-            for msg in messages:
+            for msg in own_messages:
                 if msg.get("reply_count", 0) > 0:
                     replies = slack.get_thread_replies(channel_id, msg["ts"])
                     if replies:
-                        has_thread_activity = True
+                        has_activity = True
                         break
-            if has_thread_activity:
+            if has_activity:
                 skipped += 1
                 continue
 

@@ -6,6 +6,7 @@ and retrieve user profile information (name, avatar).
 """
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 from urllib.parse import urlparse
 
@@ -495,6 +496,32 @@ class SlackService:
             )
             return None
 
+    def iter_channel_history(self, channel_id: str) -> Iterator[list[dict[str, Any]]]:
+        """Yield pages of messages from a channel, paginating automatically."""
+        if not self.client:
+            return
+        cursor: str | None = None
+        while True:
+            kwargs: dict[str, Any] = {"channel": channel_id, "limit": 999}
+            if cursor:
+                kwargs["cursor"] = cursor
+            try:
+                response = self.client.conversations_history(**kwargs)
+            except Exception:
+                logger.exception("Failed to fetch history for channel %s", channel_id)
+                raise
+            if not response.get("ok"):
+                raise RuntimeError(
+                    f"conversations_history returned not-ok for channel {channel_id}"
+                )
+            page = response.get("messages", [])
+            if page:
+                yield page
+            metadata: dict[str, Any] = response.get("response_metadata") or {}
+            cursor = metadata.get("next_cursor") or None
+            if not response.get("has_more") or not cursor:
+                break
+
     def get_channel_history(
         self, channel_id: str, limit: int | None = None
     ) -> list[dict[str, Any]]:
@@ -513,25 +540,8 @@ class SlackService:
                 )
             return response.get("messages", [])
         messages: list[dict[str, Any]] = []
-        cursor: str | None = None
-        while True:
-            kwargs: dict[str, Any] = {"channel": channel_id, "limit": 999}
-            if cursor:
-                kwargs["cursor"] = cursor
-            try:
-                response = self.client.conversations_history(**kwargs)
-            except Exception:
-                logger.exception("Failed to fetch history for channel %s", channel_id)
-                raise
-            if not response.get("ok"):
-                raise RuntimeError(
-                    f"conversations_history returned not-ok for channel {channel_id}"
-                )
-            messages.extend(response.get("messages", []))
-            metadata: dict[str, Any] = response.get("response_metadata") or {}
-            cursor = metadata.get("next_cursor") or None
-            if not response.get("has_more") or not cursor:
-                break
+        for page in self.iter_channel_history(channel_id):
+            messages.extend(page)
         return messages
 
     def archive_channel(self, channel_id: str) -> bool:
