@@ -102,7 +102,8 @@ def _get_visible_incident(
         raise Http404
 
     try:
-        sync_incident_participants_from_slack(incident, force=True)
+        stats = sync_incident_participants_from_slack(incident, force=True)
+        incident._visibility_sync_stats = stats
     except Exception:
         logger.exception(
             f"Failed to sync participants for incident {incident.id} during visibility check"
@@ -364,6 +365,10 @@ class SyncIncidentParticipantsView(generics.GenericAPIView):
 
     def post(self, request: Request, incident_id: str) -> Response:
         incident = self.get_object()
+
+        visibility_stats = getattr(incident, "_visibility_sync_stats", None)
+        if visibility_stats is not None:
+            return Response({"success": True, "stats": asdict(visibility_stats)})
 
         try:
             stats = sync_incident_participants_from_slack(incident, force=True)

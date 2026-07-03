@@ -527,6 +527,48 @@ class TestPrivateIncidentVisibilitySync:
         assert response.status_code == 404
         mock_sync.assert_not_called()
 
+    def test_sync_participants_endpoint_no_double_sync(self):
+        """Sync-participants endpoint does not re-sync when the visibility
+        check already performed a force sync."""
+        incident = self._make_private_incident()
+
+        def sync_adds_user(inc, force=False):
+            inc.participants.add(self.user)
+            return ParticipantsSyncStats(added=1)
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack",
+            side_effect=sync_adds_user,
+        ) as mock_sync:
+            self.client.force_authenticate(user=self.user)
+            response = self.client.post(
+                f"/api/incidents/{incident.incident_number}/sync-participants/"
+            )
+
+        assert response.status_code == 200
+        assert response.data["success"] is True
+        assert response.data["stats"]["added"] == 1
+        mock_sync.assert_called_once_with(incident, force=True)
+
+    def test_sync_participants_endpoint_syncs_when_already_visible(self):
+        """Sync-participants endpoint performs sync when user is already
+        visible (no fallback path triggered)."""
+        incident = self._make_private_incident()
+        incident.participants.add(self.user)
+
+        with patch(
+            "firetower.incidents.views.sync_incident_participants_from_slack",
+            return_value=ParticipantsSyncStats(added=0, already_existed=5),
+        ) as mock_sync:
+            self.client.force_authenticate(user=self.user)
+            response = self.client.post(
+                f"/api/incidents/{incident.incident_number}/sync-participants/"
+            )
+
+        assert response.status_code == 200
+        assert response.data["stats"]["already_existed"] == 5
+        mock_sync.assert_called_once_with(incident, force=True)
+
 
 @pytest.mark.django_db
 class TestIncidentAPIViews:
