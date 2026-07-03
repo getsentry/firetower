@@ -63,6 +63,7 @@ KNOWN_SUBCOMMANDS = {
     "backfill",
     "mitigated",
     "mit",
+    "mitigate",
     "resolved",
     "fixed",
     "reopen",
@@ -145,7 +146,7 @@ def handle_command(
             handle_backfill_command(ack, body, command, respond)
         elif subcommand in ("help", ""):
             handle_help_command(ack, command, respond)
-        elif subcommand in ("mitigated", "mit"):
+        elif subcommand in ("mitigated", "mit", "mitigate"):
             handle_mitigated_command(ack, body, command, respond)
         elif subcommand in ("resolved", "fixed"):
             handle_resolved_command(ack, body, command, respond)
