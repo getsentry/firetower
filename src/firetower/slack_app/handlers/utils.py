@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from django.conf import settings
@@ -10,9 +11,57 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
     ServiceTier,
+    Tag,
+    TagType,
 )
 
+logger = logging.getLogger(__name__)
+
 _DEFAULT_SEVERITY = IncidentSeverity.P3
+
+CREATE_TAG_PREFIX = "__create__:"
+
+
+def _resolve_tag_values(
+    values: list[str], tag_type: TagType, resolve_tags: bool = True
+) -> list[str]:
+    """Resolve selected tag values, creating any prefixed with CREATE_TAG_PREFIX.
+
+    Values prefixed with ``__create__:`` are stripped and get_or_create'd as Tags
+    of the given type; everything else passes through unchanged. The returned list
+    preserves order and is de-duplicated case-insensitively. When ``resolve_tags``
+    is False, prefixed values are stripped to their raw name without touching the
+    database (used for degraded-mode fallbacks when the DB is unreachable).
+    """
+    resolved: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        name = value
+        if value.startswith(CREATE_TAG_PREFIX):
+            name = value[len(CREATE_TAG_PREFIX) :].strip()
+            if not name:
+                continue
+            if resolve_tags:
+                existing = Tag.objects.filter(type=tag_type, name__iexact=name).first()
+                if existing:
+                    name = existing.name
+                else:
+                    # Inline-created tags are intentionally left approved=False
+                    # so they surface for admin audit. Tag.clean() guards
+                    # case-insensitive uniqueness; a rare simultaneous duplicate
+                    # create just errors out and the caller's guard asks the
+                    # user to retry.
+                    tag = Tag.objects.create(name=name, type=tag_type)
+                    logger.info(
+                        "Created %s tag %r from Slack modal", tag_type, tag.name
+                    )
+                    name = tag.name
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        resolved.append(name)
+    return resolved
 
 
 def get_incident_from_channel(channel_id: str) -> Incident | None:
@@ -27,6 +76,19 @@ def get_incident_from_channel(channel_id: str) -> Incident | None:
     if link:
         return link.incident
     return None
+
+
+def notify_submission_error(
+    client: Any,
+    channel_id: str,
+    user_id: str,
+    text: str = "Something went wrong updating the incident. Please try again.",
+) -> None:
+    """Send the submitting user an ephemeral failure notice (visible only to them)."""
+    try:
+        client.chat_postEphemeral(channel=channel_id, user=user_id, text=text)
+    except Exception:
+        logger.exception("Failed to post ephemeral submission error to %s", channel_id)
 
 
 def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
@@ -113,10 +175,15 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
     ]
 
 
-def parse_incident_form_values(view: dict) -> dict[str, Any]:
+def _extract_title(view: dict) -> str:
+    values = view.get("state", {}).get("values", {})
+    return values.get("title_block", {}).get("title", {}).get("value", "").strip()
+
+
+def parse_incident_form_values(view: dict, resolve_tags: bool = True) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
 
-    title = values.get("title_block", {}).get("title", {}).get("value", "").strip()
+    title = _extract_title(view)
     severity_block = values.get("severity_block", {})
     selected_option = severity_block.get("severity", {}).get(
         "selected_option"
@@ -150,7 +217,11 @@ def parse_incident_form_values(view: dict) -> dict[str, Any]:
         .get("selected_options")
         or []
     )
-    affected_service_tags = [opt["value"] for opt in affected_service_selections]
+    affected_service_tags = _resolve_tag_values(
+        [opt["value"] for opt in affected_service_selections],
+        TagType.AFFECTED_SERVICE,
+        resolve_tags=resolve_tags,
+    )
 
     affected_region_selections = (
         values.get("affected_region_block", {})
@@ -158,7 +229,11 @@ def parse_incident_form_values(view: dict) -> dict[str, Any]:
         .get("selected_options")
         or []
     )
-    affected_region_tags = [opt["value"] for opt in affected_region_selections]
+    affected_region_tags = _resolve_tag_values(
+        [opt["value"] for opt in affected_region_selections],
+        TagType.AFFECTED_REGION,
+        resolve_tags=resolve_tags,
+    )
 
     captain_slack_id = (
         values.get("captain_block", {}).get("captain_select", {}).get("selected_user")

@@ -992,12 +992,27 @@ def _sync_linear_title(incident: Incident) -> None:
         )
 
 
+def _sync_linear_assignee(incident: Incident) -> None:
+    if not settings.LINEAR or not incident.linear_parent_issue_id:
+        return
+    try:
+        linear_service = _get_linear_service()
+        captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
+        linear_service.update_issue(
+            incident.linear_parent_issue_id, assignee_id=captain_linear_id
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to update Linear issue assignee for incident {incident.id}"
+        )
+
+
 LINEAR_PARENT_DESCRIPTION = (
     "Relate action items to this ticket to have them tracked by Firetower. "
     "Child issues or other relations (related, blocking, etc.) will all work. "
     "Do not update title, status or captain here, use Firetower for that.\n\n"
-    "Firetower will reopen this ticket if the incident is reopened, or if "
-    "there are still unfinished action items. "
+    "Firetower will mark this ticket completed once the incident is resolved and "
+    "all action items are done. "
     "If you have questions, please reach out to #team-sre."
 )
 
@@ -1659,3 +1674,7 @@ def on_incident_updated(
     # Title or visibility change: sync linear
     if old_title is not None or visibility_changed:
         _sync_linear_title(incident)
+
+    # Captain change: sync linear assignee
+    if captain_changed:
+        _sync_linear_assignee(incident)

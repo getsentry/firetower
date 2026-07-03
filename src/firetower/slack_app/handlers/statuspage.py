@@ -136,6 +136,13 @@ def _build_statuspage_modal(
                 },
             },
             "label": {"type": "plain_text", "text": "Message"},
+            "hint": {
+                "type": "plain_text",
+                "text": (
+                    "If impact is specific to US or US2 mention that in your message "
+                    "so customers know whether they are affected."
+                ),
+            },
         }
     )
 
@@ -278,6 +285,34 @@ def handle_statuspage_command(
         respond("Statuspage is not configured.")
         return
 
+    from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
+
+    bolt_app = get_bolt_app()
+
+    try:
+        loading_view = bolt_app.client.views_open(
+            trigger_id=trigger_id,
+            view={
+                "type": "modal",
+                "callback_id": "statuspage_modal_loading",
+                "title": {"type": "plain_text", "text": "Loading..."},
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "Loading Statuspage data...",
+                        },
+                    }
+                ],
+            },
+        )
+        view_id = loading_view["view"]["id"]
+    except Exception:
+        logger.exception("Failed to open loading modal")
+        respond("Failed to open modal.")
+        return
+
     statuspage_incident = None
     statuspage_link = incident.external_links.filter(
         type=ExternalLinkType.STATUSPAGE
@@ -292,9 +327,21 @@ def handle_statuspage_command(
                 logger.exception(
                     "Failed to fetch existing statuspage incident %s", sp_id
                 )
-                respond(
-                    "Could not reach Statuspage to load the existing post. "
-                    "Please try again in a moment."
+                bolt_app.client.views_update(
+                    view_id=view_id,
+                    view={
+                        "type": "modal",
+                        "title": {"type": "plain_text", "text": "Error"},
+                        "blocks": [
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": "Could not reach Statuspage to load the existing post. Please try again in a moment.",
+                                },
+                            }
+                        ],
+                    },
                 )
                 return
             if statuspage_incident is None:
@@ -306,10 +353,8 @@ def handle_statuspage_command(
                 )
                 statuspage_link.delete()
 
-    from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
-
-    get_bolt_app().client.views_open(
-        trigger_id=trigger_id,
+    bolt_app.client.views_update(
+        view_id=view_id,
         view=_build_statuspage_modal(
             channel_id=channel_id,
             incident_title=incident.title,

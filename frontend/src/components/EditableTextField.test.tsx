@@ -13,6 +13,29 @@ describe('EditableTextField', () => {
     expect(display).toBeInTheDocument();
   });
 
+  it('wraps long unbroken content in the rendered display', async () => {
+    const longToken = 'https://example.com/' + 'a'.repeat(200);
+    render(<EditableTextField value={longToken} onSave={async () => {}} />);
+
+    const display = await screen.findByText(longToken);
+    expect(display).toHaveClass('break-words');
+  });
+
+  it('wraps long content in the labeled/multiline display', async () => {
+    const longToken = 'x'.repeat(300);
+    render(
+      <EditableTextField
+        value={longToken}
+        onSave={async () => {}}
+        label="Description"
+        multiline
+      />
+    );
+
+    const display = await screen.findByText(longToken);
+    expect(display).toHaveClass('break-words');
+  });
+
   it('shows trigger button', async () => {
     render(<EditableTextField value="Test" onSave={async () => {}} />);
 

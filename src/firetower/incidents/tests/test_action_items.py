@@ -435,16 +435,16 @@ class TestSyncActionItemsFromLinear:
                 "parent-issue-id", state_id="state-done"
             )
 
-    def test_sets_parent_to_started_when_incomplete_items(self, settings):
+    def test_does_not_change_parent_state_when_incomplete_items(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident()
+        incident = self._make_incident(status=IncidentStatus.DONE)
 
         children = [
             _make_linear_issue(
                 id="id-1", identifier="ENG-1", title="T1", status="Done"
             ),
             _make_linear_issue(
-                id="id-2", identifier="ENG-2", title="T2", status="Todo"
+                id="id-2", identifier="ENG-2", title="T2", status="In Progress"
             ),
         ]
 
@@ -460,9 +460,8 @@ class TestSyncActionItemsFromLinear:
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", state_id="state-started"
-            )
+            for call in mock_service.update_issue.call_args_list:
+                assert "state_id" not in call.kwargs
 
     def test_completes_parent_when_no_action_items(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
@@ -484,7 +483,7 @@ class TestSyncActionItemsFromLinear:
                 "parent-issue-id", state_id="state-done"
             )
 
-    def test_syncs_captain_as_parent_assignee(self, settings):
+    def test_does_not_push_parent_assignee_on_sync(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
         captain = User.objects.create_user(
             username="captain@example.com",
@@ -506,26 +505,8 @@ class TestSyncActionItemsFromLinear:
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", assignee_id="linear-captain-id"
-            )
-
-    def test_unassigns_parent_when_no_captain(self, settings):
-        settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident(captain=None)
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_service = mock_get.return_value
-            mock_service.get_child_issues.return_value = []
-            mock_service.get_related_issues.return_value = []
-            mock_service.get_workflow_states.return_value = None
-            mock_service.update_issue.return_value = True
-
-            sync_action_items_from_linear(incident, force=True)
-
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", assignee_id=None
-            )
+            for call in mock_service.update_issue.call_args_list:
+                assert "assignee_id" not in call.kwargs
 
 
 @pytest.mark.django_db

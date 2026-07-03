@@ -18,6 +18,8 @@ from firetower.integrations.services import SlackService
 from firetower.integrations.services.slack import escape_slack_text
 from firetower.slack_app.handlers.utils import (
     _DEFAULT_SEVERITY,
+    CREATE_TAG_PREFIX,
+    _extract_title,
     build_incident_form_blocks,
     parse_incident_form_values,
 )
@@ -212,6 +214,10 @@ ACTION_ID_TO_TAG_TYPE = {
     "affected_region_tags": TagType.AFFECTED_REGION,
 }
 
+# Tag types users can create inline from the lifecycle modals. impact_type stays
+# curated since it powers dashboards, so it is intentionally excluded.
+INLINE_CREATABLE_TAG_TYPES = {TagType.AFFECTED_SERVICE, TagType.AFFECTED_REGION}
+
 
 def handle_tag_options(ack: Any, payload: dict) -> None:
     close_old_connections()
@@ -227,11 +233,31 @@ def handle_tag_options(ack: Any, payload: dict) -> None:
     if keyword:
         qs = qs.filter(name__icontains=keyword)
 
+    matches = list(qs.order_by("name")[:100])
     options = [
         {"text": {"type": "plain_text", "text": tag.name}, "value": tag.name}
-        for tag in qs.order_by("name")[:100]
+        for tag in matches
     ]
-    ack(options=options)
+
+    stripped = keyword.strip()
+    if tag_type in INLINE_CREATABLE_TAG_TYPES and stripped:
+        exact_match = Tag.objects.filter(type=tag_type, name__iexact=stripped).exists()
+        if not exact_match:
+            # Put "+ Create" first so it survives the 100-option Slack cap even
+            # when the keyword already matches a full page of existing tags.
+            options.insert(
+                0,
+                {
+                    "text": {
+                        "type": "plain_text",
+                        "text": f'+ Create "{stripped}"',
+                    },
+                    "value": f"{CREATE_TAG_PREFIX}{stripped}",
+                },
+            )
+
+    # Slack rejects block_suggestion responses with more than 100 options.
+    ack(options=options[:100])
 
 
 def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> None:
@@ -343,8 +369,6 @@ def _create_incident_via_db(
 def handle_new_incident_submission(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
-    form = parse_incident_form_values(view)
-
     values = view.get("state", {}).get("values", {})
     option_selections = (
         values.get("options_block", {})
@@ -356,7 +380,8 @@ def handle_new_incident_submission(
     is_private = "private" in selected_values
     skip_paging = "skip_paging" in selected_values
 
-    if not form["title"]:
+    title = _extract_title(view)
+    if not title:
         ack(
             response_action="errors",
             errors={"title_block": "This field is required."},
@@ -368,6 +393,7 @@ def handle_new_incident_submission(
     slack_user_id = body.get("user", {}).get("id", "")
 
     try:
+        form = parse_incident_form_values(view)
         incident = _create_incident_via_db(
             form, slack_user_id, is_private, client, skip_paging=skip_paging
         )
@@ -375,6 +401,7 @@ def handle_new_incident_submission(
         logger.exception(
             "Database unreachable during incident creation from Slack modal"
         )
+        form = parse_incident_form_values(view, resolve_tags=False)
         form_data = {
             "title": form["title"],
             "severity": form["severity"] or _DEFAULT_SEVERITY.value,
