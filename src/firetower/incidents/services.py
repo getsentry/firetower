@@ -189,26 +189,31 @@ COMPLETED_STATUSES = {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
 _PARENT_STATUS_TEMPLATE_ENV = Environment(autoescape=False)
 
 
-def _comment_parent_issue_completed(
+def _comment_parent_issue_status_change(
     incident: Incident,
     linear_service: LinearService,
+    target_state: str,
     statuses: list[str],
 ) -> None:
     if not settings.LINEAR or not incident.linear_parent_issue_id:
         return
 
-    template_source = settings.LINEAR.get("PARENT_STATUS_COMMENT_COMPLETED", "")
+    template_key = (
+        "PARENT_STATUS_COMMENT_COMPLETED"
+        if target_state == "completed"
+        else "PARENT_STATUS_COMMENT_STARTED"
+    )
+    template_source = settings.LINEAR.get(template_key, "")
     if not template_source or not template_source.strip():
         return
 
-    completed_action_items = sum(
-        1 for s in statuses if s in {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
-    )
+    completed_action_items = sum(1 for s in statuses if s in COMPLETED_STATUSES)
     try:
         comment = _PARENT_STATUS_TEMPLATE_ENV.from_string(template_source).render(
             incident=incident,
             total_action_items=len(statuses),
             completed_action_items=completed_action_items,
+            target_state=target_state,
         )
     except TemplateError:
         logger.exception(
@@ -239,22 +244,31 @@ def _update_parent_issue_status(
         not statuses or all(s in COMPLETED_STATUSES for s in statuses)
     )
 
-    if not all_complete:
-        return
-
     states = linear_service.get_workflow_states(team_id)
     if not states:
         return
 
+    target_state = "completed" if all_complete else "started"
+
     parent_issue = linear_service.get_issue(incident.linear_parent_issue_id)
-    if not parent_issue or parent_issue.get("state_type") == "completed":
+    if not parent_issue:
         return
 
-    state_id = states.get("completed")
+    # Never override a manually-cancelled parent issue. Firetower only ever
+    # drives the parent to "started" or "completed", so a "canceled" state
+    # reflects a deliberate human decision and must not be reopened to
+    # "started" (or forced to "completed") on subsequent syncs.
+    current_state_type = parent_issue.get("state_type")
+    if current_state_type in ("canceled", target_state):
+        return
+
+    state_id = states.get(target_state)
     if state_id and linear_service.update_issue(
         incident.linear_parent_issue_id, state_id=state_id
     ):
-        _comment_parent_issue_completed(incident, linear_service, statuses)
+        _comment_parent_issue_status_change(
+            incident, linear_service, target_state, statuses
+        )
 
 
 def sync_action_items_from_linear(
@@ -297,21 +311,9 @@ def sync_action_items_from_linear(
         incident.save(update_fields=["action_items_last_synced_at"])
         return stats
 
-    related = linear_service.get_related_issues(parent_id)
-    if related is None:
-        error_msg = f"Failed to fetch related issues for incident {incident.id}"
-        logger.warning(error_msg)
-        stats.errors.append(error_msg)
-        incident.action_items_last_synced_at = timezone.now()
-        incident.save(update_fields=["action_items_last_synced_at"])
-        return stats
-
     all_issues: dict[str, dict] = {}
     for issue in children:
         all_issues[issue["id"]] = issue
-    for issue in related:
-        if issue["id"] not in all_issues:
-            all_issues[issue["id"]] = issue
 
     logger.info(f"Syncing {len(all_issues)} Linear issues to incident {incident.id}")
 

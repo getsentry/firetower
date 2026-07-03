@@ -88,7 +88,6 @@ class TestSyncActionItemsFromLinear:
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_get.return_value.get_child_issues.return_value = children
-            mock_get.return_value.get_related_issues.return_value = []
             mock_get.return_value.get_workflow_states.return_value = None
 
             stats = sync_action_items_from_linear(incident, force=True)
@@ -99,61 +98,25 @@ class TestSyncActionItemsFromLinear:
             assert incident.action_items.count() == 2
             assert incident.action_items_last_synced_at is not None
 
-    def test_creates_action_items_from_relations(self):
-        incident = self._make_incident()
-
-        related = [
-            _make_linear_issue(
-                id="id-r1",
-                identifier="ENG-10",
-                title="Related task",
-                relation_type="related",
-            ),
-            _make_linear_issue(
-                id="id-r2",
-                identifier="ENG-11",
-                title="Blocking task",
-                relation_type="blocks",
-            ),
-        ]
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_get.return_value.get_child_issues.return_value = []
-            mock_get.return_value.get_related_issues.return_value = related
-            mock_get.return_value.get_workflow_states.return_value = None
-
-            stats = sync_action_items_from_linear(incident, force=True)
-
-            assert stats.created == 2
-            item_r1 = incident.action_items.get(linear_issue_id="id-r1")
-            assert item_r1.relation_type == ActionItemRelationType.RELATED
-            item_r2 = incident.action_items.get(linear_issue_id="id-r2")
-            assert item_r2.relation_type == ActionItemRelationType.BLOCKS
-
-    def test_combines_children_and_relations(self):
+    def test_ignores_related_issues(self):
         incident = self._make_incident()
 
         children = [
             _make_linear_issue(id="id-1", identifier="ENG-1", title="Child task"),
         ]
-        related = [
-            _make_linear_issue(
-                id="id-2",
-                identifier="ENG-2",
-                title="Related task",
-                relation_type="related",
-            ),
-        ]
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_get.return_value.get_child_issues.return_value = children
-            mock_get.return_value.get_related_issues.return_value = related
-            mock_get.return_value.get_workflow_states.return_value = None
+            mock_service = mock_get.return_value
+            mock_service.get_child_issues.return_value = children
+            mock_service.get_workflow_states.return_value = None
 
             stats = sync_action_items_from_linear(incident, force=True)
 
-            assert stats.created == 2
-            assert incident.action_items.count() == 2
+            assert stats.created == 1
+            assert incident.action_items.count() == 1
+            item = incident.action_items.get(linear_issue_id="id-1")
+            assert item.relation_type == ActionItemRelationType.CHILD
+            mock_service.get_related_issues.assert_not_called()
 
     def test_same_issue_on_multiple_incidents(self):
         incident_a = self._make_incident(linear_parent_issue_id="parent-a")
@@ -165,7 +128,6 @@ class TestSyncActionItemsFromLinear:
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_get.return_value.get_child_issues.return_value = shared_issue
-            mock_get.return_value.get_related_issues.return_value = []
             mock_get.return_value.get_workflow_states.return_value = None
 
             sync_action_items_from_linear(incident_a, force=True)
@@ -174,32 +136,6 @@ class TestSyncActionItemsFromLinear:
         assert incident_a.action_items.filter(linear_issue_id="shared-1").exists()
         assert incident_b.action_items.filter(linear_issue_id="shared-1").exists()
         assert ActionItem.objects.filter(linear_issue_id="shared-1").count() == 2
-
-    def test_deduplicates_children_and_relations(self):
-        incident = self._make_incident()
-
-        children = [
-            _make_linear_issue(id="id-1", identifier="ENG-1", title="Task"),
-        ]
-        related = [
-            _make_linear_issue(
-                id="id-1",
-                identifier="ENG-1",
-                title="Task",
-                relation_type="related",
-            ),
-        ]
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_get.return_value.get_child_issues.return_value = children
-            mock_get.return_value.get_related_issues.return_value = related
-            mock_get.return_value.get_workflow_states.return_value = None
-
-            stats = sync_action_items_from_linear(incident, force=True)
-
-            assert stats.created == 1
-            item = incident.action_items.get(linear_issue_id="id-1")
-            assert item.relation_type == ActionItemRelationType.CHILD
 
     def test_updates_existing_action_items(self):
         incident = self._make_incident()
@@ -223,7 +159,6 @@ class TestSyncActionItemsFromLinear:
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_get.return_value.get_child_issues.return_value = children
-            mock_get.return_value.get_related_issues.return_value = []
             mock_get.return_value.get_workflow_states.return_value = None
 
             stats = sync_action_items_from_linear(incident, force=True)
@@ -251,7 +186,6 @@ class TestSyncActionItemsFromLinear:
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_get.return_value.get_child_issues.return_value = children
-            mock_get.return_value.get_related_issues.return_value = []
             mock_get.return_value.get_workflow_states.return_value = None
 
             stats = sync_action_items_from_linear(incident, force=True)
@@ -277,7 +211,6 @@ class TestSyncActionItemsFromLinear:
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_get.return_value.get_child_issues.return_value = []
-            mock_get.return_value.get_related_issues.return_value = []
             mock_get.return_value.get_workflow_states.return_value = None
 
             stats = sync_action_items_from_linear(incident, force=True)
@@ -295,20 +228,6 @@ class TestSyncActionItemsFromLinear:
 
             assert len(stats.errors) == 1
             assert "child issues" in stats.errors[0]
-            incident.refresh_from_db()
-            assert incident.action_items_last_synced_at is not None
-
-    def test_handles_relations_api_failure(self):
-        incident = self._make_incident()
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_get.return_value.get_child_issues.return_value = []
-            mock_get.return_value.get_related_issues.return_value = None
-
-            stats = sync_action_items_from_linear(incident, force=True)
-
-            assert len(stats.errors) == 1
-            assert "related issues" in stats.errors[0]
             incident.refresh_from_db()
             assert incident.action_items_last_synced_at is not None
 
@@ -332,7 +251,6 @@ class TestSyncActionItemsFromLinear:
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_get.return_value.get_child_issues.return_value = children
-            mock_get.return_value.get_related_issues.return_value = []
             mock_get.return_value.get_workflow_states.return_value = None
 
             sync_action_items_from_linear(incident, force=True)
@@ -359,7 +277,6 @@ class TestSyncActionItemsFromLinear:
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_get.return_value.get_child_issues.return_value = children
-            mock_get.return_value.get_related_issues.return_value = []
             mock_get.return_value.get_workflow_states.return_value = None
 
             sync_action_items_from_linear(incident, force=True)
@@ -396,7 +313,6 @@ class TestSyncActionItemsFromLinear:
             patch("firetower.incidents.services._get_linear_service") as mock_get,
         ):
             mock_get.return_value.get_child_issues.return_value = children
-            mock_get.return_value.get_related_issues.return_value = []
             mock_get.return_value.get_workflow_states.return_value = None
 
             stats = sync_action_items_from_linear(incident, force=True)
@@ -422,7 +338,6 @@ class TestSyncActionItemsFromLinear:
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_service = mock_get.return_value
             mock_service.get_child_issues.return_value = children
-            mock_service.get_related_issues.return_value = []
             mock_service.get_workflow_states.return_value = {
                 "completed": "state-done",
                 "backlog": "state-backlog",
@@ -435,7 +350,7 @@ class TestSyncActionItemsFromLinear:
                 "parent-issue-id", state_id="state-done"
             )
 
-    def test_does_not_change_parent_state_when_incomplete_items(self, settings):
+    def test_sets_parent_to_started_when_incomplete_items(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
         incident = self._make_incident(status=IncidentStatus.DONE)
 
@@ -451,7 +366,6 @@ class TestSyncActionItemsFromLinear:
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_service = mock_get.return_value
             mock_service.get_child_issues.return_value = children
-            mock_service.get_related_issues.return_value = []
             mock_service.get_workflow_states.return_value = {
                 "completed": "state-done",
                 "started": "state-started",
@@ -460,8 +374,9 @@ class TestSyncActionItemsFromLinear:
 
             sync_action_items_from_linear(incident, force=True)
 
-            for call in mock_service.update_issue.call_args_list:
-                assert "state_id" not in call.kwargs
+            mock_service.update_issue.assert_any_call(
+                "parent-issue-id", state_id="state-started"
+            )
 
     def test_completes_parent_when_no_action_items(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
@@ -470,7 +385,6 @@ class TestSyncActionItemsFromLinear:
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_service = mock_get.return_value
             mock_service.get_child_issues.return_value = []
-            mock_service.get_related_issues.return_value = []
             mock_service.get_workflow_states.return_value = {
                 "completed": "state-done",
                 "backlog": "state-backlog",
@@ -499,7 +413,6 @@ class TestSyncActionItemsFromLinear:
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_service = mock_get.return_value
             mock_service.get_child_issues.return_value = []
-            mock_service.get_related_issues.return_value = []
             mock_service.get_workflow_states.return_value = None
             mock_service.update_issue.return_value = True
 
@@ -625,180 +538,6 @@ class TestLinearService:
             assert issues[0]["relation_type"] == "child"
             assert issues[1]["status"] == "Done"
             assert issues[1]["assignee_email"] == "dev@example.com"
-
-    def test_get_related_issues_maps_relation_types(self):
-        forward_response = {
-            "issue": {
-                "relations": {
-                    "nodes": [
-                        {
-                            "type": "related",
-                            "relatedIssue": {
-                                "id": "id-1",
-                                "identifier": "ENG-1",
-                                "title": "Related task",
-                                "url": "https://linear.app/t/ENG-1",
-                                "state": {"type": "unstarted"},
-                                "assignee": None,
-                            },
-                        },
-                        {
-                            "type": "blocks",
-                            "relatedIssue": {
-                                "id": "id-2",
-                                "identifier": "ENG-2",
-                                "title": "Blocking task",
-                                "url": "https://linear.app/t/ENG-2",
-                                "state": {"type": "started"},
-                                "assignee": None,
-                            },
-                        },
-                    ],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-        inverse_response = {
-            "issue": {
-                "inverseRelations": {
-                    "nodes": [],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-
-        with patch("firetower.integrations.services.linear.settings") as mock_settings:
-            mock_settings.LINEAR = {
-                "CLIENT_ID": "test-id",
-                "CLIENT_SECRET": "test-secret",
-            }
-            service = LinearService()
-
-        with patch.object(
-            service, "_graphql", side_effect=[forward_response, inverse_response]
-        ):
-            issues = service.get_related_issues("parent-id")
-
-            assert issues is not None
-            assert len(issues) == 2
-            assert issues[0]["relation_type"] == "related"
-            assert issues[1]["relation_type"] == "blocks"
-
-    def test_get_related_issues_includes_inverse_relations(self):
-        forward_response = {
-            "issue": {
-                "relations": {
-                    "nodes": [
-                        {
-                            "type": "related",
-                            "relatedIssue": {
-                                "id": "id-1",
-                                "identifier": "ENG-1",
-                                "title": "Forward relation",
-                                "url": "https://linear.app/t/ENG-1",
-                                "state": {"type": "unstarted"},
-                                "assignee": None,
-                            },
-                        },
-                    ],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-        inverse_response = {
-            "issue": {
-                "inverseRelations": {
-                    "nodes": [
-                        {
-                            "type": "related",
-                            "issue": {
-                                "id": "id-2",
-                                "identifier": "INF-100",
-                                "title": "Inverse relation",
-                                "url": "https://linear.app/t/INF-100",
-                                "state": {"type": "started"},
-                                "assignee": None,
-                            },
-                        },
-                    ],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-
-        with patch("firetower.integrations.services.linear.settings") as mock_settings:
-            mock_settings.LINEAR = {
-                "CLIENT_ID": "test-id",
-                "CLIENT_SECRET": "test-secret",
-            }
-            service = LinearService()
-
-        with patch.object(
-            service, "_graphql", side_effect=[forward_response, inverse_response]
-        ):
-            issues = service.get_related_issues("parent-id")
-
-            assert issues is not None
-            assert len(issues) == 2
-            assert issues[0]["identifier"] == "ENG-1"
-            assert issues[1]["identifier"] == "INF-100"
-
-    def test_get_related_issues_deduplicates_across_directions(self):
-        forward_response = {
-            "issue": {
-                "relations": {
-                    "nodes": [
-                        {
-                            "type": "related",
-                            "relatedIssue": {
-                                "id": "id-1",
-                                "identifier": "ENG-1",
-                                "title": "Same issue",
-                                "url": "https://linear.app/t/ENG-1",
-                                "state": {"type": "unstarted"},
-                                "assignee": None,
-                            },
-                        },
-                    ],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-        inverse_response = {
-            "issue": {
-                "inverseRelations": {
-                    "nodes": [
-                        {
-                            "type": "related",
-                            "issue": {
-                                "id": "id-1",
-                                "identifier": "ENG-1",
-                                "title": "Same issue",
-                                "url": "https://linear.app/t/ENG-1",
-                                "state": {"type": "unstarted"},
-                                "assignee": None,
-                            },
-                        },
-                    ],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-
-        with patch("firetower.integrations.services.linear.settings") as mock_settings:
-            mock_settings.LINEAR = {
-                "CLIENT_ID": "test-id",
-                "CLIENT_SECRET": "test-secret",
-            }
-            service = LinearService()
-
-        with patch.object(
-            service, "_graphql", side_effect=[forward_response, inverse_response]
-        ):
-            issues = service.get_related_issues("parent-id")
-
-            assert issues is not None
-            assert len(issues) == 1
 
     def test_update_issue(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
