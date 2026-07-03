@@ -191,6 +191,9 @@ class TestStatuspageCommand:
             ) as MockService,
             patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
         ):
+            mock_app.return_value.client.views_open.return_value = {
+                "view": {"id": "v123"}
+            }
             instance = MockService.return_value
             instance.configured = True
             instance.get_components.return_value = ([], {})
@@ -198,7 +201,8 @@ class TestStatuspageCommand:
 
             ack.assert_called_once()
             mock_app.return_value.client.views_open.assert_called_once()
-            view = mock_app.return_value.client.views_open.call_args[1]["view"]
+            mock_app.return_value.client.views_update.assert_called_once()
+            view = mock_app.return_value.client.views_update.call_args[1]["view"]
             assert view["callback_id"] == "statuspage_modal"
             assert view["title"]["text"] == "New Statuspage Post"
 
@@ -248,6 +252,9 @@ class TestStatuspageCommand:
             ) as MockService,
             patch("firetower.slack_app.bolt.get_bolt_app") as mock_app,
         ):
+            mock_app.return_value.client.views_open.return_value = {
+                "view": {"id": "v123"}
+            }
             instance = MockService.return_value
             instance.configured = True
             instance.extract_incident_id_from_url.return_value = "sp123"
@@ -256,7 +263,7 @@ class TestStatuspageCommand:
 
             handle_statuspage_command(ack, body, command, respond)
 
-            view = mock_app.return_value.client.views_open.call_args[1]["view"]
+            view = mock_app.return_value.client.views_update.call_args[1]["view"]
             assert view["title"]["text"] == "Update Statuspage"
 
     def test_no_incident_responds_error(self, db):

@@ -27,6 +27,7 @@ class TestCurrentUserView:
         response = self.client.get("/api/ui/users/me/")
 
         assert response.status_code == 200
+        assert response.data["email"] == "john@example.com"
         assert response.data["name"] == "John Doe"
         assert response.data["avatar_url"] == "https://example.com/avatar.jpg"
 
@@ -45,6 +46,7 @@ class TestCurrentUserView:
         response = self.client.get("/api/ui/users/me/")
 
         assert response.status_code == 200
+        assert response.data["email"] == "jane@example.com"
         assert response.data["name"] == "Jane Smith"
         assert response.data["avatar_url"] is None
 
@@ -60,6 +62,7 @@ class TestCurrentUserView:
         response = self.client.get("/api/ui/users/me/")
 
         assert response.status_code == 200
+        assert response.data["email"] == "test@example.com"
         assert response.data["name"] == "test@example.com"
 
     @override_settings(IAP_ENABLED=True)

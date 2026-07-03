@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
+from jinja2 import Environment, TemplateError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import (
@@ -185,6 +186,48 @@ def _resolve_assignees(
 
 COMPLETED_STATUSES = {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
 
+_PARENT_STATUS_TEMPLATE_ENV = Environment(autoescape=False)
+
+
+def _comment_parent_issue_status_change(
+    incident: Incident,
+    linear_service: LinearService,
+    target_state: str,
+    statuses: list[str],
+) -> None:
+    if not settings.LINEAR or not incident.linear_parent_issue_id:
+        return
+
+    template_key = (
+        "PARENT_STATUS_COMMENT_COMPLETED"
+        if target_state == "completed"
+        else "PARENT_STATUS_COMMENT_STARTED"
+    )
+    template_source = settings.LINEAR.get(template_key, "")
+    if not template_source or not template_source.strip():
+        return
+
+    completed_action_items = sum(1 for s in statuses if s in COMPLETED_STATUSES)
+    try:
+        comment = _PARENT_STATUS_TEMPLATE_ENV.from_string(template_source).render(
+            incident=incident,
+            total_action_items=len(statuses),
+            completed_action_items=completed_action_items,
+            target_state=target_state,
+        )
+    except TemplateError:
+        logger.exception(
+            f"Failed to render parent status comment template for incident {incident.id}"
+        )
+        return
+
+    try:
+        linear_service.create_comment(incident.linear_parent_issue_id, comment)
+    except Exception:
+        logger.exception(
+            f"Failed to post parent status comment for incident {incident.id}"
+        )
+
 
 def _update_parent_issue_status(
     incident: Incident, linear_service: LinearService
@@ -206,20 +249,26 @@ def _update_parent_issue_status(
         return
 
     target_state = "completed" if all_complete else "started"
-    state_id = states.get(target_state)
-    if state_id:
-        linear_service.update_issue(incident.linear_parent_issue_id, state_id=state_id)
 
-
-def _sync_parent_assignee(incident: Incident, linear_service: LinearService) -> None:
-    if not incident.linear_parent_issue_id:
+    parent_issue = linear_service.get_issue(incident.linear_parent_issue_id)
+    if not parent_issue:
         return
-    from firetower.incidents.hooks import _resolve_linear_user_id  # noqa: PLC0415
 
-    captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
-    linear_service.update_issue(
-        incident.linear_parent_issue_id, assignee_id=captain_linear_id
-    )
+    # Never override a manually-cancelled parent issue. Firetower only ever
+    # drives the parent to "started" or "completed", so a "canceled" state
+    # reflects a deliberate human decision and must not be reopened to
+    # "started" (or forced to "completed") on subsequent syncs.
+    current_state_type = parent_issue.get("state_type")
+    if current_state_type in ("canceled", target_state):
+        return
+
+    state_id = states.get(target_state)
+    if state_id and linear_service.update_issue(
+        incident.linear_parent_issue_id, state_id=state_id
+    ):
+        _comment_parent_issue_status_change(
+            incident, linear_service, target_state, statuses
+        )
 
 
 def sync_action_items_from_linear(
@@ -262,21 +311,9 @@ def sync_action_items_from_linear(
         incident.save(update_fields=["action_items_last_synced_at"])
         return stats
 
-    related = linear_service.get_related_issues(parent_id)
-    if related is None:
-        error_msg = f"Failed to fetch related issues for incident {incident.id}"
-        logger.warning(error_msg)
-        stats.errors.append(error_msg)
-        incident.action_items_last_synced_at = timezone.now()
-        incident.save(update_fields=["action_items_last_synced_at"])
-        return stats
-
     all_issues: dict[str, dict] = {}
     for issue in children:
         all_issues[issue["id"]] = issue
-    for issue in related:
-        if issue["id"] not in all_issues:
-            all_issues[issue["id"]] = issue
 
     logger.info(f"Syncing {len(all_issues)} Linear issues to incident {incident.id}")
 
@@ -351,13 +388,6 @@ def sync_action_items_from_linear(
     except Exception:
         logger.exception(
             f"Failed to update Linear parent issue status for incident {incident.id}"
-        )
-
-    try:
-        _sync_parent_assignee(incident, linear_service)
-    except Exception:
-        logger.exception(
-            f"Failed to sync Linear parent assignee for incident {incident.id}"
         )
 
     logger.info(

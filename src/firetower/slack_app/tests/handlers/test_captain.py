@@ -71,9 +71,13 @@ class TestCaptainCommand:
 
 @pytest.mark.django_db
 class TestCaptainSubmission:
+    @patch("firetower.slack_app.handlers.captain.SlackService")
     @patch("firetower.incidents.serializers.on_incident_updated")
     @patch("firetower.slack_app.handlers.captain.get_or_create_user_from_slack_id")
-    def test_sets_captain(self, mock_get_user, mock_hook, user, incident):
+    def test_sets_captain(
+        self, mock_get_user, mock_hook, mock_slack_service, user, incident
+    ):
+        mock_slack_service.return_value.get_user_info.return_value = {"is_bot": False}
         mock_get_user.return_value = user
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
@@ -94,8 +98,10 @@ class TestCaptainSubmission:
         assert incident.captain == user
         client.chat_postMessage.assert_not_called()
 
+    @patch("firetower.slack_app.handlers.captain.SlackService")
     @patch("firetower.slack_app.handlers.captain.get_or_create_user_from_slack_id")
-    def test_user_not_found(self, mock_get_user, incident):
+    def test_user_not_found(self, mock_get_user, mock_slack_service, incident):
+        mock_slack_service.return_value.get_user_info.return_value = {"is_bot": False}
         mock_get_user.return_value = None
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
@@ -113,6 +119,51 @@ class TestCaptainSubmission:
 
         ack.assert_called_once()
         assert "Failed to resolve" in client.chat_postMessage.call_args[1]["text"]
+
+    @patch("firetower.slack_app.handlers.captain.SlackService")
+    @patch("firetower.slack_app.handlers.captain.get_or_create_user_from_slack_id")
+    def test_rejects_bot_user(self, mock_get_user, mock_slack_service, incident):
+        mock_slack_service.return_value.get_user_info.return_value = {"is_bot": True}
+        ack = MagicMock()
+        body = {"user": {"id": "U_SUBMITTER"}}
+        view = {
+            "state": {
+                "values": {
+                    "captain_block": {"captain_select": {"selected_user": "U_BOT"}}
+                }
+            },
+            "private_metadata": CHANNEL_ID,
+        }
+        client = MagicMock()
+
+        handle_captain_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        assert "bot user" in client.chat_postEphemeral.call_args[1]["text"]
+        assert client.chat_postEphemeral.call_args[1]["user"] == "U_SUBMITTER"
+        mock_get_user.assert_not_called()
+
+    @patch("firetower.slack_app.handlers.captain.SlackService")
+    @patch("firetower.slack_app.handlers.captain.get_or_create_user_from_slack_id")
+    def test_slack_lookup_failure(self, mock_get_user, mock_slack_service, incident):
+        mock_slack_service.return_value.get_user_info.return_value = None
+        ack = MagicMock()
+        body = {"user": {"id": "U_SUBMITTER"}}
+        view = {
+            "state": {
+                "values": {
+                    "captain_block": {"captain_select": {"selected_user": "U_X"}}
+                }
+            },
+            "private_metadata": CHANNEL_ID,
+        }
+        client = MagicMock()
+
+        handle_captain_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        assert "Could not verify" in client.chat_postEphemeral.call_args[1]["text"]
+        mock_get_user.assert_not_called()
 
     def test_no_captain_selected(self, incident):
         ack = MagicMock()

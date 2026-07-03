@@ -248,6 +248,7 @@ export function EditableTextField({
           {!isEditing && (
             <Component
               className={cn(
+                'break-words',
                 multiline && 'whitespace-pre-wrap',
                 className,
                 !value && placeholder && 'text-content-disabled italic'
@@ -265,6 +266,7 @@ export function EditableTextField({
           <Component
             className={cn(
               fullWidth ? 'flex-1 min-w-0' : 'inline',
+              'break-words',
               multiline && 'whitespace-pre-wrap',
               className,
               !value && placeholder && 'text-content-disabled italic'

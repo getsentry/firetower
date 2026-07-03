@@ -12,6 +12,7 @@ const ActionItemSchema = z.object({
   assignee_name: z.string().nullable(),
   assignee_avatar_url: z.string().nullable(),
   url: z.string(),
+  slo_deadline: z.string().nullable(),
 });
 
 export type ActionItem = z.infer<typeof ActionItemSchema>;

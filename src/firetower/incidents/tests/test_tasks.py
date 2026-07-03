@@ -403,6 +403,18 @@ class TestSendStatuspageReminder:
 
         mock_slack.post_message.assert_not_called()
 
+    def test_skips_for_private_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0, is_private=True)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        with patch(
+            "firetower.incidents.tasks.statuspage.SlackService", return_value=mock_slack
+        ):
+            send_statuspage_reminder(incident.id)
+
+        mock_slack.post_message.assert_not_called()
+
     def test_skips_when_incident_not_found(self):
         mock_slack = MagicMock()
         with patch(
@@ -664,6 +676,23 @@ class TestSendStatuspageFollowupReminder:
                     "WARNING_BUFFER_MINUTES": 0,
                 },
             ),
+        ):
+            send_statuspage_followup_reminder(incident.id)
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_for_private_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0, is_private=True)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        self._make_link(
+            incident,
+            ExternalLinkType.STATUSPAGE,
+            url="https://manage.statuspage.io/incidents/abc123",
+        )
+
+        mock_slack = MagicMock()
+        with patch(
+            "firetower.incidents.tasks.statuspage.SlackService", return_value=mock_slack
         ):
             send_statuspage_followup_reminder(incident.id)
 

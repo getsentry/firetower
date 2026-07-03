@@ -23,13 +23,6 @@ LINEAR_STATE_TYPE_MAP = {
     "canceled": "Canceled",
 }
 
-LINEAR_RELATION_TYPE_MAP = {
-    "related": "related",
-    "blocks": "blocks",
-    "blocked": "blocked_by",
-    "duplicate": "duplicate",
-}
-
 TOKEN_LIFETIME = timedelta(days=30)
 TOKEN_REFRESH_BUFFER = timedelta(days=1)
 
@@ -243,6 +236,7 @@ class LinearService:
             "identifier": issue["identifier"],
             "title": issue["title"],
             "url": issue["url"],
+            "state_type": (issue.get("state") or {}).get("type", ""),
         }
 
     def get_user_by_email(self, email: str) -> dict[str, str] | None:
@@ -470,81 +464,3 @@ class LinearService:
                 break
 
         return issues
-
-    def _fetch_relations(
-        self,
-        issue_id: str,
-        field: str,
-        issue_key: str,
-        seen_ids: set[str],
-    ) -> list[dict[str, Any]] | None:
-        query = f"""
-        query($issueId: String!, $after: String) {{
-            issue(id: $issueId) {{
-                {field}(first: 50, after: $after) {{
-                    nodes {{
-                        type
-                        {issue_key} {{
-                            {ISSUE_FIELDS}
-                        }}
-                    }}
-                    pageInfo {{
-                        hasNextPage
-                        endCursor
-                    }}
-                }}
-            }}
-        }}
-        """
-
-        issues: list[dict[str, Any]] = []
-        cursor: str | None = None
-        max_pages = 25
-
-        for _ in range(max_pages):
-            variables: dict[str, Any] = {"issueId": issue_id}
-            if cursor is not None:
-                variables["after"] = cursor
-
-            data = self._graphql(query, variables)
-            if data is None:
-                return None
-
-            issue = data.get("issue")
-            if not issue:
-                return None
-
-            relations = issue.get(field, {})
-            for node in relations.get("nodes", []):
-                related_issue = node.get(issue_key)
-                if not related_issue or "id" not in related_issue:
-                    continue
-                if related_issue["id"] in seen_ids:
-                    continue
-                seen_ids.add(related_issue["id"])
-
-                linear_type = node.get("type", "").lower()
-                relation_type = LINEAR_RELATION_TYPE_MAP.get(linear_type, "related")
-                issues.append(self._parse_issue(related_issue, relation_type))
-
-            page_info = relations.get("pageInfo", {})
-            if not page_info.get("hasNextPage"):
-                break
-            cursor = page_info.get("endCursor")
-            if cursor is None:
-                break
-
-        return issues
-
-    def get_related_issues(self, issue_id: str) -> list[dict[str, Any]] | None:
-        seen_ids: set[str] = set()
-
-        forward = self._fetch_relations(issue_id, "relations", "relatedIssue", seen_ids)
-        if forward is None:
-            return None
-
-        inverse = self._fetch_relations(issue_id, "inverseRelations", "issue", seen_ids)
-        if inverse is None:
-            return None
-
-        return forward + inverse

@@ -537,98 +537,6 @@ class TestGetChildIssues:
         assert second_call_vars["after"] == "cursor1"
 
 
-class TestGetRelatedIssues:
-    def test_combines_forward_and_inverse_relations(self, linear_service):
-        forward_response = {
-            "issue": {
-                "relations": {
-                    "nodes": [
-                        {
-                            "type": "related",
-                            "relatedIssue": {
-                                "id": "r1",
-                                "identifier": "E-1",
-                                "title": "Related",
-                                "url": "u1",
-                                "state": {"type": "started"},
-                                "assignee": None,
-                            },
-                        }
-                    ],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-        inverse_response = {
-            "issue": {
-                "inverseRelations": {
-                    "nodes": [
-                        {
-                            "type": "blocks",
-                            "issue": {
-                                "id": "r2",
-                                "identifier": "E-2",
-                                "title": "Blocker",
-                                "url": "u2",
-                                "state": {"type": "unstarted"},
-                                "assignee": None,
-                            },
-                        }
-                    ],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-
-        with patch.object(
-            linear_service,
-            "_graphql",
-            side_effect=[forward_response, inverse_response],
-        ):
-            result = linear_service.get_related_issues("issue-1")
-
-        assert len(result) == 2
-        assert result[0]["identifier"] == "E-1"
-        assert result[0]["relation_type"] == "related"
-        assert result[1]["identifier"] == "E-2"
-        assert result[1]["relation_type"] == "blocks"
-
-    def test_deduplicates_across_forward_and_inverse(self, linear_service):
-        shared_issue = {
-            "id": "same-id",
-            "identifier": "E-1",
-            "title": "Same",
-            "url": "u",
-            "state": {"type": "started"},
-            "assignee": None,
-        }
-        forward_response = {
-            "issue": {
-                "relations": {
-                    "nodes": [{"type": "related", "relatedIssue": shared_issue}],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-        inverse_response = {
-            "issue": {
-                "inverseRelations": {
-                    "nodes": [{"type": "related", "issue": shared_issue}],
-                    "pageInfo": {"hasNextPage": False, "endCursor": None},
-                }
-            }
-        }
-
-        with patch.object(
-            linear_service,
-            "_graphql",
-            side_effect=[forward_response, inverse_response],
-        ):
-            result = linear_service.get_related_issues("issue-1")
-
-        assert len(result) == 1
-
-
 class TestGetUserByEmail:
     def test_returns_user_when_found(self, linear_service):
         mock_response = {
@@ -655,5 +563,64 @@ class TestGetUserByEmail:
     def test_returns_none_on_api_failure(self, linear_service):
         with patch.object(linear_service, "_graphql", return_value=None):
             result = linear_service.get_user_by_email("alice@example.com")
+
+        assert result is None
+
+
+class TestGetIssue:
+    def test_returns_issue_with_state_type(self, linear_service):
+        mock_response = {
+            "issue": {
+                "id": "issue-123",
+                "identifier": "LIN-42",
+                "title": "Fix the thing",
+                "url": "https://linear.app/team/issue/LIN-42",
+                "priority": 1,
+                "state": {"type": "started"},
+                "assignee": {"id": "user-1", "email": "alice@example.com"},
+            }
+        }
+
+        with patch.object(linear_service, "_graphql", return_value=mock_response):
+            result = linear_service.get_issue("issue-123")
+
+        assert result == {
+            "id": "issue-123",
+            "identifier": "LIN-42",
+            "title": "Fix the thing",
+            "url": "https://linear.app/team/issue/LIN-42",
+            "state_type": "started",
+        }
+
+    def test_returns_empty_state_type_when_state_is_null(self, linear_service):
+        mock_response = {
+            "issue": {
+                "id": "issue-123",
+                "identifier": "LIN-42",
+                "title": "Fix the thing",
+                "url": "https://linear.app/team/issue/LIN-42",
+                "priority": 1,
+                "state": None,
+                "assignee": None,
+            }
+        }
+
+        with patch.object(linear_service, "_graphql", return_value=mock_response):
+            result = linear_service.get_issue("issue-123")
+
+        assert result is not None
+        assert result["state_type"] == ""
+
+    def test_returns_none_on_api_failure(self, linear_service):
+        with patch.object(linear_service, "_graphql", return_value=None):
+            result = linear_service.get_issue("issue-123")
+
+        assert result is None
+
+    def test_returns_none_when_issue_not_found(self, linear_service):
+        mock_response = {"issue": None}
+
+        with patch.object(linear_service, "_graphql", return_value=mock_response):
+            result = linear_service.get_issue("nonexistent")
 
         assert result is None
