@@ -37,7 +37,7 @@ def archive_stale_channels() -> None:
         logger.error("Could not determine own bot ID, aborting archive run")
         return
 
-    terminal_statuses = [IncidentStatus.DONE, IncidentStatus.CANCELLED]
+    terminal_statuses = [IncidentStatus.DONE, IncidentStatus.CANCELED]
     links = ExternalLink.objects.filter(
         type=ExternalLinkType.SLACK,
         incident__status__in=terminal_statuses,

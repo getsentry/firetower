@@ -512,7 +512,7 @@ class TestArchiveStaleChannels:
         mock_slack.archive_channel.assert_not_called()
 
     def test_includes_cancelled_incident_channels(self):
-        incident = self._make_incident(status=IncidentStatus.CANCELLED)
+        incident = self._make_incident(status=IncidentStatus.CANCELED)
         self._make_link(incident, "C_CANCELLED")
 
         mock_slack = MagicMock()
