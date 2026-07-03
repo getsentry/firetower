@@ -474,13 +474,24 @@ class TestSlackService:
             channel="C123", limit=999, cursor="cur1"
         )
 
-    def test_get_channel_history_returns_empty_on_error(self):
+    def test_get_channel_history_raises_on_api_error(self):
         service, mock_client = self._make_service()
         mock_client.conversations_history.side_effect = Exception("timeout")
 
-        messages = service.get_channel_history("C123")
+        with pytest.raises(Exception, match="timeout"):
+            service.get_channel_history("C123")
 
-        assert messages == []
+    def test_get_channel_history_raises_on_not_ok_response(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.return_value = {
+            "ok": False,
+            "has_more": False,
+            "messages": [],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        with pytest.raises(RuntimeError, match="not-ok"):
+            service.get_channel_history("C123")
 
     def test_get_channel_history_returns_empty_without_client(self):
         mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}
@@ -577,13 +588,24 @@ class TestSlackService:
         assert len(replies) == 1
         assert replies[0]["text"] == "has user"
 
-    def test_get_thread_replies_returns_empty_on_error(self):
+    def test_get_thread_replies_raises_on_api_error(self):
         service, mock_client = self._make_service()
         mock_client.conversations_replies.side_effect = Exception("timeout")
 
-        replies = service.get_thread_replies("C123", "1.0")
+        with pytest.raises(Exception, match="timeout"):
+            service.get_thread_replies("C123", "1.0")
 
-        assert replies == []
+    def test_get_thread_replies_raises_on_not_ok_response(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_replies.return_value = {
+            "ok": False,
+            "has_more": False,
+            "messages": [],
+            "response_metadata": {"next_cursor": ""},
+        }
+
+        with pytest.raises(RuntimeError, match="not-ok"):
+            service.get_thread_replies("C123", "1.0")
 
     def test_pin_message_success(self):
         service, mock_client = self._make_service()

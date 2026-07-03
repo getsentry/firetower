@@ -641,6 +641,39 @@ class TestArchiveStaleChannels:
 
         mock_slack.archive_channel.assert_called_once_with("C_BOTTHREADS")
 
+    def test_skips_channel_on_thread_replies_api_error(self):
+        incident = self._make_incident()
+        self._make_link(incident, "C_THREAD_ERR")
+
+        mock_slack = MagicMock()
+        mock_slack.client = True
+        mock_slack.bot_id = self.OWN_BOT_ID
+        mock_slack.parse_channel_id_from_url.return_value = "C_THREAD_ERR"
+        mock_slack.get_channel_info.return_value = {
+            "id": "C_THREAD_ERR",
+            "name": "inc-2014",
+            "is_private": False,
+            "is_archived": False,
+        }
+        mock_slack.get_channel_history.return_value = [
+            {
+                "type": "message",
+                "bot_id": self.OWN_BOT_ID,
+                "text": "bot msg",
+                "ts": "1.0",
+                "reply_count": 1,
+            }
+        ]
+        mock_slack.get_thread_replies.side_effect = Exception("API error")
+
+        with patch(
+            "firetower.incidents.tasks.archive.SlackService", return_value=mock_slack
+        ):
+            archive_stale_channels.__wrapped__()
+
+        mock_slack.post_message.assert_not_called()
+        mock_slack.archive_channel.assert_not_called()
+
     def test_aborts_when_bot_id_is_none(self):
         incident = self._make_incident()
         self._make_link(incident, "C_NOBOT")

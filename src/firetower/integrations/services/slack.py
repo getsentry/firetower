@@ -518,12 +518,11 @@ class SlackService:
                 response = self.client.conversations_history(**kwargs)
             except Exception:
                 logger.exception("Failed to fetch history for channel %s", channel_id)
-                break
+                raise
             if not response.get("ok"):
-                logger.error(
-                    "conversations_history returned not-ok for channel %s", channel_id
+                raise RuntimeError(
+                    f"conversations_history returned not-ok for channel {channel_id}"
                 )
-                break
             messages.extend(response.get("messages", []))
             metadata: dict[str, Any] = response.get("response_metadata") or {}
             cursor = metadata.get("next_cursor") or None
@@ -567,12 +566,11 @@ class SlackService:
                 response = self.client.conversations_replies(**kwargs)
             except Exception:
                 logger.exception("Failed to fetch replies for thread %s", thread_ts)
-                break
+                raise
             if not response.get("ok"):
-                logger.error(
-                    "conversations_replies returned not-ok for thread %s", thread_ts
+                raise RuntimeError(
+                    f"conversations_replies returned not-ok for thread {thread_ts}"
                 )
-                break
             raw_messages: list[dict[str, Any]] = response.get("messages") or []
             replies.extend(
                 msg_dict
