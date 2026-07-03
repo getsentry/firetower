@@ -64,6 +64,7 @@ KNOWN_SUBCOMMANDS = {
     "mitigated",
     "mit",
     "mitigate",
+    "resolve",
     "resolved",
     "fixed",
     "reopen",
@@ -148,7 +149,7 @@ def handle_command(
             handle_help_command(ack, command, respond)
         elif subcommand in ("mitigated", "mit", "mitigate"):
             handle_mitigated_command(ack, body, command, respond)
-        elif subcommand in ("resolved", "fixed"):
+        elif subcommand in ("resolved", "fixed", "resolve"):
             handle_resolved_command(ack, body, command, respond)
         elif subcommand == "reopen":
             handle_reopen_command(ack, body, command, respond)
