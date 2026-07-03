@@ -507,6 +507,10 @@ class SlackService:
             response = self.client.conversations_history(
                 channel=channel_id, limit=limit
             )
+            if not response.get("ok"):
+                raise RuntimeError(
+                    f"conversations_history returned not-ok for channel {channel_id}"
+                )
             return response.get("messages", [])
         messages: list[dict[str, Any]] = []
         cursor: str | None = None

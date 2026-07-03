@@ -691,6 +691,16 @@ class TestSlackService:
         with pytest.raises(Exception, match="timeout"):
             service.get_channel_history("C123", limit=1)
 
+    def test_get_channel_history_with_limit_raises_on_not_ok(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.return_value = {
+            "ok": False,
+            "messages": [],
+        }
+
+        with pytest.raises(RuntimeError, match="not-ok"):
+            service.get_channel_history("C123", limit=1)
+
     def test_get_channel_info_includes_is_archived(self):
         service, mock_client = self._make_service()
         mock_client.conversations_info.return_value = {
