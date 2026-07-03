@@ -78,6 +78,9 @@ def _setup_channel_for_incident(
             )
         return
 
+    if not channel_info:
+        channel_info = _slack_service.get_channel_info(channel_id)
+
     expected_name = build_channel_name(incident)
     if channel_info and channel_info["name"] != expected_name:
         renamed = _slack_service.rename_channel(channel_id, expected_name)
