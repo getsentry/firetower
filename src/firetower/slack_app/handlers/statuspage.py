@@ -47,6 +47,7 @@ def _build_statuspage_modal(
 
     is_update = statuspage_incident is not None
     latest_status = "investigating"
+    latest_message = ""
     default_impact = SEVERITY_TO_IMPACT.get(incident_severity, "major")
     affected_components: dict[str, str] = {}
 
@@ -58,6 +59,7 @@ def _build_statuspage_modal(
         )
         if incident_updates:
             latest_status = incident_updates[0].get("status", "investigating")
+            latest_message = incident_updates[0].get("body", "")
             for update in incident_updates:
                 for component in update.get("affected_components") or []:
                     component_id = component.get("code", "")
@@ -119,6 +121,41 @@ def _build_statuspage_modal(
                     },
                 },
                 "label": {"type": "plain_text", "text": "Title"},
+            }
+        )
+
+    if is_update and latest_message:
+        quoted = "\n".join(f">{line}" for line in latest_message.split("\n"))
+        blocks.append(
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Previous message:*\n{quoted[:2500]}",
+                    }
+                ],
+            }
+        )
+        blocks.append(
+            {
+                "type": "input",
+                "block_id": "reuse_message_block",
+                "optional": True,
+                "element": {
+                    "type": "checkboxes",
+                    "action_id": "reuse_message_checkbox",
+                    "options": [
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Reuse previous message",
+                            },
+                            "value": "reuse",
+                        }
+                    ],
+                },
+                "label": {"type": "plain_text", "text": " "},
             }
         )
 
@@ -251,10 +288,14 @@ def _build_statuspage_modal(
                         }
                     )
 
+    metadata = {"channel_id": channel_id}
+    if latest_message:
+        metadata["latest_message"] = latest_message
+
     return {
         "type": "modal",
         "callback_id": "statuspage_modal",
-        "private_metadata": channel_id,
+        "private_metadata": json.dumps(metadata),
         "title": {
             "type": "plain_text",
             "text": "Update Statuspage" if is_update else "New Statuspage Post",
@@ -366,7 +407,14 @@ def handle_statuspage_command(
 
 def _extract_submission_data(view: dict) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
-    channel_id = view.get("private_metadata", "")
+    raw_metadata = view.get("private_metadata", "")
+    try:
+        metadata = json.loads(raw_metadata)
+        channel_id = metadata.get("channel_id", "")
+        stored_message = metadata.get("latest_message", "")
+    except (json.JSONDecodeError, AttributeError):
+        channel_id = raw_metadata
+        stored_message = ""
 
     status = (
         values.get("status_block", {})
@@ -376,6 +424,14 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
     )
     title = values.get("title_block", {}).get("title_input", {}).get("value", "")
     message = values.get("message_block", {}).get("message_input", {}).get("value", "")
+
+    reuse_checked = bool(
+        values.get("reuse_message_block", {})
+        .get("reuse_message_checkbox", {})
+        .get("selected_options")
+    )
+    if reuse_checked and not message:
+        message = stored_message
     impact = (
         values.get("impact_block", {})
         .get("impact_select", {})
@@ -578,18 +634,17 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
 def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
     values = view.get("state", {}).get("values", {})
     errors: dict[str, str] = {}
-    message = values.get("message_block", {}).get("message_input", {}).get("value", "")
-    if not message:
-        errors["message_block"] = "Message is required."
     if "title_block" in values:
         title = values["title_block"].get("title_input", {}).get("value", "")
         if not title:
             errors["title_block"] = "Title is required."
+
+    data = _extract_submission_data(view)
+    if not data["message"]:
+        errors["message_block"] = "Message is required."
     if errors:
         ack(response_action="errors", errors=errors)
         return
-
-    data = _extract_submission_data(view)
 
     if data["status"] == "resolved":
         non_operational = [

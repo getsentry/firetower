@@ -133,6 +133,105 @@ class TestBuildStatuspageModal:
         )
         assert status_block["element"]["initial_option"]["value"] == "monitoring"
 
+    def test_update_shows_reuse_checkbox_and_previous_message(self):
+        sp_incident = {
+            "name": "Issue",
+            "impact": "major",
+            "incident_updates": [
+                {
+                    "status": "identified",
+                    "body": "We found the root cause in the DB layer.",
+                    "created_at": "2024-01-02T00:00:00Z",
+                    "affected_components": [],
+                },
+                {
+                    "status": "investigating",
+                    "body": "Looking into reports of elevated errors.",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "affected_components": [],
+                },
+            ],
+        }
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+                statuspage_incident=sp_incident,
+            )
+
+        context_blocks = [b for b in modal["blocks"] if b.get("type") == "context"]
+        assert any(
+            "We found the root cause" in el["text"]
+            for b in context_blocks
+            for el in b.get("elements", [])
+        )
+
+        reuse_block = next(
+            (b for b in modal["blocks"] if b.get("block_id") == "reuse_message_block"),
+            None,
+        )
+        assert reuse_block is not None
+        assert reuse_block["optional"] is True
+        checkbox = reuse_block["element"]
+        assert checkbox["type"] == "checkboxes"
+        assert checkbox["options"][0]["value"] == "reuse"
+
+        message_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "message_block"
+        )
+        assert "initial_value" not in message_block["element"]
+
+        metadata = json.loads(modal["private_metadata"])
+        assert metadata["latest_message"] == "We found the root cause in the DB layer."
+
+    def test_update_without_body_has_no_reuse_checkbox(self):
+        sp_incident = {
+            "name": "Issue",
+            "impact": "major",
+            "incident_updates": [
+                {
+                    "status": "investigating",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "affected_components": [],
+                },
+            ],
+        }
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+                statuspage_incident=sp_incident,
+            )
+
+        block_ids = [b.get("block_id") for b in modal["blocks"]]
+        assert "reuse_message_block" not in block_ids
+
+    def test_new_post_has_no_reuse_checkbox(self):
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+            )
+
+        block_ids = [b.get("block_id") for b in modal["blocks"]]
+        assert "reuse_message_block" not in block_ids
+        message_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "message_block"
+        )
+        assert "initial_value" not in message_block["element"]
+
     def test_component_fetch_failure_shows_warning(self):
         with patch(
             "firetower.slack_app.handlers.statuspage.StatuspageService"
@@ -300,6 +399,8 @@ class TestStatuspageSubmission:
         impact="major",
         channel_id=CHANNEL_ID,
         components=None,
+        reuse_message=False,
+        latest_message="",
     ):
         values: dict = {
             "status_block": {
@@ -319,6 +420,12 @@ class TestStatuspageSubmission:
                 }
             },
         }
+        if reuse_message:
+            values["reuse_message_block"] = {
+                "reuse_message_checkbox": {
+                    "selected_options": [{"value": "reuse"}],
+                }
+            }
         if components:
             for comp_id, comp_status in components.items():
                 values[f"component_{comp_id}"] = {
@@ -326,9 +433,12 @@ class TestStatuspageSubmission:
                         "selected_option": {"value": comp_status},
                     }
                 }
+        metadata = {"channel_id": channel_id}
+        if latest_message:
+            metadata["latest_message"] = latest_message
         return {
             "state": {"values": values},
-            "private_metadata": channel_id,
+            "private_metadata": json.dumps(metadata),
         }
 
     def test_creates_new_statuspage_incident(self, incident):
@@ -483,6 +593,76 @@ class TestStatuspageSubmission:
             errors={"message_block": "Message is required."},
         )
         client.chat_postMessage.assert_not_called()
+
+    def test_reuse_checkbox_uses_stored_message(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(
+            message="",
+            reuse_message=True,
+            latest_message="Previous update text",
+        )
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.return_value = {"id": "sp_reuse"}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/sp_reuse"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once_with()
+        instance.create_incident.assert_called_once()
+        assert (
+            instance.create_incident.call_args[1]["message"] == "Previous update text"
+        )
+
+    def test_reuse_checkbox_without_stored_message_still_errors(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(
+            message="",
+            reuse_message=True,
+            latest_message="",
+        )
+        client = MagicMock()
+
+        handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once_with(
+            response_action="errors",
+            errors={"message_block": "Message is required."},
+        )
+
+    def test_typed_message_takes_precedence_over_reuse(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view(
+            message="New custom message",
+            reuse_message=True,
+            latest_message="Previous update text",
+        )
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.return_value = {"id": "sp_typed"}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/sp_typed"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        instance.create_incident.assert_called_once()
+        assert instance.create_incident.call_args[1]["message"] == "New custom message"
 
     def test_unconfigured_service_responds_error(self, incident):
         ack = MagicMock()
