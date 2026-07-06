@@ -461,7 +461,9 @@ def _build_component_warning_modal(
     }
 
 
-def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
+def _process_statuspage_submission(
+    data: dict[str, Any], client: Any, user_id: str = ""
+) -> bool:
     channel_id = data["channel_id"]
     status = data["status"]
     title = data["title"]
@@ -519,7 +521,10 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
                     components=components or None,
                 )
                 statuspage_url = service.get_incident_url(result["id"])
-                success_message = f"Statuspage has been updated: {statuspage_url}"
+                attribution = f"<@{user_id}> " if user_id else ""
+                success_message = (
+                    f"{attribution}updated the statuspage: {statuspage_url}"
+                )
             else:
                 result = service.create_incident(
                     title=title,
@@ -531,7 +536,10 @@ def _process_statuspage_submission(data: dict[str, Any], client: Any) -> bool:
                 statuspage_url = service.get_incident_url(result["id"])
                 statuspage_link.url = statuspage_url
                 statuspage_link.save(update_fields=["url"])
-                success_message = f"Statuspage post created: {statuspage_url}"
+                attribution = f"<@{user_id}> " if user_id else ""
+                success_message = (
+                    f"{attribution}created a statuspage post: {statuspage_url}"
+                )
     except Exception:
         logger.exception("Failed to create/update statuspage incident")
         client.chat_postMessage(
@@ -618,7 +626,8 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
             return
 
     ack()
-    _process_statuspage_submission(data, client)
+    submitter_id = body.get("user", {}).get("id", "")
+    _process_statuspage_submission(data, client, user_id=submitter_id)
 
 
 def handle_component_impact_select(ack: Any, body: dict) -> None:
@@ -630,7 +639,8 @@ def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> No
     view = body.get("view", {})
     data = json.loads(view.get("private_metadata", "{}"))
     data["components"] = dict.fromkeys(data.get("components", {}), "operational")
-    success = _process_statuspage_submission(data, client)
+    submitter_id = body.get("user", {}).get("id", "")
+    success = _process_statuspage_submission(data, client, user_id=submitter_id)
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
     if success:
@@ -658,7 +668,8 @@ def handle_statuspage_resolve_anyway(ack: Any, body: dict, client: Any) -> None:
     ack()
     view = body.get("view", {})
     data = json.loads(view.get("private_metadata", "{}"))
-    success = _process_statuspage_submission(data, client)
+    submitter_id = body.get("user", {}).get("id", "")
+    success = _process_statuspage_submission(data, client, user_id=submitter_id)
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
     if success:
