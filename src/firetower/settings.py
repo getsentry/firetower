@@ -342,6 +342,16 @@ ACTION_ITEM_SYNC_THROTTLE_SECONDS = (
     int(config.linear.action_item_sync_throttle_seconds) if config.linear else 300
 )
 
+# Tight timeout/retry budget for the incident allocation path, which calls
+# Linear while holding a DB lock. Kept lower than the default LinearService
+# budget so a hung Linear can't hold the lock for the full default duration.
+INCIDENT_ALLOC_LINEAR_TIMEOUT = (
+    int(config.linear.alloc_timeout_seconds) if config.linear else 8
+)
+INCIDENT_ALLOC_LINEAR_RETRIES = (
+    int(config.linear.alloc_max_retries) if config.linear else 1
+)
+
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     # Pagination
