@@ -5,7 +5,12 @@ from typing import Any
 from django.conf import settings
 
 from firetower.auth.services import get_or_create_user_from_slack_id
-from firetower.incidents.hooks import build_channel_name, build_channel_topic
+from firetower.incidents.allocation import LinearUnavailable, adopt_on_create_enabled
+from firetower.incidents.hooks import (
+    _populate_linear_parent,
+    build_channel_name,
+    build_channel_topic,
+)
 from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
@@ -273,6 +278,16 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
 
     try:
         incident = serializer.save()
+    except LinearUnavailable:
+        logger.warning("Linear unavailable during backfill incident allocation")
+        client.chat_postMessage(
+            channel=slack_user_id,
+            text=(
+                "Linear was temporarily unreachable, so the incident was not created. "
+                "Please retry `/ft backfill` shortly."
+            ),
+        )
+        return
     except Exception:
         logger.exception("Failed to create backfill incident from Slack modal")
         client.chat_postMessage(
@@ -280,5 +295,19 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
             text="Something went wrong creating the backfill incident. Please try again.",
         )
         return
+
+    # Backfill uses skip_hooks=True, so the populate path never runs via the
+    # hook. Populate the adopted Linear parent here so backfilled incidents get
+    # their parent issue too.
+    if adopt_on_create_enabled() and incident.linear_parent_issue_id:
+        identity = getattr(incident, "_allocated_identity", None)
+        if identity is not None:
+            try:
+                _populate_linear_parent(incident, identity.linear_url)
+            except Exception:
+                logger.exception(
+                    "Failed to populate Linear parent for backfill incident %s",
+                    incident.id,
+                )
 
     _setup_channel_for_incident(incident, channel_id, slack_user_id, client)

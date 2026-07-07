@@ -57,6 +57,12 @@ team_id = ""
 project_id = ""
 # When true, claim the Linear issue matching the incident number (e.g. INC-2160) instead of creating a new one.
 sync_identifiers = false
+# When true (and sync_identifiers is true), allocate incident ids by claiming or
+# creating a matching INC-N placeholder in Linear at creation time, so the
+# incident's numeric id and Linear parent are minted together. Requires
+# sync_identifiers. Defaults to false (legacy: id from the local counter, Linear
+# parent claimed/created afterwards by the hook).
+adopt_on_create = false
 # Tight timeout (seconds) and retry count for Linear calls on the incident
 # allocation path, which runs while holding a DB lock. Kept lower than the
 # default LinearService budget so a hung Linear can't hold the lock too long.
