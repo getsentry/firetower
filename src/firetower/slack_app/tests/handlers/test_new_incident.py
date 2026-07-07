@@ -7,7 +7,13 @@ from django.db import OperationalError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.allocation import LinearUnavailable
-from firetower.incidents.models import Incident, IncidentSeverity, Tag, TagType
+from firetower.incidents.models import (
+    Incident,
+    IncidentSeverity,
+    PendingIncident,
+    Tag,
+    TagType,
+)
 from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.new_incident import (
     _build_new_incident_modal,
@@ -641,6 +647,7 @@ class TestNewIncidentSubmission:
     def test_linear_unavailable_creates_fallback_channel(
         self, mock_create_db, mock_fallback
     ):
+        mock_fallback.return_value = "C_TMP"
         ack = MagicMock()
         client = MagicMock()
         body = {"user": {"id": "U_TEST"}}
@@ -670,6 +677,12 @@ class TestNewIncidentSubmission:
             mock_fallback.call_args.kwargs["degraded_reason"]
             == "Linear was unreachable"
         )
+
+        pending = PendingIncident.objects.get(slack_channel_id="C_TMP")
+        assert pending.title == "Linear Down Incident"
+        assert pending.severity == "P1"
+        assert pending.reporter_slack_id == "U_TEST"
+        assert pending.captain_slack_id == "U_CAP"
 
     @pytest.mark.usefixtures("_enable_hooks")
     @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
@@ -844,8 +857,11 @@ class TestFallbackChannel:
         # a second call may happen for the status channel (P0/P1).
         first_call = mock_slack_svc.create_channel.call_args_list[0]
         channel_name = first_call[0][0]
-        prefix = f"{settings.PROJECT_KEY.lower()}-"
+        prefix = f"{settings.PROJECT_KEY.lower()}-tmp-"
+        # backfill's `inc-` guard still matches, but the `-tmp-` marker keeps the
+        # name from ever looking like `inc-<int>`.
         assert channel_name.startswith(prefix)
+        assert channel_name.startswith(f"{settings.PROJECT_KEY.lower()}-")
         assert len(channel_name) == len(prefix) + 8  # prefix + 8 hex chars
 
     @patch("firetower.slack_app.handlers.new_incident._slack_service")

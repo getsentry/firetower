@@ -5,6 +5,7 @@ from django_q.tasks import Schedule
 from firetower.incidents.models import Incident
 from firetower.incidents.tasks.action_items import send_action_item_reminder
 from firetower.incidents.tasks.decorators import datadog_log
+from firetower.incidents.tasks.recovery import sweep_incident_recovery
 from firetower.incidents.tasks.statuspage import (
     STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE,
     STATUSPAGE_REMINDER_MESSAGE,
@@ -21,6 +22,7 @@ __all__ = [
     "send_action_item_reminder",
     "send_statuspage_followup_reminder",
     "send_statuspage_reminder",
+    "sweep_incident_recovery",
 ]
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,12 @@ SCHEDULES = {
         "func": "firetower.incidents.tasks.send_action_item_reminder",
         "schedule_type": Schedule.MINUTES,
         "minutes": 30,
+        "repeats": -1,
+    },
+    "sweep_incident_recovery": {
+        "func": "firetower.incidents.tasks.sweep_incident_recovery",
+        "schedule_type": Schedule.MINUTES,
+        "minutes": 10,
         "repeats": -1,
     },
 }

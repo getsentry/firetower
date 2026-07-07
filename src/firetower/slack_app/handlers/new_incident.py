@@ -13,7 +13,7 @@ from firetower.incidents.hooks import (
     decorate_incident_channel,
     page_for_channel,
 )
-from firetower.incidents.models import Incident, Tag, TagType
+from firetower.incidents.models import Incident, PendingIncident, Tag, TagType
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.integrations.services import SlackService
 from firetower.integrations.services.slack import escape_slack_text
@@ -35,7 +35,17 @@ def _create_fallback_channel(
     form_data: dict,
     *,
     degraded_reason: str | None = None,
-) -> None:
+    pending_recovery: bool = False,
+) -> str | None:
+    """Create a degraded-mode incident channel and return its channel id.
+
+    Returns the created Slack channel id (so callers can persist a
+    ``PendingIncident`` keyed on it), or ``None`` if channel creation failed.
+
+    When ``pending_recovery`` is set (the DB is up but Linear is down), the
+    messaging tells the user the incident will finalize automatically once
+    Linear recovers, rather than requiring a manual backfill.
+    """
     title = form_data["title"]
     severity = form_data["severity"]
     description = form_data.get("description", "")
@@ -44,7 +54,12 @@ def _create_fallback_channel(
     is_private = form_data.get("is_private", False)
     skip_paging = form_data.get("skip_paging", False)
 
-    channel_name = f"{settings.PROJECT_KEY.lower()}-{uuid.uuid4().hex[:8]}"
+    # Name it ``inc-tmp-<hash>`` (never ``inc-<8 hex>``): an 8-hex suffix is
+    # all-digits ~1.7% of the time, which would match ``^inc-\d+$`` and become a
+    # latent trap for anything that parses a channel name to an int. The
+    # ``inc-tmp-`` prefix still satisfies backfill's ``inc-`` guard and is
+    # renamed to ``inc-<id>`` when the incident is finalized.
+    channel_name = f"{settings.PROJECT_KEY.lower()}-tmp-{uuid.uuid4().hex[:8]}"
 
     channel_id = _slack_service.create_channel(channel_name, is_private=is_private)
     if not channel_id:
@@ -57,7 +72,7 @@ def _create_fallback_channel(
                 "and let #team-sre know."
             ),
         )
-        return
+        return None
 
     # Post and pin metadata for backfill
     metadata_lines = [
@@ -85,15 +100,23 @@ def _create_fallback_channel(
         )
 
     channel_reason = degraded_reason or "database unreachable"
-    try:
-        _slack_service.post_message(
-            channel_id,
+    if pending_recovery:
+        degraded_warning = (
+            f":warning: This channel was created in degraded mode ({channel_reason}). "
+            "The incident number will be assigned automatically once Linear "
+            "recovers; you can also run `/ft backfill` in this channel to finalize "
+            "it manually."
+        )
+    else:
+        degraded_warning = (
             f":warning: This channel was created in degraded mode ({channel_reason}). "
             "The incident has NOT been recorded in Firetower. Once the issue is "
             "resolved, run `/ft backfill` in this channel to record it. "
             "Note: automated escalations (sentry-sudo) will not work for this "
-            "incident — page Prod Eng directly if you need to escalate.",
+            "incident — page Prod Eng directly if you need to escalate."
         )
+    try:
+        _slack_service.post_message(channel_id, degraded_warning)
     except Exception:
         logger.exception("Failed to post warning in fallback channel %s", channel_name)
 
@@ -132,20 +155,29 @@ def _create_fallback_channel(
 
     # DM the user
     dm_reason = degraded_reason or "database issue"
-    try:
-        client.chat_postMessage(
-            channel=slack_user_id,
-            text=(
-                f"An incident channel has been created in degraded mode ({dm_reason}).\n"
-                f"Slack channel: <#{channel_id}>\n\n"
-                "The incident has NOT been recorded in Firetower. Once the issue is "
-                "resolved, run `/ft backfill` in the channel to record it. "
-                "Automated escalations (sentry-sudo) will not work for this "
-                "incident — page Prod Eng directly if you need to escalate."
-            ),
+    if pending_recovery:
+        dm_text = (
+            f"An incident channel has been created in degraded mode ({dm_reason}).\n"
+            f"Slack channel: <#{channel_id}>\n\n"
+            "The incident number will be assigned automatically once Linear "
+            "recovers. You can also run `/ft backfill` in the channel to finalize "
+            "it manually."
         )
+    else:
+        dm_text = (
+            f"An incident channel has been created in degraded mode ({dm_reason}).\n"
+            f"Slack channel: <#{channel_id}>\n\n"
+            "The incident has NOT been recorded in Firetower. Once the issue is "
+            "resolved, run `/ft backfill` in the channel to record it. "
+            "Automated escalations (sentry-sudo) will not work for this "
+            "incident — page Prod Eng directly if you need to escalate."
+        )
+    try:
+        client.chat_postMessage(channel=slack_user_id, text=dm_text)
     except Exception:
         logger.exception("Failed to DM user about fallback channel %s", channel_name)
+
+    return channel_id
 
 
 _PRIVATE_OPTION: dict[str, Any] = {
@@ -437,12 +469,36 @@ def handle_new_incident_submission(
         form_data = _fallback_form_data(
             view, is_private=is_private, skip_paging=skip_paging
         )
-        _create_fallback_channel(
+        channel_id = _create_fallback_channel(
             client,
             slack_user_id,
             form_data,
             degraded_reason="Linear was unreachable",
+            pending_recovery=True,
         )
+        # The DB is up (only Linear is down), so record a PendingIncident keyed
+        # on the temp channel. The recovery sweep finalizes it into a real
+        # incident once Linear recovers, with no human re-entry; `/ft backfill`
+        # remains a manual fallback.
+        if channel_id:
+            try:
+                PendingIncident.objects.update_or_create(
+                    slack_channel_id=channel_id,
+                    defaults={
+                        "title": form_data["title"],
+                        "severity": form_data["severity"],
+                        "description": form_data["description"],
+                        "impact_summary": form_data["impact_summary"],
+                        "is_private": form_data["is_private"],
+                        "captain_slack_id": form_data["captain_slack_id"] or "",
+                        "reporter_slack_id": slack_user_id,
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to persist PendingIncident for fallback channel %s",
+                    channel_id,
+                )
         return
     except Exception:
         logger.exception("Failed to create incident from Slack modal")

@@ -57,6 +57,33 @@ class IncidentSeverity(models.TextChoices):
     P4 = "P4", "P4"
 
 
+class PendingIncident(models.Model):
+    """A declared incident whose Linear id could not be allocated.
+
+    Written by the Linear-unavailable declare branch (the DB is up, only Linear
+    is down) so the recovery sweep can finalize it into a real ``Incident`` once
+    Linear recovers, with no human re-entry. No ``Incident`` row exists yet
+    because the PK needs an id we could not allocate.
+    """
+
+    slack_channel_id = models.CharField(max_length=255, unique=True)
+    title = models.CharField(max_length=500)
+    severity = models.CharField(max_length=2, choices=IncidentSeverity.choices)
+    description = models.TextField(blank=True, default="")
+    impact_summary = models.TextField(blank=True, default="")
+    is_private = models.BooleanField(default=False)
+    captain_slack_id = models.CharField(max_length=255, blank=True, default="")
+    reporter_slack_id = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "incidents_pending_incident"
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"PendingIncident({self.slack_channel_id}: {self.title})"
+
+
 class ServiceTier(models.TextChoices):
     T0 = "T0", "T0"
     T1 = "T1", "T1"
