@@ -124,54 +124,24 @@ def _build_statuspage_modal(
             }
         )
 
+    message_element: dict[str, Any] = {
+        "type": "plain_text_input",
+        "action_id": "message_input",
+        "multiline": True,
+    }
     if is_update and latest_message:
-        quoted = "\n".join(f">{line}" for line in latest_message.split("\n"))
-        blocks.append(
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Previous message:*\n{quoted[:2500]}",
-                    }
-                ],
-            }
-        )
-        blocks.append(
-            {
-                "type": "input",
-                "block_id": "reuse_message_block",
-                "optional": True,
-                "element": {
-                    "type": "checkboxes",
-                    "action_id": "reuse_message_checkbox",
-                    "options": [
-                        {
-                            "text": {
-                                "type": "plain_text",
-                                "text": "Reuse previous message",
-                            },
-                            "value": "reuse",
-                        }
-                    ],
-                },
-                "label": {"type": "plain_text", "text": " "},
-            }
-        )
+        message_element["initial_value"] = latest_message
+    else:
+        message_element["placeholder"] = {
+            "type": "plain_text",
+            "text": DEFAULT_MESSAGES.get(latest_status, ""),
+        }
 
     blocks.append(
         {
             "type": "input",
             "block_id": "message_block",
-            "element": {
-                "type": "plain_text_input",
-                "action_id": "message_input",
-                "multiline": True,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": DEFAULT_MESSAGES.get(latest_status, ""),
-                },
-            },
+            "element": message_element,
             "label": {"type": "plain_text", "text": "Message"},
             "hint": {
                 "type": "plain_text",
@@ -289,8 +259,6 @@ def _build_statuspage_modal(
                     )
 
     metadata = {"channel_id": channel_id}
-    if latest_message:
-        metadata["latest_message"] = latest_message
 
     return {
         "type": "modal",
@@ -411,10 +379,8 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
     try:
         metadata = json.loads(raw_metadata)
         channel_id = metadata.get("channel_id", "")
-        stored_message = metadata.get("latest_message", "")
     except (json.JSONDecodeError, AttributeError):
         channel_id = raw_metadata
-        stored_message = ""
 
     status = (
         values.get("status_block", {})
@@ -424,14 +390,6 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
     )
     title = values.get("title_block", {}).get("title_input", {}).get("value", "")
     message = values.get("message_block", {}).get("message_input", {}).get("value", "")
-
-    reuse_checked = bool(
-        values.get("reuse_message_block", {})
-        .get("reuse_message_checkbox", {})
-        .get("selected_options")
-    )
-    if reuse_checked and not message:
-        message = stored_message
     impact = (
         values.get("impact_block", {})
         .get("impact_select", {})
