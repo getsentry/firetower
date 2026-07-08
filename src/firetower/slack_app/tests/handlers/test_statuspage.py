@@ -422,7 +422,7 @@ class TestStatuspageSubmission:
 
     def test_creates_new_statuspage_incident(self, incident):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view()
         client = MagicMock()
 
@@ -452,11 +452,13 @@ class TestStatuspageSubmission:
         )
         assert link.url == "https://test.statuspage.io/incidents/new_sp_123"
 
-        assert "created" in client.chat_postMessage.call_args[1]["text"]
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "created" in msg
+        assert "<@U_SUBMITTER>" in msg
 
     def test_posts_to_both_incident_and_status_channels(self, incident):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view()
         client = MagicMock()
 
@@ -479,7 +481,7 @@ class TestStatuspageSubmission:
 
     def test_posts_to_both_channels_when_invoked_from_status_channel(self, incident):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view(channel_id=STATUS_CHANNEL_ID)
         client = MagicMock()
 
@@ -502,7 +504,7 @@ class TestStatuspageSubmission:
 
     def test_creates_with_components(self, incident):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view(components={"comp1": "major_outage"})
         client = MagicMock()
 
@@ -534,7 +536,7 @@ class TestStatuspageSubmission:
         )
 
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view(status="identified", message="Found the cause")
         client = MagicMock()
 
@@ -557,11 +559,13 @@ class TestStatuspageSubmission:
             message="Found the cause",
             components=None,
         )
-        assert "updated" in client.chat_postMessage.call_args[1]["text"]
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "updated" in msg
+        assert "<@U_SUBMITTER>" in msg
 
     def test_empty_message_returns_error(self, incident):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view(message="")
         client = MagicMock()
 
@@ -575,7 +579,7 @@ class TestStatuspageSubmission:
 
     def test_unconfigured_service_responds_error(self, incident):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view()
         client = MagicMock()
 
@@ -617,7 +621,7 @@ class TestStatuspageSubmission:
 
     def test_no_incident_for_channel(self, db):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view(channel_id="C_NONEXISTENT")
         client = MagicMock()
 
@@ -637,7 +641,7 @@ class TestStatuspageSubmission:
         self, incident
     ):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view(
             status="resolved",
             components={"c1": "major_outage"},
@@ -684,7 +688,7 @@ class TestStatuspageSubmission:
 
     def test_rejects_empty_title(self, incident):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view(title="")
         client = MagicMock()
 
@@ -743,9 +747,9 @@ class TestExtractSubmissionData:
 
 
 class TestStatuspageResetAndResolve:
-    def _make_body(self, data: dict) -> dict:
+    def _make_body(self, data: dict, user_id: str = "U_SUBMITTER") -> dict:
         return {
-            "user": {"id": "U_SUBMITTER"},
+            "user": {"id": user_id},
             "view": {
                 "id": "V_WARNING",
                 "private_metadata": json.dumps(data),
@@ -778,6 +782,7 @@ class TestStatuspageResetAndResolve:
         mock_process.assert_called_once()
         passed_data = mock_process.call_args[0][0]
         assert passed_data["components"] == {"c1": "operational", "c2": "operational"}
+        assert mock_process.call_args[1]["user_id"] == "U_SUBMITTER"
         mock_app.return_value.client.views_update.assert_called_once()
         update_kwargs = mock_app.return_value.client.views_update.call_args[1]
         assert update_kwargs["view_id"] == "V_WARNING"
@@ -815,9 +820,9 @@ class TestStatuspageResetAndResolve:
 
 
 class TestStatuspageResolveAnyway:
-    def _make_body(self, data: dict) -> dict:
+    def _make_body(self, data: dict, user_id: str = "U_SUBMITTER") -> dict:
         return {
-            "user": {"id": "U_SUBMITTER"},
+            "user": {"id": user_id},
             "view": {
                 "id": "V_WARNING",
                 "private_metadata": json.dumps(data),
@@ -847,7 +852,7 @@ class TestStatuspageResolveAnyway:
             handle_statuspage_resolve_anyway(ack, body, client)
 
         ack.assert_called_once_with()
-        mock_process.assert_called_once_with(data, client, "U_SUBMITTER")
+        mock_process.assert_called_once_with(data, client, user_id="U_SUBMITTER")
         passed_data = mock_process.call_args[0][0]
         assert passed_data["components"] == {
             "c1": "major_outage",
