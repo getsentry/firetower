@@ -7,6 +7,7 @@ import requests
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.slack_app.handlers.statuspage import (
     _build_statuspage_modal,
+    _extract_submission_data,
     handle_statuspage_command,
     handle_statuspage_reset_and_resolve,
     handle_statuspage_resolve_anyway,
@@ -693,6 +694,52 @@ class TestStatuspageSubmission:
             response_action="errors",
             errors={"title_block": "Title is required."},
         )
+
+    def test_api_error_with_empty_user_id_skips_ephemeral(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view()
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.side_effect = requests.RequestException(
+                "API error"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        client.chat_postEphemeral.assert_not_called()
+
+
+class TestExtractSubmissionData:
+    def test_null_message_value_returns_empty_string(self):
+        view = {
+            "state": {
+                "values": {
+                    "status_block": {
+                        "status_select": {
+                            "selected_option": {"value": "investigating"},
+                        }
+                    },
+                    "message_block": {
+                        "message_input": {"value": None},
+                    },
+                    "impact_block": {
+                        "impact_select": {
+                            "selected_option": {"value": "major"},
+                        }
+                    },
+                }
+            },
+            "private_metadata": json.dumps({"channel_id": "C123"}),
+        }
+        data = _extract_submission_data(view)
+        assert data["message"] == ""
 
 
 class TestStatuspageResetAndResolve:

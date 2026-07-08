@@ -389,7 +389,9 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
         .get("value", "investigating")
     )
     title = values.get("title_block", {}).get("title_input", {}).get("value", "")
-    message = values.get("message_block", {}).get("message_input", {}).get("value", "")
+    message = (
+        values.get("message_block", {}).get("message_input", {}).get("value") or ""
+    )
     impact = (
         values.get("impact_block", {})
         .get("impact_select", {})
@@ -550,11 +552,12 @@ def _process_statuspage_submission(
                 success_message = f"Statuspage post created: {statuspage_url}"
     except Exception:
         logger.exception("Failed to create/update statuspage incident")
-        client.chat_postEphemeral(
-            channel=channel_id,
-            user=user_id,
-            text="Something went wrong updating Statuspage. Please try again.",
-        )
+        if user_id:
+            client.chat_postEphemeral(
+                channel=channel_id,
+                user=user_id,
+                text="Something went wrong updating Statuspage. Please try again.",
+            )
         return False
 
     notify_channels = {channel_id}
