@@ -592,7 +592,7 @@ class TestStatuspageSubmission:
 
     def test_api_error_sends_failure_message(self, incident):
         ack = MagicMock()
-        body = {}
+        body = {"user": {"id": "U_SUBMITTER"}}
         view = self._make_view()
         client = MagicMock()
 
@@ -608,7 +608,8 @@ class TestStatuspageSubmission:
             handle_statuspage_submission(ack, body, view, client)
 
         ack.assert_called_once()
-        assert "went wrong" in client.chat_postMessage.call_args[1]["text"]
+        assert "went wrong" in client.chat_postEphemeral.call_args[1]["text"]
+        assert client.chat_postEphemeral.call_args[1]["user"] == "U_SUBMITTER"
         assert not ExternalLink.objects.filter(
             incident=incident, type=ExternalLinkType.STATUSPAGE
         ).exists()
@@ -697,10 +698,11 @@ class TestStatuspageSubmission:
 class TestStatuspageResetAndResolve:
     def _make_body(self, data: dict) -> dict:
         return {
+            "user": {"id": "U_SUBMITTER"},
             "view": {
                 "id": "V_WARNING",
                 "private_metadata": json.dumps(data),
-            }
+            },
         }
 
     def test_sets_all_components_operational_and_processes(self):
@@ -768,10 +770,11 @@ class TestStatuspageResetAndResolve:
 class TestStatuspageResolveAnyway:
     def _make_body(self, data: dict) -> dict:
         return {
+            "user": {"id": "U_SUBMITTER"},
             "view": {
                 "id": "V_WARNING",
                 "private_metadata": json.dumps(data),
-            }
+            },
         }
 
     def test_processes_submission_and_shows_success(self):
@@ -797,7 +800,7 @@ class TestStatuspageResolveAnyway:
             handle_statuspage_resolve_anyway(ack, body, client)
 
         ack.assert_called_once_with()
-        mock_process.assert_called_once_with(data, client)
+        mock_process.assert_called_once_with(data, client, "U_SUBMITTER")
         passed_data = mock_process.call_args[0][0]
         assert passed_data["components"] == {
             "c1": "major_outage",
