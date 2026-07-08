@@ -40,6 +40,14 @@ def _get_linear_service() -> LinearService:
 
 HIGH_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 ACTIVE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
+# Statuses that mean the incident has been responded to/mitigated, at which
+# point any PagerDuty pages Firetower triggered should be auto-resolved.
+PAGE_RESOLVE_STATUSES = {
+    IncidentStatus.MITIGATED,
+    IncidentStatus.DONE,
+    IncidentStatus.POSTMORTEM,
+    IncidentStatus.CANCELED,
+}
 
 DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
 
@@ -196,6 +204,52 @@ def _page_if_needed(
         is_private=incident.is_private,
         skip_paging=skip_paging,
     )
+
+
+def resolve_pages_for_incident(incident: Incident) -> None:
+    """Resolve any PagerDuty pages Firetower triggered for this incident.
+
+    The dedup key is deterministically rebuilt from incident_number + policy
+    name, matching what page_for_channel sent at trigger time on the normal
+    path, so no PD lookup or stored alert id is needed. Resolving a policy that
+    never paged (or was already resolved) is a harmless 202 no-op, so we resolve
+    every configured policy unconditionally.
+
+    Known gap: pages fired on the degraded fallback path use the Slack channel
+    name as the dedup prefix (not the incident number), so they are not matched
+    here. Those are cleaned up manually.
+    """
+    pd_config = settings.PAGERDUTY
+    if not pd_config:
+        return
+
+    escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
+
+    pd_service = None
+
+    for policy_name in PAGING_POLICIES:
+        policy = escalation_policies.get(policy_name)
+        if not policy:
+            continue
+
+        integration_key = policy.get("integration_key")
+        if not integration_key:
+            continue
+
+        if pd_service is None:
+            try:
+                pd_service = PagerDutyService()
+            except Exception:
+                logger.exception("Failed to initialize PagerDutyService for resolve")
+                return
+
+        dedup_key = f"firetower-{incident.incident_number}-{policy_name}"
+        try:
+            pd_service.resolve_incident(dedup_key, integration_key)
+        except Exception:
+            logger.exception(
+                f"Failed to resolve {policy_name} page for {incident.incident_number}"
+            )
 
 
 def build_channel_name(incident: Incident) -> str:
@@ -1601,6 +1655,20 @@ def on_incident_updated(
         except Exception:
             logger.exception(
                 f"Failed to trigger slack dump in on_incident_updated for incident {incident.id}"
+            )
+
+    # Status change into a mitigated/terminal state: resolve any PD pages we sent.
+    # Best-effort so a PagerDuty hiccup never breaks the incident update.
+    if (
+        old_status is not None
+        and old_status in ACTIVE_STATUSES
+        and incident.status in PAGE_RESOLVE_STATUSES
+    ):
+        try:
+            resolve_pages_for_incident(incident)
+        except Exception:
+            logger.exception(
+                f"Failed to resolve pages in on_incident_updated for incident {incident.id}"
             )
 
     # Severity escalation: page, invite oncall, create status channel, schedule reminders
