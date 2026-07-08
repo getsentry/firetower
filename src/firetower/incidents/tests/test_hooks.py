@@ -3589,9 +3589,7 @@ class TestOnIncidentUpdated:
 
     @patch("firetower.incidents.hooks.resolve_pages_for_incident")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_resolves_pages_on_active_to_mitigated(
-        self, mock_slack, mock_resolve
-    ):
+    def test_resolves_pages_on_active_to_mitigated(self, mock_slack, mock_resolve):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = self._make_incident(status=IncidentStatus.MITIGATED)
@@ -3615,9 +3613,7 @@ class TestOnIncidentUpdated:
 
     @patch("firetower.incidents.hooks.resolve_pages_for_incident")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_does_not_resolve_pages_on_no_status_change(
-        self, mock_slack, mock_resolve
-    ):
+    def test_does_not_resolve_pages_on_no_status_change(self, mock_slack, mock_resolve):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = self._make_incident(status=IncidentStatus.ACTIVE)
