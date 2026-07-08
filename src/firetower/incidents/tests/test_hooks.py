@@ -3655,6 +3655,22 @@ class TestOnIncidentUpdated:
 
         mock_resolve.assert_not_called()
 
+    @patch("firetower.incidents.hooks.resolve_pages_for_incident")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_re_resolves_pages_on_mitigated_to_postmortem(
+        self, mock_slack, mock_resolve
+    ):
+        # Mitigated is still an active status, so a transition to a terminal
+        # state re-resolves. This is a harmless idempotent 202 no-op.
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.POSTMORTEM)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
+
+        mock_resolve.assert_called_once_with(incident)
+
     @patch("firetower.incidents.hooks.PagerDutyService")
     @patch("firetower.incidents.hooks._slack_service")
     def test_resolve_failure_does_not_break_update(self, mock_slack, mock_pd_cls):

@@ -215,6 +215,14 @@ def resolve_pages_for_incident(incident: Incident) -> None:
     never paged (or was already resolved) is a harmless 202 no-op, so we resolve
     every configured policy unconditionally.
 
+    Intentionally NOT gated on is_private or severity, unlike the trigger path
+    (page_for_channel). An incident can be paged while it is public and P0/P1
+    and then have its visibility or severity changed before it is mitigated;
+    gating resolve on the *current* is_private/severity would leave those
+    already-fired pages open. Resolving unconditionally costs at most a couple
+    of dead 202 no-op calls for incidents that never paged, which we accept in
+    exchange for never missing a real page.
+
     Known gap: pages fired on the degraded fallback path use the Slack channel
     name as the dedup prefix (not the incident number), so they are not matched
     here. Those are cleaned up manually.
@@ -1659,6 +1667,9 @@ def on_incident_updated(
 
     # Status change into a mitigated/terminal state: resolve any PD pages we sent.
     # Best-effort so a PagerDuty hiccup never breaks the incident update.
+    # resolve_pages_for_incident is intentionally severity- and visibility-
+    # agnostic (see its docstring): severity/visibility can change after the
+    # page fired, so gating on current values could strand an open page.
     if (
         old_status is not None
         and old_status in ACTIVE_STATUSES
