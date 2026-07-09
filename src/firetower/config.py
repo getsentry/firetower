@@ -18,6 +18,10 @@ class PostgresConfig:
     host: str
     user: str
     password: str
+    # Additional passwords tried (in order) only when `password` fails
+    # authentication. Used to bridge the race window during a password
+    # rotation, when the server and app may briefly disagree on the password.
+    fallback_passwords: list[str] = field(default_factory=list)
 
 
 @deserialize
@@ -185,6 +189,7 @@ class DummyConfigFile(ConfigFile):
             host="localhost",
             user="postgres",
             password="dummy_dev_password",
+            fallback_passwords=[],
         )
         self.slack = SlackConfig(
             bot_token="",
