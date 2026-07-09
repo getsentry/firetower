@@ -19,6 +19,10 @@ db = "firetower"
 host = "localhost"
 user = "postgres"
 password = "dummy_dev_password"
+# Optional: during a password rotation, list the other valid password(s) here.
+# If `password` is rejected with an auth error, each of these is tried in order.
+# Once the rotation is complete, move the new value into `password` and clear this.
+# fallback_passwords = ["<other-password>"]
 
 [slack]
 bot_token = ""

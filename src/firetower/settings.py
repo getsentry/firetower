@@ -187,11 +187,14 @@ WSGI_APPLICATION = "firetower.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        # Custom backend: extends the stock postgresql backend to retry auth
+        # with FALLBACK_PASSWORDS during a password rotation.
+        "ENGINE": "firetower.db_backend",
         "NAME": config.postgres.db,
         "HOST": config.postgres.host,
         "USER": config.postgres.user,
         "PASSWORD": config.postgres.password,
+        "FALLBACK_PASSWORDS": config.postgres.fallback_passwords,
         "CONN_HEALTH_CHECKS": True,
     },
 }
