@@ -5,10 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "cryptography>=48.0.0",
+    "cryptography>=48.0.1",
     "datadog==0.52.1",
     "datadog-api-client==2.54.0",
-    "django>=5.2.14,<6",
+    "django>=5.2.15,<6",
     "django-cors-headers>=4.9.0",
     "django-fernet-encrypted-fields>=0.3.1",
     "django-kubernetes>=1.1.0",
