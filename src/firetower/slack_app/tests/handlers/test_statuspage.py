@@ -7,6 +7,7 @@ import requests
 from firetower.incidents.models import ExternalLink, ExternalLinkType
 from firetower.slack_app.handlers.statuspage import (
     _build_statuspage_modal,
+    _extract_submission_data,
     handle_statuspage_command,
     handle_statuspage_reset_and_resolve,
     handle_statuspage_resolve_anyway,
@@ -132,6 +133,93 @@ class TestBuildStatuspageModal:
             b for b in modal["blocks"] if b.get("block_id") == "status_block"
         )
         assert status_block["element"]["initial_option"]["value"] == "monitoring"
+
+    def test_update_prefills_message_from_previous(self):
+        sp_incident = {
+            "name": "Issue",
+            "impact": "major",
+            "incident_updates": [
+                {
+                    "status": "identified",
+                    "body": "We found the root cause in the DB layer.",
+                    "created_at": "2024-01-02T00:00:00Z",
+                    "affected_components": [],
+                },
+                {
+                    "status": "investigating",
+                    "body": "Looking into reports of elevated errors.",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "affected_components": [],
+                },
+            ],
+        }
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+                statuspage_incident=sp_incident,
+            )
+
+        message_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "message_block"
+        )
+        assert (
+            message_block["element"]["initial_value"]
+            == "We found the root cause in the DB layer."
+        )
+
+        block_ids = [b.get("block_id") for b in modal["blocks"]]
+        assert "reuse_message_block" not in block_ids
+
+    def test_update_without_body_uses_placeholder(self):
+        sp_incident = {
+            "name": "Issue",
+            "impact": "major",
+            "incident_updates": [
+                {
+                    "status": "investigating",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "affected_components": [],
+                },
+            ],
+        }
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+                statuspage_incident=sp_incident,
+            )
+
+        message_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "message_block"
+        )
+        assert "initial_value" not in message_block["element"]
+        assert "placeholder" in message_block["element"]
+
+    def test_new_post_uses_placeholder(self):
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            MockService.return_value.configured = False
+            modal = _build_statuspage_modal(
+                channel_id=CHANNEL_ID,
+                incident_title="Test",
+                incident_severity="P1",
+            )
+
+        message_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "message_block"
+        )
+        assert "initial_value" not in message_block["element"]
+        assert "placeholder" in message_block["element"]
 
     def test_component_fetch_failure_shows_warning(self):
         with patch(
@@ -326,9 +414,10 @@ class TestStatuspageSubmission:
                         "selected_option": {"value": comp_status},
                     }
                 }
+        metadata = {"channel_id": channel_id}
         return {
             "state": {"values": values},
-            "private_metadata": channel_id,
+            "private_metadata": json.dumps(metadata),
         }
 
     def test_creates_new_statuspage_incident(self, incident):
@@ -524,7 +613,8 @@ class TestStatuspageSubmission:
             handle_statuspage_submission(ack, body, view, client)
 
         ack.assert_called_once()
-        assert "went wrong" in client.chat_postMessage.call_args[1]["text"]
+        assert "went wrong" in client.chat_postEphemeral.call_args[1]["text"]
+        assert client.chat_postEphemeral.call_args[1]["user"] == "U_SUBMITTER"
         assert not ExternalLink.objects.filter(
             incident=incident, type=ExternalLinkType.STATUSPAGE
         ).exists()
@@ -608,6 +698,52 @@ class TestStatuspageSubmission:
             response_action="errors",
             errors={"title_block": "Title is required."},
         )
+
+    def test_api_error_with_empty_user_id_skips_ephemeral(self, incident):
+        ack = MagicMock()
+        body = {}
+        view = self._make_view()
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.side_effect = requests.RequestException(
+                "API error"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        ack.assert_called_once()
+        client.chat_postEphemeral.assert_not_called()
+
+
+class TestExtractSubmissionData:
+    def test_null_message_value_returns_empty_string(self):
+        view = {
+            "state": {
+                "values": {
+                    "status_block": {
+                        "status_select": {
+                            "selected_option": {"value": "investigating"},
+                        }
+                    },
+                    "message_block": {
+                        "message_input": {"value": None},
+                    },
+                    "impact_block": {
+                        "impact_select": {
+                            "selected_option": {"value": "major"},
+                        }
+                    },
+                }
+            },
+            "private_metadata": json.dumps({"channel_id": "C123"}),
+        }
+        data = _extract_submission_data(view)
+        assert data["message"] == ""
 
 
 class TestStatuspageResetAndResolve:

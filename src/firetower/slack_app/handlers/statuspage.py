@@ -47,6 +47,7 @@ def _build_statuspage_modal(
 
     is_update = statuspage_incident is not None
     latest_status = "investigating"
+    latest_message = ""
     default_impact = SEVERITY_TO_IMPACT.get(incident_severity, "major")
     affected_components: dict[str, str] = {}
 
@@ -58,6 +59,7 @@ def _build_statuspage_modal(
         )
         if incident_updates:
             latest_status = incident_updates[0].get("status", "investigating")
+            latest_message = incident_updates[0].get("body", "")
             for update in incident_updates:
                 for component in update.get("affected_components") or []:
                     component_id = component.get("code", "")
@@ -122,19 +124,24 @@ def _build_statuspage_modal(
             }
         )
 
+    message_element: dict[str, Any] = {
+        "type": "plain_text_input",
+        "action_id": "message_input",
+        "multiline": True,
+    }
+    if is_update and latest_message:
+        message_element["initial_value"] = latest_message
+    else:
+        message_element["placeholder"] = {
+            "type": "plain_text",
+            "text": DEFAULT_MESSAGES.get(latest_status, ""),
+        }
+
     blocks.append(
         {
             "type": "input",
             "block_id": "message_block",
-            "element": {
-                "type": "plain_text_input",
-                "action_id": "message_input",
-                "multiline": True,
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": DEFAULT_MESSAGES.get(latest_status, ""),
-                },
-            },
+            "element": message_element,
             "label": {"type": "plain_text", "text": "Message"},
             "hint": {
                 "type": "plain_text",
@@ -251,10 +258,12 @@ def _build_statuspage_modal(
                         }
                     )
 
+    metadata = {"channel_id": channel_id}
+
     return {
         "type": "modal",
         "callback_id": "statuspage_modal",
-        "private_metadata": channel_id,
+        "private_metadata": json.dumps(metadata),
         "title": {
             "type": "plain_text",
             "text": "Update Statuspage" if is_update else "New Statuspage Post",
@@ -366,7 +375,12 @@ def handle_statuspage_command(
 
 def _extract_submission_data(view: dict) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
-    channel_id = view.get("private_metadata", "")
+    raw_metadata = view.get("private_metadata", "")
+    try:
+        metadata = json.loads(raw_metadata)
+        channel_id = metadata.get("channel_id", "")
+    except (json.JSONDecodeError, AttributeError):
+        channel_id = raw_metadata
 
     status = (
         values.get("status_block", {})
@@ -375,7 +389,9 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
         .get("value", "investigating")
     )
     title = values.get("title_block", {}).get("title_input", {}).get("value", "")
-    message = values.get("message_block", {}).get("message_input", {}).get("value", "")
+    message = (
+        values.get("message_block", {}).get("message_input", {}).get("value") or ""
+    )
     impact = (
         values.get("impact_block", {})
         .get("impact_select", {})
@@ -542,10 +558,12 @@ def _process_statuspage_submission(
                 )
     except Exception:
         logger.exception("Failed to create/update statuspage incident")
-        client.chat_postMessage(
-            channel=channel_id,
-            text="Something went wrong updating Statuspage. Please try again.",
-        )
+        if user_id:
+            client.chat_postEphemeral(
+                channel=channel_id,
+                user=user_id,
+                text="Something went wrong updating Statuspage. Please try again.",
+            )
         return False
 
     notify_channels = {channel_id}
@@ -586,18 +604,17 @@ def _process_statuspage_submission(
 def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) -> None:
     values = view.get("state", {}).get("values", {})
     errors: dict[str, str] = {}
-    message = values.get("message_block", {}).get("message_input", {}).get("value", "")
-    if not message:
-        errors["message_block"] = "Message is required."
     if "title_block" in values:
         title = values["title_block"].get("title_input", {}).get("value", "")
         if not title:
             errors["title_block"] = "Title is required."
+
+    data = _extract_submission_data(view)
+    if not data["message"]:
+        errors["message_block"] = "Message is required."
     if errors:
         ack(response_action="errors", errors=errors)
         return
-
-    data = _extract_submission_data(view)
 
     if data["status"] == "resolved":
         non_operational = [
@@ -626,8 +643,8 @@ def handle_statuspage_submission(ack: Any, body: dict, view: dict, client: Any) 
             return
 
     ack()
-    submitter_id = body.get("user", {}).get("id", "")
-    _process_statuspage_submission(data, client, user_id=submitter_id)
+    user_id = body.get("user", {}).get("id", "")
+    _process_statuspage_submission(data, client, user_id=user_id)
 
 
 def handle_component_impact_select(ack: Any, body: dict) -> None:
@@ -636,11 +653,11 @@ def handle_component_impact_select(ack: Any, body: dict) -> None:
 
 def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> None:
     ack()
+    user_id = body.get("user", {}).get("id", "")
     view = body.get("view", {})
     data = json.loads(view.get("private_metadata", "{}"))
     data["components"] = dict.fromkeys(data.get("components", {}), "operational")
-    submitter_id = body.get("user", {}).get("id", "")
-    success = _process_statuspage_submission(data, client, user_id=submitter_id)
+    success = _process_statuspage_submission(data, client, user_id=user_id)
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
     if success:
@@ -666,10 +683,10 @@ def handle_statuspage_reset_and_resolve(ack: Any, body: dict, client: Any) -> No
 
 def handle_statuspage_resolve_anyway(ack: Any, body: dict, client: Any) -> None:
     ack()
+    user_id = body.get("user", {}).get("id", "")
     view = body.get("view", {})
     data = json.loads(view.get("private_metadata", "{}"))
-    submitter_id = body.get("user", {}).get("id", "")
-    success = _process_statuspage_submission(data, client, user_id=submitter_id)
+    success = _process_statuspage_submission(data, client, user_id=user_id)
     from firetower.slack_app.bolt import get_bolt_app  # noqa: PLC0415
 
     if success:
