@@ -86,7 +86,10 @@ SERVICE_REGISTRY_URL = config.service_registry_url
 SECRET_KEY = config.django_secret_key
 
 # Used by django-fernet-encrypted-fields to encrypt sensitive DB fields (e.g. OAuth tokens).
-SALT_KEY = config.salt_key
+# `salt_keys` (plural) takes precedence when set: values are encrypted with the first
+# key and can be decrypted with any of them, which supports key rotation. Otherwise the
+# single `salt_key` is used.
+SALT_KEY = config.salt_keys if config.salt_keys else config.salt_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_is_dev()

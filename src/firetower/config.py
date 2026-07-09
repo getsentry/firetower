@@ -136,6 +136,9 @@ class ConfigFile:
     salt_key: str
     sentry_dsn: str
     service_registry_url: str | None = None
+    # When non-empty, `salt_keys` overrides `salt_key`. Used for key rotation:
+    # values are encrypted with the first key and can be decrypted with any.
+    salt_keys: list[str] = field(default_factory=list)
     notion: NotionConfig | None = None
     genai: GenAIConfig | None = None
     log_level: str = "INFO"
@@ -207,6 +210,7 @@ class DummyConfigFile(ConfigFile):
         self.firetower_base_url = ""
         self.django_secret_key = "dummy_value_DO_NOT_USE"
         self.salt_key = ""
+        self.salt_keys = []
         self.sentry_dsn = ""
         self.service_registry_url = None
         self.region_grouping: list[list[str]] = []
