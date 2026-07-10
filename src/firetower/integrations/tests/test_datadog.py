@@ -63,7 +63,7 @@ class TestCreateNotebook:
         assert body.data.attributes.name == "[INC-100] Database is on fire"
         cells = body.data.attributes.cells
         assert len(cells) == 1
-        assert cells[0].attributes.definition.text == "# [INC-100] Database is on fire"
+        assert cells[0].attributes.definition.text == "---"
         assert str(body.data.attributes.time.live_span) == "1h"
 
     def test_create_notebook_truncates_long_title(self):
@@ -86,7 +86,7 @@ class TestCreateNotebook:
         assert name.startswith("[INC-2000] ")
         assert name.endswith("...")
         cells = body.data.attributes.cells
-        assert cells[0].attributes.definition.text == f"# [INC-2000] {long_title}"
+        assert cells[0].attributes.definition.text == "---"
 
     def test_create_notebook_short_title_not_truncated(self):
         with _patch_dd_env():

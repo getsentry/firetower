@@ -80,7 +80,7 @@ class DatadogService:
                 header_cell = NotebookCellCreateRequest(
                     attributes=NotebookMarkdownCellAttributes(
                         definition=NotebookMarkdownCellDefinition(
-                            text=f"# [{incident_number}] {title}",
+                            text="---",
                             type=NotebookMarkdownCellDefinitionType.MARKDOWN,
                         ),
                     ),
