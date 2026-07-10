@@ -61,7 +61,9 @@ class TestCreateNotebook:
         mock_api.create_notebook.assert_called_once()
         body = mock_api.create_notebook.call_args[1]["body"]
         assert body.data.attributes.name == "[INC-100] Database is on fire"
-        assert body.data.attributes.cells == []
+        cells = body.data.attributes.cells
+        assert len(cells) == 1
+        assert cells[0].attributes.definition.text == "---"
         assert str(body.data.attributes.time.live_span) == "1h"
 
     def test_create_notebook_truncates_long_title(self):
@@ -83,6 +85,8 @@ class TestCreateNotebook:
         assert len(name) == 80
         assert name.startswith("[INC-2000] ")
         assert name.endswith("...")
+        cells = body.data.attributes.cells
+        assert cells[0].attributes.definition.text == "---"
 
     def test_create_notebook_short_title_not_truncated(self):
         with _patch_dd_env():
