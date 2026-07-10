@@ -52,6 +52,34 @@ class PagerDutyService:
             )
             return False
 
+    def resolve_incident(self, dedup_key: str, integration_key: str) -> bool:
+        """Resolve a PagerDuty alert by re-sending its (routing_key, dedup_key).
+
+        PagerDuty groups Events API v2 alerts by (routing_key, dedup_key), so a
+        resolve for an unknown or already-resolved key is a harmless 202 no-op.
+        This lets us resolve without any REST lookup or stored PD alert id.
+        """
+        payload: dict = {
+            "routing_key": integration_key,
+            "event_action": "resolve",
+            "dedup_key": dedup_key,
+        }
+
+        try:
+            resp = requests.post(EVENTS_API_URL, json=payload, timeout=10)
+            resp.raise_for_status()
+            logger.info(
+                "Resolved PagerDuty incident",
+                extra={"dedup_key": dedup_key},
+            )
+            return True
+        except requests.RequestException:
+            logger.exception(
+                "Failed to resolve PagerDuty incident",
+                extra={"dedup_key": dedup_key},
+            )
+            return False
+
     def get_oncall_users(self, escalation_policy_id: str) -> list[dict]:
         headers = {
             "Authorization": f"Token token={self.api_token}",

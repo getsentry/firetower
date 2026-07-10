@@ -29,6 +29,7 @@ from firetower.incidents.hooks import (
     on_title_changed,
     on_visibility_changed,
     page_for_channel,
+    resolve_pages_for_incident,
     schedule_statuspage_followup_reminder,
 )
 from firetower.incidents.models import (
@@ -797,6 +798,102 @@ MOCK_PD_CONFIG = {
         },
     },
 }
+
+
+@pytest.mark.django_db
+class TestResolvePagesForIncident:
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_resolves_both_policies(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+
+        incident = Incident.objects.create(
+            title="Major outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        resolve_pages_for_incident(incident)
+
+        assert mock_pd.resolve_incident.call_count == 2
+        imoc_call, pe_call = mock_pd.resolve_incident.call_args_list
+        assert imoc_call == (
+            (f"firetower-{incident.incident_number}-IMOC", "imoc-integration-key"),
+        )
+        assert pe_call == (
+            (
+                f"firetower-{incident.incident_number}-PROD_ENG",
+                "prod-eng-integration-key",
+            ),
+        )
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_resolves_regardless_of_severity(self, mock_pd_cls, settings):
+        # We do not know which policies actually paged, so resolve is
+        # unconditional and relies on PD treating unknown keys as a no-op.
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+
+        incident = Incident.objects.create(
+            title="Minor blip",
+            severity=IncidentSeverity.P3,
+        )
+
+        resolve_pages_for_incident(incident)
+
+        assert mock_pd.resolve_incident.call_count == 2
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_noop_when_pagerduty_unconfigured(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = None
+
+        incident = Incident.objects.create(
+            title="Outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        resolve_pages_for_incident(incident)
+
+        mock_pd_cls.assert_not_called()
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_skips_policies_without_integration_key(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = {
+            "API_TOKEN": "test-token",
+            "ESCALATION_POLICIES": {
+                "IMOC": {"id": "PIMOC01", "integration_key": "imoc-integration-key"},
+                "PROD_ENG": {"id": "PPE001"},
+            },
+        }
+        mock_pd = mock_pd_cls.return_value
+
+        incident = Incident.objects.create(
+            title="Outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        resolve_pages_for_incident(incident)
+
+        assert mock_pd.resolve_incident.call_count == 1
+        (call,) = mock_pd.resolve_incident.call_args_list
+        assert call == (
+            (f"firetower-{incident.incident_number}-IMOC", "imoc-integration-key"),
+        )
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_pd_failure_does_not_raise(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.resolve_incident.side_effect = Exception("boom")
+
+        incident = Incident.objects.create(
+            title="Outage",
+            severity=IncidentSeverity.P0,
+        )
+
+        # Should swallow per-policy errors and keep going.
+        resolve_pages_for_incident(incident)
+
+        assert mock_pd.resolve_incident.call_count == 2
 
 
 @pytest.mark.django_db
@@ -3489,6 +3586,98 @@ class TestOnIncidentUpdated:
         on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
 
         mock_dump_async.assert_called_once_with(mock_client, "C12345", incident)
+
+    @patch("firetower.incidents.hooks.resolve_pages_for_incident")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_resolves_pages_on_active_to_mitigated(self, mock_slack, mock_resolve):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        mock_resolve.assert_called_once_with(incident)
+
+    @patch("firetower.incidents.hooks.resolve_pages_for_incident")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_resolves_pages_on_active_to_canceled(self, mock_slack, mock_resolve):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.CANCELED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        mock_resolve.assert_called_once_with(incident)
+
+    @patch("firetower.incidents.hooks.resolve_pages_for_incident")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_resolve_pages_on_no_status_change(self, mock_slack, mock_resolve):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_title="Old title")
+
+        mock_resolve.assert_not_called()
+
+    @patch("firetower.incidents.hooks.resolve_pages_for_incident")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_resolve_pages_on_reopen(self, mock_slack, mock_resolve):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
+
+        mock_resolve.assert_not_called()
+
+    @patch("firetower.incidents.hooks.resolve_pages_for_incident")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_resolve_pages_from_terminal_status(
+        self, mock_slack, mock_resolve
+    ):
+        # Postmortem is not an active status, so a later transition to Done
+        # should not re-resolve (pages were already resolved at mitigation).
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.POSTMORTEM)
+
+        mock_resolve.assert_not_called()
+
+    @patch("firetower.incidents.hooks.resolve_pages_for_incident")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_re_resolves_pages_on_mitigated_to_postmortem(
+        self, mock_slack, mock_resolve
+    ):
+        # Mitigated is still an active status, so a transition to a terminal
+        # state re-resolves. This is a harmless idempotent 202 no-op.
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.POSTMORTEM)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
+
+        mock_resolve.assert_called_once_with(incident)
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_resolve_failure_does_not_break_update(self, mock_slack, mock_pd_cls):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_pd_cls.side_effect = Exception("pd down")
+
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        # Must not raise even if PagerDuty resolve blows up.
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
 
     @patch("firetower.incidents.hooks.schedule_statuspage_followup_reminder")
     @patch("firetower.incidents.hooks._schedule_statuspage_reminder")
