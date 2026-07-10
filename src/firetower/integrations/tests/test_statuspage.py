@@ -199,6 +199,69 @@ class TestStatuspageServiceCreateIncident:
             assert payload["incident"]["component_ids"] == ["comp1"]
             assert payload["incident"]["components"] == {"comp1": "major_outage"}
 
+    def test_create_incident_filters_operational_from_component_ids(self):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "new789"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
+            service = StatuspageService()
+
+        with patch(
+            "firetower.integrations.services.statuspage.requests.post",
+            return_value=mock_response,
+        ) as mock_post:
+            service.create_incident(
+                title="Partial Outage",
+                status="investigating",
+                message="Some components affected",
+                components={
+                    "comp1": "major_outage",
+                    "comp2": "operational",
+                    "comp3": "degraded_performance",
+                },
+            )
+
+            payload = mock_post.call_args[1]["json"]
+            assert sorted(payload["incident"]["component_ids"]) == [
+                "comp1",
+                "comp3",
+            ]
+            assert payload["incident"]["components"] == {
+                "comp1": "major_outage",
+                "comp2": "operational",
+                "comp3": "degraded_performance",
+            }
+
+    def test_create_incident_all_operational_components(self):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "new999"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
+            service = StatuspageService()
+
+        with patch(
+            "firetower.integrations.services.statuspage.requests.post",
+            return_value=mock_response,
+        ) as mock_post:
+            service.create_incident(
+                title="Recovery",
+                status="resolved",
+                message="All clear",
+                components={
+                    "comp1": "operational",
+                    "comp2": "operational",
+                },
+            )
+
+            payload = mock_post.call_args[1]["json"]
+            assert payload["incident"]["component_ids"] == []
+            assert payload["incident"]["components"] == {
+                "comp1": "operational",
+                "comp2": "operational",
+            }
+
     def test_create_incident_raises_on_error(self):
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = Exception("API error")
@@ -261,6 +324,38 @@ class TestStatuspageServiceUpdateIncident:
             assert payload["incident"]["component_ids"] == ["comp1"]
             assert payload["incident"]["components"] == {
                 "comp1": "degraded_performance"
+            }
+
+    def test_update_incident_filters_operational_from_component_ids(self):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "inc123"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
+            service = StatuspageService()
+
+        with patch(
+            "firetower.integrations.services.statuspage.requests.patch",
+            return_value=mock_response,
+        ) as mock_patch:
+            service.update_incident(
+                incident_id="inc123",
+                components={
+                    "comp1": "degraded_performance",
+                    "comp2": "operational",
+                    "comp3": "partial_outage",
+                },
+            )
+
+            payload = mock_patch.call_args[1]["json"]
+            assert sorted(payload["incident"]["component_ids"]) == [
+                "comp1",
+                "comp3",
+            ]
+            assert payload["incident"]["components"] == {
+                "comp1": "degraded_performance",
+                "comp2": "operational",
+                "comp3": "partial_outage",
             }
 
     def test_update_incident_minimal(self):

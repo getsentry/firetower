@@ -134,7 +134,13 @@ class StatuspageService:
         if components:
             # component_ids and components must be in the same payload or Statuspage
             # treats them as separate actions and suppresses one webhook.
-            payload["incident"]["component_ids"] = list(components.keys())
+            # Only list non-operational components in component_ids so the
+            # incident page shows affected components, but send all statuses
+            # in components so resets to operational are still applied.
+            affected_ids = [
+                cid for cid, status in components.items() if status != "operational"
+            ]
+            payload["incident"]["component_ids"] = affected_ids
             payload["incident"]["components"] = components
 
         response = requests.post(
@@ -167,7 +173,13 @@ class StatuspageService:
         if components:
             # component_ids and components must be in the same payload or Statuspage
             # treats them as separate actions and suppresses one webhook.
-            incident_data["component_ids"] = list(components.keys())
+            # Only list non-operational components in component_ids so the
+            # incident page shows affected components, but send all statuses
+            # in components so resets to operational are still applied.
+            affected_ids = [
+                cid for cid, status in components.items() if status != "operational"
+            ]
+            incident_data["component_ids"] = affected_ids
             incident_data["components"] = components
 
         payload = {"incident": incident_data}
