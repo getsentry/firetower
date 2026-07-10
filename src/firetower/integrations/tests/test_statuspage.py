@@ -196,6 +196,7 @@ class TestStatuspageServiceCreateIncident:
 
             payload = mock_post.call_args[1]["json"]
             assert payload["incident"]["impact"] == "critical"
+            assert payload["incident"]["component_ids"] == ["comp1"]
             assert payload["incident"]["components"] == {"comp1": "major_outage"}
 
     def test_create_incident_raises_on_error(self):
@@ -257,6 +258,7 @@ class TestStatuspageServiceUpdateIncident:
             )
 
             payload = mock_patch.call_args[1]["json"]
+            assert payload["incident"]["component_ids"] == ["comp1"]
             assert payload["incident"]["components"] == {
                 "comp1": "degraded_performance"
             }
@@ -278,6 +280,7 @@ class TestStatuspageServiceUpdateIncident:
             payload = mock_patch.call_args[1]["json"]
             assert "status" not in payload["incident"]
             assert "body" not in payload["incident"]
+            assert "component_ids" not in payload["incident"]
             assert "components" not in payload["incident"]
             assert payload["incident"]["deliver_notifications"] is True
 

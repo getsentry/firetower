@@ -132,6 +132,9 @@ class StatuspageService:
             }
         }
         if components:
+            # component_ids and components must be in the same payload or Statuspage
+            # treats them as separate actions and suppresses one webhook.
+            payload["incident"]["component_ids"] = list(components.keys())
             payload["incident"]["components"] = components
 
         response = requests.post(
@@ -162,6 +165,9 @@ class StatuspageService:
         if message:
             incident_data["body"] = message
         if components:
+            # component_ids and components must be in the same payload or Statuspage
+            # treats them as separate actions and suppresses one webhook.
+            incident_data["component_ids"] = list(components.keys())
             incident_data["components"] = components
 
         payload = {"incident": incident_data}
