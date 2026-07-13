@@ -6,6 +6,7 @@ and retrieve user profile information (name, avatar).
 """
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 from urllib.parse import urlparse
 
@@ -61,9 +62,24 @@ class SlackService:
         )
 
         self.client = WebClient(token=self.bot_token) if self.bot_token else None
+        self._bot_id: str | None = None
 
         if self.client is None:
             logger.warning("Slack client not initialized - missing bot token")
+
+    @property
+    def bot_id(self) -> str | None:
+        if self._bot_id is not None:
+            return self._bot_id
+        if not self.client:
+            return None
+        try:
+            response = self.client.auth_test()
+            self._bot_id = response.get("bot_id")
+            return self._bot_id
+        except SlackApiError as e:
+            logger.error(f"Error fetching bot identity: {e}")
+            return None
 
     def get_user_profile_by_email(self, email: str) -> dict | None:
         """
@@ -347,6 +363,21 @@ class SlackService:
                 )
             return False
 
+    def delete_message(self, channel_id: str, message_ts: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot delete message - Slack client not initialized")
+            return False
+
+        try:
+            self.client.chat_delete(channel=channel_id, ts=message_ts)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error deleting message: {e}",
+                extra={"channel_id": channel_id, "ts": message_ts},
+            )
+            return False
+
     def add_bookmark(self, channel_id: str, title: str, link: str) -> bool:
         if not self.client:
             logger.warning("Cannot add bookmark - Slack client not initialized")
@@ -465,11 +496,10 @@ class SlackService:
             )
             return None
 
-    def get_channel_history(self, channel_id: str) -> list[dict[str, Any]]:
-        """Return all messages from a channel, paginating automatically."""
+    def iter_channel_history(self, channel_id: str) -> Iterator[list[dict[str, Any]]]:
+        """Yield pages of messages from a channel, paginating automatically."""
         if not self.client:
-            return []
-        messages: list[dict[str, Any]] = []
+            return
         cursor: str | None = None
         while True:
             kwargs: dict[str, Any] = {"channel": channel_id, "limit": 999}
@@ -479,18 +509,56 @@ class SlackService:
                 response = self.client.conversations_history(**kwargs)
             except Exception:
                 logger.exception("Failed to fetch history for channel %s", channel_id)
-                break
+                raise
             if not response.get("ok"):
-                logger.error(
-                    "conversations_history returned not-ok for channel %s", channel_id
+                raise RuntimeError(
+                    f"conversations_history returned not-ok for channel {channel_id}"
                 )
-                break
-            messages.extend(response.get("messages", []))
+            page: list[dict[str, Any]] = response.get("messages", [])
+            if page:
+                yield page
             metadata: dict[str, Any] = response.get("response_metadata") or {}
             cursor = metadata.get("next_cursor") or None
             if not response.get("has_more") or not cursor:
                 break
+
+    def get_channel_history(
+        self, channel_id: str, limit: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Return messages from a channel. When *limit* is set, fetch at most
+        that many messages in a single API call (no pagination). When *limit*
+        is ``None``, paginate to retrieve all messages."""
+        if not self.client:
+            return []
+        if limit is not None:
+            response = self.client.conversations_history(
+                channel=channel_id, limit=limit
+            )
+            if not response.get("ok"):
+                raise RuntimeError(
+                    f"conversations_history returned not-ok for channel {channel_id}"
+                )
+            return response.get("messages", [])
+        messages: list[dict[str, Any]] = []
+        for page in self.iter_channel_history(channel_id):
+            messages.extend(page)
         return messages
+
+    def archive_channel(self, channel_id: str) -> bool:
+        if not self.client:
+            logger.warning("Cannot archive channel - Slack client not initialized")
+            return False
+
+        try:
+            logger.info(f"Archiving channel {channel_id}")
+            self.client.conversations_archive(channel=channel_id)
+            return True
+        except SlackApiError as e:
+            logger.error(
+                f"Error archiving channel: {e}",
+                extra={"channel_id": channel_id},
+            )
+            return False
 
     def get_thread_replies(
         self, channel_id: str, thread_ts: str
@@ -512,12 +580,11 @@ class SlackService:
                 response = self.client.conversations_replies(**kwargs)
             except Exception:
                 logger.exception("Failed to fetch replies for thread %s", thread_ts)
-                break
+                raise
             if not response.get("ok"):
-                logger.error(
-                    "conversations_replies returned not-ok for thread %s", thread_ts
+                raise RuntimeError(
+                    f"conversations_replies returned not-ok for thread {thread_ts}"
                 )
-                break
             raw_messages: list[dict[str, Any]] = response.get("messages") or []
             replies.extend(
                 msg_dict
