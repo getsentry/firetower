@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from datetime import timedelta
 from typing import Any
@@ -32,6 +33,7 @@ TOKEN_REFRESH_BUFFER = timedelta(days=1)
 LINEAR_RETRYABLE_STATUS_CODES = frozenset({502, 503, 504})
 LINEAR_DEFAULT_MAX_RETRIES = 3
 LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS = 1.0
+LINEAR_DEFAULT_TIMEOUT_SECONDS = 30
 
 ISSUE_FIELDS = """
     id
@@ -49,19 +51,63 @@ ISSUE_FIELDS = """
 """
 
 
+class LinearError(Exception):
+    """Raised when a Linear API call fails outright.
+
+    A "failure" means the call could not be completed successfully: a transport
+    error, a non-OK HTTP response, a GraphQL ``errors`` payload, or a missing /
+    invalid access token. It is distinct from a call that *succeeds* but returns
+    an empty or absent result (e.g. an issue that genuinely does not exist),
+    which callers observe as ``None``.
+    """
+
+
+def parse_project_number(identifier: str) -> int | None:
+    """Return the integer N when ``identifier`` is exactly
+    ``f"{settings.PROJECT_KEY}-<digits>"`` (e.g. ``"INC-2353"`` -> ``2353``),
+    otherwise ``None`` (e.g. ``"PRODENG-1404"`` or ``"INC-abc"``).
+    """
+    match = re.fullmatch(rf"{re.escape(settings.PROJECT_KEY)}-(\d+)", identifier)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
 class LinearService:
-    def __init__(self) -> None:
+    def __init__(
+        self, *, timeout: int | None = None, max_retries: int | None = None
+    ) -> None:
         assert settings.LINEAR is not None
         self.client_id = settings.LINEAR.get("CLIENT_ID")
         self.client_secret = settings.LINEAR.get("CLIENT_SECRET")
         self.api_key = settings.LINEAR.get("API_KEY")
-        self.max_retries: int = max(
-            1, settings.LINEAR.get("MAX_RETRIES", LINEAR_DEFAULT_MAX_RETRIES)
+        configured_max_retries = (
+            max_retries
+            if max_retries is not None
+            else settings.LINEAR.get("MAX_RETRIES", LINEAR_DEFAULT_MAX_RETRIES)
         )
+        self.max_retries: int = max(1, configured_max_retries)
         self.retry_backoff_seconds: float = settings.LINEAR.get(
             "RETRY_BACKOFF_SECONDS", LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS
         )
+        self.timeout: int = (
+            timeout if timeout is not None else LINEAR_DEFAULT_TIMEOUT_SECONDS
+        )
         self._workflow_states_cache: dict[str, str] | None = None
+
+    @classmethod
+    def for_allocation(cls) -> "LinearService":
+        """Construct a service with the tight timeout/retry budget used by the
+        incident allocation path.
+
+        The allocator calls Linear while holding a DB lock, so it uses a bounded
+        timeout and fewer retries than the default budget to ensure a hung or
+        slow Linear can't hold the lock for the full default duration.
+        """
+        return cls(
+            timeout=settings.INCIDENT_ALLOC_LINEAR_TIMEOUT,
+            max_retries=settings.INCIDENT_ALLOC_LINEAR_RETRIES,
+        )
 
     def _request_new_token(self) -> str | None:
         try:
@@ -74,7 +120,7 @@ class LinearService:
                     "scope": "read,write",
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
-                timeout=30,
+                timeout=self.timeout,
             )
             response.raise_for_status()
             data = response.json()
@@ -125,19 +171,35 @@ class LinearService:
                 "Authorization": auth_value,
                 "Content-Type": "application/json",
             },
-            timeout=30,
+            timeout=self.timeout,
         )
+
+    def _raise_if_requested(self, message: str, *, raise_on_error: bool) -> None:
+        """Raise ``LinearError`` when the caller opted in, otherwise do nothing.
+
+        Lets a failed Linear call fall back to the historical ``None`` return
+        while allowing opt-in callers to distinguish a failure from a genuine
+        empty result.
+        """
+        if raise_on_error:
+            raise LinearError(message)
 
     def _graphql(
         self,
         query: str,
         variables: dict | None = None,
         retryable: bool = True,
+        *,
+        raise_on_error: bool = False,
     ) -> dict | None:
         access_token = self._get_access_token()
         if not access_token:
             logger.warning(
                 "Cannot make Linear API call - no valid access token available"
+            )
+            self._raise_if_requested(
+                "No valid Linear access token available",
+                raise_on_error=raise_on_error,
             )
             return None
 
@@ -153,11 +215,19 @@ class LinearService:
                         logger.error(
                             "Linear API returned 401 with api_key — key is invalid or expired"
                         )
+                        self._raise_if_requested(
+                            "Linear API returned 401 — api_key is invalid or expired",
+                            raise_on_error=raise_on_error,
+                        )
                         return None
 
                     logger.info("Linear token expired, requesting new token")
                     access_token = self._request_new_token()
                     if not access_token:
+                        self._raise_if_requested(
+                            "Linear token refresh failed after 401",
+                            raise_on_error=raise_on_error,
+                        )
                         return None
 
                     response = self._make_graphql_request(
@@ -177,6 +247,10 @@ class LinearService:
                         response.status_code,
                         response.text,
                     )
+                    self._raise_if_requested(
+                        f"Linear API returned HTTP {response.status_code}",
+                        raise_on_error=raise_on_error,
+                    )
                     return None
 
                 data = response.json()
@@ -186,16 +260,39 @@ class LinearService:
                         "Linear GraphQL errors",
                         extra={"errors": data["errors"]},
                     )
+                    self._raise_if_requested(
+                        "Linear GraphQL response contained errors",
+                        raise_on_error=raise_on_error,
+                    )
                     return None
 
-                return data.get("data")
+                result = data.get("data")
+                if result is None:
+                    # A 200 OK carrying a null/absent top-level "data" with no
+                    # "errors" key is an anomalous/failed response, not a genuine
+                    # empty result. Treat it as a failure so raise_on_error
+                    # callers don't mistake it for "not found". Default callers
+                    # still get None (unchanged behavior).
+                    logger.error("Linear API returned no top-level data")
+                    self._raise_if_requested(
+                        "Linear API returned no data",
+                        raise_on_error=raise_on_error,
+                    )
+                    return None
+                return result
             except requests.RequestException:
                 if not is_last_attempt:
                     self._sleep_before_retry(attempt)
                     continue
                 logger.exception("Linear API request failed")
+                self._raise_if_requested(
+                    "Linear API request failed", raise_on_error=raise_on_error
+                )
                 return None
 
+        self._raise_if_requested(
+            "Linear API call failed", raise_on_error=raise_on_error
+        )
         return None
 
     def _sleep_before_retry(self, attempt: int) -> None:
@@ -219,7 +316,18 @@ class LinearService:
             "relation_type": relation_type,
         }
 
-    def get_issue(self, issue_id: str) -> dict[str, Any] | None:
+    def get_issue(
+        self, issue_id: str, *, raise_on_error: bool = False
+    ) -> dict[str, Any] | None:
+        """Fetch a Linear issue by id.
+
+        By default (``raise_on_error=False``) any failure -- including the call
+        failing outright -- is reported as ``None``, matching historical
+        behavior. When ``raise_on_error=True``, ``None`` is returned *only* when
+        the call succeeded and the issue is genuinely absent; a failed call
+        raises :class:`LinearError` so callers can distinguish "not found" from
+        "could not tell".
+        """
         query = f"""
         query($id: String!) {{
             issue(id: $id) {{
@@ -227,7 +335,7 @@ class LinearService:
             }}
         }}
         """
-        data = self._graphql(query, {"id": issue_id})
+        data = self._graphql(query, {"id": issue_id}, raise_on_error=raise_on_error)
         if not data or not data.get("issue"):
             return None
         issue = data["issue"]

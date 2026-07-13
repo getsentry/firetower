@@ -81,6 +81,8 @@ class LinearConfig:
     project_id: str = ""
     sync_identifiers: bool = False
     api_key: str = ""
+    alloc_timeout_seconds: int = 8
+    alloc_max_retries: int = 1
     action_item_slo_days_high_priority: int = 14
     action_item_slo_days_medium_priority: int = 30
     action_item_nag_comment_high_priority: str = (

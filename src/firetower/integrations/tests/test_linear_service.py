@@ -8,8 +8,11 @@ from django.utils import timezone
 from firetower.integrations.services.linear import (
     LINEAR_DEFAULT_MAX_RETRIES,
     LINEAR_DEFAULT_RETRY_BACKOFF_SECONDS,
+    LINEAR_DEFAULT_TIMEOUT_SECONDS,
     LINEAR_TOKEN_URL,
+    LinearError,
     LinearService,
+    parse_project_number,
 )
 
 
@@ -439,6 +442,274 @@ class TestGraphql:
 
         assert svc.max_retries == 1
 
+    def test_uses_default_timeout(self, linear_service):
+        assert linear_service.timeout == LINEAR_DEFAULT_TIMEOUT_SECONDS
+
+    def test_raises_linear_error_when_no_access_token(self, linear_service):
+        with patch.object(linear_service, "_get_access_token", return_value=None):
+            with pytest.raises(LinearError):
+                linear_service._graphql("query { viewer { id } }", raise_on_error=True)
+
+    def test_raises_linear_error_on_non_ok_response(self, linear_service):
+        error_response = MagicMock()
+        error_response.status_code = 500
+        error_response.ok = False
+        error_response.text = "Internal Server Error"
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=error_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service._graphql("query { viewer { id } }", raise_on_error=True)
+
+    def test_raises_linear_error_on_graphql_errors(self, linear_service):
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "errors": [{"message": "some error"}],
+            "data": None,
+        }
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service._graphql("query { viewer { id } }", raise_on_error=True)
+
+    def test_raises_linear_error_on_request_exception(self, linear_service):
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service,
+                "_make_graphql_request",
+                side_effect=requests.ConnectionError("connection reset"),
+            ),
+            patch.object(linear_service, "_sleep_before_retry"),
+        ):
+            with pytest.raises(LinearError):
+                linear_service._graphql("query { viewer { id } }", raise_on_error=True)
+
+    def test_raises_linear_error_on_401_with_api_key(self, linear_service):
+        linear_service.api_key = "lin_api_test"
+        unauthorized_response = MagicMock()
+        unauthorized_response.status_code = 401
+        unauthorized_response.ok = False
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="lin_api_test"
+            ),
+            patch.object(
+                linear_service,
+                "_make_graphql_request",
+                return_value=unauthorized_response,
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service._graphql("query { viewer { id } }", raise_on_error=True)
+
+    def test_returns_data_when_result_absent_with_raise_on_error(self, linear_service):
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": {"issue": None}}
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            result = linear_service._graphql(
+                "query { issue { id } }", raise_on_error=True
+            )
+
+        assert result == {"issue": None}
+
+    def test_raises_linear_error_when_top_level_data_null(self, linear_service):
+        # 200 OK with a null top-level "data" and no "errors" is anomalous, not
+        # a genuine empty result; raise_on_error callers must not mistake it
+        # for "not found".
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": None}
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service._graphql("query { issue { id } }", raise_on_error=True)
+
+    def test_returns_none_when_top_level_data_null_without_raise(self, linear_service):
+        # Default behavior unchanged: null top-level data still returns None.
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": None}
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            result = linear_service._graphql("query { issue { id } }")
+
+        assert result is None
+
+    def test_raises_linear_error_when_data_key_missing(self, linear_service):
+        # Same anomaly when the "data" key is omitted entirely.
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {}
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service._graphql("query { issue { id } }", raise_on_error=True)
+
+
+class TestLinearBudget:
+    def test_for_allocation_uses_settings_budget(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {"CLIENT_ID": "id", "CLIENT_SECRET": "secret"}
+            mock_settings.INCIDENT_ALLOC_LINEAR_TIMEOUT = 8
+            mock_settings.INCIDENT_ALLOC_LINEAR_RETRIES = 1
+            svc = LinearService.for_allocation()
+
+        assert svc.timeout == 8
+        assert svc.max_retries == 1
+
+    def test_constructor_overrides_timeout_and_retries(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "id",
+                "CLIENT_SECRET": "secret",
+                "MAX_RETRIES": 5,
+            }
+            svc = LinearService(timeout=8, max_retries=1)
+
+        assert svc.timeout == 8
+        assert svc.max_retries == 1
+
+    def test_tight_timeout_is_plumbed_into_request(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {"CLIENT_ID": "id", "CLIENT_SECRET": "secret"}
+            svc = LinearService(timeout=8, max_retries=1)
+
+        with patch("firetower.integrations.services.linear.requests.post") as mock_post:
+            svc._make_graphql_request("query { viewer { id } }", None, "tok")
+
+        _, kwargs = mock_post.call_args
+        assert kwargs["timeout"] == 8
+
+    @patch("firetower.integrations.services.linear.LinearOAuthToken")
+    def test_tight_timeout_is_plumbed_into_token_request(self, mock_token_model):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {"CLIENT_ID": "id", "CLIENT_SECRET": "secret"}
+            svc = LinearService(timeout=8, max_retries=1)
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "access_token": "new-access-token",
+            "expires_in": 3600,
+        }
+
+        with patch("firetower.integrations.services.linear.requests.post") as mock_post:
+            mock_post.return_value = mock_response
+            svc._request_new_token()
+
+        _, kwargs = mock_post.call_args
+        assert kwargs["timeout"] == 8
+
+    def test_tight_retries_limit_attempts(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {"CLIENT_ID": "id", "CLIENT_SECRET": "secret"}
+            svc = LinearService(timeout=8, max_retries=1)
+
+        transient_response = MagicMock()
+        transient_response.status_code = 502
+        transient_response.ok = False
+        transient_response.text = "Bad Gateway"
+
+        with (
+            patch.object(svc, "_get_access_token", return_value="valid-token"),
+            patch.object(
+                svc, "_make_graphql_request", return_value=transient_response
+            ) as mock_request,
+            patch.object(svc, "_sleep_before_retry") as mock_sleep,
+        ):
+            result = svc._graphql("query { viewer { id } }")
+
+        assert result is None
+        assert mock_request.call_count == 1
+        mock_sleep.assert_not_called()
+
+
+class TestParseProjectNumber:
+    @pytest.mark.parametrize(
+        "identifier,expected",
+        [
+            ("INC-2353", 2353),
+            ("INC-1", 1),
+            ("INC-0", 0),
+        ],
+    )
+    def test_matches_project_key(self, identifier, expected):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.PROJECT_KEY = "INC"
+            assert parse_project_number(identifier) == expected
+
+    @pytest.mark.parametrize(
+        "identifier",
+        [
+            "PRODENG-1404",
+            "INC-abc",
+            "INC-12a",
+            "INC-",
+            "INC",
+            "",
+            "inc-2353",
+            " INC-1",
+            "INC-1 ",
+            "XINC-1",
+        ],
+    )
+    def test_returns_none_for_non_matches(self, identifier):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.PROJECT_KEY = "INC"
+            assert parse_project_number(identifier) is None
+
 
 class TestParseIssue:
     def test_parses_full_issue(self, linear_service):
@@ -624,3 +895,52 @@ class TestGetIssue:
             result = linear_service.get_issue("nonexistent")
 
         assert result is None
+
+    def test_returns_none_when_issue_null_even_with_raise_on_error(
+        self, linear_service
+    ):
+        mock_response = {"issue": None}
+
+        with patch.object(
+            linear_service, "_graphql", return_value=mock_response
+        ) as mock_gql:
+            result = linear_service.get_issue("nonexistent", raise_on_error=True)
+
+        assert result is None
+        assert mock_gql.call_args.kwargs["raise_on_error"] is True
+
+    def test_raises_linear_error_on_call_failure_when_raise_on_error(
+        self, linear_service
+    ):
+        with patch.object(linear_service, "_graphql", side_effect=LinearError("boom")):
+            with pytest.raises(LinearError):
+                linear_service.get_issue("issue-123", raise_on_error=True)
+
+    def test_returns_none_on_call_failure_when_not_raising(self, linear_service):
+        with patch.object(linear_service, "_graphql", return_value=None) as mock_gql:
+            result = linear_service.get_issue("issue-123")
+
+        assert result is None
+        assert mock_gql.call_args.kwargs["raise_on_error"] is False
+
+    def test_raises_linear_error_when_top_level_data_null_end_to_end(
+        self, linear_service
+    ):
+        # Exercises the real _graphql: a 200 with {"data": null} and no "errors"
+        # must raise for raise_on_error callers rather than return None (which
+        # would be indistinguishable from "issue genuinely absent").
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": None}
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service.get_issue("issue-123", raise_on_error=True)
