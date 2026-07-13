@@ -229,9 +229,10 @@ class TestOnIncidentCreated:
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_posts_to_feed_channel(self, mock_slack, settings):
-        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+        mock_slack.post_message.return_value = "1234567890.123456"
 
         incident = Incident.objects.create(
             title="Test Incident",
@@ -249,7 +250,7 @@ class TestOnIncidentCreated:
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_saves_feed_message_ts(self, mock_slack, settings):
-        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
         mock_slack.post_message.return_value = "1234567890.123456"
@@ -266,7 +267,7 @@ class TestOnIncidentCreated:
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_private_incident_skips_feed_channel(self, mock_slack, settings):
-        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
 
@@ -3834,7 +3835,7 @@ class TestOnIncidentUpdated:
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_severity_change_posts_to_feed_channel_thread(self, mock_slack, settings):
-        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = self._make_incident(
@@ -3856,7 +3857,7 @@ class TestOnIncidentUpdated:
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_severity_change_skips_feed_thread_without_ts(self, mock_slack, settings):
-        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = self._make_incident(severity=IncidentSeverity.P0)
@@ -3871,7 +3872,7 @@ class TestOnIncidentUpdated:
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_severity_change_skips_feed_thread_for_private(self, mock_slack, settings):
-        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = self._make_incident(
@@ -3890,7 +3891,7 @@ class TestOnIncidentUpdated:
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_status_change_does_not_post_to_feed_thread(self, mock_slack, settings):
-        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = self._make_incident(
