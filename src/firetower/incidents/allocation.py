@@ -37,10 +37,8 @@ logger = logging.getLogger(__name__)
 
 METRIC_PREFIX = "firetower.inc_alloc"
 
-# Title used for placeholder issues minted by the allocator. ``_looks_like_placeholder``
-# also accepts the legacy title so pre-seeded placeholders keep working.
-PLACEHOLDER_TITLE = "Firetower placeholder — do not edit"
-LEGACY_PLACEHOLDER_TITLE = "Placeholder"
+# Title used for placeholder issues minted by the allocator.
+PLACEHOLDER_TITLE = "Placeholder"
 
 # Upper bound on how many aliased / used / stray ``INC-N`` slots we skip before
 # giving up on claiming and falling through to create-and-adopt.
@@ -79,10 +77,10 @@ def adopt_on_create_enabled() -> bool:
 def _looks_like_placeholder(issue: dict[str, object]) -> bool:
     """Conservatively decide whether ``issue`` is a claimable placeholder.
 
-    Only issues whose title matches the current or legacy placeholder title are
-    claimable; anything else is a "stray" real issue we must not touch.
+    Only issues whose title matches the placeholder title are claimable;
+    anything else is a "stray" real issue we must not touch.
     """
-    return issue.get("title") in (PLACEHOLDER_TITLE, LEGACY_PLACEHOLDER_TITLE)
+    return issue.get("title") == PLACEHOLDER_TITLE
 
 
 def _ensure_incident_counter() -> None:

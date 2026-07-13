@@ -5,7 +5,6 @@ from django.conf import settings as django_settings
 from django.core.exceptions import ImproperlyConfigured
 
 from firetower.incidents.allocation import (
-    LEGACY_PLACEHOLDER_TITLE,
     PLACEHOLDER_TITLE,
     AllocatedIdentity,
     LinearUnavailable,
@@ -107,9 +106,6 @@ class TestLooksLikePlaceholder:
     def test_accepts_current_title(self):
         assert _looks_like_placeholder({"title": PLACEHOLDER_TITLE}) is True
 
-    def test_accepts_legacy_title(self):
-        assert _looks_like_placeholder({"title": LEGACY_PLACEHOLDER_TITLE}) is True
-
     def test_rejects_other_title(self):
         assert _looks_like_placeholder({"title": "Real incident"}) is False
 
@@ -141,11 +137,9 @@ class TestAllocateClaim:
         assert IncidentCounter.objects.get(pk=1).next_id == 2335
         linear.create_issue.assert_not_called()
 
-    def test_claims_legacy_titled_placeholder(self, adopt_enabled):
+    def test_claims_titled_placeholder(self, adopt_enabled):
         _set_counter(2334)
-        linear = _make_linear(
-            {_identifier(2334): _placeholder(2334, title=LEGACY_PLACEHOLDER_TITLE)}
-        )
+        linear = _make_linear({_identifier(2334): _placeholder(2334)})
 
         with _patch_linear(linear):
             identity = allocate_incident_identity()
