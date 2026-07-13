@@ -189,6 +189,8 @@ class Incident(models.Model):
     action_items_last_synced_at = models.DateTimeField(null=True, blank=True)
     linear_parent_issue_id = models.CharField(max_length=255, null=True, blank=True)
 
+    feed_message_ts = models.CharField(max_length=50, null=True, blank=True)
+
     # Milestone timestamps (for postmortem)
     total_downtime = models.IntegerField(
         null=True, blank=True, help_text="Total downtime in minutes"
