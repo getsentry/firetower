@@ -2,11 +2,9 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-import requests
 
 from firetower.integrations.services.genai import (
     GenAIService,
-    _detect_location,
     parse_key_timestamps,
 )
 from firetower.integrations.services.notion import (
@@ -162,29 +160,15 @@ class TestAddTimelineToPage:
         assert len(calls) == 3
 
 
-class TestDetectLocation:
-    def test_parses_region_from_metadata_server(self):
-        mock_resp = MagicMock()
-        mock_resp.text = "projects/123456789/regions/us-east1"
-        with patch(
-            "firetower.integrations.services.genai.requests.get", return_value=mock_resp
-        ):
-            assert _detect_location() == "us-east1"
-
-    def test_falls_back_to_default_when_metadata_unavailable(self):
-        with patch(
-            "firetower.integrations.services.genai.requests.get",
-            side_effect=requests.exceptions.ConnectionError,
-        ):
-            assert _detect_location() == "us-central1"
-
-    def test_falls_back_on_non_200(self):
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError
-        with patch(
-            "firetower.integrations.services.genai.requests.get", return_value=mock_resp
-        ):
-            assert _detect_location() == "us-central1"
+def _make_response(text):
+    """Build a mock mirroring openrouter ChatResult -> choices[0].message.content."""
+    message = MagicMock()
+    message.content = text
+    choice = MagicMock()
+    choice.message = message
+    response = MagicMock()
+    response.choices = [choice]
+    return response
 
 
 class TestGenAIService:
@@ -195,7 +179,7 @@ class TestGenAIService:
             return_value=None,
         ):
             svc = GenAIService.__new__(GenAIService)
-            svc._model = "gemini-2.5-flash"
+            svc._model = "google/gemini-2.5-flash"
             svc._client = MagicMock()
             return svc
 
@@ -212,8 +196,8 @@ class TestGenAIService:
         ]
 
     def test_returns_timeline_text(self, genai_service):
-        genai_service._client.models.generate_content.return_value = MagicMock(
-            text="## Timeline\n- [2024-01-15 14:00 UTC] - event"
+        genai_service._client.chat.send.return_value = _make_response(
+            "## Timeline\n- [2024-01-15 14:00 UTC] - event"
         )
         result = genai_service.generate_timeline(self._make_messages())
         assert result is not None
@@ -222,18 +206,16 @@ class TestGenAIService:
     def test_returns_none_for_empty_messages(self, genai_service):
         result = genai_service.generate_timeline([])
         assert result is None
-        genai_service._client.models.generate_content.assert_not_called()
+        genai_service._client.chat.send.assert_not_called()
 
     def test_returns_none_on_empty_response(self, genai_service):
-        genai_service._client.models.generate_content.return_value = MagicMock(
-            text=None
-        )
+        genai_service._client.chat.send.return_value = _make_response(None)
         result = genai_service.generate_timeline(self._make_messages())
         assert result is None
 
     def test_handles_curly_braces_in_messages(self, genai_service):
-        genai_service._client.models.generate_content.return_value = MagicMock(
-            text="## Timeline\n- [2024-01-15 14:00 UTC] - event"
+        genai_service._client.chat.send.return_value = _make_response(
+            "## Timeline\n- [2024-01-15 14:00 UTC] - event"
         )
         messages = [
             {
@@ -248,26 +230,22 @@ class TestGenAIService:
         assert result is not None
 
     def test_returns_none_on_exception(self, genai_service):
-        genai_service._client.models.generate_content.side_effect = RuntimeError(
-            "API down"
-        )
+        genai_service._client.chat.send.side_effect = RuntimeError("API down")
         result = genai_service.generate_timeline(self._make_messages())
         assert result is None
 
     def test_includes_incident_summary_in_prompt(self, genai_service):
-        genai_service._client.models.generate_content.return_value = MagicMock(
-            text="timeline"
-        )
+        genai_service._client.chat.send.return_value = _make_response("timeline")
         genai_service.generate_timeline(
             self._make_messages(), incident_summary="DB outage"
         )
-        call_args = genai_service._client.models.generate_content.call_args
-        assert "DB outage" in call_args.kwargs["contents"]
+        call_args = genai_service._client.chat.send.call_args
+        assert "DB outage" in call_args.kwargs["messages"][0].content
 
     def test_includes_all_thread_replies(self, genai_service):
         # SlackService.get_thread_replies already strips the parent message, so
         # replies contains only real replies and no [1:] skip is needed.
-        genai_service._client.models.generate_content.return_value = MagicMock(text="t")
+        genai_service._client.chat.send.return_value = _make_response("t")
         messages = [
             {
                 "author": "a@sentry.io",
@@ -289,9 +267,9 @@ class TestGenAIService:
             }
         ]
         genai_service.generate_timeline(messages)
-        contents = genai_service._client.models.generate_content.call_args.kwargs[
-            "contents"
-        ]
+        contents = genai_service._client.chat.send.call_args.kwargs["messages"][
+            0
+        ].content
         assert "first reply" in contents
         assert "second reply" in contents
 

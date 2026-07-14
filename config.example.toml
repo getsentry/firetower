@@ -80,6 +80,12 @@ troubleshooting_template_markdown = """
 # Your troubleshooting template in Markdown here
 """
 
+[genai]
+# OpenRouter API key (https://openrouter.ai). Omit to disable AI timeline generation.
+api_key = ""
+# OpenRouter model slug; routes to Google's Gemini 2.5 Flash.
+model = "google/gemini-2.5-flash"
+
 [statuspage]
 api_key = ""
 page_id = ""
