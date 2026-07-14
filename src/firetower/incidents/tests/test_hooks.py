@@ -3972,3 +3972,27 @@ class TestManualPage:
         links = mock_pd.trigger_incident.call_args[1]["links"]
         assert all(link["text"] != "Slack Channel" for link in links)
         mock_slack.build_channel_url.assert_not_called()
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_pd_failure_returns_empty_and_suppresses_warning(
+        self, mock_slack, mock_pd_cls, settings
+    ):
+        # When the PD trigger fails, manual_page returns an empty set and does
+        # not post a per-policy warning to Slack, because it passes
+        # channel_id=None into page_policies. handle_page_submission owns the
+        # single consolidated failure message instead.
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = False
+
+        incident = Incident.objects.create(
+            title="Issue",
+            severity=IncidentSeverity.P1,
+        )
+
+        result = manual_page(incident, ["IMOC"], channel_id="C1")
+
+        assert result == set()
+        mock_slack.post_message.assert_not_called()

@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from firetower.incidents.models import IncidentStatus
 from firetower.slack_app.handlers.page import (
     handle_page_command,
     handle_page_submission,
@@ -46,6 +47,45 @@ class TestPageCommand:
             "IMOC",
             "Production Engineering",
         ]
+        assert "optional" not in policies_block
+        note_block = next(
+            b for b in view["blocks"] if b.get("block_id") == "note_block"
+        )
+        assert note_block["optional"] is True
+
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    def test_missing_trigger_id_responds_error(
+        self, mock_get_bolt_app, incident, settings
+    ):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        ack = MagicMock()
+        body = {"channel_id": CHANNEL_ID}
+        command = {"command": "/inc"}
+        respond = MagicMock()
+
+        handle_page_command(ack, body, command, respond)
+
+        ack.assert_called_once()
+        assert "trigger_id" in respond.call_args[0][0]
+        mock_get_bolt_app.return_value.client.views_open.assert_not_called()
+
+    @patch("firetower.slack_app.bolt.get_bolt_app")
+    def test_terminal_status_incident_responds_error(
+        self, mock_get_bolt_app, incident, settings
+    ):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        incident.status = IncidentStatus.DONE
+        incident.save(update_fields=["status"])
+        ack = MagicMock()
+        body = {"channel_id": CHANNEL_ID, "trigger_id": "T12345"}
+        command = {"command": "/inc"}
+        respond = MagicMock()
+
+        handle_page_command(ack, body, command, respond)
+
+        ack.assert_called_once()
+        assert "Cannot page" in respond.call_args[0][0]
+        mock_get_bolt_app.return_value.client.views_open.assert_not_called()
 
     @patch("firetower.slack_app.bolt.get_bolt_app")
     def test_no_incident_responds_error(self, mock_get_bolt_app, db, settings):
@@ -190,6 +230,67 @@ class TestPageSubmission:
 
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "escalate manually" in msg
+
+    @patch("firetower.slack_app.handlers.page.manual_page")
+    def test_partial_failure_reports_both(self, mock_manual_page, incident, settings):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_manual_page.return_value = {"IMOC"}
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_PAGER"}}
+        view = {
+            "private_metadata": CHANNEL_ID,
+            "state": {
+                "values": {
+                    "policies_block": {
+                        "policies": {
+                            "selected_options": [
+                                {"value": "IMOC"},
+                                {"value": "PROD_ENG"},
+                            ]
+                        }
+                    },
+                    "note_block": {"note": {"value": ""}},
+                }
+            },
+        }
+
+        handle_page_submission(ack, body, view, client)
+
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "paged *IMOC*" in msg
+        assert "Failed to page *Production Engineering*" in msg
+
+    @patch("firetower.slack_app.handlers.page.manual_page")
+    def test_terminal_status_incident_is_noop(
+        self, mock_manual_page, incident, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        incident.status = IncidentStatus.DONE
+        incident.save(update_fields=["status"])
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_PAGER"}}
+        view = {
+            "private_metadata": CHANNEL_ID,
+            "state": {
+                "values": {
+                    "policies_block": {
+                        "policies": {"selected_options": [{"value": "IMOC"}]}
+                    },
+                    "note_block": {"note": {"value": ""}},
+                }
+            },
+        }
+
+        handle_page_submission(ack, body, view, client)
+
+        ack.assert_called_once_with()
+        mock_manual_page.assert_not_called()
+        client.chat_postMessage.assert_called_once()
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "Not paging" in msg
+        assert incident.status in msg
 
     @patch("firetower.slack_app.handlers.page.manual_page")
     def test_missing_incident_does_not_crash(self, mock_manual_page, db):

@@ -303,6 +303,9 @@ def manual_page(
                 "text": "Slack Channel",
             }
         )
+    # The manual path (handle_page_submission) owns its own channel messaging,
+    # reporting both successes and failures in a single message, so we pass
+    # channel_id=None here to suppress page_policies' per-policy warnings.
     return page_policies(
         policy_names,
         incident.incident_number,
@@ -310,7 +313,7 @@ def manual_page(
         incident.title,
         _slack_service,
         links=links,
-        channel_id=channel_id,
+        channel_id=None,
         note=note,
     )
 
