@@ -8,7 +8,7 @@ from firetower.slack_app.handlers.page import (
     handle_page_submission,
 )
 
-from .conftest import CHANNEL_ID
+from .conftest import CHANNEL_ID, STATUS_CHANNEL_ID
 
 MOCK_PD_CONFIG = {
     "API_TOKEN": "test-token",
@@ -165,6 +165,35 @@ class TestPageSubmission:
 
     @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
     @patch("firetower.slack_app.handlers.page.manual_page")
+    def test_uses_primary_channel_when_run_from_status_channel(
+        self, mock_manual_page, mock_invite_oncall, incident, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_manual_page.return_value = {"IMOC"}
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_PAGER"}}
+        view = {
+            "private_metadata": STATUS_CHANNEL_ID,
+            "state": {
+                "values": {
+                    "policies_block": {
+                        "policies": {"selected_options": [{"value": "IMOC"}]}
+                    },
+                    "note_block": {"note": {"value": ""}},
+                }
+            },
+        }
+
+        handle_page_submission(ack, body, view, client)
+
+        # Side effects target the primary incident channel, not the status one.
+        assert mock_manual_page.call_args.kwargs["channel_id"] == CHANNEL_ID
+        mock_invite_oncall.assert_called_once_with(CHANNEL_ID, {"IMOC"})
+        assert client.chat_postMessage.call_args[1]["channel"] == CHANNEL_ID
+
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
+    @patch("firetower.slack_app.handlers.page.manual_page")
     def test_note_trimmed_passed_and_posted(
         self, mock_manual_page, mock_invite_oncall, incident, settings
     ):
@@ -312,6 +341,38 @@ class TestPageSubmission:
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Not paging" in msg
         assert incident.status in msg
+
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
+    @patch("firetower.slack_app.handlers.page.manual_page")
+    def test_terminal_status_message_posts_to_primary_channel(
+        self, mock_manual_page, mock_invite_oncall, incident, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        incident.status = IncidentStatus.DONE
+        incident.save(update_fields=["status"])
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_PAGER"}}
+        view = {
+            "private_metadata": STATUS_CHANNEL_ID,
+            "state": {
+                "values": {
+                    "policies_block": {
+                        "policies": {"selected_options": [{"value": "IMOC"}]}
+                    },
+                    "note_block": {"note": {"value": ""}},
+                }
+            },
+        }
+
+        handle_page_submission(ack, body, view, client)
+
+        mock_manual_page.assert_not_called()
+        mock_invite_oncall.assert_not_called()
+        client.chat_postMessage.assert_called_once()
+        # Terminal-status notice posts to the primary channel, not the status one.
+        assert client.chat_postMessage.call_args[1]["channel"] == CHANNEL_ID
+        assert "Not paging" in client.chat_postMessage.call_args[1]["text"]
 
     @patch("firetower.slack_app.handlers.page.manual_page")
     def test_missing_incident_does_not_crash(self, mock_manual_page, db):

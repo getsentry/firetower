@@ -5,6 +5,7 @@ from django.conf import settings
 
 from firetower.incidents.hooks import (
     PAGING_POLICIES,
+    get_incident_channel_id,
     get_pageable_policies,
     invite_paged_oncall,
     manual_page,
@@ -137,6 +138,11 @@ def handle_page_submission(ack: Any, body: dict, view: dict, client: Any) -> Non
         logger.error("Page submission: no incident for channel %s", channel_id)
         return
 
+    # Paging side effects (PD Slack link, on-call invite, roster/confirmation)
+    # target the incident's primary channel, matching the auto-page path — not
+    # the channel the command was run from, which may be the -status channel.
+    target_channel_id = get_incident_channel_id(incident) or channel_id
+
     # Status may have changed to terminal between opening and submitting the
     # modal; re-paging would re-trigger an already-resolved PD alert.
     if incident.status in CLOSED_STATUSES:
@@ -146,7 +152,7 @@ def handle_page_submission(ack: Any, body: dict, view: dict, client: Any) -> Non
             incident.status,
         )
         client.chat_postMessage(
-            channel=channel_id,
+            channel=target_channel_id,
             text=f"Not paging {incident.incident_number} — it is now {incident.status}.",
         )
         return
@@ -155,7 +161,7 @@ def handle_page_submission(ack: Any, body: dict, view: dict, client: Any) -> Non
         values.get("note_block", {}).get("note", {}).get("value") or ""
     ).strip() or None
 
-    paged = manual_page(incident, policy_names, channel_id=channel_id, note=note)
+    paged = manual_page(incident, policy_names, channel_id=target_channel_id, note=note)
 
     pager_id = body.get("user", {}).get("id", "")
     incident_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
@@ -199,9 +205,9 @@ def handle_page_submission(ack: Any, body: dict, view: dict, client: Any) -> Non
     if note:
         message += f"\n*Note:* {escape_slack_text(note)}"
 
-    client.chat_postMessage(channel=channel_id, text=message)
+    client.chat_postMessage(channel=target_channel_id, text=message)
 
     # Mirror the high-severity auto-page path: invite and @mention the on-call
     # users for the policies we actually paged.
     if paged:
-        invite_paged_oncall(channel_id, paged)
+        invite_paged_oncall(target_channel_id, paged)

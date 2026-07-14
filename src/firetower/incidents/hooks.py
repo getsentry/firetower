@@ -175,7 +175,9 @@ def page_policies(
         page_label = policy_info.page_label
         summary = f"[{page_label}] [{severity}] {dedup_prefix}: {title}"
         if note:
-            summary = f"{summary}\nNote: {note}"
+            # Flatten user newlines/whitespace so the PD alert summary stays
+            # on one line (Slack display keeps the original text).
+            summary = f"{summary}\nNote: {' '.join(note.split())}"
         summary = summary[:PD_SUMMARY_MAX_LENGTH]
 
         try:
@@ -425,6 +427,15 @@ def _get_channel_id(incident: Incident) -> str | None:
     if not slack_link:
         return None
     return _slack_service.parse_channel_id_from_url(slack_link.url)
+
+
+def get_incident_channel_id(incident: Incident) -> str | None:
+    """Return the incident's primary Slack channel id (never the status channel).
+
+    Used by /inc page so paging side effects target the main incident channel
+    even when the command is run from the -status channel.
+    """
+    return _get_channel_id(incident)
 
 
 def _get_status_channel_id(incident: Incident) -> str | None:

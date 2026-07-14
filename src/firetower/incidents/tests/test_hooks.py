@@ -21,6 +21,7 @@ from firetower.incidents.hooks import (
     build_channel_name,
     build_channel_topic,
     create_linear_parent_issue,
+    get_incident_channel_id,
     get_pageable_policies,
     invite_paged_oncall,
     manual_page,
@@ -3873,6 +3874,24 @@ class TestPagePolicies:
         assert summary == "[IMOC] [P1] INC-9: Boom\nNote: db is on fire"
 
     @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_note_newlines_flattened_in_summary(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+
+        page_policies(
+            ["IMOC"],
+            "INC-9",
+            IncidentSeverity.P1,
+            "Boom",
+            MagicMock(),
+            note="line one\nline two\r\n  extra",
+        )
+
+        summary = mock_pd.trigger_incident.call_args[0][0]
+        assert summary == "[IMOC] [P1] INC-9: Boom\nNote: line one line two extra"
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
     def test_noop_when_pagerduty_unconfigured(self, mock_pd_cls, settings):
         settings.PAGERDUTY = None
 
@@ -4041,3 +4060,26 @@ class TestInvitePagedOncall:
         mock_pd_cls.assert_not_called()
         mock_slack.invite_to_channel.assert_not_called()
         mock_slack.post_message.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestGetIncidentChannelId:
+    def test_returns_primary_channel_not_status(self, db):
+        incident = Incident.objects.create(title="X", severity=IncidentSeverity.P2)
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C_MAIN",
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK_STATUS,
+            url="https://slack.com/archives/C_STATUS",
+        )
+
+        assert get_incident_channel_id(incident) == "C_MAIN"
+
+    def test_none_when_no_channel(self, db):
+        incident = Incident.objects.create(title="X", severity=IncidentSeverity.P2)
+
+        assert get_incident_channel_id(incident) is None
