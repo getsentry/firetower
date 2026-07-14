@@ -75,7 +75,8 @@ class SlackConfig:
 
 @deserialize
 class GenAIConfig:
-    model: str = "gemini-2.5-flash"
+    api_key: str = ""
+    model: str = "google/gemini-2.5-flash"
 
 
 @deserialize
