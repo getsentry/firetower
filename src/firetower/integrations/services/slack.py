@@ -62,13 +62,12 @@ class SlackService:
             },
         )
 
+        self.client: WebClient | None = None
         if self.bot_token:
             self.client = WebClient(token=self.bot_token)
             self.client.retry_handlers.append(
                 RateLimitErrorRetryHandler(max_retry_count=1)
             )
-        else:
-            self.client = None
 
         if self.client is None:
             logger.warning("Slack client not initialized - missing bot token")
@@ -391,7 +390,7 @@ class SlackService:
                         f"Failed to join channel {channel_id} for bookmark retry",
                         extra={"channel_id": channel_id},
                     )
-            elif e.response.get("error") == "too_many_requests":
+            elif e.response.get("error") == "ratelimited":
                 retry_after = int(e.response.headers.get("Retry-After", 1))
                 logger.warning(
                     f"Rate limited adding bookmark to channel {channel_id}, retrying after {retry_after}s"
