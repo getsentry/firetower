@@ -120,8 +120,11 @@ class TestPageCommand:
 
 @pytest.mark.django_db
 class TestPageSubmission:
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
     @patch("firetower.slack_app.handlers.page.manual_page")
-    def test_pages_selected_policies(self, mock_manual_page, incident, settings):
+    def test_pages_selected_policies(
+        self, mock_manual_page, mock_invite_oncall, incident, settings
+    ):
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
         mock_manual_page.return_value = {"IMOC", "PROD_ENG"}
         ack = MagicMock()
@@ -158,9 +161,13 @@ class TestPageSubmission:
         assert "*IMOC*" in msg
         assert "*Production Engineering*" in msg
         assert incident.incident_number in msg
+        mock_invite_oncall.assert_called_once_with(CHANNEL_ID, {"IMOC", "PROD_ENG"})
 
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
     @patch("firetower.slack_app.handlers.page.manual_page")
-    def test_note_trimmed_passed_and_posted(self, mock_manual_page, incident, settings):
+    def test_note_trimmed_passed_and_posted(
+        self, mock_manual_page, mock_invite_oncall, incident, settings
+    ):
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
         mock_manual_page.return_value = {"IMOC"}
         ack = MagicMock()
@@ -184,8 +191,11 @@ class TestPageSubmission:
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "db is on fire" in msg
 
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
     @patch("firetower.slack_app.handlers.page.manual_page")
-    def test_no_selection_returns_errors(self, mock_manual_page, incident):
+    def test_no_selection_returns_errors(
+        self, mock_manual_page, mock_invite_oncall, incident
+    ):
         ack = MagicMock()
         client = MagicMock()
         body = {"user": {"id": "U_PAGER"}}
@@ -205,10 +215,14 @@ class TestPageSubmission:
             errors={"policies_block": "Select at least one escalation policy to page."},
         )
         mock_manual_page.assert_not_called()
+        mock_invite_oncall.assert_not_called()
         client.chat_postMessage.assert_not_called()
 
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
     @patch("firetower.slack_app.handlers.page.manual_page")
-    def test_none_paged_posts_failure(self, mock_manual_page, incident, settings):
+    def test_none_paged_posts_failure(
+        self, mock_manual_page, mock_invite_oncall, incident, settings
+    ):
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
         mock_manual_page.return_value = set()
         ack = MagicMock()
@@ -230,9 +244,13 @@ class TestPageSubmission:
 
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "escalate manually" in msg
+        mock_invite_oncall.assert_not_called()
 
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
     @patch("firetower.slack_app.handlers.page.manual_page")
-    def test_partial_failure_reports_both(self, mock_manual_page, incident, settings):
+    def test_partial_failure_reports_both(
+        self, mock_manual_page, mock_invite_oncall, incident, settings
+    ):
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
         mock_manual_page.return_value = {"IMOC"}
         ack = MagicMock()
@@ -260,10 +278,12 @@ class TestPageSubmission:
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "paged *IMOC*" in msg
         assert "Failed to page *Production Engineering*" in msg
+        mock_invite_oncall.assert_called_once_with(CHANNEL_ID, {"IMOC"})
 
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
     @patch("firetower.slack_app.handlers.page.manual_page")
     def test_terminal_status_incident_is_noop(
-        self, mock_manual_page, incident, settings
+        self, mock_manual_page, mock_invite_oncall, incident, settings
     ):
         settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
         incident.status = IncidentStatus.DONE
@@ -287,6 +307,7 @@ class TestPageSubmission:
 
         ack.assert_called_once_with()
         mock_manual_page.assert_not_called()
+        mock_invite_oncall.assert_not_called()
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Not paging" in msg

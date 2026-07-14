@@ -22,6 +22,7 @@ from firetower.incidents.hooks import (
     build_channel_topic,
     create_linear_parent_issue,
     get_pageable_policies,
+    invite_paged_oncall,
     manual_page,
     on_captain_changed,
     on_incident_created,
@@ -3995,4 +3996,48 @@ class TestManualPage:
         result = manual_page(incident, ["IMOC"], channel_id="C1")
 
         assert result == set()
+        mock_slack.post_message.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestInvitePagedOncall:
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_invites_only_paged_policies_with_suffix(
+        self, mock_pd_cls, mock_slack, settings
+    ):
+        # Only the paged policy (PROD_ENG) should be queried/invited; IMOC is
+        # left alone. Level-1 on-call gets the "(paged)" suffix.
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.return_value = [
+            {"email": "primary@example.com", "escalation_level": 1},
+            {"email": "secondary@example.com", "escalation_level": 2},
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            {"slack_user_id": "U_PRIMARY"},
+            {"slack_user_id": "U_SECONDARY"},
+        ]
+
+        invite_paged_oncall("C123", {"PROD_ENG"})
+
+        mock_pd.get_oncall_users.assert_called_once_with("PPE001")
+        mock_slack.invite_to_channel.assert_called_once_with(
+            "C123", ["U_PRIMARY", "U_SECONDARY"]
+        )
+        message = mock_slack.post_message.call_args[0][1]
+        assert message == (
+            "On-Call Prod Eng (Primary): <@U_PRIMARY> (paged)\n"
+            "On-Call Prod Eng (Secondary): <@U_SECONDARY>"
+        )
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_empty_paged_is_noop(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+
+        invite_paged_oncall("C123", set())
+
+        mock_pd_cls.assert_not_called()
+        mock_slack.invite_to_channel.assert_not_called()
         mock_slack.post_message.assert_not_called()

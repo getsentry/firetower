@@ -6,6 +6,7 @@ from django.conf import settings
 from firetower.incidents.hooks import (
     PAGING_POLICIES,
     get_pageable_policies,
+    invite_paged_oncall,
     manual_page,
 )
 from firetower.incidents.models import IncidentStatus
@@ -199,3 +200,8 @@ def handle_page_submission(ack: Any, body: dict, view: dict, client: Any) -> Non
         message += f"\n*Note:* {escape_slack_text(note)}"
 
     client.chat_postMessage(channel=channel_id, text=message)
+
+    # Mirror the high-severity auto-page path: invite and @mention the on-call
+    # users for the policies we actually paged.
+    if paged:
+        invite_paged_oncall(channel_id, paged)

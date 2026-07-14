@@ -483,18 +483,16 @@ def _oncall_role_label(
     return policy_label
 
 
-def _invite_oncall_to_channel(
-    severity: str,
+def invite_oncall_for_policies(
+    policy_names: Iterable[str],
     channel_id: str,
     slack_service: SlackService,
     *,
-    is_private: bool = False,
-    skip_paging: bool = False,
     paged_policies: set[str] | None = None,
 ) -> None:
-    """Invite on-call users to a channel. No DB access."""
-    if is_private or skip_paging or severity not in HIGH_SEVERITIES:
-        return
+    """Invite on-call users for the given policies to a channel and post their
+    roles. No gating, no DB access. Unknown policy names are ignored."""
+    selected = set(policy_names)
 
     pd_config = settings.PAGERDUTY
     if not pd_config:
@@ -512,6 +510,8 @@ def _invite_oncall_to_channel(
     users_to_invite: list[tuple[str, str]] = []
 
     for policy_index, (policy_name, policy_info) in enumerate(PAGING_POLICIES.items()):
+        if policy_name not in selected:
+            continue
         policy_label = policy_info.label
         max_level = policy_info.max_level
         policy = escalation_policies.get(policy_name)
@@ -601,6 +601,43 @@ def _invite_oncall_to_channel(
             logger.exception(
                 f"Failed to post oncall role message in channel {channel_id}"
             )
+
+
+def _invite_oncall_to_channel(
+    severity: str,
+    channel_id: str,
+    slack_service: SlackService,
+    *,
+    is_private: bool = False,
+    skip_paging: bool = False,
+    paged_policies: set[str] | None = None,
+) -> None:
+    """Invite on-call users to a channel. No DB access."""
+    if is_private or skip_paging or severity not in HIGH_SEVERITIES:
+        return
+
+    invite_oncall_for_policies(
+        PAGING_POLICIES.keys(),
+        channel_id,
+        slack_service,
+        paged_policies=paged_policies,
+    )
+
+
+def invite_paged_oncall(channel_id: str, paged_policies: set[str]) -> None:
+    """Invite and @mention the on-call users for the given paged policies in a
+    channel, mirroring the high-severity auto-page behavior. Used by /inc page.
+
+    No gating: the caller has already decided which policies were paged.
+    """
+    if not paged_policies:
+        return
+    invite_oncall_for_policies(
+        paged_policies,
+        channel_id,
+        _slack_service,
+        paged_policies=paged_policies,
+    )
 
 
 def _invite_oncall_users(
