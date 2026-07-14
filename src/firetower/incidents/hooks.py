@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -74,15 +75,22 @@ def get_statuspage_warning_buffer_minutes() -> int:
 class PolicyConfig:
     label: str
     page_label: str
+    display_name: str
     max_level: int
 
 
 PAGING_POLICIES: dict[str, PolicyConfig] = {
     "IMOC": PolicyConfig(
-        label="On-Call Incident Manager", page_label="IMOC", max_level=1
+        label="On-Call Incident Manager",
+        page_label="IMOC",
+        display_name="IMOC",
+        max_level=1,
     ),
     "PROD_ENG": PolicyConfig(
-        label="On-Call Prod Eng", page_label="PE On-Call", max_level=2
+        label="On-Call Prod Eng",
+        page_label="PE On-Call",
+        display_name="Production Engineering",
+        max_level=2,
     ),
 }
 
@@ -108,25 +116,28 @@ class ChannelSetupContext:
     topic: str | None = None
 
 
-def page_for_channel(
-    severity: str,
+def page_policies(
+    policy_names: Iterable[str],
     dedup_prefix: str,
+    severity: str,
     title: str,
     slack_service: SlackService,
     *,
     links: list[dict[str, str]] | None = None,
     channel_id: str | None = None,
-    is_private: bool = False,
-    skip_paging: bool = False,
+    note: str | None = None,
 ) -> set[str]:
-    """Trigger PD pages for pageable severities. No DB access.
+    """Trigger PD pages for the named escalation policies. No gating, no DB access.
+
+    Unlike page_for_channel this does not gate on severity or privacy; callers
+    that need that gating (auto-paging) apply it before calling. Unknown policy
+    names are ignored. Uses the same deterministic firetower-<prefix>-<POLICY>
+    dedup key as everywhere else, so pages triggered here still auto-resolve via
+    resolve_pages_for_incident.
 
     Returns the set of policy names that were successfully paged.
     """
     paged: set[str] = set()
-
-    if is_private or skip_paging or severity not in HIGH_SEVERITIES:
-        return paged
 
     pd_config = settings.PAGERDUTY
     if not pd_config:
@@ -136,7 +147,11 @@ def page_for_channel(
 
     pd_service = None
 
-    for policy_name, policy_info in PAGING_POLICIES.items():
+    for policy_name in policy_names:
+        policy_info = PAGING_POLICIES.get(policy_name)
+        if not policy_info:
+            continue
+
         policy = escalation_policies.get(policy_name)
         if not policy:
             logger.info(f"No {policy_name} escalation policy configured, skipping page")
@@ -159,6 +174,8 @@ def page_for_channel(
         dedup_key = f"firetower-{dedup_prefix}-{policy_name}"
         page_label = policy_info.page_label
         summary = f"[{page_label}] [{severity}] {dedup_prefix}: {title}"
+        if note:
+            summary = f"{summary}\nNote: {note}"
         summary = summary[:PD_SUMMARY_MAX_LENGTH]
 
         try:
@@ -176,6 +193,54 @@ def page_for_channel(
             logger.exception(f"Failed to page {policy_name} for {dedup_prefix}")
 
     return paged
+
+
+def get_pageable_policies() -> list[tuple[str, str]]:
+    """Return (policy_name, display_name) for each configured escalation policy.
+
+    Only policies that have an integration_key configured are returned, so the
+    /inc page modal never offers a policy that cannot actually be paged.
+    """
+    pd_config = settings.PAGERDUTY
+    if not pd_config:
+        return []
+
+    escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
+    result: list[tuple[str, str]] = []
+    for policy_name, policy_info in PAGING_POLICIES.items():
+        policy = escalation_policies.get(policy_name)
+        if policy and policy.get("integration_key"):
+            result.append((policy_name, policy_info.display_name))
+    return result
+
+
+def page_for_channel(
+    severity: str,
+    dedup_prefix: str,
+    title: str,
+    slack_service: SlackService,
+    *,
+    links: list[dict[str, str]] | None = None,
+    channel_id: str | None = None,
+    is_private: bool = False,
+    skip_paging: bool = False,
+) -> set[str]:
+    """Trigger PD pages for pageable severities. No DB access.
+
+    Returns the set of policy names that were successfully paged.
+    """
+    if is_private or skip_paging or severity not in HIGH_SEVERITIES:
+        return set()
+
+    return page_policies(
+        PAGING_POLICIES.keys(),
+        dedup_prefix,
+        severity,
+        title,
+        slack_service,
+        links=links,
+        channel_id=channel_id,
+    )
 
 
 def _page_if_needed(
@@ -203,6 +268,50 @@ def _page_if_needed(
         channel_id=channel_id,
         is_private=incident.is_private,
         skip_paging=skip_paging,
+    )
+
+
+def manual_page(
+    incident: Incident,
+    policy_names: Iterable[str],
+    *,
+    channel_id: str | None = None,
+    note: str | None = None,
+) -> set[str]:
+    """Manually page the given escalation policies for an incident.
+
+    Unlike _page_if_needed this is not gated on severity or privacy: the caller
+    (the /inc page command) has explicitly chosen to page. It reuses the
+    deterministic firetower-<incident_number>-<POLICY> dedup key so pages
+    triggered here still auto-resolve via resolve_pages_for_incident when the
+    incident is mitigated/resolved.
+
+    Note: PagerDuty dedups on that key, so if a page for a policy is already
+    open (e.g. from auto-paging), re-paging it is a no-op that does not
+    re-notify. This covers the primary use case of paging incidents that did
+    not auto-page (private, low severity, or a skipped policy).
+
+    Returns the set of policy names that were successfully paged.
+    """
+    links: list[dict[str, str]] = [
+        {"href": _build_incident_url(incident), "text": "View in Firetower"}
+    ]
+    if channel_id:
+        links.append(
+            {
+                "href": _slack_service.build_channel_url(channel_id),
+                "text": "Slack Channel",
+            }
+        )
+    return page_policies(
+        policy_names,
+        incident.incident_number,
+        incident.severity,
+        incident.title,
+        _slack_service,
+        links=links,
+        channel_id=channel_id,
+        note=note,
     )
 
 
