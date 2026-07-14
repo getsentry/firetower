@@ -121,7 +121,11 @@ def handle_page_submission(ack: Any, body: dict, view: dict, client: Any) -> Non
         values.get("policies_block", {}).get("policies", {}).get("selected_options")
         or []
     )
-    policy_names = [opt["value"] for opt in selected]
+    # Only accept policies we actually offer, guarding against crafted
+    # submissions carrying arbitrary values.
+    policy_names = [
+        opt.get("value") for opt in selected if opt.get("value") in PAGING_POLICIES
+    ]
 
     if not policy_names:
         ack(
@@ -161,7 +165,20 @@ def handle_page_submission(ack: Any, body: dict, view: dict, client: Any) -> Non
         values.get("note_block", {}).get("note", {}).get("value") or ""
     ).strip() or None
 
-    paged = manual_page(incident, policy_names, channel_id=target_channel_id, note=note)
+    try:
+        paged = manual_page(
+            incident, policy_names, channel_id=target_channel_id, note=note
+        )
+    except Exception:
+        logger.exception("Failed to page policies for %s", incident.incident_number)
+        client.chat_postMessage(
+            channel=target_channel_id,
+            text=(
+                f"Failed to page on-call for {incident.incident_number}. "
+                "Please escalate manually."
+            ),
+        )
+        return
 
     pager_id = body.get("user", {}).get("id", "")
     incident_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"

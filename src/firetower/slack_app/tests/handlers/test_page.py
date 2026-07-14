@@ -374,6 +374,94 @@ class TestPageSubmission:
         assert client.chat_postMessage.call_args[1]["channel"] == CHANNEL_ID
         assert "Not paging" in client.chat_postMessage.call_args[1]["text"]
 
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
+    @patch("firetower.slack_app.handlers.page.manual_page")
+    def test_unknown_policy_values_rejected(
+        self, mock_manual_page, mock_invite_oncall, incident
+    ):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_PAGER"}}
+        view = {
+            "private_metadata": CHANNEL_ID,
+            "state": {
+                "values": {
+                    "policies_block": {
+                        "policies": {"selected_options": [{"value": "BOGUS"}]}
+                    },
+                }
+            },
+        }
+
+        handle_page_submission(ack, body, view, client)
+
+        ack.assert_called_once_with(
+            response_action="errors",
+            errors={"policies_block": "Select at least one escalation policy to page."},
+        )
+        mock_manual_page.assert_not_called()
+        mock_invite_oncall.assert_not_called()
+        client.chat_postMessage.assert_not_called()
+
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
+    @patch("firetower.slack_app.handlers.page.manual_page")
+    def test_unknown_policy_values_filtered_out(
+        self, mock_manual_page, mock_invite_oncall, incident, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_manual_page.return_value = {"IMOC"}
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_PAGER"}}
+        view = {
+            "private_metadata": CHANNEL_ID,
+            "state": {
+                "values": {
+                    "policies_block": {
+                        "policies": {
+                            "selected_options": [
+                                {"value": "IMOC"},
+                                {"value": "BOGUS"},
+                            ]
+                        }
+                    },
+                    "note_block": {"note": {"value": ""}},
+                }
+            },
+        }
+
+        handle_page_submission(ack, body, view, client)
+
+        assert mock_manual_page.call_args[0][1] == ["IMOC"]
+
+    @patch("firetower.slack_app.handlers.page.invite_paged_oncall")
+    @patch("firetower.slack_app.handlers.page.manual_page")
+    def test_manual_page_exception_posts_failure(
+        self, mock_manual_page, mock_invite_oncall, incident, settings
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_manual_page.side_effect = Exception("boom")
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_PAGER"}}
+        view = {
+            "private_metadata": CHANNEL_ID,
+            "state": {
+                "values": {
+                    "policies_block": {
+                        "policies": {"selected_options": [{"value": "IMOC"}]}
+                    },
+                    "note_block": {"note": {"value": ""}},
+                }
+            },
+        }
+
+        handle_page_submission(ack, body, view, client)
+
+        client.chat_postMessage.assert_called_once()
+        assert "Failed to page" in client.chat_postMessage.call_args[1]["text"]
+        mock_invite_oncall.assert_not_called()
+
     @patch("firetower.slack_app.handlers.page.manual_page")
     def test_missing_incident_does_not_crash(self, mock_manual_page, db):
         ack = MagicMock()
