@@ -10,8 +10,11 @@ from typing import Any
 from urllib.parse import urlparse
 
 from django.conf import settings
+import time
+
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from slack_sdk.http_retry.builtin_handlers import RateLimitErrorRetryHandler
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +63,11 @@ class SlackService:
             },
         )
 
-        self.client = WebClient(token=self.bot_token) if self.bot_token else None
+        if self.bot_token:
+            self.client = WebClient(token=self.bot_token)
+            self.client.retry_handlers.append(RateLimitErrorRetryHandler(max_retry_count=1))
+        else:
+            self.client = None
 
         if self.client is None:
             logger.warning("Slack client not initialized - missing bot token")
@@ -381,6 +388,22 @@ class SlackService:
                 else:
                     logger.error(
                         f"Failed to join channel {channel_id} for bookmark retry",
+                        extra={"channel_id": channel_id},
+                    )
+            elif e.response.get("error") == "too_many_requests":
+                retry_after = int(e.response.headers.get("Retry-After", 1))
+                logger.warning(
+                    f"Rate limited adding bookmark to channel {channel_id}, retrying after {retry_after}s"
+                )
+                time.sleep(retry_after)
+                try:
+                    self.client.bookmarks_add(
+                        channel_id=channel_id, title=title, type="link", link=link
+                    )
+                    return True
+                except SlackApiError as retry_error:
+                    logger.error(
+                        f"Error adding bookmark after rate limit retry: {retry_error}",
                         extra={"channel_id": channel_id},
                     )
             else:
