@@ -6,12 +6,11 @@ and retrieve user profile information (name, avatar).
 """
 
 import logging
+import time
 from typing import Any
 from urllib.parse import urlparse
 
 from django.conf import settings
-import time
-
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.http_retry.builtin_handlers import RateLimitErrorRetryHandler
@@ -65,7 +64,9 @@ class SlackService:
 
         if self.bot_token:
             self.client = WebClient(token=self.bot_token)
-            self.client.retry_handlers.append(RateLimitErrorRetryHandler(max_retry_count=1))
+            self.client.retry_handlers.append(
+                RateLimitErrorRetryHandler(max_retry_count=1)
+            )
         else:
             self.client = None
 
