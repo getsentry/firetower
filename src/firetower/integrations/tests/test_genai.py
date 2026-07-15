@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from firetower.integrations.services.genai import (
+    _DEFAULT_MODEL,
     GenAIService,
     parse_key_timestamps,
 )
@@ -179,7 +180,7 @@ class TestGenAIService:
             return_value=None,
         ):
             svc = GenAIService.__new__(GenAIService)
-            svc._model = "google/gemini-2.5-flash"
+            svc._model = _DEFAULT_MODEL
             svc._client = MagicMock()
             return svc
 
@@ -194,6 +195,12 @@ class TestGenAIService:
             }
             for i in range(n)
         ]
+
+    def test_requests_zero_data_retention_provider(self, genai_service):
+        genai_service._client.chat.send.return_value = _make_response("timeline")
+        genai_service.generate_timeline(self._make_messages())
+        provider = genai_service._client.chat.send.call_args.kwargs["provider"]
+        assert provider.zdr is True
 
     def test_returns_timeline_text(self, genai_service):
         genai_service._client.chat.send.return_value = _make_response(
@@ -272,6 +279,44 @@ class TestGenAIService:
         ].content
         assert "first reply" in contents
         assert "second reply" in contents
+
+
+class TestFromSettings:
+    def test_returns_none_when_api_key_missing(self):
+        with patch("django.conf.settings") as mock_settings:
+            mock_settings.GENAI = {"MODEL": _DEFAULT_MODEL}
+            assert GenAIService.from_settings() is None
+
+    def test_returns_none_when_api_key_empty(self):
+        with patch("django.conf.settings") as mock_settings:
+            mock_settings.GENAI = {"API_KEY": ""}
+            assert GenAIService.from_settings() is None
+
+    def test_returns_none_when_config_absent(self):
+        with patch("django.conf.settings") as mock_settings:
+            mock_settings.GENAI = None
+            assert GenAIService.from_settings() is None
+
+    def test_builds_instance_when_api_key_present(self):
+        with (
+            patch("django.conf.settings") as mock_settings,
+            patch("openrouter.OpenRouter") as mock_openrouter,
+        ):
+            mock_settings.GENAI = {"API_KEY": "sk-test", "MODEL": "custom/model"}
+            svc = GenAIService.from_settings()
+            assert isinstance(svc, GenAIService)
+            assert svc._model == "custom/model"
+            mock_openrouter.assert_called_once_with(api_key="sk-test")
+
+    def test_defaults_model_when_not_configured(self):
+        with (
+            patch("django.conf.settings") as mock_settings,
+            patch("openrouter.OpenRouter"),
+        ):
+            mock_settings.GENAI = {"API_KEY": "sk-test"}
+            svc = GenAIService.from_settings()
+            assert isinstance(svc, GenAIService)
+            assert svc._model == _DEFAULT_MODEL
 
 
 class TestParseKeyTimestamps:

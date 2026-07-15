@@ -81,7 +81,7 @@ troubleshooting_template_markdown = """
 """
 
 [genai]
-# OpenRouter API key (https://openrouter.ai). Omit to disable AI timeline generation.
+# OpenRouter API key (https://openrouter.ai). Leave blank or omit to disable AI timeline generation.
 api_key = ""
 # OpenRouter model slug; routes to Google's Gemini 2.5 Flash.
 model = "google/gemini-2.5-flash"

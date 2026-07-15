@@ -5,6 +5,9 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# OpenRouter model slug; routes to Google's Gemini 2.5 Flash.
+_DEFAULT_MODEL = "google/gemini-2.5-flash"
+
 _TIMELINE_PROMPT_PREFIX = """\
 You are an expert incident analyst. Based on the following Slack channel messages \
 from an incident response, create a concise timeline of key events.
@@ -100,13 +103,13 @@ class GenAIService:
             return None
         return cls(
             api_key=api_key,
-            model=config.get("MODEL", "google/gemini-2.5-flash"),
+            model=config.get("MODEL", _DEFAULT_MODEL),
         )
 
     def __init__(
         self,
         api_key: str,
-        model: str = "google/gemini-2.5-flash",
+        model: str = _DEFAULT_MODEL,
     ) -> None:
         from openrouter import OpenRouter  # noqa: PLC0415
 
