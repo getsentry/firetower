@@ -488,6 +488,49 @@ class TestGraphql:
             with pytest.raises(LinearError):
                 linear_service._graphql("query { viewer { id } }", raise_on_error=True)
 
+    def test_raises_linear_error_on_non_json_response(self, linear_service):
+        # A 2xx whose body is not valid JSON must surface as LinearError for
+        # raise_on_error callers, not let the ValueError from .json() propagate
+        # and crash the allocator (which only expects LinearError).
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.side_effect = ValueError("Expecting value")
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service._graphql("query { viewer { id } }", raise_on_error=True)
+
+    def test_returns_none_on_non_json_response_when_not_raising(self, linear_service):
+        # Default callers still get None (unchanged behavior), and it is not
+        # retried (a broken body is not a transient transport error).
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.side_effect = ValueError("Expecting value")
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ) as mock_req,
+            patch.object(linear_service, "_sleep_before_retry") as mock_sleep,
+        ):
+            result = linear_service._graphql("query { viewer { id } }")
+
+        assert result is None
+        assert mock_req.call_count == 1
+        mock_sleep.assert_not_called()
+
     def test_raises_linear_error_on_request_exception(self, linear_service):
         with (
             patch.object(

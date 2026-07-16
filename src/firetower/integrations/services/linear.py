@@ -294,7 +294,21 @@ class LinearService:
                     )
                     return None
 
-                data = response.json()
+                try:
+                    data = response.json()
+                except ValueError:
+                    # A 2xx response whose body is not valid JSON is a broken
+                    # response, not a transient transport error, so don't retry.
+                    # Surface it as a failure (LinearError for raise_on_error
+                    # callers) rather than letting the ValueError propagate and
+                    # crash callers like the allocator, which only expect
+                    # LinearError for Linear failures.
+                    logger.exception("Linear API returned non-JSON response")
+                    self._raise_if_requested(
+                        "Linear API returned a non-JSON response",
+                        raise_on_error=raise_on_error,
+                    )
+                    return None
 
                 if "errors" in data:
                     # Looking up an issue by an identifier that does not exist
