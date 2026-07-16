@@ -62,6 +62,46 @@ class LinearError(Exception):
     """
 
 
+# GraphQL error signatures Linear returns when an issue lookup by identifier
+# references an issue that does not exist. Matched case-insensitively against
+# the error's `extensions.type`/`extensions.code` and, as a fallback, its
+# message. Kept deliberately narrow so only genuine not-found responses are
+# swallowed as "empty"; any other error still surfaces as a failure.
+_NOT_FOUND_ERROR_TOKENS = (
+    "entity not found",
+    "could not find referenced",
+    "not found",
+)
+
+
+def _errors_are_not_found(errors: Any) -> bool:
+    """True iff every GraphQL error in ``errors`` is an issue-not-found error.
+
+    Linear responds to an ``issue(id:)`` lookup for a nonexistent identifier
+    with an "entity not found" GraphQL error rather than a null result. We only
+    treat the response as an empty (not-found) result when *all* returned
+    errors are not-found errors, so a response mixing a real failure with a
+    not-found error still raises.
+    """
+    if not isinstance(errors, list) or not errors:
+        return False
+    for err in errors:
+        if not isinstance(err, dict):
+            return False
+        extensions = err.get("extensions") or {}
+        signal = " ".join(
+            str(extensions.get(key, ""))
+            for key in ("type", "code", "userPresentableMessage")
+        ).lower()
+        message = str(err.get("message", "")).lower()
+        # Normalize underscores so codes like ``NOT_FOUND`` match the
+        # space-delimited tokens below.
+        haystack = f"{signal} {message}".replace("_", " ")
+        if not any(token in haystack for token in _NOT_FOUND_ERROR_TOKENS):
+            return False
+    return True
+
+
 def parse_project_number(identifier: str) -> int | None:
     """Return the integer N when ``identifier`` is exactly
     ``f"{settings.PROJECT_KEY}-<digits>"`` (e.g. ``"INC-2353"`` -> ``2353``),
@@ -191,6 +231,7 @@ class LinearService:
         retryable: bool = True,
         *,
         raise_on_error: bool = False,
+        not_found_is_empty: bool = False,
     ) -> dict | None:
         access_token = self._get_access_token()
         if not access_token:
@@ -256,6 +297,14 @@ class LinearService:
                 data = response.json()
 
                 if "errors" in data:
+                    # Looking up an issue by an identifier that does not exist
+                    # (e.g. the placeholder slot the allocator wants to mint)
+                    # comes back as a GraphQL "entity not found" error rather
+                    # than a null result. When the caller asked for it, treat
+                    # that specific case as a genuine empty result (None) so a
+                    # missing issue is not mistaken for "Linear unreachable".
+                    if not_found_is_empty and _errors_are_not_found(data["errors"]):
+                        return None
                     logger.error(
                         "Linear GraphQL errors",
                         extra={"errors": data["errors"]},
@@ -335,7 +384,12 @@ class LinearService:
             }}
         }}
         """
-        data = self._graphql(query, {"id": issue_id}, raise_on_error=raise_on_error)
+        data = self._graphql(
+            query,
+            {"id": issue_id},
+            raise_on_error=raise_on_error,
+            not_found_is_empty=True,
+        )
         if not data or not data.get("issue"):
             return None
         issue = data["issue"]

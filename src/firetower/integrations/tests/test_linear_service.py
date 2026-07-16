@@ -12,6 +12,7 @@ from firetower.integrations.services.linear import (
     LINEAR_TOKEN_URL,
     LinearError,
     LinearService,
+    _errors_are_not_found,
     parse_project_number,
 )
 
@@ -944,3 +945,115 @@ class TestGetIssue:
         ):
             with pytest.raises(LinearError):
                 linear_service.get_issue("issue-123", raise_on_error=True)
+
+    def _not_found_response(self):
+        # Mirrors the real Linear response for an issue(id:) lookup against an
+        # identifier that does not exist: HTTP 200 with a GraphQL "entity not
+        # found" error and no data. Verified live: looking up an absent
+        # TESTINC-N returns "Could not find referenced Issue." (RELENG-911).
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "errors": [
+                {
+                    "message": "Entity not found: Issue - Could not find "
+                    "referenced Issue.",
+                    "extensions": {"type": "invalid input", "code": "NOT_FOUND"},
+                }
+            ]
+        }
+        return mock_response
+
+    def test_absent_identifier_returns_none_not_raises_end_to_end(self, linear_service):
+        # THE RELENG-911 create_adopt bug: an absent placeholder slot must read
+        # as "not found" (None), not as an error. Before the fix this raised
+        # LinearError -> LinearUnavailable -> degraded on every mint.
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service,
+                "_make_graphql_request",
+                return_value=self._not_found_response(),
+            ),
+        ):
+            result = linear_service.get_issue("TESTINC-2189", raise_on_error=True)
+
+        assert result is None
+
+    def test_real_graphql_error_still_raises_end_to_end(self, linear_service):
+        # A non-not-found error (e.g. auth/validation) must still raise for
+        # raise_on_error callers, so the allocator degrades rather than clobber.
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "errors": [
+                {
+                    "message": "Authentication required",
+                    "extensions": {"type": "authentication error"},
+                }
+            ]
+        }
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service.get_issue("TESTINC-2189", raise_on_error=True)
+
+    def test_mixed_errors_with_one_real_error_still_raises(self, linear_service):
+        # If any error in the payload is not a not-found error, the whole
+        # response is treated as a failure (raises), never swallowed as empty.
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "errors": [
+                {"message": "Entity not found: Issue"},
+                {"message": "Rate limit exceeded"},
+            ]
+        }
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service.get_issue("TESTINC-2189", raise_on_error=True)
+
+
+class TestErrorsAreNotFound:
+    def test_message_only_not_found(self):
+        assert _errors_are_not_found(
+            [{"message": "Entity not found: Issue - Could not find referenced Issue."}]
+        )
+
+    def test_extensions_code_not_found(self):
+        assert _errors_are_not_found(
+            [{"message": "nope", "extensions": {"code": "NOT_FOUND"}}]
+        )
+
+    def test_real_error_is_not_not_found(self):
+        assert not _errors_are_not_found([{"message": "Authentication required"}])
+
+    def test_all_must_be_not_found(self):
+        assert not _errors_are_not_found(
+            [{"message": "Entity not found"}, {"message": "boom"}]
+        )
+
+    def test_empty_or_malformed_is_not_not_found(self):
+        assert not _errors_are_not_found([])
+        assert not _errors_are_not_found(None)
+        assert not _errors_are_not_found(["not a dict"])
