@@ -207,6 +207,9 @@ class ConfigFile:
         self.django_secret_key = _env_override(
             self.django_secret_key, "DJANGO_SECRET_KEY"
         )
+        # SALT_KEY overrides only the singular salt_key. Salt-key rotation uses the
+        # salt_keys list, which takes precedence in settings.py; rotate via the
+        # config file, not this env var. See RELENG-918.
         self.salt_key = _env_override(self.salt_key, "SALT_KEY")
 
         # slack is a required section, but guard defensively anyway.
