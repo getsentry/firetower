@@ -1078,14 +1078,20 @@ class TestGetIssue:
 
 
 class TestErrorsAreNotFound:
-    def test_message_only_not_found(self):
+    def test_issue_not_found_message(self):
         assert _errors_are_not_found(
             [{"message": "Entity not found: Issue - Could not find referenced Issue."}]
         )
 
-    def test_extensions_code_not_found(self):
-        assert _errors_are_not_found(
-            [{"message": "nope", "extensions": {"code": "NOT_FOUND"}}]
+    def test_case_insensitive(self):
+        assert _errors_are_not_found([{"message": "COULD NOT FIND REFERENCED ISSUE"}])
+
+    def test_other_not_found_entities_do_not_match(self):
+        # Only a missing *issue* counts; team/user/etc. not-found must still
+        # surface as a failure so the allocator degrades instead of minting.
+        assert not _errors_are_not_found([{"message": "Team not found"}])
+        assert not _errors_are_not_found(
+            [{"message": "Could not find referenced User."}]
         )
 
     def test_real_error_is_not_not_found(self):
@@ -1093,7 +1099,10 @@ class TestErrorsAreNotFound:
 
     def test_all_must_be_not_found(self):
         assert not _errors_are_not_found(
-            [{"message": "Entity not found"}, {"message": "boom"}]
+            [
+                {"message": "Could not find referenced Issue."},
+                {"message": "boom"},
+            ]
         )
 
     def test_empty_or_malformed_is_not_not_found(self):

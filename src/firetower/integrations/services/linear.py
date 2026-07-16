@@ -62,42 +62,29 @@ class LinearError(Exception):
     """
 
 
-# GraphQL error signatures Linear returns when an issue lookup by identifier
-# references an issue that does not exist. Matched case-insensitively against
-# the error's `extensions.type`/`extensions.code` and, as a fallback, its
-# message. Kept deliberately narrow so only genuine not-found responses are
-# swallowed as "empty"; any other error still surfaces as a failure.
-_NOT_FOUND_ERROR_TOKENS = (
-    "entity not found",
-    "could not find referenced",
-    "not found",
-)
+# Exact message Linear returns when an ``issue(id:)`` lookup references an
+# issue that does not exist. Matched case-insensitively. Deliberately specific
+# to a missing *issue* (not a generic "not found") so unrelated errors
+# (team/user/project not found, auth, etc.) still surface as failures rather
+# than being mistaken for an empty issue lookup.
+_ISSUE_NOT_FOUND_MESSAGE = "could not find referenced issue"
 
 
 def _errors_are_not_found(errors: Any) -> bool:
     """True iff every GraphQL error in ``errors`` is an issue-not-found error.
 
     Linear responds to an ``issue(id:)`` lookup for a nonexistent identifier
-    with an "entity not found" GraphQL error rather than a null result. We only
-    treat the response as an empty (not-found) result when *all* returned
-    errors are not-found errors, so a response mixing a real failure with a
-    not-found error still raises.
+    with a "Could not find referenced Issue." GraphQL error rather than a null
+    result. We only treat the response as an empty (not-found) result when
+    *all* returned errors are that specific issue-not-found error, so a
+    response mixing a real failure with a not-found error still raises.
     """
     if not isinstance(errors, list) or not errors:
         return False
     for err in errors:
         if not isinstance(err, dict):
             return False
-        extensions = err.get("extensions") or {}
-        signal = " ".join(
-            str(extensions.get(key, ""))
-            for key in ("type", "code", "userPresentableMessage")
-        ).lower()
-        message = str(err.get("message", "")).lower()
-        # Normalize underscores so codes like ``NOT_FOUND`` match the
-        # space-delimited tokens below.
-        haystack = f"{signal} {message}".replace("_", " ")
-        if not any(token in haystack for token in _NOT_FOUND_ERROR_TOKENS):
+        if _ISSUE_NOT_FOUND_MESSAGE not in str(err.get("message", "")).lower():
             return False
     return True
 
