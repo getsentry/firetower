@@ -1172,19 +1172,19 @@ def create_linear_parent_issue(
     incident: Incident, *, channel_id: str | None = None
 ) -> None:
     # Adopt-on-create: the allocator already claimed/created a matching Linear
-    # parent whose uuid is on the incident. Populate it directly (no lookup by
-    # identifier) and skip the legacy claim/create path entirely.
-    if adopt_on_create_enabled():
-        # With adopt-on-create on, the legacy claim-by-identifier path must
-        # never run (it is the clobber-prone code RELENG-911 exists to avoid).
-        # The allocator always sets linear_parent_issue_id when the flag is on;
-        # if it is somehow missing, refuse to fall through and claim/clobber.
-        if not incident.linear_parent_issue_id:
-            logger.error(
-                f"Adopt-on-create enabled but incident {incident.id} has no "
-                "linear_parent_issue_id; refusing to run legacy claim path"
-            )
-            return
+    # parent whose uuid is on the incident. Populate it directly by uuid (no
+    # lookup by identifier, so it can never clobber a moved/aliased issue) and
+    # skip the legacy claim/create path entirely.
+    #
+    # This only applies when the incident actually has a parent uuid. New
+    # incidents always do under the flag (the allocator sets it before this
+    # hook runs). The one flag-on caller that arrives WITHOUT a uuid is the
+    # backfill in sync_action_items_from_linear (incidents predating Linear
+    # integration); those fall through to the legacy claim path below, which
+    # claims their existing INC-N placeholder. That is safe because every such
+    # parentless incident has a clean, correctly-identified INC-N Placeholder
+    # (never moved), so the claim resolves to the right issue.
+    if adopt_on_create_enabled() and incident.linear_parent_issue_id:
         identity = getattr(incident, "_allocated_identity", None)
         url = identity.linear_url if identity is not None else None
         if not url:

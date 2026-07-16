@@ -579,18 +579,33 @@ class TestCreateLinearParentIssueAdoptPath:
         )
 
     @patch("firetower.incidents.hooks.populate_linear_parent")
+    @patch("firetower.incidents.hooks.claim_linear_issue")
     @patch("firetower.incidents.hooks._get_linear_service")
-    def test_no_claim_when_flag_on_but_no_parent_id(
-        self, mock_get_linear, mock_populate, adopt_enabled
+    def test_flag_on_no_parent_id_backfills_via_legacy_claim(
+        self, mock_get_linear, mock_claim, mock_populate, adopt_enabled
     ):
-        # With adopt-on-create enabled but no linear_parent_issue_id, the
-        # dangerous legacy claim-by-identifier path must never run (RELENG-911).
+        # Flag on + no linear_parent_issue_id is the backfill case
+        # (sync_action_items_from_linear on an incident predating Linear
+        # integration). It falls through to the legacy claim path, which claims
+        # the incident's existing INC-N Placeholder. Safe because every such
+        # parentless incident has a clean, correctly-identified placeholder
+        # (never moved) — so the by-identifier claim can't clobber. It must NOT
+        # take the uuid adopt path (there's no uuid to populate).
+        adopt_enabled.LINEAR["SYNC_IDENTIFIERS"] = True
         incident = Incident.objects.create(
             id=2501, title="No parent", severity=IncidentSeverity.P2
         )
+        linear = mock_get_linear.return_value
+        linear.get_workflow_states.return_value = {}
+        mock_claim.return_value = {
+            "id": "uuid-claimed",
+            "identifier": "TESTINC-2501",
+            "url": "https://linear.app/issue/claimed",
+        }
+        linear.update_issue.return_value = True
 
         create_linear_parent_issue(incident)
 
+        # Legacy claim ran (backfill); uuid adopt path did not.
+        mock_claim.assert_called_once()
         mock_populate.assert_not_called()
-        mock_get_linear.return_value.get_issue.assert_not_called()
-        mock_get_linear.return_value.create_issue.assert_not_called()
