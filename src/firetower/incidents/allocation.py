@@ -9,7 +9,7 @@ the counter forward, claiming a clean matching placeholder or creating a new one
 and adopting whatever id Linear mints. The incident's numeric id and its Linear
 parent are therefore always allocated together, and we never claim an issue whose
 identifier does not match the id we hand out (which is what let the legacy
-``_claim_linear_issue`` path clobber moved/aliased issues).
+``claim_linear_issue`` path clobber moved/aliased issues).
 """
 
 import logging

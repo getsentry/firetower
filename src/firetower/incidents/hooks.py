@@ -1085,7 +1085,7 @@ LINEAR_PARENT_DESCRIPTION = (
 MAX_CLAIM_ATTEMPTS = 5
 
 
-def _claim_linear_issue(
+def claim_linear_issue(
     linear_service: LinearService,
     incident: Incident,
     team_id: str,
@@ -1108,7 +1108,7 @@ def _claim_linear_issue(
     return None
 
 
-def _populate_linear_parent(
+def populate_linear_parent(
     incident: Incident, url: str, *, channel_id: str | None = None
 ) -> None:
     """Populate a pre-claimed / adopted Linear parent issue.
@@ -1174,7 +1174,17 @@ def create_linear_parent_issue(
     # Adopt-on-create: the allocator already claimed/created a matching Linear
     # parent whose uuid is on the incident. Populate it directly (no lookup by
     # identifier) and skip the legacy claim/create path entirely.
-    if adopt_on_create_enabled() and incident.linear_parent_issue_id:
+    if adopt_on_create_enabled():
+        # With adopt-on-create on, the legacy claim-by-identifier path must
+        # never run (it is the clobber-prone code RELENG-911 exists to avoid).
+        # The allocator always sets linear_parent_issue_id when the flag is on;
+        # if it is somehow missing, refuse to fall through and claim/clobber.
+        if not incident.linear_parent_issue_id:
+            logger.error(
+                f"Adopt-on-create enabled but incident {incident.id} has no "
+                "linear_parent_issue_id; refusing to run legacy claim path"
+            )
+            return
         identity = getattr(incident, "_allocated_identity", None)
         url = identity.linear_url if identity is not None else None
         if not url:
@@ -1187,7 +1197,7 @@ def create_linear_parent_issue(
                 )
                 url = None
         if url:
-            _populate_linear_parent(incident, url, channel_id=channel_id)
+            populate_linear_parent(incident, url, channel_id=channel_id)
         return
 
     linear_config = settings.LINEAR
@@ -1215,7 +1225,7 @@ def create_linear_parent_issue(
         captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
 
         if sync_identifiers:
-            issue = _claim_linear_issue(linear_service, incident, team_id, project_id)
+            issue = claim_linear_issue(linear_service, incident, team_id, project_id)
             if not issue:
                 linear_link.delete()
                 logger.warning(

@@ -7,9 +7,9 @@ from django.conf import settings
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.allocation import LinearUnavailable, adopt_on_create_enabled
 from firetower.incidents.hooks import (
-    _populate_linear_parent,
     build_channel_name,
     build_channel_topic,
+    populate_linear_parent,
 )
 from firetower.incidents.models import (
     ExternalLink,
@@ -303,7 +303,7 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
         identity = getattr(incident, "_allocated_identity", None)
         if identity is not None:
             try:
-                _populate_linear_parent(incident, identity.linear_url)
+                populate_linear_parent(incident, identity.linear_url)
             except Exception:
                 logger.exception(
                     "Failed to populate Linear parent for backfill incident %s",

@@ -1002,7 +1002,6 @@ class TestGetIssue:
                 {
                     "message": "Entity not found: Issue - Could not find "
                     "referenced Issue.",
-                    "extensions": {"type": "invalid input", "code": "NOT_FOUND"},
                 }
             ]
         }

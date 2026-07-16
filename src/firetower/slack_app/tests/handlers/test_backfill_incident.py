@@ -556,7 +556,7 @@ class TestBackfillSubmission:
         "firetower.slack_app.handlers.backfill_incident.adopt_on_create_enabled",
         return_value=True,
     )
-    @patch("firetower.slack_app.handlers.backfill_incident._populate_linear_parent")
+    @patch("firetower.slack_app.handlers.backfill_incident.populate_linear_parent")
     @patch("firetower.incidents.serializers.allocate_incident_identity")
     @patch(
         "firetower.slack_app.handlers.backfill_incident.sync_incident_participants_from_slack"

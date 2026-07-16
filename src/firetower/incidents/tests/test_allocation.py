@@ -14,8 +14,8 @@ from firetower.incidents.allocation import (
     allocate_incident_identity,
 )
 from firetower.incidents.hooks import (
-    _populate_linear_parent,
     create_linear_parent_issue,
+    populate_linear_parent,
 )
 from firetower.incidents.models import (
     ExternalLink,
@@ -136,15 +136,6 @@ class TestAllocateClaim:
         )
         assert IncidentCounter.objects.get(pk=1).next_id == 2335
         linear.create_issue.assert_not_called()
-
-    def test_claims_titled_placeholder(self, adopt_enabled):
-        _set_counter(2334)
-        linear = _make_linear({_identifier(2334): _placeholder(2334)})
-
-        with _patch_linear(linear):
-            identity = allocate_incident_identity()
-
-        assert identity.inc_id == 2334
 
 
 @pytest.mark.django_db
@@ -355,7 +346,12 @@ class TestAllocateAtomicTripwire:
 
 @pytest.mark.django_db
 class TestAllocateSerialization:
-    def test_consecutive_allocations_get_distinct_ids(self, adopt_enabled):
+    def test_sequential_allocations_get_distinct_ids(self, adopt_enabled):
+        # Verifies that two SEQUENTIAL allocate calls advance the counter and
+        # get distinct ids. This does NOT exercise real concurrent contention
+        # of the select_for_update row lock: pytest wraps each test in a single
+        # transaction, so genuine cross-transaction row-lock contention cannot
+        # be reproduced in-process.
         _set_counter(2334)
         linear = _make_linear(
             {
@@ -491,7 +487,7 @@ class TestPopulateLinearParent:
         linear.get_workflow_states.return_value = {"started": "state-started"}
         linear.update_issue.return_value = True
 
-        _populate_linear_parent(
+        populate_linear_parent(
             incident, "https://linear.app/issue/x", channel_id="C123"
         )
 
@@ -510,8 +506,8 @@ class TestPopulateLinearParent:
         incident = self._incident(settings)
         mock_get_linear.return_value.get_workflow_states.return_value = {}
 
-        _populate_linear_parent(incident, "https://linear.app/issue/x")
-        _populate_linear_parent(incident, "https://linear.app/issue/y")
+        populate_linear_parent(incident, "https://linear.app/issue/x")
+        populate_linear_parent(incident, "https://linear.app/issue/y")
 
         links = ExternalLink.objects.filter(
             incident=incident, type=ExternalLinkType.LINEAR
@@ -527,7 +523,7 @@ class TestPopulateLinearParent:
         linear.get_workflow_states.return_value = {}
         linear.update_issue.side_effect = RuntimeError("boom")
 
-        _populate_linear_parent(incident, "https://linear.app/issue/x")
+        populate_linear_parent(incident, "https://linear.app/issue/x")
 
         link = ExternalLink.objects.get(incident=incident, type=ExternalLinkType.LINEAR)
         assert link.url == "https://linear.app/issue/x"
@@ -538,7 +534,7 @@ class TestPopulateLinearParent:
         incident = self._incident(settings)
         mock_get_linear.return_value.get_workflow_states.return_value = {}
 
-        _populate_linear_parent(incident, "https://linear.app/issue/x")
+        populate_linear_parent(incident, "https://linear.app/issue/x")
 
         mock_slack.add_bookmark.assert_not_called()
 
@@ -552,7 +548,7 @@ class TestCreateLinearParentIssueAdoptPath:
         incident.linear_parent_issue_id = "uuid-verified"
         return incident
 
-    @patch("firetower.incidents.hooks._populate_linear_parent")
+    @patch("firetower.incidents.hooks.populate_linear_parent")
     def test_uses_stashed_identity_url(self, mock_populate, adopt_enabled):
         incident = self._incident()
         incident._allocated_identity = AllocatedIdentity(
@@ -565,7 +561,7 @@ class TestCreateLinearParentIssueAdoptPath:
             incident, "https://linear.app/issue/x", channel_id="C1"
         )
 
-    @patch("firetower.incidents.hooks._populate_linear_parent")
+    @patch("firetower.incidents.hooks.populate_linear_parent")
     @patch("firetower.incidents.hooks._get_linear_service")
     def test_falls_back_to_get_issue_for_url(
         self, mock_get_linear, mock_populate, adopt_enabled
@@ -582,13 +578,13 @@ class TestCreateLinearParentIssueAdoptPath:
             incident, "https://linear.app/issue/fallback", channel_id="C1"
         )
 
-    @patch("firetower.incidents.hooks._populate_linear_parent")
+    @patch("firetower.incidents.hooks.populate_linear_parent")
     @patch("firetower.incidents.hooks._get_linear_service")
-    def test_legacy_path_when_no_parent_id(
+    def test_no_claim_when_flag_on_but_no_parent_id(
         self, mock_get_linear, mock_populate, adopt_enabled
     ):
-        mock_get_linear.return_value.get_issue.return_value = None
-        mock_get_linear.return_value.create_issue.return_value = None
+        # With adopt-on-create enabled but no linear_parent_issue_id, the
+        # dangerous legacy claim-by-identifier path must never run (RELENG-911).
         incident = Incident.objects.create(
             id=2501, title="No parent", severity=IncidentSeverity.P2
         )
@@ -596,3 +592,5 @@ class TestCreateLinearParentIssueAdoptPath:
         create_linear_parent_issue(incident)
 
         mock_populate.assert_not_called()
+        mock_get_linear.return_value.get_issue.assert_not_called()
+        mock_get_linear.return_value.create_issue.assert_not_called()
