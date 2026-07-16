@@ -212,6 +212,14 @@ class ConfigFile:
         # config file, not this env var. See RELENG-918.
         self.salt_key = _env_override(self.salt_key, "SALT_KEY")
 
+        # postgres is a required section, but guard defensively anyway. Rotation of
+        # the live password uses postgres.fallback_passwords in the config file;
+        # DJANGO_PG_PASS only overrides the primary password.
+        if self.postgres is not None:
+            self.postgres.password = _env_override(
+                self.postgres.password, "DJANGO_PG_PASS"
+            )
+
         # slack is a required section, but guard defensively anyway.
         if self.slack is not None:
             self.slack.bot_token = _env_override(

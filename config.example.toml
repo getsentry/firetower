@@ -5,6 +5,7 @@
 # is used. This lets prod inject per-secret values without changing local dev.
 # Overridable keys and their env vars:
 #   django_secret_key                                  -> DJANGO_SECRET_KEY
+#   [postgres] password                                -> DJANGO_PG_PASS
 #   salt_key                                           -> SALT_KEY
 #     (NOTE: SALT_KEY only overrides the singular salt_key. To rotate salt keys,
 #      use the salt_keys list in this config file, which takes precedence.)
@@ -39,7 +40,7 @@ region_grouping = [["region-a", "region-b"], ["region-c", "region-d"]]
 db = "firetower"
 host = "localhost"
 user = "postgres"
-password = "dummy_dev_password"
+password = "dummy_dev_password"  # Overridable via DJANGO_PG_PASS
 # Optional: during a password rotation, list the other valid password(s) here.
 # If `password` is rejected with an auth error, each of these is tried in order.
 # Once the rotation is complete, move the new value into `password` and clear this.
