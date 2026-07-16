@@ -441,9 +441,12 @@ class TestSerializerAllocation:
         assert incident._allocated_identity is identity
 
     @patch("firetower.incidents.serializers.allocate_incident_identity")
-    def test_flag_off_identity_leaves_no_linear_parent(self, mock_allocate, settings):
+    def test_flag_off_skips_allocator_and_uses_counter(self, mock_allocate, settings):
+        # Flag off: the serializer must NOT call the allocator. The id is
+        # assigned by Incident.save() inside its own atomic block (gapless on
+        # rollback), and no Linear parent is set.
         settings.LINEAR = None
-        mock_allocate.return_value = AllocatedIdentity(2600, "", "")
+        _set_counter(2600)
 
         serializer = IncidentWriteSerializer(
             data=self._serializer_data(), context={"skip_hooks": True}
@@ -451,6 +454,7 @@ class TestSerializerAllocation:
         assert serializer.is_valid(), serializer.errors
         incident = serializer.save()
 
+        mock_allocate.assert_not_called()
         assert incident.id == 2600
         assert incident.linear_parent_issue_id is None
 

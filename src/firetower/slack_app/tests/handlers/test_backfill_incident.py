@@ -549,6 +549,10 @@ class TestBackfillSubmission:
         assert "Could not identify" in msg
 
     @patch(
+        "firetower.incidents.serializers.adopt_on_create_enabled",
+        return_value=True,
+    )
+    @patch(
         "firetower.slack_app.handlers.backfill_incident.adopt_on_create_enabled",
         return_value=True,
     )
@@ -569,6 +573,7 @@ class TestBackfillSubmission:
         mock_allocate,
         mock_populate,
         mock_enabled,
+        mock_enabled_serializer,
     ):
         mock_get_user.return_value = self.user
         mock_allocate.return_value = AllocatedIdentity(
@@ -597,6 +602,14 @@ class TestBackfillSubmission:
         assert mock_populate.call_args[0][1] == "https://linear.app/issue/x"
 
     @patch(
+        "firetower.incidents.serializers.adopt_on_create_enabled",
+        return_value=True,
+    )
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.adopt_on_create_enabled",
+        return_value=True,
+    )
+    @patch(
         "firetower.incidents.serializers.allocate_incident_identity",
         side_effect=LinearUnavailable,
     )
@@ -605,7 +618,12 @@ class TestBackfillSubmission:
         "firetower.slack_app.handlers.backfill_incident.get_or_create_user_from_slack_id"
     )
     def test_linear_unavailable_dms_retry_and_creates_no_incident(
-        self, mock_get_user, mock_slack_svc, mock_allocate
+        self,
+        mock_get_user,
+        mock_slack_svc,
+        mock_allocate,
+        mock_enabled,
+        mock_enabled_serializer,
     ):
         mock_get_user.return_value = self.user
         mock_slack_svc.build_channel_url.return_value = (

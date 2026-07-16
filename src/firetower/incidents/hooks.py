@@ -1180,7 +1180,7 @@ def create_linear_parent_issue(
         if not url:
             try:
                 issue = _get_linear_service().get_issue(incident.linear_parent_issue_id)
-                url = issue["url"] if issue else None
+                url = issue.get("url") if issue else None
             except Exception:
                 logger.exception(
                     f"Failed to resolve Linear url for incident {incident.id}"

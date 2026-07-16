@@ -89,8 +89,10 @@ def _create_fallback_channel(
         _slack_service.post_message(
             channel_id,
             f":warning: This channel was created in degraded mode ({channel_reason}). "
-            "The incident has NOT been recorded in Firetower. Details will need to be "
-            "backfilled once the database is restored.",
+            "The incident has NOT been recorded in Firetower. Once the issue is "
+            "resolved, run `/ft backfill` in this channel to record it. "
+            "Note: automated escalations (sentry-sudo) will not work for this "
+            "incident — page Prod Eng directly if you need to escalate.",
         )
     except Exception:
         logger.exception("Failed to post warning in fallback channel %s", channel_name)
@@ -136,8 +138,10 @@ def _create_fallback_channel(
             text=(
                 f"An incident channel has been created in degraded mode ({dm_reason}).\n"
                 f"Slack channel: <#{channel_id}>\n\n"
-                "The incident has NOT been recorded in Firetower and will need to be "
-                "backfilled once the database is restored."
+                "The incident has NOT been recorded in Firetower. Once the issue is "
+                "resolved, run `/ft backfill` in the channel to record it. "
+                "Automated escalations (sentry-sudo) will not work for this "
+                "incident — page Prod Eng directly if you need to escalate."
             ),
         )
     except Exception:
