@@ -22,7 +22,6 @@ export function FilterPanel() {
           label="Service Tier"
           filterKey="service_tier"
           options={ServiceTierSchema.options}
-          allowEmpty
         />
         <TagFilter label="Impact Type" filterKey="impact_type" tagType="IMPACT_TYPE" />
         <TagFilter

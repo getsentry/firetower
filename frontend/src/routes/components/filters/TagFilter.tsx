@@ -5,7 +5,6 @@ import {Pencil, XIcon} from 'lucide-react';
 import {cn} from 'utils/cn';
 
 import {tagsQueryOptions, type TagType} from '../../$incidentId/queries/tagsQueryOptions';
-import {EMPTY_FILTER_SENTINEL} from '../../types';
 import {type ArrayFilterKey} from '../useActiveFilters';
 
 import {useFilterEditor} from './useFilterEditor';
@@ -33,18 +32,10 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
   } = useFilterEditor({filterKey});
   const {data: suggestions = []} = useQuery(tagsQueryOptions(tagType));
 
-  const available: string[] = [
-    ...(!selected.includes(EMPTY_FILTER_SENTINEL) &&
-    'empty'.includes(inputValue.toLowerCase())
-      ? [EMPTY_FILTER_SENTINEL]
-      : []),
-    ...suggestions.filter(
-      (s: string) =>
-        s !== EMPTY_FILTER_SENTINEL &&
-        !selected.includes(s) &&
-        s.toLowerCase().includes(inputValue.toLowerCase())
-    ),
-  ];
+  const available = suggestions.filter(
+    (s: string) =>
+      !selected.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
+  );
 
   return (
     <div>
@@ -71,17 +62,13 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
                     variant="close"
                     size={null}
                     onClick={() => toggle(v)}
-                    aria-label={`Remove ${v === EMPTY_FILTER_SENTINEL ? 'Empty' : v}`}
+                    aria-label={`Remove ${v}`}
                   >
                     <XIcon className="h-3.5 w-3.5" />
                   </Button>
                 }
               >
-                {v === EMPTY_FILTER_SENTINEL ? (
-                  <span className="text-content-disabled italic">Empty</span>
-                ) : (
-                  v
-                )}
+                {v}
               </Tag>
             ))}
             <input
@@ -112,17 +99,13 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
                       e.stopPropagation();
                       remove(v);
                     }}
-                    aria-label={`Remove ${v === EMPTY_FILTER_SENTINEL ? 'Empty' : v}`}
+                    aria-label={`Remove ${v}`}
                   >
                     <XIcon className="h-3.5 w-3.5" />
                   </Button>
                 }
               >
-                {v === EMPTY_FILTER_SENTINEL ? (
-                  <span className="text-content-disabled italic">Empty</span>
-                ) : (
-                  v
-                )}
+                {v}
               </Tag>
             ))}
           </div>
@@ -157,11 +140,7 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
                       : 'hover:bg-background-transparent-neutral-muted'
                   )}
                 >
-                  {option === EMPTY_FILTER_SENTINEL ? (
-                    <span className="text-content-disabled italic">Empty</span>
-                  ) : (
-                    option
-                  )}
+                  {option}
                 </button>
               ))}
             </div>

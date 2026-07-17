@@ -1,7 +1,5 @@
 import {z} from 'zod';
 
-export const EMPTY_FILTER_SENTINEL = '__empty__';
-
 export const StatusSchema = z.enum([
   'Active',
   'Mitigated',

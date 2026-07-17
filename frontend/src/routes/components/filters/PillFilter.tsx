@@ -4,7 +4,6 @@ import {Tag} from 'components/Tag';
 import {Pencil, XIcon} from 'lucide-react';
 import {cn} from 'utils/cn';
 
-import {EMPTY_FILTER_SENTINEL} from '../../types';
 import {type ArrayFilterKey} from '../useActiveFilters';
 
 import {useFilterEditor} from './useFilterEditor';
@@ -15,14 +14,12 @@ interface PillFilterProps<T extends PillVariant> {
   label: string;
   filterKey: ArrayFilterKey;
   options: readonly T[];
-  allowEmpty?: boolean;
 }
 
 export function PillFilter<T extends PillVariant>({
   label,
   filterKey,
   options,
-  allowEmpty = false,
 }: PillFilterProps<T>) {
   const {
     isEditing,
@@ -39,19 +36,9 @@ export function PillFilter<T extends PillVariant>({
     handleKeyDown,
   } = useFilterEditor({filterKey});
 
-  const emptyPrefix: (typeof EMPTY_FILTER_SENTINEL)[] =
-    allowEmpty &&
-    !selected.includes(EMPTY_FILTER_SENTINEL) &&
-    'empty'.includes(inputValue.toLowerCase())
-      ? [EMPTY_FILTER_SENTINEL]
-      : [];
-
-  const available: (T | typeof EMPTY_FILTER_SENTINEL)[] = [
-    ...emptyPrefix,
-    ...options.filter(
-      o => !selected.includes(o) && o.toLowerCase().includes(inputValue.toLowerCase())
-    ),
-  ];
+  const available = options.filter(
+    o => !selected.includes(o) && o.toLowerCase().includes(inputValue.toLowerCase())
+  );
 
   return (
     <div>
@@ -78,17 +65,13 @@ export function PillFilter<T extends PillVariant>({
                     variant="close"
                     size={null}
                     onClick={() => toggle(v)}
-                    aria-label={`Remove ${v === EMPTY_FILTER_SENTINEL ? 'Empty' : v}`}
+                    aria-label={`Remove ${v}`}
                   >
                     <XIcon className="h-3.5 w-3.5" />
                   </Button>
                 }
               >
-                {v === EMPTY_FILTER_SENTINEL ? (
-                  <span className="text-content-disabled italic">Empty</span>
-                ) : (
-                  <Pill variant={v as T}>{v}</Pill>
-                )}
+                <Pill variant={v as T}>{v}</Pill>
               </Tag>
             ))}
             <input
@@ -119,17 +102,13 @@ export function PillFilter<T extends PillVariant>({
                       e.stopPropagation();
                       remove(v);
                     }}
-                    aria-label={`Remove ${v === EMPTY_FILTER_SENTINEL ? 'Empty' : v}`}
+                    aria-label={`Remove ${v}`}
                   >
                     <XIcon className="h-3.5 w-3.5" />
                   </Button>
                 }
               >
-                {v === EMPTY_FILTER_SENTINEL ? (
-                  <span className="text-content-disabled italic">Empty</span>
-                ) : (
-                  <Pill variant={v as T}>{v}</Pill>
-                )}
+                <Pill variant={v as T}>{v}</Pill>
               </Tag>
             ))}
           </div>
@@ -164,11 +143,7 @@ export function PillFilter<T extends PillVariant>({
                       : 'hover:bg-background-transparent-neutral-muted'
                   )}
                 >
-                  {option === EMPTY_FILTER_SENTINEL ? (
-                    <span className="text-content-disabled italic">Empty</span>
-                  ) : (
-                    <Pill variant={option as T}>{option}</Pill>
-                  )}
+                  <Pill variant={option}>{option}</Pill>
                 </button>
               ))}
             </div>
