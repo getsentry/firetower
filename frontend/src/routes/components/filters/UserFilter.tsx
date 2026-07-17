@@ -154,7 +154,7 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
 
   const showEmptyOption =
     !selected.includes(EMPTY_FILTER_SENTINEL) &&
-    (!debouncedSearch || 'empty'.includes(debouncedSearch.toLowerCase()));
+    (!inputValue || 'empty'.includes(inputValue.toLowerCase()));
 
   const available = useMemo(() => {
     const notSelected = users.filter(u => !selected.includes(u.email));

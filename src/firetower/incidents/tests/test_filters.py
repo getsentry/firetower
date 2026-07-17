@@ -666,7 +666,7 @@ class TestUIIncidentFilters:
             status=IncidentStatus.ACTIVE,
             severity=IncidentSeverity.P1,
         )
-        Incident.objects.create(
+        inc_other = Incident.objects.create(
             title="Other Service",
             status=IncidentStatus.ACTIVE,
             severity=IncidentSeverity.P1,
@@ -674,7 +674,7 @@ class TestUIIncidentFilters:
         api_tag = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
         web_tag = Tag.objects.create(name="Web", type=TagType.AFFECTED_SERVICE)
         inc_with_tag.affected_service_tags.add(api_tag)
-        Incident.objects.last().affected_service_tags.add(web_tag)
+        inc_other.affected_service_tags.add(web_tag)
 
         self.client.force_authenticate(user=self.user)
         response = self.client.get(

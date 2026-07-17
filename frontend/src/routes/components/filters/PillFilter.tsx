@@ -39,12 +39,15 @@ export function PillFilter<T extends PillVariant>({
     handleKeyDown,
   } = useFilterEditor({filterKey});
 
-  const available: (T | typeof EMPTY_FILTER_SENTINEL)[] = [
-    ...(allowEmpty &&
+  const emptyPrefix: (typeof EMPTY_FILTER_SENTINEL)[] =
+    allowEmpty &&
     !selected.includes(EMPTY_FILTER_SENTINEL) &&
     'empty'.includes(inputValue.toLowerCase())
       ? [EMPTY_FILTER_SENTINEL]
-      : []),
+      : [];
+
+  const available: (T | typeof EMPTY_FILTER_SENTINEL)[] = [
+    ...emptyPrefix,
     ...options.filter(
       o => !selected.includes(o) && o.toLowerCase().includes(inputValue.toLowerCase())
     ),
