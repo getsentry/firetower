@@ -4,24 +4,12 @@ Configuration file loader for Firetower.
 Loads configuration values from a TOML file and validates that all required keys are present.
 """
 
-import os
 from dataclasses import field
 from pathlib import Path
 from typing import Any
 
 from serde import deserialize, from_dict
 from serde.toml import from_toml
-
-
-def _env_override(value: str, env_var: str) -> str:
-    """
-    Return the environment variable value if it is set and non-empty, else `value`.
-
-    The non-empty guard is deliberate: a stray empty env var must not blank out a
-    real secret coming from the TOML config. Unset or empty env vars fall back to
-    the TOML value.
-    """
-    return v if (v := os.environ.get(env_var)) else value
 
 
 @deserialize
@@ -177,7 +165,6 @@ class ConfigFile:
         """
         with open(file_path) as f:
             data: ConfigFile = from_toml(ConfigFile, f.read())
-        data._apply_env_overrides()
         return data
 
     @classmethod
@@ -191,66 +178,7 @@ class ConfigFile:
         Returns:
             ConfigFile instance with loaded configuration.
         """
-        config = from_dict(ConfigFile, data)
-        config._apply_env_overrides()
-        return config
-
-    def _apply_env_overrides(self) -> None:
-        """
-        Override secret config values from dedicated environment variables.
-
-        Applied as the single choke point after construction in both `from_file`
-        and `from_dict` so every code path (and tests) shares one source of truth.
-        Each override wins only when its env var is set AND non-empty; otherwise the
-        TOML value is preserved (see `_env_override`). See RELENG-918.
-        """
-        self.django_secret_key = _env_override(
-            self.django_secret_key, "DJANGO_SECRET_KEY"
-        )
-        # SALT_KEY overrides only the singular salt_key. Salt-key rotation uses the
-        # salt_keys list, which takes precedence in settings.py; rotate via the
-        # config file, not this env var. See RELENG-918.
-        self.salt_key = _env_override(self.salt_key, "SALT_KEY")
-
-        # postgres is a required section, but guard defensively anyway. Rotation of
-        # the live password uses postgres.fallback_passwords in the config file;
-        # DJANGO_PG_PASS only overrides the primary password.
-        if self.postgres is not None:
-            self.postgres.password = _env_override(
-                self.postgres.password, "DJANGO_PG_PASS"
-            )
-
-        # slack is a required section, but guard defensively anyway.
-        if self.slack is not None:
-            self.slack.bot_token = _env_override(
-                self.slack.bot_token, "SLACK_BOT_TOKEN"
-            )
-            self.slack.app_token = _env_override(
-                self.slack.app_token, "SLACK_APP_TOKEN"
-            )
-
-        if self.linear is not None:
-            self.linear.client_secret = _env_override(
-                self.linear.client_secret, "LINEAR_CLIENT_SECRET"
-            )
-
-        if self.pagerduty is not None:
-            self.pagerduty.api_token = _env_override(
-                self.pagerduty.api_token, "PAGERDUTY_API_TOKEN"
-            )
-            for name, policy in self.pagerduty.escalation_policies.items():
-                if override := os.environ.get(f"PAGERDUTY_ESCALATION_KEY_{name}"):
-                    policy.integration_key = override
-
-        if self.statuspage is not None:
-            self.statuspage.api_key = _env_override(
-                self.statuspage.api_key, "STATUSPAGE_API_KEY"
-            )
-
-        if self.notion is not None:
-            self.notion.integration_token = _env_override(
-                self.notion.integration_token, "NOTION_INTEGRATION_TOKEN"
-            )
+        return from_dict(ConfigFile, data)
 
 
 class DummyConfigFile(ConfigFile):
