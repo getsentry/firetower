@@ -62,6 +62,33 @@ class LinearError(Exception):
     """
 
 
+# Exact message Linear returns when an ``issue(id:)`` lookup references an
+# issue that does not exist. Matched case-insensitively. Deliberately specific
+# to a missing *issue* (not a generic "not found") so unrelated errors
+# (team/user/project not found, auth, etc.) still surface as failures rather
+# than being mistaken for an empty issue lookup.
+_ISSUE_NOT_FOUND_MESSAGE = "could not find referenced issue"
+
+
+def _errors_are_not_found(errors: Any) -> bool:
+    """True iff every GraphQL error in ``errors`` is an issue-not-found error.
+
+    Linear responds to an ``issue(id:)`` lookup for a nonexistent identifier
+    with a "Could not find referenced Issue." GraphQL error rather than a null
+    result. We only treat the response as an empty (not-found) result when
+    *all* returned errors are that specific issue-not-found error, so a
+    response mixing a real failure with a not-found error still raises.
+    """
+    if not isinstance(errors, list) or not errors:
+        return False
+    for err in errors:
+        if not isinstance(err, dict):
+            return False
+        if _ISSUE_NOT_FOUND_MESSAGE not in str(err.get("message", "")).lower():
+            return False
+    return True
+
+
 def parse_project_number(identifier: str) -> int | None:
     """Return the integer N when ``identifier`` is exactly
     ``f"{settings.PROJECT_KEY}-<digits>"`` (e.g. ``"INC-2353"`` -> ``2353``),
@@ -191,6 +218,7 @@ class LinearService:
         retryable: bool = True,
         *,
         raise_on_error: bool = False,
+        not_found_is_empty: bool = False,
     ) -> dict | None:
         access_token = self._get_access_token()
         if not access_token:
@@ -253,9 +281,31 @@ class LinearService:
                     )
                     return None
 
-                data = response.json()
+                try:
+                    data = response.json()
+                except ValueError:
+                    # A 2xx response whose body is not valid JSON is a broken
+                    # response, not a transient transport error, so don't retry.
+                    # Surface it as a failure (LinearError for raise_on_error
+                    # callers) rather than letting the ValueError propagate and
+                    # crash callers like the allocator, which only expect
+                    # LinearError for Linear failures.
+                    logger.exception("Linear API returned non-JSON response")
+                    self._raise_if_requested(
+                        "Linear API returned a non-JSON response",
+                        raise_on_error=raise_on_error,
+                    )
+                    return None
 
                 if "errors" in data:
+                    # Looking up an issue by an identifier that does not exist
+                    # (e.g. the placeholder slot the allocator wants to mint)
+                    # comes back as a GraphQL "entity not found" error rather
+                    # than a null result. When the caller asked for it, treat
+                    # that specific case as a genuine empty result (None) so a
+                    # missing issue is not mistaken for "Linear unreachable".
+                    if not_found_is_empty and _errors_are_not_found(data["errors"]):
+                        return None
                     logger.error(
                         "Linear GraphQL errors",
                         extra={"errors": data["errors"]},
@@ -335,7 +385,12 @@ class LinearService:
             }}
         }}
         """
-        data = self._graphql(query, {"id": issue_id}, raise_on_error=raise_on_error)
+        data = self._graphql(
+            query,
+            {"id": issue_id},
+            raise_on_error=raise_on_error,
+            not_found_is_empty=True,
+        )
         if not data or not data.get("issue"):
             return None
         issue = data["issue"]

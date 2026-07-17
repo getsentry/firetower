@@ -3,7 +3,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models, transaction
 from django.db.models import Q, QuerySet
 
@@ -324,6 +324,14 @@ class Incident(models.Model):
         """Override save to run validation and assign gapless ID"""
         with transaction.atomic():
             if self._state.adding and self.id is None:
+                from firetower.incidents.allocation import (  # noqa: PLC0415
+                    adopt_on_create_enabled,
+                )
+
+                if adopt_on_create_enabled():
+                    raise ImproperlyConfigured(
+                        "incident id must come from allocate_incident_identity()"
+                    )
                 self.id = get_next_incident_id()
             self.full_clean()
             super().save(*args, **kwargs)

@@ -12,6 +12,7 @@ from firetower.integrations.services.linear import (
     LINEAR_TOKEN_URL,
     LinearError,
     LinearService,
+    _errors_are_not_found,
     parse_project_number,
 )
 
@@ -487,6 +488,49 @@ class TestGraphql:
             with pytest.raises(LinearError):
                 linear_service._graphql("query { viewer { id } }", raise_on_error=True)
 
+    def test_raises_linear_error_on_non_json_response(self, linear_service):
+        # A 2xx whose body is not valid JSON must surface as LinearError for
+        # raise_on_error callers, not let the ValueError from .json() propagate
+        # and crash the allocator (which only expects LinearError).
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.side_effect = ValueError("Expecting value")
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service._graphql("query { viewer { id } }", raise_on_error=True)
+
+    def test_returns_none_on_non_json_response_when_not_raising(self, linear_service):
+        # Default callers still get None (unchanged behavior), and it is not
+        # retried (a broken body is not a transient transport error).
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.side_effect = ValueError("Expecting value")
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ) as mock_req,
+            patch.object(linear_service, "_sleep_before_retry") as mock_sleep,
+        ):
+            result = linear_service._graphql("query { viewer { id } }")
+
+        assert result is None
+        assert mock_req.call_count == 1
+        mock_sleep.assert_not_called()
+
     def test_raises_linear_error_on_request_exception(self, linear_service):
         with (
             patch.object(
@@ -944,3 +988,123 @@ class TestGetIssue:
         ):
             with pytest.raises(LinearError):
                 linear_service.get_issue("issue-123", raise_on_error=True)
+
+    def _not_found_response(self):
+        # Mirrors the real Linear response for an issue(id:) lookup against an
+        # identifier that does not exist: HTTP 200 with a GraphQL "entity not
+        # found" error and no data. Verified live: looking up an absent
+        # TESTINC-N returns "Could not find referenced Issue." (RELENG-911).
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "errors": [
+                {
+                    "message": "Entity not found: Issue - Could not find "
+                    "referenced Issue.",
+                }
+            ]
+        }
+        return mock_response
+
+    def test_absent_identifier_returns_none_not_raises_end_to_end(self, linear_service):
+        # THE RELENG-911 create_adopt bug: an absent placeholder slot must read
+        # as "not found" (None), not as an error. Before the fix this raised
+        # LinearError -> LinearUnavailable -> degraded on every mint.
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service,
+                "_make_graphql_request",
+                return_value=self._not_found_response(),
+            ),
+        ):
+            result = linear_service.get_issue("TESTINC-2189", raise_on_error=True)
+
+        assert result is None
+
+    def test_real_graphql_error_still_raises_end_to_end(self, linear_service):
+        # A non-not-found error (e.g. auth/validation) must still raise for
+        # raise_on_error callers, so the allocator degrades rather than clobber.
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "errors": [
+                {
+                    "message": "Authentication required",
+                    "extensions": {"type": "authentication error"},
+                }
+            ]
+        }
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service.get_issue("TESTINC-2189", raise_on_error=True)
+
+    def test_mixed_errors_with_one_real_error_still_raises(self, linear_service):
+        # If any error in the payload is not a not-found error, the whole
+        # response is treated as a failure (raises), never swallowed as empty.
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "errors": [
+                {"message": "Entity not found: Issue"},
+                {"message": "Rate limit exceeded"},
+            ]
+        }
+
+        with (
+            patch.object(
+                linear_service, "_get_access_token", return_value="valid-token"
+            ),
+            patch.object(
+                linear_service, "_make_graphql_request", return_value=mock_response
+            ),
+        ):
+            with pytest.raises(LinearError):
+                linear_service.get_issue("TESTINC-2189", raise_on_error=True)
+
+
+class TestErrorsAreNotFound:
+    def test_issue_not_found_message(self):
+        assert _errors_are_not_found(
+            [{"message": "Entity not found: Issue - Could not find referenced Issue."}]
+        )
+
+    def test_case_insensitive(self):
+        assert _errors_are_not_found([{"message": "COULD NOT FIND REFERENCED ISSUE"}])
+
+    def test_other_not_found_entities_do_not_match(self):
+        # Only a missing *issue* counts; team/user/etc. not-found must still
+        # surface as a failure so the allocator degrades instead of minting.
+        assert not _errors_are_not_found([{"message": "Team not found"}])
+        assert not _errors_are_not_found(
+            [{"message": "Could not find referenced User."}]
+        )
+
+    def test_real_error_is_not_not_found(self):
+        assert not _errors_are_not_found([{"message": "Authentication required"}])
+
+    def test_all_must_be_not_found(self):
+        assert not _errors_are_not_found(
+            [
+                {"message": "Could not find referenced Issue."},
+                {"message": "boom"},
+            ]
+        )
+
+    def test_empty_or_malformed_is_not_not_found(self):
+        assert not _errors_are_not_found([])
+        assert not _errors_are_not_found(None)
+        assert not _errors_are_not_found(["not a dict"])

@@ -80,6 +80,7 @@ class LinearConfig:
     team_id: str = ""
     project_id: str = ""
     sync_identifiers: bool = False
+    adopt_on_create: bool = False
     api_key: str = ""
     alloc_timeout_seconds: int = 8
     alloc_max_retries: int = 1

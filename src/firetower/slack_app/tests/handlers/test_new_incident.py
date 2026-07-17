@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.db import OperationalError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
+from firetower.incidents.allocation import LinearUnavailable
 from firetower.incidents.models import Incident, IncidentSeverity, Tag, TagType
 from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.new_incident import (
@@ -631,6 +632,44 @@ class TestNewIncidentSubmission:
         form_data = mock_fallback.call_args[0][2]
         assert form_data["title"] == "DB Down Incident"
         assert form_data["severity"] == "P0"
+
+    @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
+    @patch(
+        "firetower.slack_app.handlers.new_incident._create_incident_via_db",
+        side_effect=LinearUnavailable,
+    )
+    def test_linear_unavailable_creates_fallback_channel(
+        self, mock_create_db, mock_fallback
+    ):
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        view = {
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "Linear Down Incident"}},
+                    "severity_block": {
+                        "severity": {"selected_option": {"value": "P1"}}
+                    },
+                    "description_block": {"description": {"value": "Desc"}},
+                    "impact_summary_block": {"impact_summary": {"value": "Impact"}},
+                    "captain_block": {"captain_select": {"selected_user": "U_CAP"}},
+                    "options_block": {"incident_options": {"selected_options": []}},
+                }
+            }
+        }
+
+        handle_new_incident_submission(ack, body, view, client)
+
+        mock_fallback.assert_called_once()
+        assert mock_fallback.call_args[0][1] == "U_TEST"
+        form_data = mock_fallback.call_args[0][2]
+        assert form_data["title"] == "Linear Down Incident"
+        assert form_data["severity"] == "P1"
+        assert (
+            mock_fallback.call_args.kwargs["degraded_reason"]
+            == "Linear was unreachable"
+        )
 
     @pytest.mark.usefixtures("_enable_hooks")
     @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
