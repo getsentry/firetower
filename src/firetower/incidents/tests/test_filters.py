@@ -655,6 +655,37 @@ class TestUIIncidentFilters:
         assert response.data["count"] == 1
         assert response.data["results"][0]["title"] == "No Service"
 
+    def test_filter_by_empty_and_value_tag(self):
+        inc_with_tag = Incident.objects.create(
+            title="With Service",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="No Service",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="Other Service",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        api_tag = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        web_tag = Tag.objects.create(name="Web", type=TagType.AFFECTED_SERVICE)
+        inc_with_tag.affected_service_tags.add(api_tag)
+        Incident.objects.last().affected_service_tags.add(web_tag)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/ui/incidents/?affected_service=__empty__&affected_service=API"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        titles = {r["title"] for r in response.data["results"]}
+        assert titles == {"With Service", "No Service"}
+
 
 @pytest.mark.django_db
 class TestServiceAPIIncidentFilters:

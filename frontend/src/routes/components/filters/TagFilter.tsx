@@ -40,7 +40,9 @@ export function TagFilter({label, filterKey, tagType}: TagFilterProps) {
       : []),
     ...suggestions.filter(
       (s: string) =>
-        !selected.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
+        s !== EMPTY_FILTER_SENTINEL &&
+        !selected.includes(s) &&
+        s.toLowerCase().includes(inputValue.toLowerCase())
     ),
   ];
 
