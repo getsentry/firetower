@@ -10,6 +10,7 @@ from django.utils import timezone
 from django_q.tasks import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
+from firetower.incidents.allocation import adopt_on_create_enabled
 from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
@@ -1084,7 +1085,7 @@ LINEAR_PARENT_DESCRIPTION = (
 MAX_CLAIM_ATTEMPTS = 5
 
 
-def _claim_linear_issue(
+def claim_linear_issue(
     linear_service: LinearService,
     incident: Incident,
     team_id: str,
@@ -1107,9 +1108,98 @@ def _claim_linear_issue(
     return None
 
 
+def populate_linear_parent(
+    incident: Incident, url: str, *, channel_id: str | None = None
+) -> None:
+    """Populate a pre-claimed / adopted Linear parent issue.
+
+    ``incident.linear_parent_issue_id`` is an already-verified match for the
+    incident number, so this updates it directly by uuid via the default
+    LinearService (outside the allocation lock) and never looks the issue up by
+    identifier — so it can never clobber a moved/aliased issue. Every Linear
+    call is best-effort and non-fatal.
+    """
+    ExternalLink.objects.update_or_create(
+        incident=incident,
+        type=ExternalLinkType.LINEAR,
+        defaults={"url": url},
+    )
+
+    linear_config = settings.LINEAR
+    uuid = incident.linear_parent_issue_id
+    if not linear_config or not uuid:
+        return
+
+    team_id = str(linear_config.get("TEAM_ID", ""))
+    linear_service = _get_linear_service()
+
+    try:
+        states = linear_service.get_workflow_states(team_id) if team_id else None
+        started_state_id = states.get("started") if states else None
+        captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
+        linear_service.update_issue(
+            uuid,
+            title=_linear_issue_title(incident, sync_identifiers=True),
+            description=LINEAR_PARENT_DESCRIPTION,
+            state_id=started_state_id,
+            assignee_id=captain_linear_id,
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to update adopted Linear issue for incident {incident.id}"
+        )
+
+    try:
+        incident_url = _build_incident_url(incident)
+        linear_service.create_attachment(
+            uuid, incident_url, f"Firetower: {incident.incident_number}"
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to create Linear attachment for incident {incident.id}"
+        )
+
+    if channel_id and url:
+        try:
+            _slack_service.add_bookmark(channel_id, "Linear Issue", url)
+        except Exception:
+            logger.exception(
+                f"Failed to add Linear bookmark for incident {incident.id}"
+            )
+
+
 def create_linear_parent_issue(
     incident: Incident, *, channel_id: str | None = None
 ) -> None:
+    # Adopt-on-create: the allocator already claimed/created a matching Linear
+    # parent whose uuid is on the incident. Populate it directly by uuid (no
+    # lookup by identifier, so it can never clobber a moved/aliased issue) and
+    # skip the legacy claim/create path entirely.
+    #
+    # This only applies when the incident actually has a parent uuid. New
+    # incidents always do under the flag (the allocator sets it before this
+    # hook runs). The one flag-on caller that arrives WITHOUT a uuid is the
+    # backfill in sync_action_items_from_linear (incidents predating Linear
+    # integration); those fall through to the legacy claim path below, which
+    # claims their existing INC-N placeholder. That is safe because every such
+    # parentless incident has a clean, correctly-identified INC-N Placeholder
+    # (never moved), so the claim resolves to the right issue.
+    if adopt_on_create_enabled() and incident.linear_parent_issue_id:
+        identity = getattr(incident, "_allocated_identity", None)
+        url = identity.linear_url if identity is not None else None
+        if not url:
+            try:
+                issue = _get_linear_service().get_issue(incident.linear_parent_issue_id)
+                url = issue.get("url") if issue else None
+            except Exception:
+                logger.exception(
+                    f"Failed to resolve Linear url for incident {incident.id}"
+                )
+                url = None
+        if url:
+            populate_linear_parent(incident, url, channel_id=channel_id)
+        return
+
     linear_config = settings.LINEAR
     if not linear_config:
         return
@@ -1135,7 +1225,7 @@ def create_linear_parent_issue(
         captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
 
         if sync_identifiers:
-            issue = _claim_linear_issue(linear_service, incident, team_id, project_id)
+            issue = claim_linear_issue(linear_service, incident, team_id, project_id)
             if not issue:
                 linear_link.delete()
                 logger.warning(

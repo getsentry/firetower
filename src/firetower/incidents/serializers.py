@@ -10,6 +10,11 @@ from rest_framework import serializers
 
 from firetower.auth.services import get_or_create_user_from_email
 
+from .allocation import (
+    AllocatedIdentity,
+    adopt_on_create_enabled,
+    allocate_incident_identity,
+)
 from .hooks import (
     on_incident_created,
     on_incident_updated,
@@ -492,8 +497,26 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
         impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
 
+        # When adopt-on-create is enabled, allocate the id (and Linear parent)
+        # before create so the incident is saved with both; lets
+        # LinearUnavailable propagate. When disabled, skip pre-allocation and let
+        # Incident.save() assign the id inside its own atomic block alongside the
+        # insert, so a failed create rolls back the counter bump (gapless ids) —
+        # the pre-adopt-on-create behavior.
+        identity: AllocatedIdentity | None = None
+        if adopt_on_create_enabled():
+            identity = allocate_incident_identity()
+            validated_data["id"] = identity.inc_id
+            if identity.linear_issue_uuid:
+                validated_data["linear_parent_issue_id"] = identity.linear_issue_uuid
+
         # Create the incident
         incident = super().create(validated_data)
+
+        # Stash so the hook / backfill can populate the Linear parent url without
+        # an extra Linear round-trip.
+        if identity is not None:
+            incident._allocated_identity = identity
 
         # Create external links if provided
         if external_links_data:

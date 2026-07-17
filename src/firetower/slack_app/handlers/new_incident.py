@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import InterfaceError, OperationalError, close_old_connections
 
 from firetower.auth.services import get_or_create_user_from_slack_id
+from firetower.incidents.allocation import LinearUnavailable
 from firetower.incidents.hooks import (
     HIGH_SEVERITIES,
     ChannelSetupContext,
@@ -28,7 +29,13 @@ logger = logging.getLogger(__name__)
 _slack_service = SlackService()
 
 
-def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -> None:
+def _create_fallback_channel(
+    client: Any,
+    slack_user_id: str,
+    form_data: dict,
+    *,
+    degraded_reason: str | None = None,
+) -> None:
     title = form_data["title"]
     severity = form_data["severity"]
     description = form_data.get("description", "")
@@ -77,12 +84,15 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
             "Failed to post/pin metadata in fallback channel %s", channel_name
         )
 
+    channel_reason = degraded_reason or "database unreachable"
     try:
         _slack_service.post_message(
             channel_id,
-            ":warning: This channel was created in degraded mode (database unreachable). "
-            "The incident has NOT been recorded in Firetower. Details will need to be "
-            "backfilled once the database is restored.",
+            f":warning: This channel was created in degraded mode ({channel_reason}). "
+            "The incident has NOT been recorded in Firetower. Once the issue is "
+            "resolved, run `/ft backfill` in this channel to record it. "
+            "Note: automated escalations (sentry-sudo) will not work for this "
+            "incident — page Prod Eng directly if you need to escalate.",
         )
     except Exception:
         logger.exception("Failed to post warning in fallback channel %s", channel_name)
@@ -121,14 +131,17 @@ def _create_fallback_channel(client: Any, slack_user_id: str, form_data: dict) -
         )
 
     # DM the user
+    dm_reason = degraded_reason or "database issue"
     try:
         client.chat_postMessage(
             channel=slack_user_id,
             text=(
-                "An incident channel has been created in degraded mode (database issue).\n"
+                f"An incident channel has been created in degraded mode ({dm_reason}).\n"
                 f"Slack channel: <#{channel_id}>\n\n"
-                "The incident has NOT been recorded in Firetower and will need to be "
-                "backfilled once the database is restored."
+                "The incident has NOT been recorded in Firetower. Once the issue is "
+                "resolved, run `/ft backfill` in the channel to record it. "
+                "Automated escalations (sentry-sudo) will not work for this "
+                "incident — page Prod Eng directly if you need to escalate."
             ),
         )
     except Exception:
@@ -361,6 +374,22 @@ def _create_incident_via_db(
     return serializer.save()
 
 
+def _fallback_form_data(
+    view: dict, *, is_private: bool, skip_paging: bool
+) -> dict[str, Any]:
+    """Build the degraded-mode channel form data from a submitted modal view."""
+    form = parse_incident_form_values(view, resolve_tags=False)
+    return {
+        "title": form["title"],
+        "severity": form["severity"] or _DEFAULT_SEVERITY.value,
+        "description": form["description"],
+        "impact_summary": form["impact_summary"],
+        "captain_slack_id": form["captain_slack_id"],
+        "is_private": is_private,
+        "skip_paging": skip_paging,
+    }
+
+
 def handle_new_incident_submission(
     ack: Any, body: dict, view: dict, client: Any
 ) -> None:
@@ -396,17 +425,24 @@ def handle_new_incident_submission(
         logger.exception(
             "Database unreachable during incident creation from Slack modal"
         )
-        form = parse_incident_form_values(view, resolve_tags=False)
-        form_data = {
-            "title": form["title"],
-            "severity": form["severity"] or _DEFAULT_SEVERITY.value,
-            "description": form["description"],
-            "impact_summary": form["impact_summary"],
-            "captain_slack_id": form["captain_slack_id"],
-            "is_private": is_private,
-            "skip_paging": skip_paging,
-        }
+        form_data = _fallback_form_data(
+            view, is_private=is_private, skip_paging=skip_paging
+        )
         _create_fallback_channel(client, slack_user_id, form_data)
+        return
+    except LinearUnavailable:
+        logger.exception(
+            "Linear unavailable during incident id allocation from Slack modal"
+        )
+        form_data = _fallback_form_data(
+            view, is_private=is_private, skip_paging=skip_paging
+        )
+        _create_fallback_channel(
+            client,
+            slack_user_id,
+            form_data,
+            degraded_reason="Linear was unreachable",
+        )
         return
     except Exception:
         logger.exception("Failed to create incident from Slack modal")
