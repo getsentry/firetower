@@ -1470,8 +1470,13 @@ def on_incident_created(incident: Incident, *, skip_paging: bool = False) -> Non
         if decoration.status_channel_id:
             _save_status_channel_link(incident, decoration.status_channel_id)
         if decoration.feed_message_ts:
-            incident.feed_message_ts = decoration.feed_message_ts
-            incident.save(update_fields=["feed_message_ts"])
+            try:
+                incident.feed_message_ts = decoration.feed_message_ts
+                incident.save(update_fields=["feed_message_ts"])
+            except Exception:
+                logger.exception(
+                    f"Failed to save feed_message_ts for incident {incident.id}"
+                )
 
         # DB-dedup Datadog/Notion after shared decoration so the guide message
         # appears first in the channel.

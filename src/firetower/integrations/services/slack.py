@@ -308,6 +308,11 @@ class SlackService:
             kwargs["thread_ts"] = thread_ts
             if reply_broadcast:
                 kwargs["reply_broadcast"] = True
+        elif reply_broadcast:
+            logger.warning(
+                "reply_broadcast=True ignored because thread_ts is not set for channel %s",
+                channel_id,
+            )
 
         try:
             logger.info(f"Posting message to channel {channel_id}")
