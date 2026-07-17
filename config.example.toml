@@ -1,32 +1,10 @@
-# ---------------------------------------------------------------------------
-# Secret env-var overrides (RELENG-918)
-# Each secret below can be overridden by a dedicated environment variable. The
-# env var wins ONLY when it is set AND non-empty; otherwise the TOML value here
-# is used. This lets prod inject per-secret values without changing local dev.
-# Overridable keys and their env vars:
-#   django_secret_key                                  -> DJANGO_SECRET_KEY
-#   [postgres] password                                -> DJANGO_PG_PASS
-#   salt_key                                           -> SALT_KEY
-#     (NOTE: SALT_KEY only overrides the singular salt_key. To rotate salt keys,
-#      use the salt_keys list in this config file, which takes precedence.)
-#   [slack] bot_token                                  -> SLACK_BOT_TOKEN
-#   [slack] app_token                                  -> SLACK_APP_TOKEN
-#   [linear] client_secret                             -> LINEAR_CLIENT_SECRET
-#   [pagerduty] api_token                              -> PAGERDUTY_API_TOKEN
-#   [pagerduty.escalation_policies.<NAME>] integration_key
-#                                          -> PAGERDUTY_ESCALATION_KEY_<NAME>
-#   [statuspage] api_key                               -> STATUSPAGE_API_KEY
-#   [notion] integration_token                         -> NOTION_INTEGRATION_TOKEN
-# ---------------------------------------------------------------------------
 project_key = "INC"
 log_level = "INFO"
-django_secret_key = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69"  # Overridable via DJANGO_SECRET_KEY env var (env wins if set & non-empty)
+django_secret_key = "django-insecure-gmj)qc*_dk&^i1=z7oy(ew7%5*fz^yowp8=4=0882_d=i3hl69"
 # Salt for django-fernet-encrypted-fields. In prod, use a unique value: python -c "import secrets; print(secrets.token_urlsafe(32))"
-salt_key = ""  # Overridable via SALT_KEY
+salt_key = ""
 # Optional: for key rotation, set salt_keys (plural) to a list of salts. When present it
-# takes precedence over salt_key (and over any SALT_KEY env override), so rotate salt keys
-# here in the config file rather than via the env var. Values are encrypted with the
-# FIRST key and can be decrypted with any,
+# overrides salt_key. Values are encrypted with the FIRST key and can be decrypted with any,
 # so during rotation list the new key first and keep the old one until every row is
 # re-encrypted (run the reencrypt_encrypted_fields migration), then drop the old key.
 # salt_keys = ["<new-salt>", "<old-salt>"]
@@ -40,17 +18,17 @@ region_grouping = [["region-a", "region-b"], ["region-c", "region-d"]]
 db = "firetower"
 host = "localhost"
 user = "postgres"
-password = "dummy_dev_password"  # Overridable via DJANGO_PG_PASS
+password = "dummy_dev_password"
 # Optional: during a password rotation, list the other valid password(s) here.
 # If `password` is rejected with an auth error, each of these is tried in order.
 # Once the rotation is complete, move the new value into `password` and clear this.
 # fallback_passwords = ["<other-password>"]
 
 [slack]
-bot_token = ""  # Overridable via SLACK_BOT_TOKEN
+bot_token = ""
 team_id = "<slack-team-id>"
 participant_sync_throttle_seconds = 300
-app_token = ""  # Overridable via SLACK_APP_TOKEN
+app_token = ""
 incident_feed_channel_id = ""
 always_invited_ids = []
 incident_guide_message = "This is the message posted whenever a new incident slack channel is created."
@@ -61,19 +39,19 @@ iap_enabled = false
 iap_audience = ""
 
 [pagerduty]
-api_token = ""  # Overridable via PAGERDUTY_API_TOKEN
+api_token = ""
 
 [pagerduty.escalation_policies.IMOC]
 id = ""
-integration_key = ""  # Overridable via PAGERDUTY_ESCALATION_KEY_IMOC
+integration_key = ""
 
 [pagerduty.escalation_policies.PROD_ENG]
 id = ""
-integration_key = ""  # Overridable via PAGERDUTY_ESCALATION_KEY_PROD_ENG
+integration_key = ""
 
 [linear]
 client_id = ""
-client_secret = ""  # Overridable via LINEAR_CLIENT_SECRET
+client_secret = ""
 action_item_sync_throttle_seconds = 300
 team_id = ""
 project_id = ""
@@ -98,7 +76,7 @@ action_item_slo_days_high_priority = 14
 action_item_slo_days_medium_priority = 28
 
 [notion]
-integration_token = ""  # Overridable via NOTION_INTEGRATION_TOKEN
+integration_token = ""
 database_id = ""
 template_markdown = """
 # Your postmortem template in Markdown here
@@ -109,7 +87,7 @@ troubleshooting_template_markdown = """
 """
 
 [statuspage]
-api_key = ""  # Overridable via STATUSPAGE_API_KEY
+api_key = ""
 page_id = ""
 url = "https://your-page.statuspage.io/"
 warning_buffer_minutes = 5
