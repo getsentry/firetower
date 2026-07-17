@@ -7,6 +7,7 @@ import {cn} from 'utils/cn';
 
 import {currentUserQueryOptions} from '../../queries/currentUserQueryOptions';
 import {usersInfiniteQueryOptions} from '../../queries/usersQueryOptions';
+import {EMPTY_FILTER_SENTINEL} from '../../types';
 import {type ArrayFilterKey} from '../useActiveFilters';
 
 import {useFilterEditor} from './useFilterEditor';
@@ -31,13 +32,17 @@ function EditingTags({
           variant="close"
           size={null}
           onClick={() => toggle(v)}
-          aria-label={`Remove ${v}`}
+          aria-label={`Remove ${v === EMPTY_FILTER_SENTINEL ? 'Empty' : v}`}
         >
           <XIcon className="h-3.5 w-3.5" />
         </Button>
       }
     >
-      {v}
+      {v === EMPTY_FILTER_SENTINEL ? (
+        <span className="text-content-disabled italic">Empty</span>
+      ) : (
+        v
+      )}
     </Tag>
   ));
 }
@@ -66,13 +71,17 @@ function ReadOnlyTags({
                 e.stopPropagation();
                 remove(v);
               }}
-              aria-label={`Remove ${v}`}
+              aria-label={`Remove ${v === EMPTY_FILTER_SENTINEL ? 'Empty' : v}`}
             >
               <XIcon className="h-3.5 w-3.5" />
             </Button>
           }
         >
-          {v}
+          {v === EMPTY_FILTER_SENTINEL ? (
+            <span className="text-content-disabled italic">Empty</span>
+          ) : (
+            v
+          )}
         </Tag>
       ))}
     </div>
@@ -143,6 +152,10 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
     enabled: isEditing,
   });
 
+  const showEmptyOption =
+    !selected.includes(EMPTY_FILTER_SENTINEL) &&
+    (!debouncedSearch || 'empty'.includes(debouncedSearch.toLowerCase()));
+
   const available = useMemo(() => {
     const notSelected = users.filter(u => !selected.includes(u.email));
 
@@ -157,11 +170,14 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
 
     if (!matchesSearch) return notSelected;
 
-    // Always prepend the active user regardless of pagination position,
-    // removing any duplicate that may have loaded from the paginated list.
     const rest = notSelected.filter(u => u.email !== currentUser.email);
     return [currentUser, ...rest];
   }, [users, selected, currentUser, debouncedSearch]);
+
+  const allOptions = useMemo(() => {
+    const emails = available.map(u => u.email);
+    return showEmptyOption ? [EMPTY_FILTER_SENTINEL, ...emails] : emails;
+  }, [available, showEmptyOption]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(inputValue), 300);
@@ -211,7 +227,7 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
                 setInputValue(e.target.value);
                 setFocusedIndex(0);
               }}
-              onKeyDown={handleKeyDown(available.map(u => u.email))}
+              onKeyDown={handleKeyDown(allOptions)}
               placeholder="Search users..."
               className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
             />
@@ -223,33 +239,55 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
         {isEditing ? (
           <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
             <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {showEmptyOption ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggle(EMPTY_FILTER_SENTINEL);
+                    setInputValue('');
+                    setFocusedIndex(0);
+                    inputRef.current?.focus();
+                  }}
+                  className={cn(
+                    'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
+                    focusedIndex === 0
+                      ? 'bg-background-secondary'
+                      : 'hover:bg-background-transparent-neutral-muted'
+                  )}
+                >
+                  <span className="text-content-disabled italic">Empty</span>
+                </button>
+              ) : null}
               {available.length > 0 ? (
-                available.map((user, index) => (
-                  <button
-                    key={user.email}
-                    type="button"
-                    onClick={() => {
-                      toggle(user.email);
-                      setInputValue('');
-                      setFocusedIndex(0);
-                      inputRef.current?.focus();
-                    }}
-                    className={cn(
-                      'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
-                      index === focusedIndex
-                        ? 'bg-background-secondary'
-                        : 'hover:bg-background-transparent-neutral-muted'
-                    )}
-                  >
-                    <span>{user.name}</span>{' '}
-                    <span className="text-content-disabled">{user.email}</span>
-                  </button>
-                ))
-              ) : (
+                available.map((user, index) => {
+                  const adjustedIndex = showEmptyOption ? index + 1 : index;
+                  return (
+                    <button
+                      key={user.email}
+                      type="button"
+                      onClick={() => {
+                        toggle(user.email);
+                        setInputValue('');
+                        setFocusedIndex(0);
+                        inputRef.current?.focus();
+                      }}
+                      className={cn(
+                        'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
+                        adjustedIndex === focusedIndex
+                          ? 'bg-background-secondary'
+                          : 'hover:bg-background-transparent-neutral-muted'
+                      )}
+                    >
+                      <span>{user.name}</span>{' '}
+                      <span className="text-content-disabled">{user.email}</span>
+                    </button>
+                  );
+                })
+              ) : !showEmptyOption ? (
                 <p className="text-content-disabled px-space-md py-space-sm text-size-sm">
                   No users found
                 </p>
-              )}
+              ) : null}
               <div ref={scrollSentinelRef} />
             </div>
           </div>
