@@ -353,6 +353,22 @@ describe('Advanced Filter Params', () => {
     );
   });
 
+  it('passes participant filter params to API', async () => {
+    renderRoute('/?participant=alice%40example.com&participant=bob%40example.com');
+
+    await screen.findByText('INC-1247');
+
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/incidents/',
+        query: expect.objectContaining({
+          participant: ['alice@example.com', 'bob@example.com'],
+          page: 1,
+        }),
+      })
+    );
+  });
+
   it('passes date filter params to API', async () => {
     renderRoute('/?created_after=2024-01-01&created_before=2024-12-31');
 
@@ -444,6 +460,7 @@ describe('Advanced Filters UI', () => {
     await user.click(toggle);
 
     expect(screen.getByText('Severity')).toBeInTheDocument();
+    expect(screen.getByText('Participant')).toBeInTheDocument();
   });
 
   it('auto-opens when URL has advanced filters', async () => {

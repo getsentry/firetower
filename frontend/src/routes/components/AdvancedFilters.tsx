@@ -38,6 +38,7 @@ export function FilterPanel() {
         <TagFilter label="Root Cause" filterKey="root_cause" tagType="ROOT_CAUSE" />
         <UserFilter label="Captain" filterKey="captain" />
         <UserFilter label="Reporter" filterKey="reporter" />
+        <UserFilter label="Participant" filterKey="participant" />
         <DateRangeFilter />
       </div>
     </Card>
