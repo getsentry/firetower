@@ -1078,9 +1078,7 @@ class TestServiceAPIIncidentFilters:
         )
 
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(
-            "/api/incidents/?participant=reporter@example.com"
-        )
+        response = self.client.get("/api/incidents/?participant=reporter@example.com")
 
         assert response.status_code == 200
         assert response.data["count"] == 1
