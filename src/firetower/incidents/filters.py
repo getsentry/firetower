@@ -193,3 +193,22 @@ def filter_by_reporter(
         else:
             queryset = queryset.filter(reporter__email__in=actual_emails)
     return queryset
+
+
+def filter_by_participant(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    participant_emails = request.GET.getlist("participant")
+    if participant_emails:
+        include_empty = EMPTY_FILTER_SENTINEL in participant_emails
+        actual_emails = [v for v in participant_emails if v != EMPTY_FILTER_SENTINEL]
+        if include_empty and actual_emails:
+            queryset = queryset.filter(
+                Q(participants__email__in=actual_emails) | Q(participants__isnull=True)
+            )
+        elif include_empty:
+            queryset = queryset.filter(participants__isnull=True)
+        else:
+            queryset = queryset.filter(participants__email__in=actual_emails)
+        queryset = queryset.distinct()
+    return queryset
