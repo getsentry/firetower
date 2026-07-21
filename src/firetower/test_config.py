@@ -4,6 +4,33 @@ import pytest
 
 from firetower.config import ConfigError, ConfigFile
 
+# Every env var that _apply_env_overrides consults. Cleared before each test so
+# ambient secrets in the CI/dev environment can't override file values or
+# satisfy a deliberately-missing secret (which would flake these tests).
+_SECRET_ENV_VARS = (
+    "DJANGO_SECRET_KEY",
+    "SALT_KEY",
+    "DJANGO_PG_PASS",
+    "SLACK_BOT_TOKEN",
+    "SLACK_APP_TOKEN",
+    "LINEAR_CLIENT_SECRET",
+    "PAGERDUTY_API_TOKEN",
+    "PAGERDUTY_ESCALATION_KEY_IMOC",
+    "STATUSPAGE_API_KEY",
+    "NOTION_INTEGRATION_TOKEN",
+)
+
+
+@pytest.fixture(autouse=True)
+def _clear_secret_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate every test from ambient secret env vars.
+
+    Tests that need an override set it explicitly with monkeypatch.setenv after
+    this fixture has cleared the baseline.
+    """
+    for var in _SECRET_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
+
 
 def _minimal_config() -> dict:
     """A minimal config dict with every required secret present in-file."""
