@@ -13,6 +13,10 @@ from serde import deserialize, from_dict
 from serde.toml import from_toml
 
 
+class ConfigError(Exception):
+    """Raised when a required secret is missing from both config and environment."""
+
+
 def _env_override(value: str, env_var: str) -> str:
     """
     Return the environment variable value if it is set and non-empty, else `value`.
@@ -29,7 +33,10 @@ class PostgresConfig:
     db: str
     host: str
     user: str
-    password: str
+    # Overridable via DJANGO_PG_PASS. Parse-optional (default "") so it can be
+    # supplied purely by the env var; required-non-empty is enforced after env
+    # overrides in ConfigFile._validate_required_secrets. See RELENG-918.
+    password: str = ""
     # Additional passwords tried (in order) only when `password` fails
     # authentication. Used to bridge the race window during a password
     # rotation, when the server and app may briefly disagree on the password.
@@ -44,16 +51,20 @@ class EscalationPolicy:
 
 @deserialize
 class PagerDutyConfig:
-    api_token: str
     escalation_policies: dict[str, EscalationPolicy]
+    # Overridable via PAGERDUTY_API_TOKEN. Parse-optional; required-non-empty when
+    # the [pagerduty] section is present (enforced after env overrides).
+    api_token: str = ""
 
 
 @deserialize
 class SlackConfig:
-    bot_token: str
     team_id: str
     participant_sync_throttle_seconds: int
-    app_token: str
+    # Overridable via SLACK_BOT_TOKEN / SLACK_APP_TOKEN. Parse-optional; both are
+    # required-non-empty (enforced after env overrides).
+    bot_token: str = ""
+    app_token: str = ""
     incident_feed_channel_id: str = ""
     always_invited_ids: list[str] = field(default_factory=list)
     incident_guide_message: str = ""
@@ -67,8 +78,10 @@ class GenAIConfig:
 
 @deserialize
 class NotionConfig:
-    integration_token: str
     database_id: str
+    # Overridable via NOTION_INTEGRATION_TOKEN. Parse-optional; required-non-empty
+    # when the [notion] section is present (enforced after env overrides).
+    integration_token: str = ""
     template_markdown: str = ""
     troubleshooting_database_id: str = ""
     troubleshooting_template_markdown: str = ""
@@ -76,9 +89,11 @@ class NotionConfig:
 
 @deserialize
 class StatuspageConfig:
-    api_key: str
     page_id: str
     url: str
+    # Overridable via STATUSPAGE_API_KEY. Parse-optional; required-non-empty when
+    # the [statuspage] section is present (enforced after env overrides).
+    api_key: str = ""
     initial_reminder_delay_minutes: int | None = None
     followup_reminder_delay_minutes: int | None = None
     warning_buffer_minutes: int = 0
@@ -149,9 +164,12 @@ class ConfigFile:
 
     project_key: str
     firetower_base_url: str
-    django_secret_key: str
-    salt_key: str
     sentry_dsn: str
+    # Overridable via DJANGO_SECRET_KEY / SALT_KEY. Parse-optional so they can be
+    # supplied purely by env vars; required-non-empty is enforced after env
+    # overrides (salt is satisfied by either salt_key or salt_keys). See RELENG-918.
+    django_secret_key: str = ""
+    salt_key: str = ""
     service_registry_url: str | None = None
     # When non-empty, `salt_keys` overrides `salt_key`. Used for key rotation:
     # values are encrypted with the first key and can be decrypted with any.
@@ -178,6 +196,7 @@ class ConfigFile:
         with open(file_path) as f:
             data: ConfigFile = from_toml(ConfigFile, f.read())
         data._apply_env_overrides()
+        data._validate_required_secrets()
         return data
 
     @classmethod
@@ -193,6 +212,7 @@ class ConfigFile:
         """
         config = from_dict(ConfigFile, data)
         config._apply_env_overrides()
+        config._validate_required_secrets()
         return config
 
     def _apply_env_overrides(self) -> None:
@@ -250,6 +270,61 @@ class ConfigFile:
         if self.notion is not None:
             self.notion.integration_token = _env_override(
                 self.notion.integration_token, "NOTION_INTEGRATION_TOKEN"
+            )
+
+    def _validate_required_secrets(self) -> None:
+        """
+        Validate that required secrets are populated from either config or env.
+
+        Run after `_apply_env_overrides` so a secret is considered present if it
+        came from the TOML file OR its dedicated environment variable — the two are
+        interchangeable sources. Secrets tied to an optional integration section are
+        only required when that section is configured. Raises ConfigError listing
+        every missing secret so a misconfigured deploy fails fast at boot rather
+        than as an obscure downstream API/auth error. See RELENG-918.
+        """
+        # (label, is_satisfied): a secret is satisfied when it resolved to a
+        # non-empty value from file or env, OR its optional section is absent (so
+        # it is not required at all). Salt is satisfied by either the singular
+        # salt_key or the salt_keys list (the plural is the rotation escape hatch
+        # and takes precedence in settings.py). TODO(RELENG-918): revisit salt_keys.
+        checks: list[tuple[str, bool]] = [
+            (
+                "django_secret_key (env: DJANGO_SECRET_KEY)",
+                bool(self.django_secret_key),
+            ),
+            ("salt_key (env: SALT_KEY)", bool(self.salt_key or self.salt_keys)),
+            (
+                "postgres.password (env: DJANGO_PG_PASS)",
+                self.postgres is None or bool(self.postgres.password),
+            ),
+            (
+                "slack.bot_token (env: SLACK_BOT_TOKEN)",
+                self.slack is None or bool(self.slack.bot_token),
+            ),
+            (
+                "slack.app_token (env: SLACK_APP_TOKEN)",
+                self.slack is None or bool(self.slack.app_token),
+            ),
+            (
+                "pagerduty.api_token (env: PAGERDUTY_API_TOKEN)",
+                self.pagerduty is None or bool(self.pagerduty.api_token),
+            ),
+            (
+                "statuspage.api_key (env: STATUSPAGE_API_KEY)",
+                self.statuspage is None or bool(self.statuspage.api_key),
+            ),
+            (
+                "notion.integration_token (env: NOTION_INTEGRATION_TOKEN)",
+                self.notion is None or bool(self.notion.integration_token),
+            ),
+        ]
+        missing = [label for label, satisfied in checks if not satisfied]
+
+        if missing:
+            raise ConfigError(
+                "Missing required secret(s), set via config file or environment: "
+                + ", ".join(missing)
             )
 
 
