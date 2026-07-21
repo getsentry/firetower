@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import time
@@ -68,6 +69,26 @@ class LinearError(Exception):
 # (team/user/project not found, auth, etc.) still surface as failures rather
 # than being mistaken for an empty issue lookup.
 _ISSUE_NOT_FOUND_MESSAGE = "could not find referenced issue"
+
+
+_MAX_LOGGED_ERRORS_LEN = 2000
+
+
+def _summarize_graphql_errors(errors: Any) -> str:
+    """Render a GraphQL ``errors`` payload as a compact string for logging.
+
+    The log formatter drops ``extra={}``, so the raw payload is folded into the
+    message itself to make the actual Linear error visible in Cloud Run logs.
+    Falls back to ``repr`` for anything not JSON-serializable and truncates so a
+    huge payload can't blow up a log line.
+    """
+    try:
+        rendered = json.dumps(errors, default=str, separators=(",", ":"))
+    except (TypeError, ValueError):
+        rendered = repr(errors)
+    if len(rendered) > _MAX_LOGGED_ERRORS_LEN:
+        rendered = rendered[:_MAX_LOGGED_ERRORS_LEN] + "…[truncated]"
+    return rendered
 
 
 def _errors_are_not_found(errors: Any) -> bool:
@@ -307,7 +328,8 @@ class LinearService:
                     if not_found_is_empty and _errors_are_not_found(data["errors"]):
                         return None
                     logger.error(
-                        "Linear GraphQL errors",
+                        "Linear GraphQL errors: %s",
+                        _summarize_graphql_errors(data["errors"]),
                         extra={"errors": data["errors"]},
                     )
                     self._raise_if_requested(

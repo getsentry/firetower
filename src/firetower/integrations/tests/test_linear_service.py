@@ -13,6 +13,7 @@ from firetower.integrations.services.linear import (
     LinearError,
     LinearService,
     _errors_are_not_found,
+    _summarize_graphql_errors,
     parse_project_number,
 )
 
@@ -1108,3 +1109,21 @@ class TestErrorsAreNotFound:
         assert not _errors_are_not_found([])
         assert not _errors_are_not_found(None)
         assert not _errors_are_not_found(["not a dict"])
+
+
+class TestSummarizeGraphqlErrors:
+    def test_renders_message_content(self):
+        summary = _summarize_graphql_errors(
+            [{"message": "Access denied", "extensions": {"code": "FORBIDDEN"}}]
+        )
+        assert "Access denied" in summary
+        assert "FORBIDDEN" in summary
+
+    def test_non_serializable_falls_back_to_repr(self):
+        summary = _summarize_graphql_errors(object())
+        assert summary  # does not raise, returns something
+
+    def test_truncates_huge_payload(self):
+        summary = _summarize_graphql_errors([{"message": "x" * 5000}])
+        assert len(summary) < 5000
+        assert summary.endswith("…[truncated]")
