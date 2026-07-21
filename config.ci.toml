@@ -33,6 +33,6 @@ iap_enabled = false
 iap_audience = ""
 
 [pagerduty]
-api_token = ""
+api_token = "ci-test-pagerduty-token"
 
 [pagerduty.escalation_policies]

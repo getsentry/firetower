@@ -1,8 +1,14 @@
 # ---------------------------------------------------------------------------
 # Secret env-var overrides (RELENG-918)
-# Each secret below can be overridden by a dedicated environment variable. The
-# env var wins ONLY when it is set AND non-empty; otherwise the TOML value here
-# is used. This lets prod inject per-secret values without changing local dev.
+# Each secret below can be supplied by EITHER this TOML file OR a dedicated
+# environment variable — the two are interchangeable sources. The env var wins
+# ONLY when it is set AND non-empty; otherwise the TOML value here is used. This
+# lets prod inject per-secret values via env without changing local dev, and lets
+# these keys be omitted entirely from TOML when supplied purely by env.
+# Required secrets (django_secret_key, salt_key, postgres.password, slack
+# bot/app tokens, and — when their section is present — pagerduty.api_token,
+# statuspage.api_key, notion.integration_token) must resolve to a non-empty
+# value from one of the two sources or config loading fails fast at boot.
 # Overridable keys and their env vars:
 #   django_secret_key                                  -> DJANGO_SECRET_KEY
 #   [postgres] password                                -> DJANGO_PG_PASS
