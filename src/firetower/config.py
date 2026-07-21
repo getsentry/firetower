@@ -17,6 +17,15 @@ class ConfigError(Exception):
     """Raised when a required secret is missing from both config and environment."""
 
 
+# Secret handling (RELENG-918): every field marked `# secret` below is parse-
+# optional (default "") so it can be supplied purely by its dedicated env var
+# instead of the TOML file. Env values are applied by
+# ConfigFile._apply_env_overrides (env wins when set and non-empty, else TOML),
+# and ConfigFile._validate_required_secrets enforces that the required ones
+# resolve to a non-empty value from either source. Secrets on an optional
+# integration section are only required when that section is configured.
+
+
 def _env_override(value: str, env_var: str) -> str:
     """
     Return the environment variable value if it is set and non-empty, else `value`.
@@ -33,10 +42,7 @@ class PostgresConfig:
     db: str
     host: str
     user: str
-    # Overridable via DJANGO_PG_PASS. Parse-optional (default "") so it can be
-    # supplied purely by the env var; required-non-empty is enforced after env
-    # overrides in ConfigFile._validate_required_secrets. See RELENG-918.
-    password: str = ""
+    password: str = ""  # secret: DJANGO_PG_PASS
     # Additional passwords tried (in order) only when `password` fails
     # authentication. Used to bridge the race window during a password
     # rotation, when the server and app may briefly disagree on the password.
@@ -52,19 +58,15 @@ class EscalationPolicy:
 @deserialize
 class PagerDutyConfig:
     escalation_policies: dict[str, EscalationPolicy]
-    # Overridable via PAGERDUTY_API_TOKEN. Parse-optional; required-non-empty when
-    # the [pagerduty] section is present (enforced after env overrides).
-    api_token: str = ""
+    api_token: str = ""  # secret: PAGERDUTY_API_TOKEN
 
 
 @deserialize
 class SlackConfig:
     team_id: str
     participant_sync_throttle_seconds: int
-    # Overridable via SLACK_BOT_TOKEN / SLACK_APP_TOKEN. Parse-optional; both are
-    # required-non-empty (enforced after env overrides).
-    bot_token: str = ""
-    app_token: str = ""
+    bot_token: str = ""  # secret: SLACK_BOT_TOKEN
+    app_token: str = ""  # secret: SLACK_APP_TOKEN
     incident_feed_channel_id: str = ""
     always_invited_ids: list[str] = field(default_factory=list)
     incident_guide_message: str = ""
@@ -79,9 +81,7 @@ class GenAIConfig:
 @deserialize
 class NotionConfig:
     database_id: str
-    # Overridable via NOTION_INTEGRATION_TOKEN. Parse-optional; required-non-empty
-    # when the [notion] section is present (enforced after env overrides).
-    integration_token: str = ""
+    integration_token: str = ""  # secret: NOTION_INTEGRATION_TOKEN
     template_markdown: str = ""
     troubleshooting_database_id: str = ""
     troubleshooting_template_markdown: str = ""
@@ -91,9 +91,7 @@ class NotionConfig:
 class StatuspageConfig:
     page_id: str
     url: str
-    # Overridable via STATUSPAGE_API_KEY. Parse-optional; required-non-empty when
-    # the [statuspage] section is present (enforced after env overrides).
-    api_key: str = ""
+    api_key: str = ""  # secret: STATUSPAGE_API_KEY
     initial_reminder_delay_minutes: int | None = None
     followup_reminder_delay_minutes: int | None = None
     warning_buffer_minutes: int = 0
@@ -102,7 +100,7 @@ class StatuspageConfig:
 @deserialize
 class LinearConfig:
     client_id: str = ""
-    client_secret: str = ""
+    client_secret: str = ""  # secret: LINEAR_CLIENT_SECRET
     action_item_sync_throttle_seconds: int = 300
     team_id: str = ""
     project_id: str = ""
@@ -165,11 +163,8 @@ class ConfigFile:
     project_key: str
     firetower_base_url: str
     sentry_dsn: str
-    # Overridable via DJANGO_SECRET_KEY / SALT_KEY. Parse-optional so they can be
-    # supplied purely by env vars; required-non-empty is enforced after env
-    # overrides (salt is satisfied by either salt_key or salt_keys). See RELENG-918.
-    django_secret_key: str = ""
-    salt_key: str = ""
+    django_secret_key: str = ""  # secret: DJANGO_SECRET_KEY
+    salt_key: str = ""  # secret: SALT_KEY (or salt_keys below)
     service_registry_url: str | None = None
     # When non-empty, `salt_keys` overrides `salt_key`. Used for key rotation:
     # values are encrypted with the first key and can be decrypted with any.
