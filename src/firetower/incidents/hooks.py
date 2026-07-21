@@ -1325,9 +1325,7 @@ def _schedule_statuspage_reminder(
 
 
 def cancel_statuspage_followup_reminder(incident: Incident) -> None:
-    Schedule.objects.filter(
-        name=f"statuspage_followup_reminder_{incident.id}"
-    ).delete()
+    Schedule.objects.filter(name=f"statuspage_followup_reminder_{incident.id}").delete()
 
 
 def schedule_statuspage_followup_reminder(
