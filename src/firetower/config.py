@@ -218,54 +218,35 @@ class ConfigFile:
         and `from_dict` so every code path (and tests) shares one source of truth.
         Each override wins only when its env var is set AND non-empty; otherwise the
         TOML value is preserved (see `_env_override`). See RELENG-918.
+
+        Note: SALT_KEY overrides only the singular salt_key; salt-key rotation uses
+        the salt_keys list, which takes precedence in settings.py (rotate via the
+        config file, not this env var). DJANGO_PG_PASS overrides only the primary
+        postgres password; rotation uses postgres.fallback_passwords.
         """
-        self.django_secret_key = _env_override(
-            self.django_secret_key, "DJANGO_SECRET_KEY"
-        )
-        # SALT_KEY overrides only the singular salt_key. Salt-key rotation uses the
-        # salt_keys list, which takes precedence in settings.py; rotate via the
-        # config file, not this env var. See RELENG-918.
-        self.salt_key = _env_override(self.salt_key, "SALT_KEY")
+        # (target, attribute, env var). target is None when its optional section
+        # is absent, in which case the override is skipped.
+        overrides: list[tuple[Any, str, str]] = [
+            (self, "django_secret_key", "DJANGO_SECRET_KEY"),
+            (self, "salt_key", "SALT_KEY"),
+            (self.postgres, "password", "DJANGO_PG_PASS"),
+            (self.slack, "bot_token", "SLACK_BOT_TOKEN"),
+            (self.slack, "app_token", "SLACK_APP_TOKEN"),
+            (self.linear, "client_secret", "LINEAR_CLIENT_SECRET"),
+            (self.pagerduty, "api_token", "PAGERDUTY_API_TOKEN"),
+            (self.statuspage, "api_key", "STATUSPAGE_API_KEY"),
+            (self.notion, "integration_token", "NOTION_INTEGRATION_TOKEN"),
+        ]
+        for target, attr, env_var in overrides:
+            if target is not None:
+                setattr(target, attr, _env_override(getattr(target, attr), env_var))
 
-        # postgres is a required section, but guard defensively anyway. Rotation of
-        # the live password uses postgres.fallback_passwords in the config file;
-        # DJANGO_PG_PASS only overrides the primary password.
-        if self.postgres is not None:
-            self.postgres.password = _env_override(
-                self.postgres.password, "DJANGO_PG_PASS"
-            )
-
-        # slack is a required section, but guard defensively anyway.
-        if self.slack is not None:
-            self.slack.bot_token = _env_override(
-                self.slack.bot_token, "SLACK_BOT_TOKEN"
-            )
-            self.slack.app_token = _env_override(
-                self.slack.app_token, "SLACK_APP_TOKEN"
-            )
-
-        if self.linear is not None:
-            self.linear.client_secret = _env_override(
-                self.linear.client_secret, "LINEAR_CLIENT_SECRET"
-            )
-
+        # Escalation keys can't use the flat table: the env var name is derived
+        # per policy (PAGERDUTY_ESCALATION_KEY_<NAME>).
         if self.pagerduty is not None:
-            self.pagerduty.api_token = _env_override(
-                self.pagerduty.api_token, "PAGERDUTY_API_TOKEN"
-            )
             for name, policy in self.pagerduty.escalation_policies.items():
                 if override := os.environ.get(f"PAGERDUTY_ESCALATION_KEY_{name}"):
                     policy.integration_key = override
-
-        if self.statuspage is not None:
-            self.statuspage.api_key = _env_override(
-                self.statuspage.api_key, "STATUSPAGE_API_KEY"
-            )
-
-        if self.notion is not None:
-            self.notion.integration_token = _env_override(
-                self.notion.integration_token, "NOTION_INTEGRATION_TOKEN"
-            )
 
     def _validate_required_secrets(self) -> None:
         """
