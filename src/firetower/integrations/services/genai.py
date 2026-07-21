@@ -3,14 +3,10 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
-import requests
-
 logger = logging.getLogger(__name__)
 
-_METADATA_BASE = "http://metadata.google.internal/computeMetadata/v1"
-_METADATA_HEADERS = {"Metadata-Flavor": "Google"}
-_METADATA_TIMEOUT = 1.0
-_DEFAULT_LOCATION = "us-central1"
+# OpenRouter model slug; routes to Google's Gemini 2.5 Flash.
+_DEFAULT_MODEL = "google/gemini-2.5-flash"
 
 _TIMELINE_PROMPT_PREFIX = """\
 You are an expert incident analyst. Based on the following Slack channel messages \
@@ -50,28 +46,6 @@ Your response MUST follow this exact format:
 - Resolution: [YYYY-MM-DD HH:MM UTC]
 
 If a timestamp is unknown or not applicable, use "N/A" instead of a timestamp."""
-
-
-def _detect_location() -> str:
-    """Query the GCP metadata server for the Cloud Run region.
-
-    Falls back to us-central1 when not running on GCP (e.g. local dev).
-    The metadata server returns a path like 'projects/123/regions/us-central1'.
-    """
-    try:
-        resp = requests.get(
-            f"{_METADATA_BASE}/instance/region",
-            headers=_METADATA_HEADERS,
-            timeout=_METADATA_TIMEOUT,
-        )
-        resp.raise_for_status()
-        return resp.text.strip().split("/")[-1]
-    except Exception:
-        logger.debug(
-            "Could not detect GCP region from metadata server; using %s",
-            _DEFAULT_LOCATION,
-        )
-        return _DEFAULT_LOCATION
 
 
 _KEY_TIMESTAMPS_LABEL_MAP = {
@@ -124,19 +98,50 @@ class GenAIService:
         config = getattr(settings, "GENAI", None)
         if not config:
             return None
-        return cls(model=config.get("MODEL", "gemini-2.5-flash"))
-
-    def __init__(self, model: str = "gemini-2.5-flash") -> None:
-        from google import genai  # noqa: PLC0415
-
-        # project=None lets the SDK infer from GOOGLE_CLOUD_PROJECT env var or ADC.
-        # location is read from the GCP metadata server so no explicit config is needed.
-        self._client = genai.Client(
-            vertexai=True,
-            project=None,
-            location=_detect_location(),
+        api_key = config.get("API_KEY")
+        if not api_key:
+            return None
+        return cls(
+            api_key=api_key,
+            model=config.get("MODEL", _DEFAULT_MODEL),
         )
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = _DEFAULT_MODEL,
+    ) -> None:
+        from openrouter import OpenRouter  # noqa: PLC0415
+
+        # OpenRouter is the company-wide AI gateway; the SDK defaults its base URL
+        # to https://openrouter.ai/api/v1, so only the API key is needed.
+        self._client = OpenRouter(api_key=api_key)
         self._model = model
+
+    def _generate(self, prompt: str) -> str | None:
+        from openrouter.components.chatusermessage import (  # noqa: PLC0415
+            ChatUserMessage,
+        )
+        from openrouter.components.providerpreferences import (  # noqa: PLC0415
+            ProviderPreferences,
+        )
+
+        response = self._client.chat.send(
+            model=self._model,
+            messages=[ChatUserMessage(role="user", content=prompt)],
+            stream=False,
+            # Incident Slack content goes to a third party, so require
+            # zero-data-retention routing.
+            provider=ProviderPreferences(zdr=True),
+        )
+        content = (
+            response.choices[0].message.content
+            if response and response.choices
+            else None
+        )
+        # OpenRouter allows structured content parts, but a text completion
+        # returns a plain string; ignore anything non-str defensively.
+        return content if isinstance(content, str) and content else None
 
     def generate_timeline(
         self,
@@ -172,18 +177,14 @@ class GenAIService:
                 + _TIMELINE_PROMPT_SUFFIX
             )
 
-            response = self._client.models.generate_content(
-                model=self._model,
-                contents=prompt,
-            )
+            content = self._generate(prompt)
+            if content:
+                logger.info("Successfully generated timeline using OpenRouter")
+                return content
 
-            if response and response.text:
-                logger.info("Successfully generated timeline using Gemini")
-                return response.text
-
-            logger.warning("Gemini returned empty response for timeline generation")
+            logger.warning("OpenRouter returned empty response for timeline generation")
             return None
 
         except Exception:
-            logger.exception("Failed to generate timeline with Gemini")
+            logger.exception("Failed to generate timeline with OpenRouter")
             return None
