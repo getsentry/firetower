@@ -21,6 +21,10 @@ from firetower.incidents.hooks import (
     build_channel_name,
     build_channel_topic,
     create_linear_parent_issue,
+    get_incident_channel_id,
+    get_pageable_policies,
+    invite_paged_oncall,
+    manual_page,
     on_captain_changed,
     on_incident_created,
     on_incident_updated,
@@ -29,6 +33,7 @@ from firetower.incidents.hooks import (
     on_title_changed,
     on_visibility_changed,
     page_for_channel,
+    page_policies,
     resolve_pages_for_incident,
     schedule_statuspage_followup_reminder,
 )
@@ -3814,3 +3819,267 @@ class TestOnIncidentUpdated:
         on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
 
         mock_get_linear.return_value.update_issue.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestPagePolicies:
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_pages_low_severity_incident(self, mock_pd_cls, settings):
+        # Unlike page_for_channel, page_policies does not gate on severity.
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+
+        slack = MagicMock()
+        result = page_policies(
+            ["IMOC"], "INC-500", IncidentSeverity.P3, "Low sev", slack
+        )
+
+        assert result == {"IMOC"}
+        mock_pd.trigger_incident.assert_called_once()
+        summary, dedup_key, integration_key = mock_pd.trigger_incident.call_args[0]
+        assert summary == "[IMOC] [P3] INC-500: Low sev"
+        assert dedup_key == "firetower-INC-500-IMOC"
+        assert integration_key == "imoc-integration-key"
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_ignores_unknown_policy_names(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+
+        result = page_policies(
+            ["NOPE", "PROD_ENG"], "INC-1", IncidentSeverity.P0, "T", MagicMock()
+        )
+
+        assert result == {"PROD_ENG"}
+        assert mock_pd.trigger_incident.call_count == 1
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_note_appended_to_summary(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+
+        page_policies(
+            ["IMOC"],
+            "INC-9",
+            IncidentSeverity.P1,
+            "Boom",
+            MagicMock(),
+            note="db is on fire",
+        )
+
+        summary = mock_pd.trigger_incident.call_args[0][0]
+        assert summary == "[IMOC] [P1] INC-9: Boom\nNote: db is on fire"
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_note_newlines_flattened_in_summary(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+
+        page_policies(
+            ["IMOC"],
+            "INC-9",
+            IncidentSeverity.P1,
+            "Boom",
+            MagicMock(),
+            note="line one\nline two\r\n  extra",
+        )
+
+        summary = mock_pd.trigger_incident.call_args[0][0]
+        assert summary == "[IMOC] [P1] INC-9: Boom\nNote: line one line two extra"
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_noop_when_pagerduty_unconfigured(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = None
+
+        result = page_policies(["IMOC"], "INC-1", IncidentSeverity.P0, "T", MagicMock())
+
+        assert result == set()
+        mock_pd_cls.assert_not_called()
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_posts_warning_on_failure(self, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = False
+
+        slack = MagicMock()
+        result = page_policies(
+            ["IMOC"], "INC-1", IncidentSeverity.P0, "T", slack, channel_id="C1"
+        )
+
+        assert result == set()
+        slack.post_message.assert_called_once()
+        assert "Failed to page" in slack.post_message.call_args[0][1]
+
+
+@pytest.mark.django_db
+class TestGetPageablePolicies:
+    def test_returns_configured_policies_with_display_names(self, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+
+        assert get_pageable_policies() == [
+            ("IMOC", "IMOC"),
+            ("PROD_ENG", "Production Engineering"),
+        ]
+
+    def test_excludes_policies_without_integration_key(self, settings):
+        settings.PAGERDUTY = {
+            "API_TOKEN": "test-token",
+            "ESCALATION_POLICIES": {
+                "IMOC": {"id": "PIMOC01", "integration_key": "imoc-integration-key"},
+                "PROD_ENG": {"id": "PPE001"},
+            },
+        }
+
+        assert get_pageable_policies() == [("IMOC", "IMOC")]
+
+    def test_empty_when_unconfigured(self, settings):
+        settings.PAGERDUTY = None
+
+        assert get_pageable_policies() == []
+
+
+@pytest.mark.django_db
+class TestManualPage:
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_pages_private_low_severity_incident(
+        self, mock_slack, mock_pd_cls, settings
+    ):
+        # manual_page is explicit, so it pages even a private P3 incident that
+        # auto-paging would skip.
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+        mock_slack.build_channel_url.return_value = "https://slack.example.com/c/C1"
+
+        incident = Incident.objects.create(
+            title="Quiet issue",
+            severity=IncidentSeverity.P3,
+            is_private=True,
+        )
+
+        result = manual_page(incident, ["IMOC"], channel_id="C1", note="context")
+
+        assert result == {"IMOC"}
+        summary, dedup_key, integration_key = mock_pd.trigger_incident.call_args[0]
+        assert dedup_key == f"firetower-{incident.incident_number}-IMOC"
+        assert summary.endswith("\nNote: context")
+        links = mock_pd.trigger_incident.call_args[1]["links"]
+        assert {"text": "View in Firetower"}.items() <= links[0].items()
+        assert any(link["text"] == "Slack Channel" for link in links)
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_channel_omits_slack_link(self, mock_slack, mock_pd_cls, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = True
+
+        incident = Incident.objects.create(
+            title="Issue",
+            severity=IncidentSeverity.P2,
+        )
+
+        manual_page(incident, ["PROD_ENG"])
+
+        links = mock_pd.trigger_incident.call_args[1]["links"]
+        assert all(link["text"] != "Slack Channel" for link in links)
+        mock_slack.build_channel_url.assert_not_called()
+
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_pd_failure_returns_empty_and_suppresses_warning(
+        self, mock_slack, mock_pd_cls, settings
+    ):
+        # When the PD trigger fails, manual_page returns an empty set and does
+        # not post a per-policy warning to Slack, because it passes
+        # channel_id=None into page_policies. handle_page_submission owns the
+        # single consolidated failure message instead.
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.trigger_incident.return_value = False
+
+        incident = Incident.objects.create(
+            title="Issue",
+            severity=IncidentSeverity.P1,
+        )
+
+        result = manual_page(incident, ["IMOC"], channel_id="C1")
+
+        assert result == set()
+        mock_slack.post_message.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestInvitePagedOncall:
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_invites_only_paged_policies_with_suffix(
+        self, mock_pd_cls, mock_slack, settings
+    ):
+        # Only the paged policy (PROD_ENG) should be queried/invited; IMOC is
+        # left alone. Level-1 on-call gets the "(paged)" suffix.
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+        mock_pd = mock_pd_cls.return_value
+        mock_pd.get_oncall_users.return_value = [
+            {"email": "primary@example.com", "escalation_level": 1},
+            {"email": "secondary@example.com", "escalation_level": 2},
+        ]
+        mock_slack.get_user_profile_by_email.side_effect = [
+            {"slack_user_id": "U_PRIMARY"},
+            {"slack_user_id": "U_SECONDARY"},
+        ]
+
+        invite_paged_oncall("C123", {"PROD_ENG"})
+
+        mock_pd.get_oncall_users.assert_called_once_with("PPE001")
+        mock_slack.invite_to_channel.assert_called_once_with(
+            "C123", ["U_PRIMARY", "U_SECONDARY"]
+        )
+        message = mock_slack.post_message.call_args[0][1]
+        assert message == (
+            "On-Call Prod Eng (Primary): <@U_PRIMARY> (paged)\n"
+            "On-Call Prod Eng (Secondary): <@U_SECONDARY>"
+        )
+
+    @patch("firetower.incidents.hooks._slack_service")
+    @patch("firetower.incidents.hooks.PagerDutyService")
+    def test_empty_paged_is_noop(self, mock_pd_cls, mock_slack, settings):
+        settings.PAGERDUTY = MOCK_PD_CONFIG
+
+        invite_paged_oncall("C123", set())
+
+        mock_pd_cls.assert_not_called()
+        mock_slack.invite_to_channel.assert_not_called()
+        mock_slack.post_message.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestGetIncidentChannelId:
+    def test_returns_primary_channel_not_status(self, db):
+        incident = Incident.objects.create(title="X", severity=IncidentSeverity.P2)
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C_MAIN",
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK_STATUS,
+            url="https://slack.com/archives/C_STATUS",
+        )
+
+        assert get_incident_channel_id(incident) == "C_MAIN"
+
+    def test_none_when_no_channel(self, db):
+        incident = Incident.objects.create(title="X", severity=IncidentSeverity.P2)
+
+        assert get_incident_channel_id(incident) is None
