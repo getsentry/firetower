@@ -91,23 +91,39 @@ def _summarize_graphql_errors(errors: Any) -> str:
     return rendered
 
 
+def _error_is_not_found(err: Any) -> bool:
+    """True iff a single GraphQL error is Linear's issue-not-found error.
+
+    Linear responds to an ``issue(id:)`` lookup for a nonexistent identifier
+    with a "Could not find referenced Issue." error rather than a null result.
+    That sentinel text has been observed in two places depending on the Linear
+    API version: the top-level ``message`` (older) and, more recently, only in
+    ``extensions.userPresentableMessage`` (with ``message`` reduced to the terse
+    "Entity not found: Issue"). Check both so a genuinely-absent issue is not
+    misclassified as "Linear unreachable" and sent to degraded mode.
+    """
+    if not isinstance(err, dict):
+        return False
+    extensions = err.get("extensions")
+    user_message = (
+        extensions.get("userPresentableMessage", "")
+        if isinstance(extensions, dict)
+        else ""
+    )
+    haystack = f"{err.get('message', '')} {user_message}".lower()
+    return _ISSUE_NOT_FOUND_MESSAGE in haystack
+
+
 def _errors_are_not_found(errors: Any) -> bool:
     """True iff every GraphQL error in ``errors`` is an issue-not-found error.
 
-    Linear responds to an ``issue(id:)`` lookup for a nonexistent identifier
-    with a "Could not find referenced Issue." GraphQL error rather than a null
-    result. We only treat the response as an empty (not-found) result when
-    *all* returned errors are that specific issue-not-found error, so a
-    response mixing a real failure with a not-found error still raises.
+    We only treat the response as an empty (not-found) result when *all* returned
+    errors are that specific issue-not-found error, so a response mixing a real
+    failure with a not-found error still raises.
     """
     if not isinstance(errors, list) or not errors:
         return False
-    for err in errors:
-        if not isinstance(err, dict):
-            return False
-        if _ISSUE_NOT_FOUND_MESSAGE not in str(err.get("message", "")).lower():
-            return False
-    return True
+    return all(_error_is_not_found(err) for err in errors)
 
 
 def parse_project_number(identifier: str) -> int | None:
