@@ -242,7 +242,8 @@ class ConfigFile:
                 setattr(target, attr, _env_override(getattr(target, attr), env_var))
 
         # Escalation keys can't use the flat table: the env var name is derived
-        # per policy (PAGERDUTY_ESCALATION_KEY_<NAME>).
+        # per policy (PAGERDUTY_ESCALATION_KEY_<NAME>). The value is the
+        # escalation policy's PagerDuty integration key.
         if self.pagerduty is not None:
             for name, policy in self.pagerduty.escalation_policies.items():
                 if override := os.environ.get(f"PAGERDUTY_ESCALATION_KEY_{name}"):
