@@ -43,7 +43,7 @@ SCHEDULES = {
     "sweep_incident_recovery": {
         "func": "firetower.incidents.tasks.sweep_incident_recovery",
         "schedule_type": Schedule.MINUTES,
-        "minutes": 10,
+        "minutes": 5,
         "repeats": -1,
     },
 }
