@@ -91,6 +91,12 @@ PD_SUMMARY_MAX_LENGTH = 1024
 
 
 @dataclass
+class ChannelDecorationResult:
+    status_channel_id: str | None = None
+    feed_message_ts: str | None = None
+
+
+@dataclass
 class ChannelSetupContext:
     """Primitive-arg context shared by normal and fallback incident channel setup."""
 
@@ -858,7 +864,7 @@ def decorate_incident_channel(
     skip_datadog: bool = False,
     skip_notion: bool = False,
     paged_policies: set[str] | None = None,
-) -> str | None:
+) -> ChannelDecorationResult:
     """
     Shared channel setup called by both the normal and fallback creation paths.
 
@@ -978,9 +984,12 @@ def decorate_incident_channel(
     except Exception:
         logger.exception(f"Failed to invite oncall users to {ctx.channel_name}")
 
-    status_channel_id: str | None = None
+    result = ChannelDecorationResult()
+
     try:
-        status_channel_id = _create_status_channel_for_context(ctx, slack_service)
+        result.status_channel_id = _create_status_channel_for_context(
+            ctx, slack_service
+        )
     except Exception:
         logger.exception(f"Failed to create status channel for {ctx.channel_name}")
 
@@ -1001,11 +1010,13 @@ def decorate_incident_channel(
                     f"{escape_slack_text(ctx.title)}"
                     f"\n\nFor those involved, please join <#{ctx.channel_id}>"
                 )
-            slack_service.post_message(feed_channel_id, feed_message)
+            result.feed_message_ts = slack_service.post_message(
+                feed_channel_id, feed_message
+            )
         except Exception:
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
 
-    return status_channel_id
+    return result
 
 
 def _resolve_linear_user_id(
@@ -1449,15 +1460,23 @@ def on_incident_created(incident: Incident, *, skip_paging: bool = False) -> Non
             incident_number=incident.incident_number,
             topic=build_channel_topic(incident, captain_slack_id),
         )
-        status_channel_id = decorate_incident_channel(
+        decoration = decorate_incident_channel(
             ctx,
             _slack_service,
             skip_datadog=True,
             skip_notion=True,
             paged_policies=paged_policies,
         )
-        if status_channel_id:
-            _save_status_channel_link(incident, status_channel_id)
+        if decoration.status_channel_id:
+            _save_status_channel_link(incident, decoration.status_channel_id)
+        if decoration.feed_message_ts:
+            try:
+                incident.feed_message_ts = decoration.feed_message_ts
+                incident.save(update_fields=["feed_message_ts"])
+            except Exception:
+                logger.exception(
+                    f"Failed to save feed_message_ts for incident {incident.id}"
+                )
 
         # DB-dedup Datadog/Notion after shared decoration so the guide message
         # appears first in the channel.
@@ -1717,6 +1736,32 @@ def on_incident_updated(
             logger.exception(
                 f"Error posting combined message in on_incident_updated for incident {incident.id}"
             )
+
+    # --- Post severity change to feed channel thread ---
+    if (
+        old_severity is not None
+        and not incident.is_private
+        and incident.feed_message_ts
+    ):
+        feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
+        if feed_channel_id:
+            incident_url = _build_incident_url(incident)
+            feed_reply = (
+                f"<{incident_url}|{incident.incident_number} "
+                f"{escape_slack_text(incident.title)}> "
+                f"Severity updated: {old_severity} -> {incident.severity}\n"
+            )
+            try:
+                _slack_service.post_message(
+                    feed_channel_id,
+                    feed_reply,
+                    thread_ts=incident.feed_message_ts,
+                    reply_broadcast=True,
+                )
+            except Exception:
+                logger.exception(
+                    f"Error posting severity update to feed channel for incident {incident.id}"
+                )
 
     # --- Visibility gets its own separate message (same as on_visibility_changed) ---
     if visibility_changed and channel_id:

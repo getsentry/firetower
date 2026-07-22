@@ -288,17 +288,35 @@ class SlackService:
             return False
 
     def post_message(
-        self, channel_id: str, text: str, blocks: list[dict] | None = None
+        self,
+        channel_id: str,
+        text: str,
+        blocks: list[dict] | None = None,
+        thread_ts: str | None = None,
+        reply_broadcast: bool = False,
     ) -> str | None:
         if not self.client:
             logger.warning("Cannot post message - Slack client not initialized")
             return None
 
+        kwargs: dict[str, Any] = {
+            "channel": channel_id,
+            "text": text,
+            "blocks": blocks,
+        }
+        if thread_ts:
+            kwargs["thread_ts"] = thread_ts
+            if reply_broadcast:
+                kwargs["reply_broadcast"] = True
+        elif reply_broadcast:
+            logger.warning(
+                "reply_broadcast=True ignored because thread_ts is not set for channel %s",
+                channel_id,
+            )
+
         try:
             logger.info(f"Posting message to channel {channel_id}")
-            response = self.client.chat_postMessage(
-                channel=channel_id, text=text, blocks=blocks
-            )
+            response = self.client.chat_postMessage(**kwargs)
             return response.get("ts")
         except SlackApiError as e:
             if e.response.get("error") == "is_archived":
@@ -309,9 +327,7 @@ class SlackService:
                 logger.info(f"Not in channel {channel_id}, joining and retrying post")
                 if self.join_channel(channel_id):
                     try:
-                        response = self.client.chat_postMessage(
-                            channel=channel_id, text=text, blocks=blocks
-                        )
+                        response = self.client.chat_postMessage(**kwargs)
                         return response.get("ts")
                     except SlackApiError as retry_error:
                         logger.error(

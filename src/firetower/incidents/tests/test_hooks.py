@@ -229,9 +229,10 @@ class TestOnIncidentCreated:
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_posts_to_feed_channel(self, mock_slack, settings):
-        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+        mock_slack.post_message.return_value = "1234567890.123456"
 
         incident = Incident.objects.create(
             title="Test Incident",
@@ -248,8 +249,25 @@ class TestOnIncidentCreated:
         assert "P1" in feed_calls[0][0][1]
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_saves_feed_message_ts(self, mock_slack, settings):
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+        mock_slack.post_message.return_value = "1234567890.123456"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        incident.refresh_from_db()
+        assert incident.feed_message_ts == "1234567890.123456"
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_private_incident_skips_feed_channel(self, mock_slack, settings):
-        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
 
@@ -3814,3 +3832,77 @@ class TestOnIncidentUpdated:
         on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
 
         mock_get_linear.return_value.update_issue.assert_not_called()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_severity_change_posts_to_feed_channel_thread(self, mock_slack, settings):
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0, feed_message_ts="1234567890.123456"
+        )
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_severity=IncidentSeverity.P2)
+
+        feed_calls = [
+            c for c in mock_slack.post_message.call_args_list if c[0][0] == "C_FEED"
+        ]
+        assert len(feed_calls) == 1
+        msg = feed_calls[0][0][1]
+        assert "P2 -> P0" in msg
+        assert msg.index("INC-") < msg.index("Severity updated")
+        assert feed_calls[0][1]["thread_ts"] == "1234567890.123456"
+        assert feed_calls[0][1]["reply_broadcast"] is True
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_severity_change_skips_feed_thread_without_ts(self, mock_slack, settings):
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_severity=IncidentSeverity.P2)
+
+        feed_calls = [
+            c for c in mock_slack.post_message.call_args_list if c[0][0] == "C_FEED"
+        ]
+        assert len(feed_calls) == 0
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_severity_change_skips_feed_thread_for_private(self, mock_slack, settings):
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0,
+            is_private=True,
+            feed_message_ts="1234567890.123456",
+        )
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_severity=IncidentSeverity.P2)
+
+        feed_calls = [
+            c for c in mock_slack.post_message.call_args_list if c[0][0] == "C_FEED"
+        ]
+        assert len(feed_calls) == 0
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_status_change_does_not_post_to_feed_thread(self, mock_slack, settings):
+        settings.SLACK = {**settings.SLACK, "INCIDENT_FEED_CHANNEL_ID": "C_FEED"}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(
+            status=IncidentStatus.MITIGATED,
+            feed_message_ts="1234567890.123456",
+        )
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        feed_calls = [
+            c for c in mock_slack.post_message.call_args_list if c[0][0] == "C_FEED"
+        ]
+        assert len(feed_calls) == 0

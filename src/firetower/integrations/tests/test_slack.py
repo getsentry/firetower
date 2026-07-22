@@ -613,6 +613,29 @@ class TestSlackService:
         mock_client.conversations_join.side_effect = self._make_archived_error()
         assert service.join_channel("C12345") is False
 
+    def test_post_message_with_thread_ts(self):
+        service, mock_client = self._make_service()
+        mock_client.chat_postMessage.return_value = {"ts": "5555.6666"}
+        result = service.post_message(
+            "C12345", "reply", thread_ts="1111.2222", reply_broadcast=True
+        )
+        assert result == "5555.6666"
+        mock_client.chat_postMessage.assert_called_once_with(
+            channel="C12345",
+            text="reply",
+            blocks=None,
+            thread_ts="1111.2222",
+            reply_broadcast=True,
+        )
+
+    def test_post_message_thread_ts_none_omits_thread_kwargs(self):
+        service, mock_client = self._make_service()
+        mock_client.chat_postMessage.return_value = {"ts": "1111.2222"}
+        service.post_message("C12345", "hello", thread_ts=None, reply_broadcast=True)
+        mock_client.chat_postMessage.assert_called_once_with(
+            channel="C12345", text="hello", blocks=None
+        )
+
     def test_post_message_archived(self):
         service, mock_client = self._make_service()
         mock_client.chat_postMessage.side_effect = self._make_archived_error()
