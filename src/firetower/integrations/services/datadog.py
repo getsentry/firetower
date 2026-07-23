@@ -4,12 +4,27 @@ import os
 from datadog_api_client import ApiClient, Configuration
 from datadog_api_client.exceptions import ApiException
 from datadog_api_client.v1.api.notebooks_api import NotebooksApi
+from datadog_api_client.v1.model.notebook_cell_create_request import (
+    NotebookCellCreateRequest,
+)
+from datadog_api_client.v1.model.notebook_cell_resource_type import (
+    NotebookCellResourceType,
+)
 from datadog_api_client.v1.model.notebook_create_data import NotebookCreateData
 from datadog_api_client.v1.model.notebook_create_data_attributes import (
     NotebookCreateDataAttributes,
 )
 from datadog_api_client.v1.model.notebook_create_request import NotebookCreateRequest
 from datadog_api_client.v1.model.notebook_global_time import NotebookGlobalTime
+from datadog_api_client.v1.model.notebook_markdown_cell_attributes import (
+    NotebookMarkdownCellAttributes,
+)
+from datadog_api_client.v1.model.notebook_markdown_cell_definition import (
+    NotebookMarkdownCellDefinition,
+)
+from datadog_api_client.v1.model.notebook_markdown_cell_definition_type import (
+    NotebookMarkdownCellDefinitionType,
+)
 from datadog_api_client.v1.model.notebook_resource_type import NotebookResourceType
 from datadog_api_client.v1.model.widget_live_span import WidgetLiveSpan
 
@@ -62,10 +77,19 @@ class DatadogService:
             with ApiClient(configuration) as api_client:
                 api_instance = NotebooksApi(api_client)
 
+                header_cell = NotebookCellCreateRequest(
+                    attributes=NotebookMarkdownCellAttributes(
+                        definition=NotebookMarkdownCellDefinition(
+                            text="---",
+                            type=NotebookMarkdownCellDefinitionType.MARKDOWN,
+                        ),
+                    ),
+                    type=NotebookCellResourceType.NOTEBOOK_CELLS,
+                )
                 notebook_data = NotebookCreateData(
                     attributes=NotebookCreateDataAttributes(
                         name=notebook_name,
-                        cells=[],
+                        cells=[header_cell],
                         time=NotebookGlobalTime(live_span=WidgetLiveSpan("1h")),
                     ),
                     type=NotebookResourceType("notebooks"),

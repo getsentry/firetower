@@ -187,11 +187,14 @@ WSGI_APPLICATION = "firetower.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        # Custom backend: extends the stock postgresql backend to retry auth
+        # with FALLBACK_PASSWORDS during a password rotation.
+        "ENGINE": "firetower.db_backend",
         "NAME": config.postgres.db,
         "HOST": config.postgres.host,
         "USER": config.postgres.user,
         "PASSWORD": config.postgres.password,
+        "FALLBACK_PASSWORDS": config.postgres.fallback_passwords,
         "CONN_HEALTH_CHECKS": True,
     },
 }
@@ -330,6 +333,7 @@ LINEAR: dict | None = (
         "TEAM_ID": config.linear.team_id,
         "PROJECT_ID": config.linear.project_id,
         "SYNC_IDENTIFIERS": config.linear.sync_identifiers,
+        "INCIDENT_ADOPT_ON_CREATE": config.linear.adopt_on_create,
         "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": config.linear.action_item_slo_days_high_priority,
         "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": config.linear.action_item_slo_days_medium_priority,
         "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": config.linear.action_item_nag_comment_high_priority,
@@ -343,6 +347,16 @@ LINEAR: dict | None = (
 
 ACTION_ITEM_SYNC_THROTTLE_SECONDS = (
     int(config.linear.action_item_sync_throttle_seconds) if config.linear else 300
+)
+
+# Tight timeout/retry budget for the incident allocation path, which calls
+# Linear while holding a DB lock. Kept lower than the default LinearService
+# budget so a hung Linear can't hold the lock for the full default duration.
+INCIDENT_ALLOC_LINEAR_TIMEOUT = (
+    int(config.linear.alloc_timeout_seconds) if config.linear else 8
+)
+INCIDENT_ALLOC_LINEAR_RETRIES = (
+    int(config.linear.alloc_max_retries) if config.linear else 1
 )
 
 # Django REST Framework Configuration

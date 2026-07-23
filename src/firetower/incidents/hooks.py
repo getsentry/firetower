@@ -10,6 +10,7 @@ from django.utils import timezone
 from django_q.tasks import Schedule
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
+from firetower.incidents.allocation import adopt_on_create_enabled
 from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
@@ -40,6 +41,14 @@ def _get_linear_service() -> LinearService:
 
 HIGH_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
 ACTIVE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
+# Statuses that mean the incident has been responded to/mitigated, at which
+# point any PagerDuty pages Firetower triggered should be auto-resolved.
+PAGE_RESOLVE_STATUSES = {
+    IncidentStatus.MITIGATED,
+    IncidentStatus.DONE,
+    IncidentStatus.POSTMORTEM,
+    IncidentStatus.CANCELED,
+}
 
 DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
 
@@ -196,6 +205,60 @@ def _page_if_needed(
         is_private=incident.is_private,
         skip_paging=skip_paging,
     )
+
+
+def resolve_pages_for_incident(incident: Incident) -> None:
+    """Resolve any PagerDuty pages Firetower triggered for this incident.
+
+    The dedup key is deterministically rebuilt from incident_number + policy
+    name, matching what page_for_channel sent at trigger time on the normal
+    path, so no PD lookup or stored alert id is needed. Resolving a policy that
+    never paged (or was already resolved) is a harmless 202 no-op, so we resolve
+    every configured policy unconditionally.
+
+    Intentionally NOT gated on is_private or severity, unlike the trigger path
+    (page_for_channel). An incident can be paged while it is public and P0/P1
+    and then have its visibility or severity changed before it is mitigated;
+    gating resolve on the *current* is_private/severity would leave those
+    already-fired pages open. Resolving unconditionally costs at most a couple
+    of dead 202 no-op calls for incidents that never paged, which we accept in
+    exchange for never missing a real page.
+
+    Known gap: pages fired on the degraded fallback path use the Slack channel
+    name as the dedup prefix (not the incident number), so they are not matched
+    here. Those are cleaned up manually.
+    """
+    pd_config = settings.PAGERDUTY
+    if not pd_config:
+        return
+
+    escalation_policies = pd_config.get("ESCALATION_POLICIES", {})
+
+    pd_service = None
+
+    for policy_name in PAGING_POLICIES:
+        policy = escalation_policies.get(policy_name)
+        if not policy:
+            continue
+
+        integration_key = policy.get("integration_key")
+        if not integration_key:
+            continue
+
+        if pd_service is None:
+            try:
+                pd_service = PagerDutyService()
+            except Exception:
+                logger.exception("Failed to initialize PagerDutyService for resolve")
+                return
+
+        dedup_key = f"firetower-{incident.incident_number}-{policy_name}"
+        try:
+            pd_service.resolve_incident(dedup_key, integration_key)
+        except Exception:
+            logger.exception(
+                f"Failed to resolve {policy_name} page for {incident.incident_number}"
+            )
 
 
 def build_channel_name(incident: Incident) -> str:
@@ -1022,7 +1085,7 @@ LINEAR_PARENT_DESCRIPTION = (
 MAX_CLAIM_ATTEMPTS = 5
 
 
-def _claim_linear_issue(
+def claim_linear_issue(
     linear_service: LinearService,
     incident: Incident,
     team_id: str,
@@ -1045,9 +1108,98 @@ def _claim_linear_issue(
     return None
 
 
+def populate_linear_parent(
+    incident: Incident, url: str, *, channel_id: str | None = None
+) -> None:
+    """Populate a pre-claimed / adopted Linear parent issue.
+
+    ``incident.linear_parent_issue_id`` is an already-verified match for the
+    incident number, so this updates it directly by uuid via the default
+    LinearService (outside the allocation lock) and never looks the issue up by
+    identifier — so it can never clobber a moved/aliased issue. Every Linear
+    call is best-effort and non-fatal.
+    """
+    ExternalLink.objects.update_or_create(
+        incident=incident,
+        type=ExternalLinkType.LINEAR,
+        defaults={"url": url},
+    )
+
+    linear_config = settings.LINEAR
+    uuid = incident.linear_parent_issue_id
+    if not linear_config or not uuid:
+        return
+
+    team_id = str(linear_config.get("TEAM_ID", ""))
+    linear_service = _get_linear_service()
+
+    try:
+        states = linear_service.get_workflow_states(team_id) if team_id else None
+        started_state_id = states.get("started") if states else None
+        captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
+        linear_service.update_issue(
+            uuid,
+            title=_linear_issue_title(incident, sync_identifiers=True),
+            description=LINEAR_PARENT_DESCRIPTION,
+            state_id=started_state_id,
+            assignee_id=captain_linear_id,
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to update adopted Linear issue for incident {incident.id}"
+        )
+
+    try:
+        incident_url = _build_incident_url(incident)
+        linear_service.create_attachment(
+            uuid, incident_url, f"Firetower: {incident.incident_number}"
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to create Linear attachment for incident {incident.id}"
+        )
+
+    if channel_id and url:
+        try:
+            _slack_service.add_bookmark(channel_id, "Linear Issue", url)
+        except Exception:
+            logger.exception(
+                f"Failed to add Linear bookmark for incident {incident.id}"
+            )
+
+
 def create_linear_parent_issue(
     incident: Incident, *, channel_id: str | None = None
 ) -> None:
+    # Adopt-on-create: the allocator already claimed/created a matching Linear
+    # parent whose uuid is on the incident. Populate it directly by uuid (no
+    # lookup by identifier, so it can never clobber a moved/aliased issue) and
+    # skip the legacy claim/create path entirely.
+    #
+    # This only applies when the incident actually has a parent uuid. New
+    # incidents always do under the flag (the allocator sets it before this
+    # hook runs). The one flag-on caller that arrives WITHOUT a uuid is the
+    # backfill in sync_action_items_from_linear (incidents predating Linear
+    # integration); those fall through to the legacy claim path below, which
+    # claims their existing INC-N placeholder. That is safe because every such
+    # parentless incident has a clean, correctly-identified INC-N Placeholder
+    # (never moved), so the claim resolves to the right issue.
+    if adopt_on_create_enabled() and incident.linear_parent_issue_id:
+        identity = getattr(incident, "_allocated_identity", None)
+        url = identity.linear_url if identity is not None else None
+        if not url:
+            try:
+                issue = _get_linear_service().get_issue(incident.linear_parent_issue_id)
+                url = issue.get("url") if issue else None
+            except Exception:
+                logger.exception(
+                    f"Failed to resolve Linear url for incident {incident.id}"
+                )
+                url = None
+        if url:
+            populate_linear_parent(incident, url, channel_id=channel_id)
+        return
+
     linear_config = settings.LINEAR
     if not linear_config:
         return
@@ -1073,7 +1225,7 @@ def create_linear_parent_issue(
         captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
 
         if sync_identifiers:
-            issue = _claim_linear_issue(linear_service, incident, team_id, project_id)
+            issue = claim_linear_issue(linear_service, incident, team_id, project_id)
             if not issue:
                 linear_link.delete()
                 logger.warning(
@@ -1601,6 +1753,23 @@ def on_incident_updated(
         except Exception:
             logger.exception(
                 f"Failed to trigger slack dump in on_incident_updated for incident {incident.id}"
+            )
+
+    # Status change into a mitigated/terminal state: resolve any PD pages we sent.
+    # Best-effort so a PagerDuty hiccup never breaks the incident update.
+    # resolve_pages_for_incident is intentionally severity- and visibility-
+    # agnostic (see its docstring): severity/visibility can change after the
+    # page fired, so gating on current values could strand an open page.
+    if (
+        old_status is not None
+        and old_status in ACTIVE_STATUSES
+        and incident.status in PAGE_RESOLVE_STATUSES
+    ):
+        try:
+            resolve_pages_for_incident(incident)
+        except Exception:
+            logger.exception(
+                f"Failed to resolve pages in on_incident_updated for incident {incident.id}"
             )
 
     # Severity escalation: page, invite oncall, create status channel, schedule reminders

@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
+from firetower.incidents.allocation import AllocatedIdentity, LinearUnavailable
 from firetower.incidents.models import (
     ExternalLink,
     ExternalLinkType,
@@ -546,3 +547,102 @@ class TestBackfillSubmission:
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Could not identify" in msg
+
+    @patch(
+        "firetower.incidents.serializers.adopt_on_create_enabled",
+        return_value=True,
+    )
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.adopt_on_create_enabled",
+        return_value=True,
+    )
+    @patch("firetower.slack_app.handlers.backfill_incident.populate_linear_parent")
+    @patch("firetower.incidents.serializers.allocate_incident_identity")
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.sync_incident_participants_from_slack"
+    )
+    @patch("firetower.slack_app.handlers.backfill_incident._slack_service")
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.get_or_create_user_from_slack_id"
+    )
+    def test_adopt_path_populates_linear_parent(
+        self,
+        mock_get_user,
+        mock_slack_svc,
+        mock_sync,
+        mock_allocate,
+        mock_populate,
+        mock_enabled,
+        mock_enabled_serializer,
+    ):
+        mock_get_user.return_value = self.user
+        mock_allocate.return_value = AllocatedIdentity(
+            2050, "uuid-x", "https://linear.app/issue/x"
+        )
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://T0000.slack.com/archives/C_TEST"
+        )
+        mock_slack_svc.get_channel_info.return_value = {
+            "id": "C_TEST",
+            "name": f"{settings.PROJECT_KEY.lower()}-2050",
+            "is_private": False,
+        }
+        mock_slack_svc.join_channel.return_value = True
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+
+        handle_backfill_submission(ack, body, self._build_view(), client)
+
+        incident = Incident.objects.get(title="Test Backfill")
+        assert incident.linear_parent_issue_id == "uuid-x"
+        mock_populate.assert_called_once()
+        assert mock_populate.call_args[0][0] == incident
+        assert mock_populate.call_args[0][1] == "https://linear.app/issue/x"
+
+    @patch(
+        "firetower.incidents.serializers.adopt_on_create_enabled",
+        return_value=True,
+    )
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.adopt_on_create_enabled",
+        return_value=True,
+    )
+    @patch(
+        "firetower.incidents.serializers.allocate_incident_identity",
+        side_effect=LinearUnavailable,
+    )
+    @patch("firetower.slack_app.handlers.backfill_incident._slack_service")
+    @patch(
+        "firetower.slack_app.handlers.backfill_incident.get_or_create_user_from_slack_id"
+    )
+    def test_linear_unavailable_dms_retry_and_creates_no_incident(
+        self,
+        mock_get_user,
+        mock_slack_svc,
+        mock_allocate,
+        mock_enabled,
+        mock_enabled_serializer,
+    ):
+        mock_get_user.return_value = self.user
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://T0000.slack.com/archives/C_TEST"
+        )
+        mock_slack_svc.get_channel_info.return_value = {
+            "id": "C_TEST",
+            "name": f"{settings.PROJECT_KEY.lower()}-2050",
+            "is_private": False,
+        }
+
+        ack = MagicMock()
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+
+        handle_backfill_submission(ack, body, self._build_view(), client)
+
+        assert not Incident.objects.filter(title="Test Backfill").exists()
+        client.chat_postMessage.assert_called_once()
+        msg = client.chat_postMessage.call_args[1]["text"]
+        assert "/ft backfill" in msg
+        assert "Linear" in msg

@@ -64,6 +64,31 @@ class TestTriggerIncident:
         assert result is False
 
 
+class TestResolveIncident:
+    @patch("firetower.integrations.services.pagerduty.requests.post")
+    def test_resolve_success(self, mock_post, pd_service):
+        mock_post.return_value = MagicMock(status_code=202)
+
+        result = pd_service.resolve_incident("dedup-123", "int-key")
+
+        assert result is True
+        mock_post.assert_called_once()
+        mock_post.return_value.raise_for_status.assert_called_once()
+        call_kwargs = mock_post.call_args
+        assert call_kwargs.kwargs["json"]["routing_key"] == "int-key"
+        assert call_kwargs.kwargs["json"]["dedup_key"] == "dedup-123"
+        assert call_kwargs.kwargs["json"]["event_action"] == "resolve"
+        assert "payload" not in call_kwargs.kwargs["json"]
+
+    @patch("firetower.integrations.services.pagerduty.requests.post")
+    def test_resolve_failure(self, mock_post, pd_service):
+        mock_post.side_effect = requests.RequestException("connection error")
+
+        result = pd_service.resolve_incident("dedup-123", "int-key")
+
+        assert result is False
+
+
 class TestGetOncallUsers:
     @patch("firetower.integrations.services.pagerduty.requests.get")
     def test_returns_users_with_escalation_level(self, mock_get, pd_service):

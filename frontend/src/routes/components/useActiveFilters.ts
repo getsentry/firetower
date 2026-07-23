@@ -8,7 +8,8 @@ export type ArrayFilterKey =
   | 'impact_type'
   | 'affected_region'
   | 'captain'
-  | 'reporter';
+  | 'reporter'
+  | 'participant';
 
 export const ARRAY_FILTER_KEYS: ArrayFilterKey[] = [
   'severity',
@@ -19,6 +20,7 @@ export const ARRAY_FILTER_KEYS: ArrayFilterKey[] = [
   'affected_region',
   'captain',
   'reporter',
+  'participant',
 ];
 
 export function useActiveFilters() {

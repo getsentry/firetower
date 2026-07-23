@@ -1,12 +1,14 @@
 from datetime import datetime
 
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.utils import timezone as django_timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 
 from .models import Incident, IncidentSeverity, IncidentStatus, ServiceTier
+
+EMPTY_FILTER_SENTINEL = "__empty__"
 
 
 def parse_date_param(value: str) -> datetime | None:
@@ -103,15 +105,25 @@ def filter_by_service_tier(
 ) -> QuerySet[Incident]:
     service_tier_filters = request.GET.getlist("service_tier")
     if service_tier_filters:
-        valid_tiers = set(ServiceTier.__members__.values())
-        invalid_tiers = set(service_tier_filters) - valid_tiers
-        if invalid_tiers:
-            raise ValidationError(
-                {
-                    "service_tier": f"Invalid service_tier value(s): {', '.join(invalid_tiers)}"
-                }
+        include_empty = EMPTY_FILTER_SENTINEL in service_tier_filters
+        tier_values = [v for v in service_tier_filters if v != EMPTY_FILTER_SENTINEL]
+        if tier_values:
+            valid_tiers = set(ServiceTier.__members__.values())
+            invalid_tiers = set(tier_values) - valid_tiers
+            if invalid_tiers:
+                raise ValidationError(
+                    {
+                        "service_tier": f"Invalid service_tier value(s): {', '.join(invalid_tiers)}"
+                    }
+                )
+        if include_empty and tier_values:
+            queryset = queryset.filter(
+                Q(service_tier__in=tier_values) | Q(service_tier__isnull=True)
             )
-        queryset = queryset.filter(service_tier__in=service_tier_filters)
+        elif include_empty:
+            queryset = queryset.filter(service_tier__isnull=True)
+        else:
+            queryset = queryset.filter(service_tier__in=tier_values)
     return queryset
 
 
@@ -130,7 +142,17 @@ def filter_by_tags(
     for param_name, field_name in TAG_FILTER_PARAMS.items():
         tag_names = request.GET.getlist(param_name)
         if tag_names:
-            queryset = queryset.filter(**{f"{field_name}__name__in": tag_names})
+            include_empty = EMPTY_FILTER_SENTINEL in tag_names
+            actual_tags = [v for v in tag_names if v != EMPTY_FILTER_SENTINEL]
+            if include_empty and actual_tags:
+                queryset = queryset.filter(
+                    Q(**{f"{field_name}__name__in": actual_tags})
+                    | Q(**{f"{field_name}__isnull": True})
+                )
+            elif include_empty:
+                queryset = queryset.filter(**{f"{field_name}__isnull": True})
+            else:
+                queryset = queryset.filter(**{f"{field_name}__name__in": actual_tags})
             applied = True
     if applied:
         queryset = queryset.distinct()
@@ -142,7 +164,16 @@ def filter_by_captain(
 ) -> QuerySet[Incident]:
     captain_emails = request.GET.getlist("captain")
     if captain_emails:
-        queryset = queryset.filter(captain__email__in=captain_emails)
+        include_empty = EMPTY_FILTER_SENTINEL in captain_emails
+        actual_emails = [v for v in captain_emails if v != EMPTY_FILTER_SENTINEL]
+        if include_empty and actual_emails:
+            queryset = queryset.filter(
+                Q(captain__email__in=actual_emails) | Q(captain__isnull=True)
+            )
+        elif include_empty:
+            queryset = queryset.filter(captain__isnull=True)
+        else:
+            queryset = queryset.filter(captain__email__in=actual_emails)
     return queryset
 
 
@@ -151,5 +182,33 @@ def filter_by_reporter(
 ) -> QuerySet[Incident]:
     reporter_emails = request.GET.getlist("reporter")
     if reporter_emails:
-        queryset = queryset.filter(reporter__email__in=reporter_emails)
+        include_empty = EMPTY_FILTER_SENTINEL in reporter_emails
+        actual_emails = [v for v in reporter_emails if v != EMPTY_FILTER_SENTINEL]
+        if include_empty and actual_emails:
+            queryset = queryset.filter(
+                Q(reporter__email__in=actual_emails) | Q(reporter__isnull=True)
+            )
+        elif include_empty:
+            queryset = queryset.filter(reporter__isnull=True)
+        else:
+            queryset = queryset.filter(reporter__email__in=actual_emails)
+    return queryset
+
+
+def filter_by_participant(
+    queryset: QuerySet[Incident], request: Request
+) -> QuerySet[Incident]:
+    participant_emails = request.GET.getlist("participant")
+    if participant_emails:
+        include_empty = EMPTY_FILTER_SENTINEL in participant_emails
+        actual_emails = [v for v in participant_emails if v != EMPTY_FILTER_SENTINEL]
+        if include_empty and actual_emails:
+            queryset = queryset.filter(
+                Q(participants__email__in=actual_emails) | Q(participants__isnull=True)
+            )
+        elif include_empty:
+            queryset = queryset.filter(participants__isnull=True)
+        else:
+            queryset = queryset.filter(participants__email__in=actual_emails)
+        queryset = queryset.distinct()
     return queryset

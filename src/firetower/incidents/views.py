@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 from .filters import (
     filter_by_captain,
     filter_by_date_range,
+    filter_by_participant,
     filter_by_reporter,
     filter_by_service_tier,
     filter_by_severity,
@@ -144,6 +145,7 @@ class IncidentListUIView(generics.ListAPIView):
         queryset = filter_by_tags(queryset, self.request)
         queryset = filter_by_captain(queryset, self.request)
         queryset = filter_by_reporter(queryset, self.request)
+        queryset = filter_by_participant(queryset, self.request)
         return queryset
 
 
@@ -231,6 +233,7 @@ class IncidentListCreateAPIView(generics.ListCreateAPIView):
         queryset = filter_by_tags(queryset, self.request)
         queryset = filter_by_captain(queryset, self.request)
         queryset = filter_by_reporter(queryset, self.request)
+        queryset = filter_by_participant(queryset, self.request)
         return queryset
 
 
