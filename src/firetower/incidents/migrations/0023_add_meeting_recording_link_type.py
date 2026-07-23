@@ -4,15 +4,28 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('incidents', '0022_actionitem_last_nag'),
+        ("incidents", "0022_actionitem_last_nag"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='externallink',
-            name='type',
-            field=models.CharField(choices=[('SLACK', 'Slack'), ('SLACK_STATUS', 'Slack Status'), ('JIRA', 'Jira'), ('DATADOG', 'Datadog'), ('PAGERDUTY', 'PagerDuty'), ('STATUSPAGE', 'Statuspage'), ('NOTION', 'Notion'), ('NOTION_TROUBLESHOOTING', 'Notion Troubleshooting'), ('LINEAR', 'Linear'), ('MEETING_RECORDING', 'Meeting Recording')], max_length=30),
+            model_name="externallink",
+            name="type",
+            field=models.CharField(
+                choices=[
+                    ("SLACK", "Slack"),
+                    ("SLACK_STATUS", "Slack Status"),
+                    ("JIRA", "Jira"),
+                    ("DATADOG", "Datadog"),
+                    ("PAGERDUTY", "PagerDuty"),
+                    ("STATUSPAGE", "Statuspage"),
+                    ("NOTION", "Notion"),
+                    ("NOTION_TROUBLESHOOTING", "Notion Troubleshooting"),
+                    ("LINEAR", "Linear"),
+                    ("MEETING_RECORDING", "Meeting Recording"),
+                ],
+                max_length=30,
+            ),
         ),
     ]
