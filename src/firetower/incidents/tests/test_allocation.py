@@ -13,6 +13,7 @@ from firetower.incidents.allocation import (
     adopt_on_create_enabled,
     allocate_incident_identity,
 )
+from firetower.incidents.allocation import logger as allocation_logger
 from firetower.incidents.hooks import (
     create_linear_parent_issue,
     populate_linear_parent,
@@ -182,11 +183,12 @@ class TestAllocateSkips:
             {_identifier(2350): stray, _identifier(2351): _placeholder(2351)}
         )
 
-        with _patch_linear(linear):
+        with _patch_linear(linear), patch.object(allocation_logger, "warning") as warn:
             identity = allocate_incident_identity()
 
         assert identity.inc_id == 2351
         assert IncidentCounter.objects.get(pk=1).next_id == 2352
+        assert "Skipping stray non-placeholder" in warn.call_args[0][0]
 
 
 @pytest.mark.django_db
