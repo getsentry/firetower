@@ -12,6 +12,7 @@ from django.test import TestCase
 
 from firetower import config_hooks, config_reload
 from firetower.config import ConfigFile
+from firetower.integrations.models import LinearOAuthToken
 from firetower.settings import apply_config
 
 
@@ -49,6 +50,21 @@ class TestApplyConfig(TestCase):
         # The handler builds new connections from its own cached settings, not
         # directly from settings.DATABASES; the reload must refresh that cache.
         self.assertEqual(connections.settings["default"]["HOST"], "db.new.example.com")
+
+    def test_salt_key_change_busts_encrypted_field_cache(self) -> None:
+        # encrypted_fields caches derived keys per field instance for the process
+        # lifetime, so a reloaded SALT_KEY must invalidate that cache or crypto
+        # keeps using the old key while settings claims the new one.
+        field = LinearOAuthToken._meta.get_field("access_token")
+        keys_before = list(field.keys)  # prime the cached_property
+
+        new_config = replace(
+            self._original,
+            salt_keys=["a-brand-new-salt", *(self._original.salt_keys or [])],
+        )
+        apply_config(new_config)
+
+        self.assertNotEqual(list(field.keys), keys_before)
 
     def test_invalid_config_raises_before_mutating(self) -> None:
         bad_auth = replace(self._original.auth, iap_enabled=True, iap_audience="")

@@ -311,6 +311,32 @@ def _apply_config_side_effects(config: ConfigFile) -> None:
         ]
 
 
+def _reset_encrypted_field_caches() -> None:
+    """
+    Drop cached derived keys on every encrypted model field.
+
+    django-fernet-encrypted-fields derives its Fernet keys from SALT_KEY /
+    SECRET_KEY and caches them (plus the resulting Fernet/MultiFernet) in
+    ``@cached_property`` attributes (``keys``/``f``) on each field instance.
+    Those field instances live for the whole process, so without busting the
+    cache a reloaded SALT_KEY/SECRET_KEY is silently ignored by encryption and
+    decryption until restart — even though ``settings.SALT_KEY`` reports the new
+    value. That is especially dangerous during salt rotation: adding a key would
+    appear applied while ``MultiFernet`` still only used the old one.
+
+    Re-derivation is deferred (the cached_property recomputes lazily on next
+    access) and deterministic, so busting mid-request is safe.
+    """
+    from django.apps import apps  # noqa: PLC0415
+    from encrypted_fields.fields import EncryptedFieldMixin  # noqa: PLC0415
+
+    for model in apps.get_models():
+        for field in model._meta.get_fields():
+            if isinstance(field, EncryptedFieldMixin):
+                field.__dict__.pop("keys", None)
+                field.__dict__.pop("f", None)
+
+
 def apply_config(config: ConfigFile) -> None:
     """
     Re-apply every config-derived value onto the live Django settings object.
@@ -322,11 +348,12 @@ def apply_config(config: ConfigFile) -> None:
        normalized DATABASES for the connection handler, and the Datadog
        re-init) *before* touching any global state. A bad ``config.toml`` aborts
        here, leaving the running process entirely on its previous config.
-    2. Commit: rebind settings, apply logging, and swap the connection handler's
-       cached settings. These steps are constructed not to raise, so settings,
-       logging and the DB connection handler move together — never leaving, say,
-       ``settings.DATABASES`` updated while the connection handler still serves
-       the old config.
+    2. Commit: rebind settings, apply logging, swap the connection handler's
+       cached settings, and (when SALT_KEY/SECRET_KEY changed) bust the
+       encrypted-field key caches. These steps are constructed not to raise, so
+       settings, logging, the DB connection handler and the crypto keys move
+       together — never leaving, say, ``settings.DATABASES`` updated while the
+       connection handler still serves the old config.
 
     Each setting is rebound wholesale; the GIL makes a single ``setattr`` atomic,
     so concurrent readers see either the old or the new value, never a torn one.
@@ -344,6 +371,13 @@ def apply_config(config: ConfigFile) -> None:
     # Datadog re-init is a global side effect with no dependency on the new
     # settings, so run it in this phase: if it fails, nothing else has changed.
     _apply_config_side_effects(config)
+    # Whether the encryption inputs changed; captured before the settings are
+    # rebound so we can bust the encrypted-field key caches only when needed
+    # (re-derivation is comparatively expensive: PBKDF2 with 100k iterations).
+    crypto_changed = (
+        getattr(live_settings, "SALT_KEY", None) != values["SALT_KEY"]
+        or getattr(live_settings, "SECRET_KEY", None) != values["SECRET_KEY"]
+    )
 
     # --- Phase 2: commit. These steps must not raise. ---
     for key, value in values.items():
@@ -362,6 +396,11 @@ def apply_config(config: ConfigFile) -> None:
     # Kept adjacent to the setattr loop (and before dictConfig) so settings and the
     # connection handler are always committed together.
     connections._settings = connections.settings = new_connection_settings
+
+    # SALT_KEY/SECRET_KEY feed encrypted_fields' cached key derivation; bust that
+    # cache so a reloaded salt/secret actually takes effect (see the helper).
+    if crypto_changed:
+        _reset_encrypted_field_caches()
 
     logging.config.dictConfig(values["LOGGING"])
 
