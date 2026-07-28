@@ -35,12 +35,18 @@ jobs:
             --project ${{ secrets.GCP_PROJECT_SLUG }} \
             --region us-west1 \
             --format export > service.yaml
+      - name: Force new revision name
+        run: |
+          # Cloud Run only creates a new revision when the revision
+          # template changes. Since we're re-applying the exact same spec,
+          # give it a unique revision name so a new revision (and new
+          # instances) are actually created.
+          yq -i '.spec.template.metadata.name = "${{ matrix.service }}-restart-${{ github.run_number }}"' service.yaml
       - name: Redeploy ${{ matrix.service }}
-        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
-          region: us-west1
-          metadata: service.yaml
+        run: |
+          gcloud run services replace service.yaml \
+            --project ${{ secrets.GCP_PROJECT_SLUG }} \
+            --region us-west1
 
   restart-prod:
     if: ${{ inputs.environment == 'prod' }}
@@ -64,9 +70,15 @@ jobs:
             --project ${{ secrets.GCP_PROJECT_SLUG }} \
             --region us-west1 \
             --format export > service.yaml
+      - name: Force new revision name
+        run: |
+          # Cloud Run only creates a new revision when the revision
+          # template changes. Since we're re-applying the exact same spec,
+          # give it a unique revision name so a new revision (and new
+          # instances) are actually created.
+          yq -i '.spec.template.metadata.name = "${{ matrix.service }}-restart-${{ github.run_number }}"' service.yaml
       - name: Redeploy ${{ matrix.service }}
-        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
-          region: us-west1
-          metadata: service.yaml
+        run: |
+          gcloud run services replace service.yaml \
+            --project ${{ secrets.GCP_PROJECT_SLUG }} \
+            --region us-west1
