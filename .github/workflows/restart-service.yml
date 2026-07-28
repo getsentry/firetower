@@ -47,6 +47,15 @@ jobs:
           gcloud run services replace service.yaml \
             --project ${{ secrets.GCP_PROJECT_SLUG }} \
             --region us-west1
+      - name: Route traffic to new revision
+        run: |
+          # Ensure traffic actually shifts to the revision we just created,
+          # regardless of whatever traffic split was in the exported spec
+          # (e.g. if traffic was previously pinned to a specific revision).
+          gcloud run services update-traffic ${{ matrix.service }} \
+            --project ${{ secrets.GCP_PROJECT_SLUG }} \
+            --region us-west1 \
+            --to-latest
 
   restart-prod:
     if: ${{ inputs.environment == 'prod' }}
@@ -82,3 +91,12 @@ jobs:
           gcloud run services replace service.yaml \
             --project ${{ secrets.GCP_PROJECT_SLUG }} \
             --region us-west1
+      - name: Route traffic to new revision
+        run: |
+          # Ensure traffic actually shifts to the revision we just created,
+          # regardless of whatever traffic split was in the exported spec
+          # (e.g. if traffic was previously pinned to a specific revision).
+          gcloud run services update-traffic ${{ matrix.service }} \
+            --project ${{ secrets.GCP_PROJECT_SLUG }} \
+            --region us-west1 \
+            --to-latest
