@@ -40,8 +40,11 @@ jobs:
           # Cloud Run only creates a new revision when the revision
           # template changes. Since we're re-applying the exact same spec,
           # give it a unique revision name so a new revision (and new
-          # instances) are actually created.
-          yq -i '.spec.template.metadata.name = "${{ matrix.service }}-restart-${{ github.run_number }}"' service.yaml
+          # instances) are actually created. Revision names are immutable,
+          # so we can't rely on github.run_number alone: it stays the same
+          # across re-runs of a failed job. Combining run_id and run_attempt
+          # guarantees a fresh name on every attempt, including retries.
+          yq -i '.spec.template.metadata.name = "${{ matrix.service }}-restart-${{ github.run_id }}-${{ github.run_attempt }}"' service.yaml
       - name: Redeploy ${{ matrix.service }}
         run: |
           gcloud run services replace service.yaml \
@@ -84,8 +87,11 @@ jobs:
           # Cloud Run only creates a new revision when the revision
           # template changes. Since we're re-applying the exact same spec,
           # give it a unique revision name so a new revision (and new
-          # instances) are actually created.
-          yq -i '.spec.template.metadata.name = "${{ matrix.service }}-restart-${{ github.run_number }}"' service.yaml
+          # instances) are actually created. Revision names are immutable,
+          # so we can't rely on github.run_number alone: it stays the same
+          # across re-runs of a failed job. Combining run_id and run_attempt
+          # guarantees a fresh name on every attempt, including retries.
+          yq -i '.spec.template.metadata.name = "${{ matrix.service }}-restart-${{ github.run_id }}-${{ github.run_attempt }}"' service.yaml
       - name: Redeploy ${{ matrix.service }}
         run: |
           gcloud run services replace service.yaml \
