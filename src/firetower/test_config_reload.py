@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.conf import settings
+from django.db import connections
 from django.test import TestCase
 
 from firetower import config_hooks, config_reload
@@ -38,6 +39,16 @@ class TestApplyConfig(TestCase):
         apply_config(new_config)
 
         self.assertEqual(settings.SLACK["TEAM_ID"], "new-team")
+
+    def test_invalidates_connection_handler_cache_on_db_change(self) -> None:
+        new_pg = replace(self._original.postgres, host="db.new.example.com")
+        new_config = replace(self._original, postgres=new_pg)
+
+        apply_config(new_config)
+
+        # The handler builds new connections from its own cached settings, not
+        # directly from settings.DATABASES; the reload must refresh that cache.
+        self.assertEqual(connections.settings["default"]["HOST"], "db.new.example.com")
 
     def test_invalid_config_raises_before_mutating(self) -> None:
         bad_auth = replace(self._original.auth, iap_enabled=True, iap_audience="")

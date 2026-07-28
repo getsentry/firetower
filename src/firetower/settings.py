@@ -313,9 +313,17 @@ def apply_config(config: ConfigFile) -> None:
     logging.config.dictConfig(values["LOGGING"])
     _apply_config_side_effects(config)
 
-    # DATABASES may have changed (host/name/password): drop existing connections
-    # so the next query opens a fresh one against the new configuration.
-    connections.close_all()
+    # DATABASES may have changed (host/name/password). Mutating settings.DATABASES
+    # alone is not enough: ConnectionHandler caches it (@cached_property) and keeps
+    # connections in thread-local storage. So close_all() from this watcher thread
+    # would close nothing in the worker threads, and even new connections would be
+    # built from the stale cached config. Invalidate the handler's cached settings
+    # (the same reset Django uses for CACHES) so any *new* connection uses the new
+    # config; each worker thread then retires its own stale connection through the
+    # normal end-of-request cycle (CONN_MAX_AGE defaults to 0) and reconnects fresh.
+    # We deliberately do not force-close connections owned by other threads, which
+    # is not thread-safe; in-flight requests finish on their existing connection.
+    connections._settings = connections.settings = connections.configure_settings(None)
 
 
 config: ConfigFile = (
