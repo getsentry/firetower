@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0022_actionitem_last_nag"),
+        ("incidents", "0023_add_meeting_recording_link_type"),
     ]
 
     operations = [
