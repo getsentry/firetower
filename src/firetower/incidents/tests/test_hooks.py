@@ -20,6 +20,7 @@ from firetower.incidents.hooks import (
     _schedule_statuspage_reminder,
     build_channel_name,
     build_channel_topic,
+    cancel_statuspage_followup_reminder,
     create_linear_parent_issue,
     on_captain_changed,
     on_incident_created,
@@ -3256,6 +3257,16 @@ class TestScheduleStatuspageFollowupReminder:
         ):
             incident = self._make_incident(severity=IncidentSeverity.P0)
             schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
+    def test_cancel_deletes_existing_schedule(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        schedule_statuspage_followup_reminder(incident)
+
+        cancel_statuspage_followup_reminder(incident)
 
         assert not Schedule.objects.filter(
             name=f"statuspage_followup_reminder_{incident.id}"

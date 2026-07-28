@@ -588,13 +588,17 @@ def _process_statuspage_submission(
 
     try:
         from firetower.incidents.hooks import (  # noqa: PLC0415
+            cancel_statuspage_followup_reminder,
             schedule_statuspage_followup_reminder,
         )
 
-        schedule_statuspage_followup_reminder(incident)
+        if status == "resolved":
+            cancel_statuspage_followup_reminder(incident)
+        else:
+            schedule_statuspage_followup_reminder(incident)
     except Exception:
         logger.exception(
-            "Failed to schedule statuspage followup reminder for incident %s",
+            "Failed to update statuspage followup reminder for incident %s",
             incident.id,
         )
 
