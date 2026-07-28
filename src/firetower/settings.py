@@ -256,12 +256,13 @@ def _build_config_settings(config: ConfigFile) -> dict[str, Any]:
     }
 
 
-def _apply_config_side_effects(config: ConfigFile) -> None:
+def _init_sentry(config: ConfigFile) -> None:
     """
-    Run the one-shot bootstrap side effects that depend on config values.
+    Initialize the Sentry SDK. Boot-only.
 
-    Re-run on every reload so Sentry/Datadog pick up new config. These
-    initialize global SDK clients rather than setting Django settings.
+    Deliberately NOT called on config reload: re-running ``sentry_sdk.init`` on
+    an already-initialized process is unsupported and can leave the SDK in a bad
+    state, so ``sentry_dsn`` changes require a restart to take effect.
     """
     if not env_is_dev():
         sentry_sdk.init(
@@ -277,6 +278,15 @@ def _apply_config_side_effects(config: ConfigFile) -> None:
             },
         )
 
+
+def _apply_config_side_effects(config: ConfigFile) -> None:
+    """
+    Run config-derived side effects that are safe to re-run on every reload.
+
+    These initialize global SDK clients rather than setting Django settings.
+    Sentry is excluded (see ``_init_sentry``) because re-initializing it is
+    unsupported.
+    """
     # Initialize Datadog statsd (only when DD agent is available)
     if os.environ.get("DD_API_KEY"):
         initialize(
@@ -591,4 +601,5 @@ IAP_ENABLED: bool = _config_settings["IAP_ENABLED"]
 IAP_AUDIENCE: str | None = _config_settings["IAP_AUDIENCE"]
 LOGGING: dict[str, Any] = _config_settings["LOGGING"]
 
+_init_sentry(config)
 _apply_config_side_effects(config)
