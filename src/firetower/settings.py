@@ -86,6 +86,14 @@ class StatuspageSettings(TypedDict):
 
 def _build_logging(config: ConfigFile) -> dict[str, Any]:
     log_level = os.environ.get("DJANGO_LOG_LEVEL", config.log_level)
+    # Validate here, in the build phase, so a bad level fails before apply_config
+    # mutates anything rather than making the later dictConfig() call raise
+    # mid-reload and leave settings partially applied.
+    if log_level not in logging.getLevelNamesMapping():
+        raise ValueError(
+            f"Invalid log level {log_level!r}; expected one of "
+            f"{sorted(logging.getLevelNamesMapping())}"
+        )
     return {
         "version": 1,
         "disable_existing_loggers": False,
@@ -307,33 +315,55 @@ def apply_config(config: ConfigFile) -> None:
     """
     Re-apply every config-derived value onto the live Django settings object.
 
-    Used by the hot-reload watcher (``firetower.config_reload``). Values are
-    fully rebuilt first (which validates and can raise) before anything is
-    mutated, so a bad ``config.toml`` never partially updates a running process.
+    Used by the hot-reload watcher (``firetower.config_reload``). Applied in two
+    phases so a reload is atomic:
+
+    1. Build and validate everything that can raise (the settings values, the
+       normalized DATABASES for the connection handler, and the Datadog
+       re-init) *before* touching any global state. A bad ``config.toml`` aborts
+       here, leaving the running process entirely on its previous config.
+    2. Commit: rebind settings, apply logging, and swap the connection handler's
+       cached settings. These steps are constructed not to raise, so settings,
+       logging and the DB connection handler move together — never leaving, say,
+       ``settings.DATABASES`` updated while the connection handler still serves
+       the old config.
+
     Each setting is rebound wholesale; the GIL makes a single ``setattr`` atomic,
     so concurrent readers see either the old or the new value, never a torn one.
     """
     from django.conf import settings as live_settings  # noqa: PLC0415
     from django.db import connections  # noqa: PLC0415
 
+    # --- Phase 1: build and validate. No global state is mutated here. ---
     values = _build_config_settings(config)
+    # Normalize/validate the DB config up front (raises if malformed, e.g. no
+    # 'default'). configure_settings mutates in place and returns the same dict,
+    # so settings.DATABASES and the connection handler end up sharing one
+    # identical, fully-defaulted object, exactly as Django wires them itself.
+    new_connection_settings = connections.configure_settings(values["DATABASES"])
+    # Datadog re-init is a global side effect with no dependency on the new
+    # settings, so run it in this phase: if it fails, nothing else has changed.
+    _apply_config_side_effects(config)
+
+    # --- Phase 2: commit. These steps must not raise. ---
     for key, value in values.items():
         setattr(live_settings, key, value)
-
-    logging.config.dictConfig(values["LOGGING"])
-    _apply_config_side_effects(config)
 
     # DATABASES may have changed (host/name/password). Mutating settings.DATABASES
     # alone is not enough: ConnectionHandler caches it (@cached_property) and keeps
     # connections in thread-local storage. So close_all() from this watcher thread
     # would close nothing in the worker threads, and even new connections would be
-    # built from the stale cached config. Invalidate the handler's cached settings
+    # built from the stale cached config. Swap in the handler's cached settings
     # (the same reset Django uses for CACHES) so any *new* connection uses the new
     # config; each worker thread then retires its own stale connection through the
     # normal end-of-request cycle (CONN_MAX_AGE defaults to 0) and reconnects fresh.
     # We deliberately do not force-close connections owned by other threads, which
     # is not thread-safe; in-flight requests finish on their existing connection.
-    connections._settings = connections.settings = connections.configure_settings(None)
+    # Kept adjacent to the setattr loop (and before dictConfig) so settings and the
+    # connection handler are always committed together.
+    connections._settings = connections.settings = new_connection_settings
+
+    logging.config.dictConfig(values["LOGGING"])
 
 
 config: ConfigFile = (

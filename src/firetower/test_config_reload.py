@@ -59,6 +59,23 @@ class TestApplyConfig(TestCase):
 
         self.assertIs(settings.CONFIG, self._original)
 
+    def test_apply_is_atomic_when_a_commit_input_is_invalid(self) -> None:
+        # A bad log level makes the build phase raise. Nothing (settings or the
+        # connection handler) must be mutated, so settings and connections can
+        # never be left disagreeing by a half-applied reload.
+        db_host_before = connections.settings["default"]["HOST"]
+        new_pg = replace(self._original.postgres, host="db.should-not-apply.example")
+        bad_config = replace(
+            self._original, postgres=new_pg, log_level="BOGUS", project_key="NOPE"
+        )
+
+        with self.assertRaises(ValueError):
+            apply_config(bad_config)
+
+        self.assertIs(settings.CONFIG, self._original)
+        self.assertNotEqual(settings.PROJECT_KEY, "NOPE")
+        self.assertEqual(connections.settings["default"]["HOST"], db_host_before)
+
 
 class TestReloadConfig(TestCase):
     def setUp(self) -> None:
