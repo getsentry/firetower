@@ -18,10 +18,18 @@ config-derived setting via ``firetower.settings.apply_config``, then invokes
 ``firetower.config_hooks.on_config_reload``. Failures (a malformed or invalid
 config) are logged and the current in-memory config is kept, so a bad edit
 never takes down a running process.
+
+Forking: ``fork()`` clones only the calling thread, so a forked child (e.g. a
+django-q worker, or a preloaded gunicorn master's workers) does not inherit the
+watcher thread, yet it does inherit the ``_started`` flag as ``True`` and never
+re-runs ``AppConfig.ready``. Without intervention such children would watch
+nothing and stay on stale settings. We therefore re-arm the watcher in the
+child via ``os.register_at_fork``.
 """
 
 import hashlib
 import logging
+import os
 import threading
 from pathlib import Path
 
@@ -36,6 +44,7 @@ logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 _started = False
 _stop_event = threading.Event()
+_atfork_registered = False
 
 
 def reload_config() -> None:
@@ -96,9 +105,11 @@ def start_config_watcher() -> None:
     Start the config watcher daemon thread for this process.
 
     Idempotent: only the first call per process starts a thread. No-op when the
-    configured path does not exist on disk.
+    configured path does not exist on disk. Also arms an ``os.register_at_fork``
+    handler so forked children (which don't inherit the watcher thread) start
+    their own.
     """
-    global _started  # noqa: PLW0603
+    global _started, _atfork_registered  # noqa: PLW0603
 
     with _lock:
         if _started:
@@ -119,6 +130,27 @@ def start_config_watcher() -> None:
         thread.start()
         _started = True
         logger.info("Config watcher started for %s", config_path)
+
+        if not _atfork_registered and hasattr(os, "register_at_fork"):
+            # Inherited by children, so it only needs registering once.
+            os.register_at_fork(after_in_child=_restart_after_fork)
+            _atfork_registered = True
+
+
+def _restart_after_fork() -> None:
+    """
+    Re-arm the watcher in a forked child.
+
+    Runs in the child right after ``fork()``, while it is still single-threaded.
+    The parent's watcher thread did not survive the fork, but ``_started`` was
+    copied as ``True``. Replace the sync primitives (in case the parent held
+    them at fork time) and start a fresh watcher for this process.
+    """
+    global _lock, _stop_event, _started  # noqa: PLW0603
+    _lock = threading.Lock()
+    _stop_event = threading.Event()
+    _started = False
+    start_config_watcher()
 
 
 def stop_config_watcher() -> None:

@@ -170,3 +170,51 @@ class TestPollLoop(TestCase):
             config_reload._poll_loop(path, interval=0.01)
 
         reload_mock.assert_called_once()
+
+
+class TestForkRearm(TestCase):
+    def setUp(self) -> None:
+        # Snapshot module state so a test can mutate the fork-related globals.
+        self._saved = (
+            config_reload._started,
+            config_reload._atfork_registered,
+            config_reload._lock,
+            config_reload._stop_event,
+        )
+
+        def restore() -> None:
+            (
+                config_reload._started,
+                config_reload._atfork_registered,
+                config_reload._lock,
+                config_reload._stop_event,
+            ) = self._saved
+
+        self.addCleanup(restore)
+
+    def test_start_registers_atfork_handler_once(self) -> None:
+        config_reload._started = False
+        config_reload._atfork_registered = False
+        self.addCleanup(config_reload.stop_config_watcher)
+
+        with patch("firetower.config_reload.os.register_at_fork") as reg:
+            config_reload.start_config_watcher()
+            config_reload._started = False  # allow a second real start attempt
+            config_reload.start_config_watcher()
+
+        reg.assert_called_once_with(after_in_child=config_reload._restart_after_fork)
+
+    def test_restart_after_fork_rearms_watcher(self) -> None:
+        config_reload._started = True
+        old_lock = config_reload._lock
+        old_event = config_reload._stop_event
+
+        with patch.object(config_reload, "start_config_watcher") as start:
+            config_reload._restart_after_fork()
+
+        # Fresh sync primitives (the parent's may have been held at fork time)
+        # and a fresh start for the child process.
+        self.assertIsNot(config_reload._lock, old_lock)
+        self.assertIsNot(config_reload._stop_event, old_event)
+        self.assertFalse(config_reload._started)
+        start.assert_called_once_with()
