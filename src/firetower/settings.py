@@ -540,6 +540,11 @@ CONFIG_WATCH_ENABLED = (
     and not any(arg in _CONFIG_WATCH_SKIP_CMDS for arg in sys.argv)
 )
 
+# How often (seconds) the config watcher re-reads and hashes config.toml to
+# detect changes. Polling is used instead of inotify because Cloud Run's gVisor
+# sandbox does not deliver filesystem events.
+CONFIG_WATCH_POLL_SECONDS = float(os.environ.get("CONFIG_WATCH_POLL_SECONDS", "5"))
+
 
 # ---------------------------------------------------------------------------
 # Config-derived settings.

@@ -1,5 +1,5 @@
 """
-Hot reload of ``config.toml`` via watchfiles.
+Hot reload of ``config.toml`` by polling and hashing the file.
 
 A daemon watcher thread is started once per process (see
 ``firetower.incidents.apps.IncidentsConfig.ready``). Because each Django
@@ -7,23 +7,25 @@ process — every web worker, the Slack bot, each q-cluster worker — holds its
 own copy of ``django.conf.settings`` in memory, the watcher must run inside
 each process; a standalone process could only mutate its own settings.
 
-When ``config.toml`` changes the watcher rebuilds the config, re-applies every
+Detection is by periodic read + content hash rather than filesystem events
+(inotify): Cloud Run runs under the gVisor sandbox, which does not deliver
+inotify events, so an event-based watcher just times out. Hashing the file
+contents (instead of comparing mtime) also transparently handles the symlink
+swap that Kubernetes uses when updating a mounted ConfigMap.
+
+When the hash changes the watcher rebuilds the config, re-applies every
 config-derived setting via ``firetower.settings.apply_config``, then invokes
 ``firetower.config_hooks.on_config_reload``. Failures (a malformed or invalid
 config) are logged and the current in-memory config is kept, so a bad edit
 never takes down a running process.
-
-Note (Kubernetes): ConfigMaps mounted as volumes are updated by swapping a
-symlink in the mount directory, so we watch the parent directory and match on
-filename rather than watching the file inode directly.
 """
 
+import hashlib
 import logging
 import threading
 from pathlib import Path
 
 from django.conf import settings
-from watchfiles import Change, watch
 
 from firetower import config_hooks
 from firetower.config import ConfigFile
@@ -61,19 +63,32 @@ def reload_config() -> None:
         logger.exception("config reload hook raised")
 
 
-def _watch_loop(config_path: Path) -> None:
-    watch_dir = str(config_path.parent)
-    filename = config_path.name
+def _hash_file(config_path: Path) -> str | None:
+    """Return a hash of the file's contents, or ``None`` if it can't be read."""
+    try:
+        return hashlib.sha256(config_path.read_bytes()).hexdigest()
+    except OSError:
+        # Transient during a ConfigMap symlink swap, or the file was removed.
+        logger.warning("Could not read %s while polling for changes", config_path)
+        return None
 
-    def _only_config_file(_change: Change, changed_path: str) -> bool:
-        return Path(changed_path).name == filename
 
-    logger.info("Watching %s for changes", config_path)
-    for changes in watch(
-        watch_dir, watch_filter=_only_config_file, stop_event=_stop_event
-    ):
-        logger.info("Detected config change: %s", changes)
+def _poll_loop(config_path: Path, interval: float) -> None:
+    logger.info("Polling %s for changes every %ss", config_path, interval)
+    last_hash = _hash_file(config_path)
+
+    # wait() returns True only when stop is signalled, so the loop ticks every
+    # `interval` seconds until stopped, and shuts down promptly when it is.
+    while not _stop_event.wait(interval):
+        current_hash = _hash_file(config_path)
+        if current_hash is None or current_hash == last_hash:
+            continue
+
+        logger.info("Detected config change in %s", config_path)
         reload_config()
+        # Advance past this content even if the reload failed, so a persistently
+        # invalid file isn't retried every tick; it will reload on the next edit.
+        last_hash = current_hash
 
 
 def start_config_watcher() -> None:
@@ -96,8 +111,8 @@ def start_config_watcher() -> None:
 
         _stop_event.clear()
         thread = threading.Thread(
-            target=_watch_loop,
-            args=(config_path,),
+            target=_poll_loop,
+            args=(config_path, settings.CONFIG_WATCH_POLL_SECONDS),
             name="config-watcher",
             daemon=True,
         )
