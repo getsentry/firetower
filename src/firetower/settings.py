@@ -8,18 +8,31 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
+
+Hot reload
+----------
+Every config-derived setting below is produced by ``_build_config_settings`` so
+the same mapping is used at import time and when ``config.toml`` changes on disk.
+``apply_config`` re-applies those values onto the live settings object; the
+watcher that calls it lives in ``firetower.config_reload`` and is started per
+process from ``IncidentsConfig.ready`` (see ``CONFIG_WATCH_ENABLED``).
 """
 
+import logging
+import logging.config
 import os
 import sys
 from pathlib import Path
 from typing import Any, TypedDict
 
+import sentry_sdk
 from corsheaders.defaults import default_headers
 from datadog import initialize
 from datadog.dogstatsd.base import statsd
 
 from firetower.config import ConfigFile, DummyConfigFile
+
+logger = logging.getLogger(__name__)
 
 
 def env_is_dev() -> bool:
@@ -42,28 +55,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Set CONFIG_FILE_PATH environment variable to override default location
 # Hack: There are a few things that load settings.py where we don't expect to have a working config.toml.
 CONFIG_FILE_PATH = os.environ.get("CONFIG_FILE_PATH", BASE_DIR.parent / "config.toml")
-config: ConfigFile = (
-    DummyConfigFile()
-    if cmd_needs_dummy_config()
-    else ConfigFile.from_file(CONFIG_FILE_PATH)
-)
-
-
-if not env_is_dev():
-    import sentry_sdk
-
-    sentry_sdk.init(
-        dsn=config.sentry_dsn,
-        send_default_pii=False,
-        environment=os.environ.get("DJANGO_ENV", "unknown"),
-        traces_sample_rate=1.0,
-        profiles_sample_rate=0.25,
-        enable_logs=True,
-        trace_propagation_targets=[],
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
-    )
 
 
 def _coerce_region_grouping(raw: list[Any]) -> list[list[str]]:
@@ -74,22 +65,268 @@ def _coerce_region_grouping(raw: list[Any]) -> list[list[str]]:
     return [list(g) for g in raw]
 
 
-# Global project settings
-PROJECT_KEY = config.project_key
-REGION_GROUPING = _coerce_region_grouping(config.region_grouping)
-FIRETOWER_BASE_URL = config.firetower_base_url
-SERVICE_REGISTRY_URL = config.service_registry_url
+class SlackSettings(TypedDict):
+    BOT_TOKEN: str
+    TEAM_ID: str
+    APP_TOKEN: str
+    INCIDENT_FEED_CHANNEL_ID: str
+    ALWAYS_INVITED_IDS: list[str]
+    INCIDENT_GUIDE_MESSAGE: str
+    SLASH_COMMAND: str
+
+
+class StatuspageSettings(TypedDict):
+    API_KEY: str
+    PAGE_ID: str
+    URL: str
+    INITIAL_REMINDER_DELAY_MINUTES: int | None
+    FOLLOWUP_REMINDER_DELAY_MINUTES: int | None
+    WARNING_BUFFER_MINUTES: int
+
+
+def _build_logging(config: ConfigFile) -> dict[str, Any]:
+    log_level = os.environ.get("DJANGO_LOG_LEVEL", config.log_level)
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "verbose": {
+                "format": "{levelname} {asctime} {name} {message}",
+                "style": "{",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "verbose",
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+            "level": log_level,
+        },
+        "loggers": {
+            "firetower": {
+                "handlers": ["console"],
+                "level": log_level,
+                "propagate": False,
+            },
+        },
+    }
+
+
+def _build_config_settings(config: ConfigFile) -> dict[str, Any]:
+    """
+    Compute every Django setting derived from ``config.toml``.
+
+    This is the single source of truth shared by the module-level assignments
+    below and the hot-reload path in ``apply_config``. It performs validation
+    that must fail before any settings are mutated, so a bad reload leaves the
+    running process untouched.
+    """
+    if config.auth.iap_enabled and not config.auth.iap_audience:
+        raise ValueError(
+            "IAP_AUDIENCE must be set when IAP is enabled. "
+            "Set the iap_audience value in the configuration file."
+        )
+
+    slack: SlackSettings = {
+        "BOT_TOKEN": config.slack.bot_token,
+        "TEAM_ID": config.slack.team_id,
+        "APP_TOKEN": config.slack.app_token,
+        "INCIDENT_FEED_CHANNEL_ID": config.slack.incident_feed_channel_id,
+        "ALWAYS_INVITED_IDS": config.slack.always_invited_ids,
+        "INCIDENT_GUIDE_MESSAGE": config.slack.incident_guide_message,
+        "SLASH_COMMAND": config.slack.slash_command,
+    }
+
+    statuspage: StatuspageSettings | None = (
+        {
+            "API_KEY": config.statuspage.api_key,
+            "PAGE_ID": config.statuspage.page_id,
+            "URL": config.statuspage.url,
+            "INITIAL_REMINDER_DELAY_MINUTES": config.statuspage.initial_reminder_delay_minutes,
+            "FOLLOWUP_REMINDER_DELAY_MINUTES": config.statuspage.followup_reminder_delay_minutes,
+            "WARNING_BUFFER_MINUTES": config.statuspage.warning_buffer_minutes,
+        }
+        if config.statuspage
+        else None
+    )
+
+    notion: dict | None = (
+        {
+            "INTEGRATION_TOKEN": config.notion.integration_token,
+            "DATABASE_ID": config.notion.database_id,
+            "TEMPLATE_MARKDOWN": config.notion.template_markdown,
+            "TROUBLESHOOTING_DATABASE_ID": config.notion.troubleshooting_database_id,
+            "TROUBLESHOOTING_TEMPLATE_MARKDOWN": config.notion.troubleshooting_template_markdown,
+        }
+        if config.notion
+        else None
+    )
+
+    genai: dict | None = {"MODEL": config.genai.model} if config.genai else None
+
+    pagerduty: dict | None = (
+        {
+            "API_TOKEN": config.pagerduty.api_token,
+            "ESCALATION_POLICIES": {
+                name: {
+                    "id": policy.id,
+                    "integration_key": policy.integration_key,
+                }
+                for name, policy in config.pagerduty.escalation_policies.items()
+            },
+        }
+        if config.pagerduty
+        else None
+    )
+
+    linear: dict | None = (
+        {
+            "CLIENT_ID": config.linear.client_id,
+            "CLIENT_SECRET": config.linear.client_secret,
+            "API_KEY": config.linear.api_key,
+            "TEAM_ID": config.linear.team_id,
+            "PROJECT_ID": config.linear.project_id,
+            "SYNC_IDENTIFIERS": config.linear.sync_identifiers,
+            "INCIDENT_ADOPT_ON_CREATE": config.linear.adopt_on_create,
+            "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": config.linear.action_item_slo_days_high_priority,
+            "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": config.linear.action_item_slo_days_medium_priority,
+            "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": config.linear.action_item_nag_comment_high_priority,
+            "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": config.linear.action_item_nag_comment_medium_priority,
+            "PARENT_STATUS_COMMENT_COMPLETED": config.linear.parent_status_comment_completed,
+            "PARENT_STATUS_COMMENT_STARTED": config.linear.parent_status_comment_started,
+        }
+        if config.linear
+        else None
+    )
+
+    return {
+        "CONFIG": config,
+        "PROJECT_KEY": config.project_key,
+        "REGION_GROUPING": _coerce_region_grouping(config.region_grouping),
+        "FIRETOWER_BASE_URL": config.firetower_base_url,
+        "SERVICE_REGISTRY_URL": config.service_registry_url,
+        # django-fernet-encrypted-fields: `salt_keys` (plural) takes precedence
+        # for key rotation; otherwise fall back to the single `salt_key`.
+        "SECRET_KEY": config.django_secret_key,
+        "SALT_KEY": config.salt_keys if config.salt_keys else config.salt_key,
+        "DATABASES": {
+            "default": {
+                # Custom backend: extends the stock postgresql backend to retry
+                # auth with FALLBACK_PASSWORDS during a password rotation.
+                "ENGINE": "firetower.db_backend",
+                "NAME": config.postgres.db,
+                "HOST": config.postgres.host,
+                "USER": config.postgres.user,
+                "PASSWORD": config.postgres.password,
+                "FALLBACK_PASSWORDS": config.postgres.fallback_passwords,
+                "CONN_HEALTH_CHECKS": True,
+            },
+        },
+        "SLACK": slack,
+        "PARTICIPANT_SYNC_THROTTLE_SECONDS": int(
+            config.slack.participant_sync_throttle_seconds
+        ),
+        "STATUSPAGE": statuspage,
+        "NOTION": notion,
+        "GENAI": genai,
+        "HOOKS_ENABLED": config.hooks_enabled,
+        "PAGERDUTY": pagerduty,
+        "LINEAR": linear,
+        "ACTION_ITEM_SYNC_THROTTLE_SECONDS": (
+            int(config.linear.action_item_sync_throttle_seconds)
+            if config.linear
+            else 300
+        ),
+        # Tight timeout/retry budget for the incident allocation path, which
+        # calls Linear while holding a DB lock. Kept lower than the default
+        # LinearService budget so a hung Linear can't hold the lock for the full
+        # default duration.
+        "INCIDENT_ALLOC_LINEAR_TIMEOUT": (
+            int(config.linear.alloc_timeout_seconds) if config.linear else 8
+        ),
+        "INCIDENT_ALLOC_LINEAR_RETRIES": (
+            int(config.linear.alloc_max_retries) if config.linear else 1
+        ),
+        "IAP_ENABLED": config.auth.iap_enabled,
+        "IAP_AUDIENCE": config.auth.iap_audience,
+        "LOGGING": _build_logging(config),
+    }
+
+
+def _apply_config_side_effects(config: ConfigFile) -> None:
+    """
+    Run the one-shot bootstrap side effects that depend on config values.
+
+    Re-run on every reload so Sentry/Datadog pick up new config. These
+    initialize global SDK clients rather than setting Django settings.
+    """
+    if not env_is_dev():
+        sentry_sdk.init(
+            dsn=config.sentry_dsn,
+            send_default_pii=False,
+            environment=os.environ.get("DJANGO_ENV", "unknown"),
+            traces_sample_rate=1.0,
+            profiles_sample_rate=0.25,
+            enable_logs=True,
+            trace_propagation_targets=[],
+            _experiments={
+                "trace_lifecycle": "stream",
+            },
+        )
+
+    # Initialize Datadog statsd (only when DD agent is available)
+    if os.environ.get("DD_API_KEY"):
+        initialize(
+            statsd_host=os.environ.get("DATADOG_STATSD_HOST", "localhost"),
+            statsd_port=int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
+            api_key=os.environ.get("DD_API_KEY"),
+            app_key=os.environ.get("DD_APP_KEY"),
+            statsd_namespace="firetower",
+        )
+        statsd.constant_tags = [
+            f"env:{'production' if os.environ.get('DJANGO_ENV') == 'prod' else 'test'}",
+            "service:firetower",
+            f"version:{os.environ.get('K_REVISION', 'unknown')}",
+        ]
+
+
+def apply_config(config: ConfigFile) -> None:
+    """
+    Re-apply every config-derived value onto the live Django settings object.
+
+    Used by the hot-reload watcher (``firetower.config_reload``). Values are
+    fully rebuilt first (which validates and can raise) before anything is
+    mutated, so a bad ``config.toml`` never partially updates a running process.
+    Each setting is rebound wholesale; the GIL makes a single ``setattr`` atomic,
+    so concurrent readers see either the old or the new value, never a torn one.
+    """
+    from django.conf import settings as live_settings  # noqa: PLC0415
+    from django.db import connections  # noqa: PLC0415
+
+    values = _build_config_settings(config)
+    for key, value in values.items():
+        setattr(live_settings, key, value)
+
+    logging.config.dictConfig(values["LOGGING"])
+    _apply_config_side_effects(config)
+
+    # DATABASES may have changed (host/name/password): drop existing connections
+    # so the next query opens a fresh one against the new configuration.
+    connections.close_all()
+
+
+config: ConfigFile = (
+    DummyConfigFile()
+    if cmd_needs_dummy_config()
+    else ConfigFile.from_file(CONFIG_FILE_PATH)
+)
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
-SECRET_KEY = config.django_secret_key
-
-# Used by django-fernet-encrypted-fields to encrypt sensitive DB fields (e.g. OAuth tokens).
-# `salt_keys` (plural) takes precedence when set: values are encrypted with the first
-# key and can be decrypted with any of them, which supports key rotation. Otherwise the
-# single `salt_key` is used.
-SALT_KEY = config.salt_keys if config.salt_keys else config.salt_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_is_dev()
@@ -182,24 +419,6 @@ TEMPLATES = [
 WSGI_APPLICATION = "firetower.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = {
-    "default": {
-        # Custom backend: extends the stock postgresql backend to retry auth
-        # with FALLBACK_PASSWORDS during a password rotation.
-        "ENGINE": "firetower.db_backend",
-        "NAME": config.postgres.db,
-        "HOST": config.postgres.host,
-        "USER": config.postgres.user,
-        "PASSWORD": config.postgres.password,
-        "FALLBACK_PASSWORDS": config.postgres.fallback_passwords,
-        "CONN_HEALTH_CHECKS": True,
-    },
-}
-
-
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -242,123 +461,6 @@ STATIC_ROOT = "static/backend/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-
-class SlackSettings(TypedDict):
-    BOT_TOKEN: str
-    TEAM_ID: str
-    APP_TOKEN: str
-    INCIDENT_FEED_CHANNEL_ID: str
-    ALWAYS_INVITED_IDS: list[str]
-    INCIDENT_GUIDE_MESSAGE: str
-    SLASH_COMMAND: str
-
-
-SLACK: SlackSettings = {
-    "BOT_TOKEN": config.slack.bot_token,
-    "TEAM_ID": config.slack.team_id,
-    "APP_TOKEN": config.slack.app_token,
-    "INCIDENT_FEED_CHANNEL_ID": config.slack.incident_feed_channel_id,
-    "ALWAYS_INVITED_IDS": config.slack.always_invited_ids,
-    "INCIDENT_GUIDE_MESSAGE": config.slack.incident_guide_message,
-    "SLASH_COMMAND": config.slack.slash_command,
-}
-
-PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
-
-
-class StatuspageSettings(TypedDict):
-    API_KEY: str
-    PAGE_ID: str
-    URL: str
-    INITIAL_REMINDER_DELAY_MINUTES: int | None
-    FOLLOWUP_REMINDER_DELAY_MINUTES: int | None
-    WARNING_BUFFER_MINUTES: int
-
-
-STATUSPAGE: StatuspageSettings | None = (
-    {
-        "API_KEY": config.statuspage.api_key,
-        "PAGE_ID": config.statuspage.page_id,
-        "URL": config.statuspage.url,
-        "INITIAL_REMINDER_DELAY_MINUTES": config.statuspage.initial_reminder_delay_minutes,
-        "FOLLOWUP_REMINDER_DELAY_MINUTES": config.statuspage.followup_reminder_delay_minutes,
-        "WARNING_BUFFER_MINUTES": config.statuspage.warning_buffer_minutes,
-    }
-    if config.statuspage
-    else None
-)
-
-NOTION: dict | None = (
-    {
-        "INTEGRATION_TOKEN": config.notion.integration_token,
-        "DATABASE_ID": config.notion.database_id,
-        "TEMPLATE_MARKDOWN": config.notion.template_markdown,
-        "TROUBLESHOOTING_DATABASE_ID": config.notion.troubleshooting_database_id,
-        "TROUBLESHOOTING_TEMPLATE_MARKDOWN": config.notion.troubleshooting_template_markdown,
-    }
-    if config.notion
-    else None
-)
-GENAI: dict | None = (
-    {
-        "MODEL": config.genai.model,
-    }
-    if config.genai
-    else None
-)
-HOOKS_ENABLED = config.hooks_enabled
-
-# PagerDuty Integration Configuration
-PAGERDUTY = (
-    {
-        "API_TOKEN": config.pagerduty.api_token,
-        "ESCALATION_POLICIES": {
-            name: {
-                "id": policy.id,
-                "integration_key": policy.integration_key,
-            }
-            for name, policy in config.pagerduty.escalation_policies.items()
-        },
-    }
-    if config.pagerduty
-    else None
-)
-
-# Linear Integration Configuration
-LINEAR: dict | None = (
-    {
-        "CLIENT_ID": config.linear.client_id,
-        "CLIENT_SECRET": config.linear.client_secret,
-        "API_KEY": config.linear.api_key,
-        "TEAM_ID": config.linear.team_id,
-        "PROJECT_ID": config.linear.project_id,
-        "SYNC_IDENTIFIERS": config.linear.sync_identifiers,
-        "INCIDENT_ADOPT_ON_CREATE": config.linear.adopt_on_create,
-        "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": config.linear.action_item_slo_days_high_priority,
-        "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": config.linear.action_item_slo_days_medium_priority,
-        "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": config.linear.action_item_nag_comment_high_priority,
-        "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": config.linear.action_item_nag_comment_medium_priority,
-        "PARENT_STATUS_COMMENT_COMPLETED": config.linear.parent_status_comment_completed,
-        "PARENT_STATUS_COMMENT_STARTED": config.linear.parent_status_comment_started,
-    }
-    if config.linear
-    else None
-)
-
-ACTION_ITEM_SYNC_THROTTLE_SECONDS = (
-    int(config.linear.action_item_sync_throttle_seconds) if config.linear else 300
-)
-
-# Tight timeout/retry budget for the incident allocation path, which calls
-# Linear while holding a DB lock. Kept lower than the default LinearService
-# budget so a hung Linear can't hold the lock for the full default duration.
-INCIDENT_ALLOC_LINEAR_TIMEOUT = (
-    int(config.linear.alloc_timeout_seconds) if config.linear else 8
-)
-INCIDENT_ALLOC_LINEAR_RETRIES = (
-    int(config.linear.alloc_max_retries) if config.linear else 1
-)
-
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     # Pagination
@@ -384,67 +486,10 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Google IAP Authentication Configuration
-IAP_ENABLED = config.auth.iap_enabled
-IAP_AUDIENCE = config.auth.iap_audience
-
-# Validate IAP settings in production
-if IAP_ENABLED and not IAP_AUDIENCE:
-    raise Exception(
-        "IAP_AUDIENCE must be set when IAP is enabled in production. "
-        "Set the iap_audience value in the configuration file."
-    )
-
 # django-k8s proreadiness probes
 DJK8S_READINESS_PROBES = [
     "djk8s.probes.DatabaseProbe",
 ]
-
-# Initialize Datadog statsd (only when DD agent is available)
-if os.environ.get("DD_API_KEY"):
-    initialize(
-        statsd_host=os.environ.get("DATADOG_STATSD_HOST", "localhost"),
-        statsd_port=int(os.environ.get("DATADOG_STATSD_PORT", "8125")),
-        api_key=os.environ.get("DD_API_KEY"),
-        app_key=os.environ.get("DD_APP_KEY"),
-        statsd_namespace="firetower",
-    )
-    statsd.constant_tags = [
-        f"env:{'production' if os.environ.get('DJANGO_ENV') == 'prod' else 'test'}",
-        "service:firetower",
-        f"version:{os.environ.get('K_REVISION', 'unknown')}",
-    ]
-
-# Logging configuration
-_log_level = os.environ.get("DJANGO_LOG_LEVEL", config.log_level)
-
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {name} {message}",
-            "style": "{",
-        },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": _log_level,
-    },
-    "loggers": {
-        "firetower": {
-            "handlers": ["console"],
-            "level": _log_level,
-            "propagate": False,
-        },
-    },
-}
 
 Q_CLUSTER = {
     "name": "firetower",
@@ -467,3 +512,70 @@ CACHES = {
         "LOCATION": CACHE_TABLE,
     },
 }
+
+# One-shot management commands run settings + app startup but should never spawn
+# the long-lived config watcher (see IncidentsConfig.ready). Detect them, and
+# pytest, so only real service processes (server, slack bot, q cluster) watch.
+_CONFIG_WATCH_SKIP_CMDS = {
+    "migrate",
+    "makemigrations",
+    "collectstatic",
+    "test",
+    "shell",
+    "dbshell",
+    "createsuperuser",
+    "makemessages",
+    "compilemessages",
+    "check",
+    "showmigrations",
+    "sqlmigrate",
+    "dumpdata",
+    "loaddata",
+    "flush",
+    "createcachetable",
+}
+CONFIG_WATCH_ENABLED = (
+    not cmd_needs_dummy_config()
+    and "pytest" not in sys.modules
+    and not any(arg in _CONFIG_WATCH_SKIP_CMDS for arg in sys.argv)
+)
+
+
+# ---------------------------------------------------------------------------
+# Config-derived settings.
+#
+# These are produced by ``_build_config_settings`` (the single source of truth
+# shared with the hot-reload path). They are also declared here as annotated
+# module-level names so the django-stubs mypy plugin can see the setting names
+# and their types.
+# ---------------------------------------------------------------------------
+_config_settings = _build_config_settings(config)
+
+CONFIG: ConfigFile = _config_settings["CONFIG"]
+PROJECT_KEY: str = _config_settings["PROJECT_KEY"]
+REGION_GROUPING: list[list[str]] = _config_settings["REGION_GROUPING"]
+FIRETOWER_BASE_URL: str = _config_settings["FIRETOWER_BASE_URL"]
+SERVICE_REGISTRY_URL: str | None = _config_settings["SERVICE_REGISTRY_URL"]
+SECRET_KEY: str = _config_settings["SECRET_KEY"]
+SALT_KEY: str | list[str] = _config_settings["SALT_KEY"]
+DATABASES: dict[str, Any] = _config_settings["DATABASES"]
+SLACK: SlackSettings = _config_settings["SLACK"]
+PARTICIPANT_SYNC_THROTTLE_SECONDS: int = _config_settings[
+    "PARTICIPANT_SYNC_THROTTLE_SECONDS"
+]
+STATUSPAGE: StatuspageSettings | None = _config_settings["STATUSPAGE"]
+NOTION: dict | None = _config_settings["NOTION"]
+GENAI: dict | None = _config_settings["GENAI"]
+HOOKS_ENABLED: bool = _config_settings["HOOKS_ENABLED"]
+PAGERDUTY: dict | None = _config_settings["PAGERDUTY"]
+LINEAR: dict | None = _config_settings["LINEAR"]
+ACTION_ITEM_SYNC_THROTTLE_SECONDS: int = _config_settings[
+    "ACTION_ITEM_SYNC_THROTTLE_SECONDS"
+]
+INCIDENT_ALLOC_LINEAR_TIMEOUT: int = _config_settings["INCIDENT_ALLOC_LINEAR_TIMEOUT"]
+INCIDENT_ALLOC_LINEAR_RETRIES: int = _config_settings["INCIDENT_ALLOC_LINEAR_RETRIES"]
+IAP_ENABLED: bool = _config_settings["IAP_ENABLED"]
+IAP_AUDIENCE: str | None = _config_settings["IAP_AUDIENCE"]
+LOGGING: dict[str, Any] = _config_settings["LOGGING"]
+
+_apply_config_side_effects(config)
