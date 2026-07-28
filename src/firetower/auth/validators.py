@@ -16,9 +16,16 @@ class IAPTokenValidator:
 
     IAP_ISSUER = "https://cloud.google.com/iap"
 
-    def __init__(self) -> None:
-        """Initialize the validator with audience from settings."""
-        self.audience = settings.IAP_AUDIENCE
+    @property
+    def audience(self) -> str | None:
+        """
+        The expected IAP audience, read live from settings.
+
+        Read dynamically (not cached in ``__init__``) so a hot reload of
+        ``IAP_AUDIENCE`` takes effect without rebuilding the validator or the
+        long-lived middleware instance that holds it.
+        """
+        return settings.IAP_AUDIENCE
 
     def validate_token(self, token: str) -> dict[Any, Any] | None:
         """

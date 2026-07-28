@@ -251,6 +251,21 @@ class TestIAPTokenValidator:
         with pytest.raises(ValueError, match="Invalid IAP token"):
             validator.validate_token("fake_token")
 
+    @patch("firetower.auth.validators.id_token.verify_token")
+    def test_validate_token_uses_live_audience(self, mock_verify):
+        # A reloaded IAP_AUDIENCE must be honored by an existing validator
+        # instance (the middleware holds one for the process lifetime).
+        mock_verify.return_value = {"iss": IAPTokenValidator.IAP_ISSUER}
+        validator = IAPTokenValidator()
+
+        with patch("firetower.auth.validators.settings.IAP_AUDIENCE", "aud-one"):
+            validator.validate_token("fake_token")
+        assert mock_verify.call_args.kwargs["audience"] == "aud-one"
+
+        with patch("firetower.auth.validators.settings.IAP_AUDIENCE", "aud-two"):
+            validator.validate_token("fake_token")
+        assert mock_verify.call_args.kwargs["audience"] == "aud-two"
+
 
 @pytest.mark.django_db
 class TestIAPAuthenticationMiddleware:
@@ -334,6 +349,45 @@ class TestIAPAuthenticationMiddleware:
         middleware(request)
 
         assert User.objects.filter(username="dev_user").count() == 1
+
+    @patch("firetower.auth.middleware.settings.IAP_ENABLED", False)
+    def test_validator_present_when_built_while_iap_disabled(self, get_response):
+        # Regression: the middleware is built once per process. If IAP is
+        # enabled later via config hot reload, the validator must already exist
+        # (previously it was None when IAP was disabled at boot).
+        middleware = IAPAuthenticationMiddleware(get_response)
+
+        assert middleware.validator is not None
+
+    def test_enabling_iap_after_boot_authenticates(self, factory, get_response):
+        # Build the middleware while IAP is disabled, then enable it (as a
+        # reload would) and ensure requests are authenticated via the validator.
+        with patch("firetower.auth.middleware.settings.IAP_ENABLED", False):
+            middleware = IAPAuthenticationMiddleware(get_response)
+
+        request = factory.get("/")
+        request.META["HTTP_X_GOOG_IAP_JWT_ASSERTION"] = "valid_token"
+
+        with (
+            patch("firetower.auth.middleware.settings.IAP_ENABLED", True),
+            patch.object(
+                IAPTokenValidator,
+                "validate_token",
+                return_value={"email": "user@example.com", "sub": "12345"},
+            ),
+            patch.object(
+                IAPTokenValidator,
+                "extract_user_info",
+                return_value={
+                    "email": "user@example.com",
+                    "user_id": "accounts.google.com:12345",
+                },
+            ),
+        ):
+            middleware(request)
+
+        assert request.user.is_authenticated
+        assert request.user.email == "user@example.com"
 
 
 class TestConditionalCsrfViewMiddleware:

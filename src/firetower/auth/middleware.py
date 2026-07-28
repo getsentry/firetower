@@ -27,7 +27,13 @@ class IAPAuthenticationMiddleware:
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
-        self.validator = IAPTokenValidator() if settings.IAP_ENABLED else None
+        # Always hold a validator. The middleware instance is long-lived (built
+        # once per process), but IAP_ENABLED/IAP_AUDIENCE can change via config
+        # hot reload. The validator is stateless and reads IAP_AUDIENCE live, so
+        # constructing it unconditionally means enabling IAP after boot works
+        # without a restart (no "validator is None" path), and a changed
+        # audience is picked up automatically.
+        self.validator = IAPTokenValidator()
 
         if settings.IAP_ENABLED:
             logger.info("IAP authentication enabled")
@@ -48,15 +54,6 @@ class IAPAuthenticationMiddleware:
 
         if not token:
             logger.warning("IAP token missing from request")
-            request.user = AnonymousUser()
-            return
-
-        # Validator should always be set when IAP is enabled
-        if self.validator is None:
-            logger.critical(
-                "IAP authentication called but validator is not initialized. "
-                "Check IAP_ENABLED setting and middleware configuration."
-            )
             request.user = AnonymousUser()
             return
 
