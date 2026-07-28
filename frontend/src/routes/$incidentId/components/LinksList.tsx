@@ -27,6 +27,10 @@ const linkConfigs = {
     label: 'PagerDuty',
     icon: '/pagerduty.svg',
   },
+  meeting_recording: {
+    label: 'Meeting Recording',
+    icon: '/meeting_recording.svg',
+  },
   statuspage: {
     label: 'Statuspage',
     icon: '/statuspage.svg',

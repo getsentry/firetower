@@ -36,6 +36,7 @@ interface IncidentsQueryArgs {
   affected_region?: string[];
   captain?: string[];
   reporter?: string[];
+  participant?: string[];
   created_after?: string;
   created_before?: string;
 }

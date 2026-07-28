@@ -194,7 +194,7 @@ def allocate_incident_identity() -> AllocatedIdentity:
                 continue
 
             if not _looks_like_placeholder(issue):
-                logger.error(
+                logger.warning(
                     "Skipping stray non-placeholder issue at %s while allocating",
                     identifier,
                 )

@@ -504,6 +504,269 @@ class TestUIIncidentFilters:
         assert response.data["count"] == 1
         assert response.data["results"][0]["title"] == "Reporter1 Incident"
 
+    def test_filter_by_participant(self):
+        participant1 = User.objects.create_user(
+            username="participant1@example.com",
+            email="participant1@example.com",
+        )
+        participant2 = User.objects.create_user(
+            username="participant2@example.com",
+            email="participant2@example.com",
+        )
+        incident1 = Incident.objects.create(
+            title="Participant1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        incident2 = Incident.objects.create(
+            title="Participant2 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        incident1.participants.add(participant1)
+        incident2.participants.add(participant2)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/ui/incidents/?participant=participant1@example.com"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Participant1 Incident"
+
+    def test_filter_by_multiple_participants_without_duplicates(self):
+        participant1 = User.objects.create_user(
+            username="participant1@example.com",
+            email="participant1@example.com",
+        )
+        participant2 = User.objects.create_user(
+            username="participant2@example.com",
+            email="participant2@example.com",
+        )
+        incident = Incident.objects.create(
+            title="Shared Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        incident.participants.add(participant1, participant2)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/ui/incidents/?participant=participant1@example.com"
+            "&participant=participant2@example.com"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Shared Incident"
+
+    def test_filter_by_empty_participants(self):
+        participant = User.objects.create_user(
+            username="participant@example.com",
+            email="participant@example.com",
+        )
+        with_participant = Incident.objects.create(
+            title="With Participant",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        with_participant.participants.add(participant)
+        Incident.objects.create(
+            title="No Participants",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?participant=__empty__")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "No Participants"
+
+    def test_filter_by_empty_captain(self):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+        )
+        Incident.objects.create(
+            title="With Captain",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=captain,
+        )
+        Incident.objects.create(
+            title="No Captain",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?captain=__empty__")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "No Captain"
+
+    def test_filter_by_empty_and_value_captain(self):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+        )
+        Incident.objects.create(
+            title="With Captain",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=captain,
+        )
+        Incident.objects.create(
+            title="No Captain",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="Other Captain",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            captain=self.user,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/ui/incidents/?captain=__empty__&captain=captain@example.com"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        titles = {r["title"] for r in response.data["results"]}
+        assert titles == {"With Captain", "No Captain"}
+
+    def test_filter_by_empty_reporter(self):
+        reporter = User.objects.create_user(
+            username="reporter@example.com",
+            email="reporter@example.com",
+        )
+        Incident.objects.create(
+            title="With Reporter",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            reporter=reporter,
+        )
+        Incident.objects.create(
+            title="No Reporter",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?reporter=__empty__")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "No Reporter"
+
+    def test_filter_by_empty_service_tier(self):
+        Incident.objects.create(
+            title="With Tier",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            service_tier=ServiceTier.T0,
+        )
+        Incident.objects.create(
+            title="No Tier",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?service_tier=__empty__")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "No Tier"
+
+    def test_filter_by_empty_and_value_service_tier(self):
+        Incident.objects.create(
+            title="T0 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            service_tier=ServiceTier.T0,
+        )
+        Incident.objects.create(
+            title="T1 Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            service_tier=ServiceTier.T1,
+        )
+        Incident.objects.create(
+            title="No Tier",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/ui/incidents/?service_tier=__empty__&service_tier=T0"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        titles = {r["title"] for r in response.data["results"]}
+        assert titles == {"T0 Incident", "No Tier"}
+
+    def test_filter_by_empty_tag(self):
+        inc_with_tag = Incident.objects.create(
+            title="With Service",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="No Service",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        tag = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        inc_with_tag.affected_service_tags.add(tag)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/ui/incidents/?affected_service=__empty__")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "No Service"
+
+    def test_filter_by_empty_and_value_tag(self):
+        inc_with_tag = Incident.objects.create(
+            title="With Service",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        Incident.objects.create(
+            title="No Service",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        inc_other = Incident.objects.create(
+            title="Other Service",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        api_tag = Tag.objects.create(name="API", type=TagType.AFFECTED_SERVICE)
+        web_tag = Tag.objects.create(name="Web", type=TagType.AFFECTED_SERVICE)
+        inc_with_tag.affected_service_tags.add(api_tag)
+        inc_other.affected_service_tags.add(web_tag)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            "/api/ui/incidents/?affected_service=__empty__&affected_service=API"
+        )
+
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        titles = {r["title"] for r in response.data["results"]}
+        assert titles == {"With Service", "No Service"}
+
 
 @pytest.mark.django_db
 class TestServiceAPIIncidentFilters:
@@ -800,3 +1063,23 @@ class TestServiceAPIIncidentFilters:
         assert response.status_code == 200
         assert response.data["count"] == 1
         assert response.data["results"][0]["title"] == "Reporter Incident"
+
+    def test_filter_by_participant(self):
+        incident = Incident.objects.create(
+            title="Participant Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        incident.participants.add(self.reporter)
+        Incident.objects.create(
+            title="Other Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/incidents/?participant=reporter@example.com")
+
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["title"] == "Participant Incident"

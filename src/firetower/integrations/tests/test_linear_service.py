@@ -13,6 +13,7 @@ from firetower.integrations.services.linear import (
     LinearError,
     LinearService,
     _errors_are_not_found,
+    _summarize_graphql_errors,
     parse_project_number,
 )
 
@@ -992,16 +993,25 @@ class TestGetIssue:
     def _not_found_response(self):
         # Mirrors the real Linear response for an issue(id:) lookup against an
         # identifier that does not exist: HTTP 200 with a GraphQL "entity not
-        # found" error and no data. Verified live: looking up an absent
-        # TESTINC-N returns "Could not find referenced Issue." (RELENG-911).
+        # found" error and no data. Verified live 2026-07-21 (RELENG-918): the
+        # sentinel "Could not find referenced Issue." is in
+        # extensions.userPresentableMessage, while the top-level message is the
+        # terse "Entity not found: Issue".
         mock_response = MagicMock()
         mock_response.ok = True
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "errors": [
                 {
-                    "message": "Entity not found: Issue - Could not find "
-                    "referenced Issue.",
+                    "message": "Entity not found: Issue",
+                    "path": ["issue"],
+                    "extensions": {
+                        "type": "invalid input",
+                        "code": "INPUT_ERROR",
+                        "statusCode": 400,
+                        "userError": True,
+                        "userPresentableMessage": "Could not find referenced Issue.",
+                    },
                 }
             ]
         }
@@ -1082,6 +1092,28 @@ class TestErrorsAreNotFound:
             [{"message": "Entity not found: Issue - Could not find referenced Issue."}]
         )
 
+    def test_issue_not_found_in_extensions_user_presentable_message(self):
+        # Verified live 2026-07-21 (RELENG-918): Linear now puts the sentinel in
+        # extensions.userPresentableMessage, with message reduced to the terse
+        # "Entity not found: Issue". Regression test for the degraded-mode bug.
+        assert _errors_are_not_found(
+            [
+                {
+                    "message": "Entity not found: Issue",
+                    "path": ["issue"],
+                    "extensions": {
+                        "code": "INPUT_ERROR",
+                        "userPresentableMessage": "Could not find referenced Issue.",
+                    },
+                }
+            ]
+        )
+
+    def test_terse_message_without_sentinel_is_not_not_found(self):
+        # "Entity not found: Issue" alone (no sentinel anywhere) must not match,
+        # so an unexpected error still surfaces as a failure.
+        assert not _errors_are_not_found([{"message": "Entity not found: Issue"}])
+
     def test_case_insensitive(self):
         assert _errors_are_not_found([{"message": "COULD NOT FIND REFERENCED ISSUE"}])
 
@@ -1108,3 +1140,21 @@ class TestErrorsAreNotFound:
         assert not _errors_are_not_found([])
         assert not _errors_are_not_found(None)
         assert not _errors_are_not_found(["not a dict"])
+
+
+class TestSummarizeGraphqlErrors:
+    def test_renders_message_content(self):
+        summary = _summarize_graphql_errors(
+            [{"message": "Access denied", "extensions": {"code": "FORBIDDEN"}}]
+        )
+        assert "Access denied" in summary
+        assert "FORBIDDEN" in summary
+
+    def test_non_serializable_falls_back_to_repr(self):
+        summary = _summarize_graphql_errors(object())
+        assert summary  # does not raise, returns something
+
+    def test_truncates_huge_payload(self):
+        summary = _summarize_graphql_errors([{"message": "x" * 5000}])
+        assert len(summary) < 5000
+        assert summary.endswith("…[truncated]")

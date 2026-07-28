@@ -563,6 +563,41 @@ class TestStatuspageSubmission:
         assert "updated" in msg
         assert "<@U_SUBMITTER>" in msg
 
+    def test_resolving_existing_statuspage_cancels_followup_reminder(self, incident):
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.STATUSPAGE,
+            url="https://test.statuspage.io/incidents/existing_sp",
+        )
+        ack = MagicMock()
+        body = {"user": {"id": "U_SUBMITTER"}}
+        view = self._make_view(status="resolved", message="Resolved")
+        client = MagicMock()
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.statuspage.StatuspageService"
+            ) as MockService,
+            patch(
+                "firetower.incidents.hooks.cancel_statuspage_followup_reminder"
+            ) as mock_cancel,
+            patch(
+                "firetower.incidents.hooks.schedule_statuspage_followup_reminder"
+            ) as mock_schedule,
+        ):
+            instance = MockService.return_value
+            instance.configured = True
+            instance.extract_incident_id_from_url.return_value = "existing_sp"
+            instance.update_incident.return_value = {"id": "existing_sp"}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/existing_sp"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        mock_cancel.assert_called_once_with(incident)
+        mock_schedule.assert_not_called()
+
     def test_empty_message_returns_error(self, incident):
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}

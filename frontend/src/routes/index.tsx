@@ -35,6 +35,7 @@ const incidentListSearchSchema = z.object({
   affected_region: stringArrayPreprocess,
   captain: stringArrayPreprocess,
   reporter: stringArrayPreprocess,
+  participant: stringArrayPreprocess,
   created_after: z.string().optional(),
   created_before: z.string().optional(),
 });
