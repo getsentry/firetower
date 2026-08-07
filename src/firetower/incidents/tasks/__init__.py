@@ -46,6 +46,6 @@ def schedule_demo() -> None:
     incident = Incident.objects.order_by("-created_at").first()
     if incident:
         title = "Private Incident" if incident.is_private else incident.title
-        logger.info(f"Most recent incident: INC-{incident.id}: {title}")
+        logger.info(f"Most recent incident: {incident.incident_number}: {title}")
     else:
         logger.info("No incidents found.")
