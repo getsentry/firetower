@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
@@ -580,6 +581,30 @@ class TestUpdateParentIssueStatus:
 
         svc.update_issue.assert_called_once_with("lin-123", state_id="state-completed")
         svc.create_comment.assert_not_called()
+
+    def test_update_issue_failure_logs_incident_context(self, caplog):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        svc = self._make_linear_service()
+        svc.update_issue.return_value = False
+
+        # The firetower logger sets propagate=False, so caplog's root handler
+        # never sees these records; attach it to the logger directly.
+        logger = logging.getLogger("firetower.incidents.services")
+        logger.addHandler(caplog.handler)
+        try:
+            with caplog.at_level(logging.WARNING, logger=logger.name):
+                _update_parent_issue_status(incident, svc)
+        finally:
+            logger.removeHandler(caplog.handler)
+
+        # The Linear-side error carries no incident context, so the warning must
+        # name the parent issue and the incident that points at it.
+        assert len(caplog.records) == 1
+        message = caplog.records[0].getMessage()
+        assert "lin-123" in message
+        assert incident.incident_number in message
+        assert "completed" in message
+        assert "team-1" in message
 
     def test_skips_update_when_already_in_target_state(self):
         incident = self._make_incident(status=IncidentStatus.ACTIVE)

@@ -263,12 +263,26 @@ def _update_parent_issue_status(
         return
 
     state_id = states.get(target_state)
-    if state_id and linear_service.update_issue(
-        incident.linear_parent_issue_id, state_id=state_id
-    ):
+    if not state_id:
+        return
+
+    if linear_service.update_issue(incident.linear_parent_issue_id, state_id=state_id):
         _comment_parent_issue_status_change(
             incident, linear_service, target_state, statuses
         )
+        return
+
+    # The underlying Linear error is logged by LinearService without any
+    # incident context, so name the incident and its parent here. Without this
+    # a persistently mislinked parent just emits an anonymous GraphQL error
+    # every sync, with nothing tying it back to the row that needs fixing.
+    logger.warning(
+        "Failed to set Linear parent %s to %s for incident %s (team %s)",
+        incident.linear_parent_issue_id,
+        target_state,
+        incident.incident_number,
+        team_id,
+    )
 
 
 def sync_action_items_from_linear(
