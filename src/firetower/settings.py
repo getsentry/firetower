@@ -65,6 +65,12 @@ if not env_is_dev():
         },
     )
 
+    # Tag every event/log with the deployment's incident key. Environments share
+    # a Sentry project, and an untagged "incident 2178" is ambiguous between
+    # (say) INC-2178 and TESTINC-2178 -- which has already cost real debugging
+    # time chasing a test-only error as if it touched production.
+    sentry_sdk.set_tag("project_key", config.project_key)
+
 
 def _coerce_region_grouping(raw: list[Any]) -> list[list[str]]:
     if not raw:
