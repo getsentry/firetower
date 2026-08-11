@@ -44,7 +44,7 @@ dev = [
     "blessed>=1.39.0",
 ]
 prod = [
-    "ddtrace>=3.18.1",
+    "ddtrace==4.8.2",
     "granian>=2.6.0",
     "sentry-sdk[django]>=2.62.0",
 ]
