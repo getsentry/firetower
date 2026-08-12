@@ -59,12 +59,15 @@ function ActionItemCard({item}: {item: ActionItem}) {
       href={item.url}
       target="_blank"
       rel="noopener noreferrer"
-      className={cn(
-        'flex items-center gap-space-lg rounded-radius-md border-l-4 p-space-lg no-underline transition-colors duration-200',
-        'hover:bg-background-transparent-neutral-muted',
-        BORDER_CLASS[item.status]
-      )}
+      className="relative flex cursor-pointer items-center gap-space-lg rounded-radius-md p-space-lg no-underline transition-colors duration-200 hover:bg-background-transparent-neutral-muted"
     >
+      <div
+        aria-hidden="true"
+        className={cn(
+          'pointer-events-none absolute inset-y-1 left-0.5 rounded-radius-md border-l-4',
+          BORDER_CLASS[item.status]
+        )}
+      />
       <div className="min-w-0 flex-1">
         <p className="text-content-headings text-sm font-medium">{item.title}</p>
         <div className="text-content-secondary mt-space-xs gap-space-sm flex items-center text-xs">
