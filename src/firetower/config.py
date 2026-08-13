@@ -75,7 +75,7 @@ class SlackConfig:
 
 @deserialize
 class GenAIConfig:
-    api_key: str = ""
+    api_key: str = ""  # secret: OPENROUTER_API_KEY
     model: str = "google/gemini-2.5-flash"
 
 
@@ -237,6 +237,7 @@ class ConfigFile:
             (self.pagerduty, "api_token", "PAGERDUTY_API_TOKEN"),
             (self.statuspage, "api_key", "STATUSPAGE_API_KEY"),
             (self.notion, "integration_token", "NOTION_INTEGRATION_TOKEN"),
+            (self.genai, "api_key", "OPENROUTER_API_KEY"),
         ]
         for target, attr, env_var in overrides:
             if target is not None:

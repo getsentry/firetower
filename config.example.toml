@@ -23,6 +23,7 @@
 #                                          -> PAGERDUTY_ESCALATION_KEY_<NAME>
 #   [statuspage] api_key                               -> STATUSPAGE_API_KEY
 #   [notion] integration_token                         -> NOTION_INTEGRATION_TOKEN
+#   [genai] api_key                                    -> OPENROUTER_API_KEY
 # ---------------------------------------------------------------------------
 project_key = "INC"
 log_level = "INFO"
@@ -116,7 +117,7 @@ troubleshooting_template_markdown = """
 
 [genai]
 # OpenRouter API key (https://openrouter.ai). Leave blank or omit to disable AI timeline generation.
-api_key = ""
+api_key = ""  # Overridable via OPENROUTER_API_KEY
 # OpenRouter model slug; routes to Google's Gemini 2.5 Flash.
 model = "google/gemini-2.5-flash"
 
