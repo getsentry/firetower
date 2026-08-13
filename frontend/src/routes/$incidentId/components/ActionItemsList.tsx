@@ -59,7 +59,7 @@ function ActionItemCard({item}: {item: ActionItem}) {
       href={item.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="relative flex cursor-pointer items-center gap-space-lg rounded-radius-md p-space-lg no-underline transition-colors duration-200 hover:bg-background-transparent-neutral-muted"
+      className="gap-space-lg rounded-radius-md p-space-lg hover:bg-background-transparent-neutral-muted relative flex cursor-pointer items-center no-underline transition-colors duration-200"
     >
       <div
         aria-hidden="true"
