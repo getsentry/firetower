@@ -85,6 +85,20 @@ def test_rejects_bad_signature():
         _extract({"id_token": token}, jwks_public_key=_KEY.public_key())
 
 
+def test_rejects_wrong_algorithm():
+    token = jwt.encode(
+        {
+            "aud": TEST_AUD,
+            "iss": "https://accounts.google.com",
+            "exp": int(time.time()) + 3600,
+        },
+        "not-an-rsa-key-long-enough-for-hs256",
+        algorithm="HS256",
+    )
+    with pytest.raises(FastMCPError):
+        _extract({"id_token": token})
+
+
 def test_rejects_wrong_audience():
     token = _id_token(aud="some-other-client", hd="sentry.io", email_verified=True)
     with pytest.raises(FastMCPError):
