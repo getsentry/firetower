@@ -168,7 +168,7 @@ jobs:
             --container firetower-backend --image "${{ env.BACKEND_IMAGE_REF }}"
 
   deploy-prod:
-    needs: [deploy-db-migration-prod, changes]
+    needs: [deploy-db-migration-prod]
     if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
     runs-on: ubuntu-latest
     strategy:
@@ -181,8 +181,6 @@ jobs:
             multi_container: false
           - service: firetower-async-prod
             multi_container: false
-          - service: firetower-mcp
-            multi_container: false
     steps:
       - name: Checkout code
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -192,7 +190,7 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
       - name: Deploy ${{ matrix.service }}
-        if: ${{ !matrix.multi_container && (!startsWith(matrix.service, 'firetower-mcp') || needs.changes.outputs.mcp == 'true') }}
+        if: ${{ !matrix.multi_container }}
         uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
         with:
           service: ${{ matrix.service }}
