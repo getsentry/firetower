@@ -292,12 +292,7 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
   the test MCP service, mirroring the slack/async siblings) + Cloud Logging for structured
   audit lines. Per-request token validation cost (FastMCP's `client_storage` lookup and any
   tokeninfo call) is accepted — request volume is low.
-- **Cloud Armor (resolved — required, house convention):** a dedicated
-  `google_compute_security_policy "firetower-mcp-security-policy"` attached to the MCP test
-  backend — adaptive L7 DDoS protection (PREMIUM), a per-IP rate-limit throttle
-  (10000/10s → deny 429), and a catch-all allow rule at the lowest priority. Public-facing
-  IPs get Cloud Armor per the ⛅ Notion convention; this is the one public firetower surface,
-  so it gets a policy of its own (the IAP-protected services don't need one).
+- **Cloud Armor (resolved):** the MCP test backend does not use Cloud Armor.
 - **Reverse-proxy gotcha (FastMCP #2889):** behind a path-rewriting LB/proxy, the RFC 9728
   `resource_metadata` URL in the `WWW-Authenticate` header can come out wrong. Set
   `base_url` correctly and verify the emitted metadata URL against the public origin.
@@ -338,8 +333,8 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
   by the deploy gate (restarts are rare). Users just re-auth.
 - **Rotating the Google OAuth client secret / SA key:** the client secret rotation forces all
   clients to re-auth (acceptable, rare); the Hop 2 SA key rotation is transparent to clients.
-- **Global kill switch:** disable the Google OAuth client (or the firetower-api-mcp SA) to cut
-  everyone off at once.
+- **Global kill switch:** disable the Google OAuth client (or the `firetower-api-mcp-test` SA)
+  to cut everyone off at once.
 
 ## Open questions / to verify before coding
 
@@ -356,8 +351,8 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
 4. ~~Cloud Run ingress / LB wiring~~ — **resolved for test:** terraform in `~/code/ops`
    adds `firetower-mcp-test` (ingress `INTERNAL_LOAD_BALANCER`, no IAP, `allUsers` invoker)
    behind the external LB with NEG/backend/URL-map/managed-cert/DNS, mirroring siblings.
-5. ~~Rate limiting / abuse~~ — **resolved:** Cloud Armor security policy (adaptive L7 DDoS +
-   per-IP throttle) attached to the MCP test backend. See Deployment.
+5. ~~Rate limiting / abuse~~ — **resolved:** no Cloud Armor policy is attached to the MCP test
+   backend.
 6. ~~FastMCP `OAuthProxy` accepts public-client DCR + PKCE~~ — **confirmed** with pi's
    actual DCR metadata and loopback callback (and separately with jr's expected shape).
 7. jr integration PR (phase 2): declarative `mcp:` plugin in `getsentry/junior` pointing at
@@ -378,9 +373,10 @@ Done (built + dual-reviewed on `spalmurray/mcp` and ops `spalmurray/firetower-mc
       Datadog serverless-init, and direct-Python MCP entrypoint; backend image restored.
 - [x] Path-gated MCP build, separate test deploy, and `mcp_build_only` bootstrap input in
       `deploy.yml`; Dependabot covers uv dependencies.
-- [x] Terraform: test Cloud Run service, NEG/backend/URL-map, dedicated test DNS-auth + cert
-      for `mcp-test.firetower.getsentry.net`, Cloud Armor policy, IAM `firetower-api-mcp` SA,
-      and secrets scaffolding.
+- [x] Terraform: test Cloud Run service, NEG/backend/URL-map, LB host routing and explicit
+      A/AAAA records for `mcp-test.firetower.getsentry.net`, reuse of the existing wildcard
+      certificate, no Cloud Armor, dedicated `firetower-mcp-test-runtime` and
+      `firetower-api-mcp-test` identities, and secrets scaffolding.
 
 Pending (user-driven, mostly out-of-sandbox):
 
