@@ -313,7 +313,7 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
   the Cloud Run service. The secret-management half is the only Terraformable part.
 - **Two distinct redirect-URI concerns** (don't conflate):
   - *Google console* (upstream client): register exactly the single callback FastMCP uses
-    with Google: `https://mcp.test.firetower.getsentry.net/auth/callback`. Google always
+    with Google: `https://mcp-test.firetower.getsentry.net/auth/callback`. Google always
     returns to the proxy at that URL; it never calls pi, Claude, or another downstream MCP
     client's callback directly.
   - *`MCP_ALLOWED_REDIRECT_URIS`* (FastMCP `allowed_client_redirect_uris`): validates each
@@ -379,13 +379,13 @@ Done (built + dual-reviewed on `spalmurray/mcp` and ops `spalmurray/firetower-mc
 - [x] Path-gated MCP build, separate test deploy, and `mcp_build_only` bootstrap input in
       `deploy.yml`; Dependabot covers uv dependencies.
 - [x] Terraform: test Cloud Run service, NEG/backend/URL-map, dedicated test DNS-auth + cert
-      for `mcp.test.firetower.getsentry.net`, Cloud Armor policy, IAM `firetower-api-mcp` SA,
+      for `mcp-test.firetower.getsentry.net`, Cloud Armor policy, IAM `firetower-api-mcp` SA,
       and secrets scaffolding.
 
 Pending (user-driven, mostly out-of-sandbox):
 
 - [ ] Create the Google OAuth client + Internal consent screen by hand in the console with
-      the single upstream redirect `https://mcp.test.firetower.getsentry.net/auth/callback`.
+      the single upstream redirect `https://mcp-test.firetower.getsentry.net/auth/callback`.
       Claude and loopback callbacks belong only in `MCP_ALLOWED_REDIRECT_URIS`.
 - [ ] Populate Secret Manager (client secret, jwt signing key) + `mcp_google_client_id_test`.
 - [ ] Confirm the `allUsers` invoker org policy allows the public MCP service.

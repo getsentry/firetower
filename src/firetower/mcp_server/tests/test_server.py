@@ -28,7 +28,7 @@ def mcp_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Test
     config = MCPConfig(
         google_client_id="test-client-id.apps.googleusercontent.com",
         google_client_secret="test-client-secret",
-        base_url="https://mcp.test.firetower.getsentry.net",
+        base_url="https://mcp-test.firetower.getsentry.net",
         service_account="test@example.iam.gserviceaccount.com",
         firetower_url=None,
         jwt_signing_key="test-jwt-signing-key",
