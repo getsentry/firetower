@@ -16,7 +16,8 @@ Google Workspace accounts.
 - **Transport:** hosted remote MCP server, Streamable HTTP. New Cloud Run service,
   sibling to `firetower-slack-app` / `firetower-async`.
 - **Operations:** read-only (v1). No create/update/status/tag-write, even though the
-  SDK supports them.
+  SDK supports them. An explicit unauthenticated `GET /health` returns a small 200
+  response for service probes; the `/mcp` transport remains OAuth-protected.
 - **Data:** non-private incidents only (`is_private = False`). NOTE: "non-private" means
   **org-confidential — visible to any authenticated Sentry employee, NOT public to the world.**
   So the `@sentry.io` gate is a real confidentiality boundary, not a convenience.
@@ -255,6 +256,8 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
 
 - New Cloud Run service (e.g. `firetower-mcp-{test,prod}`), sibling to the slack bot.
 - **Not** behind IAP (it has its own OAuth). Confirm ingress/LB wiring.
+- Cloud Run and load-balancer probes use the public `GET /health` route. Authentication
+  middleware still protects `/mcp`; the route test asserts both behaviors together.
 - Secrets: Google OAuth client id/secret; the firetower SA credentials for Hop 2.
 - Reuse existing deploy workflow patterns (`.github/workflows/deploy.yml`).
 - **FastMCP dependency policy (resolved): track latest, don't dependency-pin.** Floor at
@@ -361,7 +364,8 @@ Done (built + dual-reviewed on `spalmurray/mcp` and ops `spalmurray/firetower-mc
 - [x] Read-only tool surface (`tools.py`) — `list_incidents` + `get_incident`, SDK-only,
       sanitized errors, `_audit()` per-user logging.
 - [x] Hop 2 via `firetower_sdk` path dep (`firetower.py`); config (`config.py`); server
-      wiring (`server.py`); 30 unit tests passing.
+      wiring (`server.py`), including public `GET /health` with protected `/mcp`; MCP tests
+      passing.
 - [x] Docker entrypoint `mcp` mode + Dockerfile `sdk/` copy + `mcp` uv group; `.env.mcp.example`.
 - [x] Deploy gate (`deploy.yml` `changes` job) + Dependabot (uv).
 - [x] Terraform: Cloud Run `firetower-mcp-{test,prod}`, NEG/backend/URL-map, dedicated test

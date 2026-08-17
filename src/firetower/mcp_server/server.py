@@ -10,12 +10,18 @@ Deployed as its own Cloud Run service over Streamable HTTP.
 import logging
 
 from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 
 from firetower.mcp_server.auth import SentryGoogleProvider
 from firetower.mcp_server.config import MCPConfig
 from firetower.mcp_server.tools import register_tools
 
 logger = logging.getLogger(__name__)
+
+
+async def health(_request: Request) -> PlainTextResponse:
+    return PlainTextResponse("ok")
 
 
 def create_mcp(config: MCPConfig | None = None) -> FastMCP:
@@ -33,6 +39,7 @@ def create_mcp(config: MCPConfig | None = None) -> FastMCP:
     }
     auth = SentryGoogleProvider(**provider_kwargs)
     mcp = FastMCP(name="firetower", auth=auth)
+    mcp.custom_route("/health", methods=["GET"], include_in_schema=False)(health)
     register_tools(mcp)
     return mcp
 

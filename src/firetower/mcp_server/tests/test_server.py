@@ -56,6 +56,16 @@ def _authorization_params(client_id: str, redirect_uri: str) -> dict[str, str]:
     }
 
 
+def test_health_is_public_while_mcp_requires_oauth(mcp_client: TestClient):
+    health_response = mcp_client.get("/health")
+    mcp_response = mcp_client.get("/mcp")
+
+    assert health_response.status_code == 200
+    assert health_response.text == "ok"
+    assert mcp_response.status_code == 401
+    assert mcp_response.headers["www-authenticate"].startswith("Bearer ")
+
+
 def test_pi_dcr_registration_accepts_loopback_callback(mcp_client: TestClient):
     registration_response = mcp_client.post("/register", json=PI_DCR_METADATA)
 
