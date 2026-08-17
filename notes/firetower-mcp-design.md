@@ -6,9 +6,10 @@ Branch/worktree: `spalmurray/mcp` (`/Users/spencer/code/spalmurray/mcp`); terraf
 
 ## Goal
 
-Let users and agents (via Claude) query firetower incident data to ask questions
-and gain insights. Read-only, **non-private incidents only**, exposed as a hosted
-remote MCP server gated to Sentry Google Workspace accounts.
+Let users and agents (including pi, Claude, and other standards-compliant MCP
+clients) query firetower incident data to ask questions and gain insights. Read-only,
+**non-private incidents only**, exposed as a hosted remote MCP server gated to Sentry
+Google Workspace accounts.
 
 ## Scope (decided)
 
@@ -40,15 +41,15 @@ The IAP concern from the original idea dissolves: the server→firetower hop reu
 existing programmatic auth path, and the client→server hop is standard remote-MCP OAuth.
 
 ```
-Claude client ──OAuth (PKCE + audience-bound token)──▶ MCP server (our domain)
-                                                          │ federates login to
-                                                          ▼
-                                                  Google  (Workspace, hd=sentry.io)
-   server validates hd + email_verified, mints OUR short-lived audience-bound token
-Claude client ──Bearer (our token)──▶ MCP server (resource server, validates token)
-                                            │ Hop 2 — single service account
-                                            ▼
-                                      firetower API → non-private incidents only
+MCP client ──OAuth (PKCE + audience-bound token)──▶ MCP server (our domain)
+                                                       │ federates login to
+                                                       ▼
+                                               Google  (Workspace, hd=sentry.io)
+server validates hd + email_verified, mints OUR short-lived audience-bound token
+MCP client ──Bearer (our token)──▶ MCP server (resource server, validates token)
+                                         │ Hop 2 — single service account
+                                         ▼
+                                   firetower API → non-private incidents only
 ```
 
 - **Hop 1 (client → MCP server):** authenticate the *human* (gate + attribution). Per-user.
@@ -59,8 +60,8 @@ Claude client ──Bearer (our token)──▶ MCP server (resource server, val
 
 Use **FastMCP** (`jlowin/fastmcp`, Python/Starlette/ASGI, production-grade). Its
 `GoogleProvider` is built on the `OAuthProxy` pattern *specifically because Google lacks
-Dynamic Client Registration* — it presents a spec-compliant face to Claude (DCR bridging,
-PKCE/S256, RFC 9728 Protected Resource Metadata inherited from the official MCP SDK,
+Dynamic Client Registration* — it presents a spec-compliant face to MCP clients (DCR
+bridging, PKCE/S256, RFC 9728 Protected Resource Metadata inherited from the official MCP SDK,
 RFC 8414 AS metadata, audience-bound token issuance) while using our fixed Google client
 credentials upstream.
 
@@ -133,24 +134,31 @@ What we build on top of the library:
    correctly regardless.)
 
 ### Client support notes
-- **Claude Code:** `claude mcp add --transport http <url>`; runs the browser OAuth flow,
-  stores tokens locally; ephemeral `localhost:*` callback (accept any local port, or pin
-  with `--callback-port`).
-- **Claude.ai / Desktop connectors:** fixed callback `https://claude.ai/api/mcp/auth_callback`;
-  tokens stored encrypted Anthropic-side. Acceptable, but note the data is org-confidential
-  (not world-public), so this is a real (if modest) trust dependency, mitigated by read-only
-  scope + short-lived audience-bound tokens.
-- DCR is **SHOULD**, not MUST — Claude can also use CIMD or Anthropic-held creds, but the
-  `GoogleProvider`/`OAuthProxy` DCR bridge covers it.
-- Static bearer tokens are **not supported** by Claude clients — OAuth (or authless) only.
-  Authless loses the gate, so OAuth it is.
+- **Native MCP clients:** standards-compliant DCR/CIMD + PKCE clients can use an HTTP
+  loopback callback on any port. The allowlist covers `localhost` and `127.0.0.1`
+  explicitly; it does not permit custom schemes, non-loopback HTTP, or arbitrary HTTPS.
+- **pi:** registers as the public DCR client `pi mcp-client` with
+  `token_endpoint_auth_method: none`, authorization-code + refresh-token grants, response
+  type `code`, and callback `http://localhost:8910/oauth/callback`. This exact flow has an
+  integration regression test.
+- **Claude Code:** `claude mcp add --transport http <url>` runs the same browser OAuth flow,
+  stores tokens locally, and uses an ephemeral loopback callback.
+- **Claude.ai / Desktop connectors:** fixed callbacks under
+  `https://claude.ai/api/mcp/auth_callback` and `https://claude.com/api/mcp/auth_callback`
+  are explicitly trusted; tokens are stored encrypted Anthropic-side. The data is
+  org-confidential, so this is a real trust dependency, mitigated by read-only scope and
+  short-lived audience-bound tokens.
+- DCR is **SHOULD**, not MUST. FastMCP keeps both standard DCR and CIMD enabled.
+- Static bearer tokens are not the integration path; authless access would lose the
+  Workspace gate, so clients use OAuth.
 
-## Client rollout: Claude first, then jr, then others
+## Client rollout
 
-**Rollout order (resolved): start with Claude (Code + claude.ai/Desktop), then expand to
-`jr`, then codex/whatever.** There is no formal phasing gate — adding a client is just an
-edit to `MCP_ALLOWED_REDIRECT_URIS` (+ the Google console redirect URIs), plus, for jr, a
-small plugin PR. The server shape is identical for all of them (OAuth + PKCE).
+The server supports standards-compliant native clients (including pi and Claude Code) and
+explicitly trusted hosted Claude callbacks from the first test deployment. `jr` remains the
+next client integration; adding a hosted client requires an explicit downstream callback
+allowlist entry, while safe native loopback clients need no per-client entry. No downstream
+MCP callback is registered in the Google console.
 
 ### Phase 2 client: `jr` (getsentry/junior)
 
@@ -238,7 +246,7 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
 - **Confused-deputy:** `OAuthProxy` uses a static upstream Google client_id → spec requires
   per-client consent + CSRF/`state` protection. FastMCP handles most of this — verify.
 - **Short-lived tokens + refresh rotation** (public clients); secure token storage.
-- **HTTPS everywhere; exact redirect-uri matching; accept `localhost:*` for Claude Code.**
+- **HTTPS everywhere; validate redirect URIs; accept loopback HTTP only for native clients.**
 - **Workspace gate:** validate signed `hd` claim (== sentry.io) + `email_verified`; anchor
   on `sub` + workspace id, not email domain. (Caveat: domain-resale attacks exist — `hd`
   is necessary, not a perfect anchor; acceptable for read-only org-confidential incident data.)
@@ -293,19 +301,20 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
   Manager via Terraform** (`google_secret_manager_secret` + `_version`) and reference from
   the Cloud Run service. The secret-management half is the only Terraformable part.
 - **Two distinct redirect-URI concerns** (don't conflate):
-  - *Google console* (upstream client): register `https://<our-origin>/auth/callback`
-    (FastMCP default `redirect_path`), plus `https://claude.ai/api/mcp/auth_callback` and
-    `https://claude.com/api/mcp/auth_callback`, plus `https://claude.ai`/`https://claude.com`
-    as Authorized JavaScript origins. Loopback (`localhost`/`127.0.0.1`) needs no port
-    enumeration — Google allows any loopback port.
-  - *`MCP_ALLOWED_REDIRECT_URIS`* (FastMCP `allowed_client_redirect_uris`): validates the
-    *downstream* MCP client callback. Set to
+  - *Google console* (upstream client): register exactly the single callback FastMCP uses
+    with Google: `https://mcp.test.firetower.getsentry.net/auth/callback`. Google always
+    returns to the proxy at that URL; it never calls pi, Claude, or another downstream MCP
+    client's callback directly.
+  - *`MCP_ALLOWED_REDIRECT_URIS`* (FastMCP `allowed_client_redirect_uris`): validates each
+    *downstream* MCP client callback. Set it to
     `https://claude.ai/api/mcp/auth_callback,https://claude.com/api/mcp/auth_callback,http://localhost:*,http://127.0.0.1:*`.
-    **Verified against current FastMCP source:** the matcher is component-wise — port `*`
-    plus root-path-matches-any handles ephemeral-port loopback correctly (an earlier ≤3.1.1
-    bug rejecting dynamic-port loopback is not present on our floor). `None` = allow all,
-    empty = block all; our `config.py` `_require()`s a non-empty value so neither happens by
-    accident.
+    The loopback patterns support native clients such as pi without accepting arbitrary
+    schemes or external hosts; hosted callbacks remain explicitly trusted. **Verified
+    against locked FastMCP 3.4.1:** the matcher is component-wise, and port `*` plus
+    root-path-matches-any handles ephemeral loopback ports. Leaving the option as `None`
+    is unsafe: 3.4.1 accepts `javascript:` and non-loopback HTTP in that mode. An empty list
+    blocks all callbacks; `config.py` requires a non-empty value so neither state happens
+    accidentally.
 
 ## Auth on key/account loss (offboarding + kill switches)
 
@@ -338,8 +347,8 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
    behind the external LB with NEG/backend/URL-map/managed-cert/DNS, mirroring siblings.
 5. ~~Rate limiting / abuse~~ — **resolved:** Cloud Armor security policy (adaptive L7 DDoS +
    per-IP throttle) attached to the MCP backends only. See Deployment.
-6. ~~FastMCP `OAuthProxy` accepts public-client DCR + PKCE~~ — **confirmed** (jr's shape;
-   also how Claude registers).
+6. ~~FastMCP `OAuthProxy` accepts public-client DCR + PKCE~~ — **confirmed** with pi's
+   actual DCR metadata and loopback callback (and separately with jr's expected shape).
 7. jr integration PR (phase 2): declarative `mcp:` plugin in `getsentry/junior` pointing at
    the deployed server URL + `allowedTools`. Deferred until after the Claude rollout.
 

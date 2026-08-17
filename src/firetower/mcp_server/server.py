@@ -25,10 +25,10 @@ def create_mcp(config: MCPConfig | None = None) -> FastMCP:
         "client_secret": config.google_client_secret,
         "base_url": config.base_url,
         "jwt_signing_key": config.jwt_signing_key,
-        "enable_cimd": True,  # Claude Code / jr register via CIMD
+        "enable_cimd": True,  # Offer CIMD alongside the provider's standard DCR
         "require_authorization_consent": True,  # confused-deputy mitigation
-        # Claude.ai connector callback + Claude Code's localhost ports. Required
-        # (see config) so we never fall open to arbitrary redirect URIs.
+        # Native MCP clients use loopback callbacks, while hosted callbacks must
+        # be explicitly trusted. Required so arbitrary redirect URIs never fall open.
         "allowed_client_redirect_uris": list(config.allowed_redirect_uris),
     }
     auth = SentryGoogleProvider(**provider_kwargs)
