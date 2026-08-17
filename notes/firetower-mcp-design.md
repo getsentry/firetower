@@ -254,12 +254,17 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
 
 ## Deployment
 
-- New Cloud Run service (e.g. `firetower-mcp-{test,prod}`), sibling to the slack bot.
+- One test-only Cloud Run service, `firetower-mcp-test`, sibling to the slack bot. There
+  is deliberately no production MCP deploy job in the Firetower workflow yet.
 - **Not** behind IAP (it has its own OAuth). Confirm ingress/LB wiring.
 - Cloud Run and load-balancer probes use the public `GET /health` route. Authentication
   middleware still protects `/mcp`; the route test asserts both behaviors together.
 - Secrets: Google OAuth client id/secret; the firetower SA credentials for Hop 2.
-- Reuse existing deploy workflow patterns (`.github/workflows/deploy.yml`).
+- `docker/mcp.Dockerfile` builds the server and in-repo SDK into a dedicated image tagged
+  `firetower-mcp:${{ github.sha }}`. It installs the `mcp` dependency group, not `prod`, runs as
+  the existing UID 1100 user, and keeps Datadog's native serverless-init wrapper. The MCP
+  entrypoint therefore invokes Python directly instead of using unavailable `ddtrace-run`.
+- The ordinary backend image no longer copies the SDK or installs the MCP dependency group.
 - **FastMCP dependency policy (resolved): track latest, don't dependency-pin.** Floor at
   `fastmcp>=3.4.1`; **Dependabot** (uv ecosystem, `.github/dependabot.yml`) opens weekly bump
   PRs — **no auto-merge**. On each fastmcp bump, re-run the auth unit tests and do a live
@@ -269,24 +274,27 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
 - **`jwt_signing_key` from env (stable across restarts).** Set it from Secret Manager so a
   restart doesn't invalidate already-issued FastMCP tokens via a new signing key.
 - **No persistent `client_storage` in v1 — and that's deliberate.** FastMCP reference tokens
-  do a hard `client_storage` lookup on *every* request, so losing the store (in-memory,
-  per-instance) breaks all active sessions immediately, not gracefully. The fix isn't a DB;
-  it's **not redeploying the service.** Today the shared image means every firetower deploy
-  would restart the MCP server and force a re-auth. We solve that with the **deploy gate**
-  (below), so the server only restarts on actual MCP changes — rare. Revisit persistent
-  storage (e.g. the Linear-token DB pattern) only if restart frequency becomes a problem.
-- **Deploy gate (resolved):** `deploy.yml` has a `changes` job that git-diffs MCP-relevant
-  paths (`src/firetower/mcp_server/`, `sdk/`, `docker/entrypoint.sh`, `docker/backend.Dockerfile`,
-  `pyproject.toml`, `uv.lock`); the `firetower-mcp*` services only deploy when `mcp == true`
-  (non-push events still deploy, to keep manual runs working). This keeps the MCP server off
-  the every-firetower-deploy restart treadmill, which is what makes in-memory storage viable.
+  do a hard `client_storage` lookup on *every* request, so losing the per-instance store
+  breaks all active sessions immediately, not gracefully. The dedicated image prevents
+  ordinary Firetower releases from restarting MCP; the deploy gate below limits MCP
+  restarts to its own changes. Revisit persistent storage only if restart frequency becomes
+  a problem.
+- **Build/deploy gate (resolved):** `deploy.yml` git-diffs `src/firetower/mcp_server/`,
+  `sdk/`, `docker/mcp.Dockerfile`, `docker/entrypoint.sh`, `pyproject.toml`, `uv.lock`, and
+  the workflow itself. Relevant pushes build and push `MCP_IMAGE_REF`; manual runs always
+  count as changed. A separate `deploy-mcp-test` job consumes that image, while the ordinary
+  backend/static build and deployment matrix remain unchanged and no production MCP job is
+  present.
+- **Bootstrap flow:** manual input `mcp_build_only=true` builds and pushes only the MCP image;
+  it skips the backend/static build, migrations, and every service deploy. Use this once to
+  make the SHA-tagged Artifact Registry image exist before Terraform creates Cloud Run.
 - **Observability (resolved):** Datadog via serverless-init (`DD_API_KEY`/`DD_APP_KEY` env on
-  both MCP services, mirroring the slack/async siblings) + Cloud Logging for the structured
-  audit lines. Per-request token validation cost (FastMCP's `client_storage` lookup, and any
-  tokeninfo call) is accepted — the request volume is low.
+  the test MCP service, mirroring the slack/async siblings) + Cloud Logging for structured
+  audit lines. Per-request token validation cost (FastMCP's `client_storage` lookup and any
+  tokeninfo call) is accepted — request volume is low.
 - **Cloud Armor (resolved — required, house convention):** a dedicated
-  `google_compute_security_policy "firetower-mcp-security-policy"` attached to *only* the MCP
-  backends — adaptive L7 DDoS protection (PREMIUM), a per-IP rate-limit throttle
+  `google_compute_security_policy "firetower-mcp-security-policy"` attached to the MCP test
+  backend — adaptive L7 DDoS protection (PREMIUM), a per-IP rate-limit throttle
   (10000/10s → deny 429), and a catch-all allow rule at the lowest priority. Public-facing
   IPs get Cloud Armor per the ⛅ Notion convention; this is the one public firetower surface,
   so it gets a policy of its own (the IAP-protected services don't need one).
@@ -345,11 +353,11 @@ captain/reporter/participant`). It is **org-confidential internal data**. Privat
 3. ~~Hop 2 SA mechanics~~ — **resolved:** reuse `firetower_sdk` directly as a uv path dep;
    it already obtains SA creds + signs the IAP-audience JWT. `firetower.py::get_client()`
    wraps it.
-4. ~~Cloud Run ingress / LB wiring~~ — **resolved:** terraform in `~/code/ops` adds
-   `firetower-mcp-{test,prod}` (ingress `INTERNAL_LOAD_BALANCER`, no IAP, `allUsers` invoker)
+4. ~~Cloud Run ingress / LB wiring~~ — **resolved for test:** terraform in `~/code/ops`
+   adds `firetower-mcp-test` (ingress `INTERNAL_LOAD_BALANCER`, no IAP, `allUsers` invoker)
    behind the external LB with NEG/backend/URL-map/managed-cert/DNS, mirroring siblings.
 5. ~~Rate limiting / abuse~~ — **resolved:** Cloud Armor security policy (adaptive L7 DDoS +
-   per-IP throttle) attached to the MCP backends only. See Deployment.
+   per-IP throttle) attached to the MCP test backend. See Deployment.
 6. ~~FastMCP `OAuthProxy` accepts public-client DCR + PKCE~~ — **confirmed** with pi's
    actual DCR metadata and loopback callback (and separately with jr's expected shape).
 7. jr integration PR (phase 2): declarative `mcp:` plugin in `getsentry/junior` pointing at
@@ -366,22 +374,27 @@ Done (built + dual-reviewed on `spalmurray/mcp` and ops `spalmurray/firetower-mc
 - [x] Hop 2 via `firetower_sdk` path dep (`firetower.py`); config (`config.py`); server
       wiring (`server.py`), including public `GET /health` with protected `/mcp`; MCP tests
       passing.
-- [x] Docker entrypoint `mcp` mode + Dockerfile `sdk/` copy + `mcp` uv group; `.env.mcp.example`.
-- [x] Deploy gate (`deploy.yml` `changes` job) + Dependabot (uv).
-- [x] Terraform: Cloud Run `firetower-mcp-{test,prod}`, NEG/backend/URL-map, dedicated test
-      DNS-auth + cert for `mcp.test.firetower.getsentry.net`, Cloud Armor policy, IAM
-      `firetower-api-mcp` SA, secrets scaffolding.
+- [x] Dedicated `docker/mcp.Dockerfile` with the SDK + `mcp` uv group, non-root runtime,
+      Datadog serverless-init, and direct-Python MCP entrypoint; backend image restored.
+- [x] Path-gated MCP build, separate test deploy, and `mcp_build_only` bootstrap input in
+      `deploy.yml`; Dependabot covers uv dependencies.
+- [x] Terraform: test Cloud Run service, NEG/backend/URL-map, dedicated test DNS-auth + cert
+      for `mcp.test.firetower.getsentry.net`, Cloud Armor policy, IAM `firetower-api-mcp` SA,
+      and secrets scaffolding.
 
 Pending (user-driven, mostly out-of-sandbox):
 
-- [ ] Commit the uncommitted changes on both branches.
-- [ ] Create the Google OAuth client + Internal consent screen by hand in the console
-      (redirect `https://mcp.test.firetower.getsentry.net/auth/callback` + claude.ai/.com).
+- [ ] Create the Google OAuth client + Internal consent screen by hand in the console with
+      the single upstream redirect `https://mcp.test.firetower.getsentry.net/auth/callback`.
+      Claude and loopback callbacks belong only in `MCP_ALLOWED_REDIRECT_URIS`.
 - [ ] Populate Secret Manager (client secret, jwt signing key) + `mcp_google_client_id_test`.
 - [ ] Confirm the `allUsers` invoker org policy allows the public MCP service.
-- [ ] `terraform fmt/validate/plan/apply` (cloudrun → frontend → iam); push `spalmurray/mcp`;
-      `gh workflow run deploy.yml --ref spalmurray/mcp -f environment=test`.
-- [ ] Live OAuth test from Claude Code + a claude.ai connector (verify same-origin behavior).
+- [ ] Push `spalmurray/mcp`, then bootstrap the exact HEAD image before creating Cloud Run:
+      `gh workflow run deploy.yml --ref spalmurray/mcp -f environment=test -f mcp_build_only=true`.
+- [ ] Pass that HEAD SHA to Ops, then run the Terraform validation/plan/apply sequence and a
+      normal test deployment.
+- [ ] Live OAuth tests from pi, Claude Code, and a claude.ai connector; verify same-origin
+      behavior, refresh, public `/health`, and protected `/mcp`.
 - [ ] Phase 2: jr plugin PR.
 
 ## References

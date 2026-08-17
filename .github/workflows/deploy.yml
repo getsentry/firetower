@@ -13,13 +13,20 @@ on:
         type: environment
         default: test
         required: true
+      mcp_build_only:
+        description: Build and push the MCP image without running migrations or deployments
+        type: boolean
+        default: false
+        required: false
 
 env:
   BACKEND_IMAGE_REF: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
+  MCP_IMAGE_REF: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower-mcp:${{ github.sha }}
   STATIC_IMAGE_REF: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/nginx:${{ github.sha }}
 
 jobs:
   build:
+    if: ${{ inputs.mcp_build_only != true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -68,23 +75,47 @@ jobs:
           SHA: ${{ github.sha }}
           EVENT: ${{ github.event_name }}
         run: |
-          # Only gate automatic pushes; manual runs always (re)deploy the MCP service.
-          # The MCP server shares the backend image but should only be recycled when
-          # its own code/deps change, since a recycle wipes its OAuth client_storage.
+          # Manual runs always build the MCP image. Automatic pushes only build and
+          # recycle the service for MCP changes, since a recycle wipes client_storage.
           if [ "$EVENT" != "push" ] || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
             echo "mcp=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if git diff --name-only "$BEFORE" "$SHA" \
-            | grep -qE '^(src/firetower/mcp_server/|sdk/|docker/entrypoint\.sh|docker/backend\.Dockerfile|pyproject\.toml|uv\.lock)'; then
+            | grep -qE '^(src/firetower/mcp_server/|sdk/|docker/(entrypoint\.sh|mcp\.Dockerfile)|pyproject\.toml|uv\.lock|\.github/workflows/deploy\.yml)'; then
             echo "mcp=true" >> "$GITHUB_OUTPUT"
           else
             echo "mcp=false" >> "$GITHUB_OUTPUT"
           fi
 
+  build-mcp:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.mcp == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
+      - name: Login to Artifact Registry
+        run: gcloud auth configure-docker us-west1-docker.pkg.dev
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+      - name: Build and push (MCP)
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          push: true
+          tags: ${{ env.MCP_IMAGE_REF }}
+          file: docker/mcp.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy-db-migration-test:
     needs: [build]
-    if: ${{ inputs.environment == 'test' }}
+    if: ${{ inputs.mcp_build_only != true && inputs.environment == 'test' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -105,7 +136,7 @@ jobs:
 
   deploy-db-migration-prod:
     needs: [build]
-    if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
+    if: ${{ inputs.mcp_build_only != true && github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -125,8 +156,8 @@ jobs:
           wait: true
 
   deploy-test:
-    needs: [deploy-db-migration-test, changes]
-    if: ${{ inputs.environment == 'test' }}
+    needs: [deploy-db-migration-test]
+    if: ${{ inputs.mcp_build_only != true && inputs.environment == 'test' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -138,8 +169,6 @@ jobs:
             multi_container: false
           - service: firetower-async-test
             multi_container: false
-          - service: firetower-mcp-test
-            multi_container: false
     steps:
       - name: Checkout code
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -149,7 +178,7 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_SLUG }}
           workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
       - name: Deploy ${{ matrix.service }}
-        if: ${{ !matrix.multi_container && (!startsWith(matrix.service, 'firetower-mcp') || needs.changes.outputs.mcp == 'true') }}
+        if: ${{ !matrix.multi_container }}
         uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
         with:
           service: ${{ matrix.service }}
@@ -167,9 +196,29 @@ jobs:
             --container nginx --image "${{ env.STATIC_IMAGE_REF }}" --port 80
             --container firetower-backend --image "${{ env.BACKEND_IMAGE_REF }}"
 
+  deploy-mcp-test:
+    needs: [build-mcp, changes, deploy-db-migration-test]
+    if: ${{ inputs.mcp_build_only != true && inputs.environment == 'test' && needs.changes.outputs.mcp == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          workload_identity_provider: projects/${{ secrets.GCP_PROJECT_NUM }}/locations/global/workloadIdentityPools/github/providers/github-prvdr
+      - name: Deploy firetower-mcp-test
+        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
+        with:
+          service: firetower-mcp-test
+          project_id: ${{ secrets.GCP_PROJECT_SLUG }}
+          region: us-west1
+          image: ${{ env.MCP_IMAGE_REF }}
+
   deploy-prod:
     needs: [deploy-db-migration-prod]
-    if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
+    if: ${{ inputs.mcp_build_only != true && github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
