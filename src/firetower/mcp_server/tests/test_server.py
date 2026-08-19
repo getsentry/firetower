@@ -1,8 +1,9 @@
 """Integration tests for the Firetower MCP HTTP and OAuth routes."""
 
+import re
 from collections.abc import Iterator
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastmcp import settings as fastmcp_settings
@@ -86,6 +87,39 @@ def test_pi_dcr_registration_accepts_loopback_callback(mcp_client: TestClient):
 
     assert authorization_response.status_code == 302
     assert urlparse(authorization_response.headers["location"]).path == "/consent"
+
+
+def test_google_authorization_requests_openid_and_email_scopes(
+    mcp_client: TestClient,
+):
+    registration_response = mcp_client.post("/register", json=PI_DCR_METADATA)
+    client_id = registration_response.json()["client_id"]
+    authorization_response = mcp_client.get(
+        "/authorize", params=_authorization_params(client_id, PI_CALLBACK)
+    )
+    consent_url = authorization_response.headers["location"]
+    consent_response = mcp_client.get(consent_url)
+    csrf_token = re.search(r'name="csrf_token" value="([^"]+)"', consent_response.text)
+
+    assert consent_response.status_code == 200
+    assert csrf_token is not None
+    consent_response = mcp_client.post(
+        consent_url,
+        data={
+            "txn_id": parse_qs(urlparse(consent_url).query)["txn_id"][0],
+            "csrf_token": csrf_token.group(1),
+            "action": "approve",
+        },
+    )
+
+    assert consent_response.status_code == 302
+    google_authorization_url = urlparse(consent_response.headers["location"])
+    assert google_authorization_url.netloc == "accounts.google.com"
+    assert google_authorization_url.path == "/o/oauth2/v2/auth"
+    assert set(parse_qs(google_authorization_url.query)["scope"][0].split()) == {
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+    }
 
 
 def test_unallowed_external_callback_fails_redirect_validation(

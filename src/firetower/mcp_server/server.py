@@ -31,6 +31,7 @@ def create_mcp(config: MCPConfig | None = None) -> FastMCP:
         "client_secret": config.google_client_secret,
         "base_url": config.base_url,
         "jwt_signing_key": config.jwt_signing_key,
+        "required_scopes": ["openid", "email"],
         "enable_cimd": True,  # Offer CIMD alongside the provider's standard DCR
         "require_authorization_consent": True,  # confused-deputy mitigation
         # Native MCP clients use loopback callbacks, while hosted callbacks must
