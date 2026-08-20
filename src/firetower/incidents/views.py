@@ -32,6 +32,7 @@ from .models import (
     ServiceTier,
     Tag,
     TagType,
+    TimelineEvent,
     filter_visible_to_user,
 )
 from .permissions import IncidentPermission, IncidentStatusPermission
@@ -51,6 +52,7 @@ from .serializers import (
     IncidentWriteSerializer,
     TagCreateSerializer,
     TagSerializer,
+    TimelineEventSerializer,
 )
 from .services import (
     ActionItemsSyncStats,
@@ -473,6 +475,27 @@ class SyncActionItemsView(generics.GenericAPIView):
 
 action_item_list = ActionItemListView.as_view()
 sync_action_items = SyncActionItemsView.as_view()
+
+
+class TimelineEventListView(generics.ListAPIView):
+    permission_classes = [IncidentPermission]
+    serializer_class = TimelineEventSerializer
+    pagination_class = None
+
+    def get_queryset(self) -> QuerySet[TimelineEvent]:
+        return self._get_incident().timeline_events.select_related("actor__userprofile")
+
+    def _get_incident(self) -> Incident:
+        if not hasattr(self, "_incident"):
+            numeric_id = parse_incident_id(self.kwargs["incident_id"])
+            self._incident = _get_visible_incident(
+                Incident.objects.all(), numeric_id, self.request.user
+            )
+            self.check_object_permissions(self.request, self._incident)
+        return self._incident
+
+
+timeline_event_list = TimelineEventListView.as_view()
 
 
 class TagListCreateAPIView(generics.ListCreateAPIView):

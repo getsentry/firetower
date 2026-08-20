@@ -5,9 +5,12 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models.functions import Lower
+from django.utils import timezone
 from rest_framework import serializers
 
+from firetower.auth.serializers import UserSerializer
 from firetower.auth.services import get_or_create_user_from_email
 
 from .allocation import (
@@ -29,7 +32,17 @@ from .models import (
     IncidentStatus,
     Tag,
     TagType,
+    TimelineEvent,
 )
+from .timeline.events import (
+    record_captain_changed,
+    record_incident_created,
+    record_severity_changed,
+    record_status_changed,
+    record_title_changed,
+    record_visibility_changed,
+)
+from .timeline.render import render_timeline_event
 
 
 @dataclass
@@ -232,6 +245,30 @@ class IncidentStatusSerializer(serializers.ModelSerializer):
         model = Incident
         fields = ["id", "status"]
         read_only_fields = ["id", "status"]
+
+
+class TimelineEventSerializer(serializers.ModelSerializer):
+    actor = UserSerializer(read_only=True, allow_null=True)
+    summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimelineEvent
+        fields = [
+            "id",
+            "source",
+            "event_type",
+            "occurred_at",
+            "created_at",
+            "actor",
+            "summary",
+            "payload",
+            "link_url",
+            "external_id",
+        ]
+        read_only_fields = fields
+
+    def get_summary(self, obj: TimelineEvent) -> str:
+        return render_timeline_event(obj)
 
 
 class IncidentReadSerializer(serializers.ModelSerializer):
@@ -485,8 +522,19 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             instance.total_downtime = int(delta.total_seconds() / 60)
             instance.save(update_fields=["total_downtime"])
 
+    def _get_actor(self) -> User | None:
+        acting_user = self.context.get("acting_user")
+        if isinstance(acting_user, User) and acting_user.is_authenticated:
+            return acting_user
+
+        request = self.context.get("request")
+        request_user = request.user if request else None
+        if isinstance(request_user, User) and request_user.is_authenticated:
+            return request_user
+        return None
+
     def create(self, validated_data: dict) -> Incident:
-        """Create incident with external links and tags"""
+        """Create incident with external links and tags."""
         external_links_data = validated_data.pop("external_links", None)
         affected_service_tag_names = validated_data.pop(
             "affected_service_tag_names", None
@@ -497,12 +545,6 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
         impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
 
-        # When adopt-on-create is enabled, allocate the id (and Linear parent)
-        # before create so the incident is saved with both; lets
-        # LinearUnavailable propagate. When disabled, skip pre-allocation and let
-        # Incident.save() assign the id inside its own atomic block alongside the
-        # insert, so a failed create rolls back the counter bump (gapless ids) —
-        # the pre-adopt-on-create behavior.
         identity: AllocatedIdentity | None = None
         if adopt_on_create_enabled():
             identity = allocate_incident_identity()
@@ -510,54 +552,57 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
             if identity.linear_issue_uuid:
                 validated_data["linear_parent_issue_id"] = identity.linear_issue_uuid
 
-        # Create the incident
-        incident = super().create(validated_data)
+        actor = self._get_actor()
+        with transaction.atomic():
+            incident = super().create(validated_data)
 
-        # Stash so the hook / backfill can populate the Linear parent url without
-        # an extra Linear round-trip.
-        if identity is not None:
-            incident._allocated_identity = identity
+            if identity is not None:
+                incident._allocated_identity = identity
 
-        # Create external links if provided
-        if external_links_data:
-            for link_type, url in external_links_data.items():
-                if url is not None:  # Skip null values on create
-                    ExternalLink.objects.create(
-                        incident=incident,
-                        type=link_type.upper(),
-                        url=url,
-                    )
+            if external_links_data:
+                for link_type, url in external_links_data.items():
+                    if url is not None:
+                        ExternalLink.objects.create(
+                            incident=incident,
+                            type=link_type.upper(),
+                            url=url,
+                        )
 
-        # Set tags if provided
-        if affected_service_tag_names:
-            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
-                name_lower__in=[n.lower() for n in affected_service_tag_names],
-                type=TagType.AFFECTED_SERVICE,
+            if affected_service_tag_names:
+                tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                    name_lower__in=[n.lower() for n in affected_service_tag_names],
+                    type=TagType.AFFECTED_SERVICE,
+                )
+                incident.affected_service_tags.set(tags)
+
+            if affected_region_tag_names:
+                tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                    name_lower__in=[n.lower() for n in affected_region_tag_names],
+                    type=TagType.AFFECTED_REGION,
+                )
+                incident.affected_region_tags.set(tags)
+
+            if root_cause_tag_names:
+                tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                    name_lower__in=[n.lower() for n in root_cause_tag_names],
+                    type=TagType.ROOT_CAUSE,
+                )
+                incident.root_cause_tags.set(tags)
+
+            if impact_type_tag_names:
+                tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                    name_lower__in=[n.lower() for n in impact_type_tag_names],
+                    type=TagType.IMPACT_TYPE,
+                )
+                incident.impact_type_tags.set(tags)
+
+            self._auto_compute_downtime(incident, validated_data)
+            record_incident_created(
+                incident,
+                severity=incident.severity,
+                actor=actor,
+                occurred_at=incident.created_at,
             )
-            incident.affected_service_tags.set(tags)
-
-        if affected_region_tag_names:
-            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
-                name_lower__in=[n.lower() for n in affected_region_tag_names],
-                type=TagType.AFFECTED_REGION,
-            )
-            incident.affected_region_tags.set(tags)
-
-        if root_cause_tag_names:
-            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
-                name_lower__in=[n.lower() for n in root_cause_tag_names],
-                type=TagType.ROOT_CAUSE,
-            )
-            incident.root_cause_tags.set(tags)
-
-        if impact_type_tag_names:
-            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
-                name_lower__in=[n.lower() for n in impact_type_tag_names],
-                type=TagType.IMPACT_TYPE,
-            )
-            incident.impact_type_tags.set(tags)
-
-        self._auto_compute_downtime(incident, validated_data)
 
         if settings.HOOKS_ENABLED and not self.context.get("skip_hooks"):
             on_incident_created(
@@ -567,13 +612,7 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         return incident
 
     def update(self, instance: Incident, validated_data: dict) -> Incident:
-        """
-        Update incident with merge behavior for external links and tag replacement.
-
-        Only updates fields provided in the request (partial update).
-        External links are merged - only provided links are updated/deleted.
-        Tags are replaced - the provided list replaces all existing tags.
-        """
+        """Update an incident and its serializer-managed related data."""
         external_links_data = validated_data.pop("external_links", None)
         affected_service_tag_names = validated_data.pop(
             "affected_service_tag_names", None
@@ -583,82 +622,133 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
         )
         root_cause_tag_names = validated_data.pop("root_cause_tag_names", None)
         impact_type_tag_names = validated_data.pop("impact_type_tag_names", None)
+        actor = self._get_actor()
 
-        old_title = instance.title
-        old_status = instance.status
-        old_severity = instance.severity
-        old_captain_id = instance.captain_id
-        old_is_private = instance.is_private
+        with transaction.atomic():
+            instance = Incident.objects.select_for_update().get(pk=instance.pk)
+            old_title = instance.title
+            old_status = instance.status
+            old_severity = instance.severity
+            old_captain = instance.captain
+            old_captain_id = instance.captain_id
+            old_is_private = instance.is_private
 
-        # Update basic fields
-        instance = super().update(instance, validated_data)
+            instance = super().update(instance, validated_data)
 
-        # Merge external links if provided
-        if external_links_data is not None:
-            for link_type, url in external_links_data.items():
-                link_type_upper = link_type.upper()
+            if external_links_data is not None:
+                for link_type, url in external_links_data.items():
+                    link_type_upper = link_type.upper()
+                    if url is None:
+                        ExternalLink.objects.filter(
+                            incident=instance, type=link_type_upper
+                        ).delete()
+                    else:
+                        ExternalLink.objects.update_or_create(
+                            incident=instance,
+                            type=link_type_upper,
+                            defaults={"url": url},
+                        )
 
-                if url is None:
-                    # Delete the link
-                    ExternalLink.objects.filter(
-                        incident=instance, type=link_type_upper
-                    ).delete()
-                else:
-                    # Create or update the link
-                    ExternalLink.objects.update_or_create(
-                        incident=instance,
-                        type=link_type_upper,
-                        defaults={"url": url},
+            if affected_service_tag_names is not None:
+                tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                    name_lower__in=[n.lower() for n in affected_service_tag_names],
+                    type=TagType.AFFECTED_SERVICE,
+                )
+                instance.affected_service_tags.set(tags)
+
+            if affected_region_tag_names is not None:
+                tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                    name_lower__in=[n.lower() for n in affected_region_tag_names],
+                    type=TagType.AFFECTED_REGION,
+                )
+                instance.affected_region_tags.set(tags)
+
+            if root_cause_tag_names is not None:
+                tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                    name_lower__in=[n.lower() for n in root_cause_tag_names],
+                    type=TagType.ROOT_CAUSE,
+                )
+                instance.root_cause_tags.set(tags)
+
+            if impact_type_tag_names is not None:
+                tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
+                    name_lower__in=[n.lower() for n in impact_type_tag_names],
+                    type=TagType.IMPACT_TYPE,
+                )
+                instance.impact_type_tags.set(tags)
+
+            self._auto_compute_downtime(instance, validated_data)
+
+            title_changed = instance.title != old_title
+            status_changed = instance.status != old_status
+            severity_changed = instance.severity != old_severity
+            captain_changed = instance.captain_id != old_captain_id
+            visibility_changed = instance.is_private != old_is_private
+            tracked_changes = any(
+                (
+                    title_changed,
+                    status_changed,
+                    severity_changed,
+                    captain_changed,
+                    visibility_changed,
+                )
+            )
+
+            if tracked_changes:
+                occurred_at = timezone.now()
+                if status_changed:
+                    record_status_changed(
+                        instance,
+                        old_status,
+                        instance.status,
+                        actor=actor,
+                        occurred_at=occurred_at,
+                    )
+                if severity_changed:
+                    record_severity_changed(
+                        instance,
+                        old_severity,
+                        instance.severity,
+                        actor=actor,
+                        occurred_at=occurred_at,
+                    )
+                if captain_changed:
+                    record_captain_changed(
+                        instance,
+                        old_captain,
+                        instance.captain,
+                        actor=actor,
+                        occurred_at=occurred_at,
+                    )
+                if title_changed:
+                    record_title_changed(
+                        instance,
+                        old_title,
+                        instance.title,
+                        actor=actor,
+                        occurred_at=occurred_at,
+                    )
+                if visibility_changed:
+                    record_visibility_changed(
+                        instance,
+                        old_is_private,
+                        instance.is_private,
+                        actor=actor,
+                        occurred_at=occurred_at,
                     )
 
-        # Replace affected service tags if provided
-        if affected_service_tag_names is not None:
-            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
-                name_lower__in=[n.lower() for n in affected_service_tag_names],
-                type=TagType.AFFECTED_SERVICE,
-            )
-            instance.affected_service_tags.set(tags)
-
-        # Replace affected region tags if provided
-        if affected_region_tag_names is not None:
-            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
-                name_lower__in=[n.lower() for n in affected_region_tag_names],
-                type=TagType.AFFECTED_REGION,
-            )
-            instance.affected_region_tags.set(tags)
-
-        # Replace root cause tags if provided
-        if root_cause_tag_names is not None:
-            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
-                name_lower__in=[n.lower() for n in root_cause_tag_names],
-                type=TagType.ROOT_CAUSE,
-            )
-            instance.root_cause_tags.set(tags)
-
-        # Replace impact type tags if provided
-        if impact_type_tag_names is not None:
-            tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
-                name_lower__in=[n.lower() for n in impact_type_tag_names],
-                type=TagType.IMPACT_TYPE,
-            )
-            instance.impact_type_tags.set(tags)
-
-        self._auto_compute_downtime(instance, validated_data)
-
-        if settings.HOOKS_ENABLED:
-            request = self.context.get("request")
-            actor = self.context.get("acting_user") or (
-                request.user if request else None
-            )
+        if (
+            tracked_changes
+            and settings.HOOKS_ENABLED
+            and not self.context.get("skip_hooks")
+        ):
             on_incident_updated(
                 instance,
-                old_title=old_title if instance.title != old_title else None,
-                old_status=old_status if instance.status != old_status else None,
-                old_severity=old_severity
-                if instance.severity != old_severity
-                else None,
-                captain_changed=instance.captain_id != old_captain_id,
-                visibility_changed=instance.is_private != old_is_private,
+                old_title=old_title if title_changed else None,
+                old_status=old_status if status_changed else None,
+                old_severity=old_severity if severity_changed else None,
+                captain_changed=captain_changed,
+                visibility_changed=visibility_changed,
                 actor=actor,
             )
 

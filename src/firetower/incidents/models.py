@@ -57,6 +57,35 @@ class IncidentSeverity(models.TextChoices):
     P4 = "P4", "P4"
 
 
+class TimelineEventSource(models.TextChoices):
+    USER = "USER", "User"
+    INTERNAL = "INTERNAL", "Firetower"
+    STATUSPAGE = "STATUSPAGE", "Statuspage"
+    PAGERDUTY = "PAGERDUTY", "PagerDuty"
+
+
+class TimelineEventType(models.TextChoices):
+    NOTE = "note", "Note"
+    INCIDENT_CREATED = "incident_created", "Incident created"
+    STATUS_CHANGED = "status_changed", "Status changed"
+    SEVERITY_CHANGED = "severity_changed", "Severity changed"
+    CAPTAIN_CHANGED = "captain_changed", "Captain changed"
+    TITLE_CHANGED = "title_changed", "Title changed"
+    VISIBILITY_CHANGED = "visibility_changed", "Visibility changed"
+    STATUSPAGE_INCIDENT_CREATED = (
+        "statuspage_incident_created",
+        "Statuspage incident created",
+    )
+    STATUSPAGE_UPDATE_POSTED = (
+        "statuspage_update_posted",
+        "Statuspage update posted",
+    )
+    PAGERDUTY_INCIDENT_TRIGGERED = (
+        "pagerduty_incident_triggered",
+        "PagerDuty incident triggered",
+    )
+
+
 class ServiceTier(models.TextChoices):
     T0 = "T0", "T0"
     T1 = "T1", "T1"
@@ -337,6 +366,32 @@ class Incident(models.Model):
 
     def __str__(self) -> str:
         return f"{self.incident_number}: {self.title}"
+
+
+class TimelineEvent(models.Model):
+    incident = models.ForeignKey(
+        "Incident", on_delete=models.CASCADE, related_name="timeline_events"
+    )
+    source = models.CharField(max_length=16, choices=TimelineEventSource.choices)
+    event_type = models.CharField(max_length=64, choices=TimelineEventType.choices)
+    occurred_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    actor = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="timeline_events_authored",
+    )
+    payload = models.JSONField(default=dict, blank=True)
+    link_url = models.URLField(max_length=1000, blank=True, default="")
+    external_id = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["occurred_at", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.incident.incident_number}: {self.get_event_type_display()}"
 
 
 class ActionItemStatus(models.TextChoices):

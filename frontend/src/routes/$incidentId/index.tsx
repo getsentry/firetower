@@ -7,6 +7,7 @@ import {GetHelpLink} from 'components/GetHelpLink';
 import {ActionItemsList} from './components/ActionItemsList';
 import {IncidentDetailSkeleton} from './components/IncidentDetailSkeleton';
 import {IncidentSummary} from './components/IncidentSummary';
+import {IncidentTimeline} from './components/IncidentTimeline';
 import {LinksList} from './components/LinksList';
 import {MilestonesCard} from './components/MilestonesCard';
 import {ParticipantsList} from './components/ParticipantsList';
@@ -63,6 +64,7 @@ function Incident() {
 
       <div className="flex flex-col gap-4 md:flex-row">
         <section className="order-2 flex flex-col gap-4 md:order-1 md:flex-[2]">
+          <IncidentTimeline incidentId={incident.id} />
           <ActionItemsList
             incidentId={params.incidentId}
             linearUrl={incident.external_links.linear}

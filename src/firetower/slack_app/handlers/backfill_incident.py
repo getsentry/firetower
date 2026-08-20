@@ -267,7 +267,9 @@ def handle_backfill_submission(ack: Any, body: dict, view: dict, client: Any) ->
         "external_links": {"slack": channel_url},
     }
 
-    serializer = IncidentWriteSerializer(data=data, context={"skip_hooks": True})
+    serializer = IncidentWriteSerializer(
+        data=data, context={"skip_hooks": True, "acting_user": user}
+    )
     if not serializer.is_valid():
         logger.error("Backfill incident validation failed: %s", serializer.errors)
         client.chat_postMessage(
