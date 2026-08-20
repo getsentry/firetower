@@ -11,6 +11,7 @@ from .views import (
     incident_list_ui,
     sync_action_items,
     sync_incident_participants,
+    timeline_event_list,
 )
 
 urlpatterns = [
@@ -26,6 +27,11 @@ urlpatterns = [
         "ui/incidents/<str:incident_id>/action-items/",
         action_item_list,
         name="action-item-list",
+    ),
+    path(
+        "ui/incidents/<str:incident_id>/timeline-events/",
+        timeline_event_list,
+        name="timeline-event-list",
     ),
     # Service API endpoints
     path(

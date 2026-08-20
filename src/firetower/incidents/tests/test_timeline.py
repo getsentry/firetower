@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
 from django.db import IntegrityError
+from rest_framework.test import APIClient
 
 from firetower.incidents.models import (
     ExternalLink,
@@ -16,6 +17,7 @@ from firetower.incidents.models import (
     TimelineEventType,
 )
 from firetower.incidents.serializers import IncidentWriteSerializer
+from firetower.incidents.services import ParticipantsSyncStats
 from firetower.incidents.timeline.events import (
     record_captain_changed,
     record_incident_created,
@@ -24,6 +26,7 @@ from firetower.incidents.timeline.events import (
     record_title_changed,
     record_visibility_changed,
 )
+from firetower.incidents.timeline.render import render_timeline_event
 
 
 @pytest.fixture
@@ -279,3 +282,221 @@ class TestTimelinePersistence:
         incident.title = "Direct update"
         incident.save()
         assert incident.timeline_events.count() == 0
+
+
+class TestTimelineRenderer:
+    @pytest.mark.parametrize(
+        ("event_type", "payload", "expected"),
+        [
+            (TimelineEventType.NOTE, {"text": "A note"}, "A note"),
+            (
+                TimelineEventType.INCIDENT_CREATED,
+                {"severity": "P1"},
+                "Incident created at severity P1",
+            ),
+            (
+                TimelineEventType.STATUS_CHANGED,
+                {"old": "Active", "new": "Mitigated"},
+                "Status changed: Active → Mitigated",
+            ),
+            (
+                TimelineEventType.SEVERITY_CHANGED,
+                {"old": "P2", "new": "P1"},
+                "Severity changed: P2 → P1",
+            ),
+            (
+                TimelineEventType.CAPTAIN_CHANGED,
+                {"old": None, "new": "First User"},
+                "Captain changed: Unassigned → First User",
+            ),
+            (
+                TimelineEventType.TITLE_CHANGED,
+                {"old": "Old", "new": "New"},
+                "Title changed: Old → New",
+            ),
+            (
+                TimelineEventType.VISIBILITY_CHANGED,
+                {"old": False, "new": True},
+                "Visibility changed: Public → Private",
+            ),
+            (
+                TimelineEventType.STATUSPAGE_INCIDENT_CREATED,
+                {"message": "Investigating"},
+                'Statuspage incident posted: "Investigating"',
+            ),
+            (
+                TimelineEventType.STATUSPAGE_UPDATE_POSTED,
+                {"message": "Monitoring"},
+                'Statuspage update: "Monitoring"',
+            ),
+            (
+                TimelineEventType.PAGERDUTY_INCIDENT_TRIGGERED,
+                {"service": "Backend"},
+                "PagerDuty page triggered for Backend",
+            ),
+        ],
+    )
+    def test_renders_every_declared_event_type(self, event_type, payload, expected):
+        event = TimelineEvent(event_type=event_type, payload=payload)
+        assert render_timeline_event(event) == expected
+
+
+@pytest.mark.django_db
+class TestTimelineEventAPI:
+    def setup_method(self):
+        self.client = APIClient()
+        self.reader = User.objects.create_user(
+            username="reader@example.com", email="reader@example.com"
+        )
+        self.captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Timeline",
+            last_name="Captain",
+        )
+        self.captain.userprofile.avatar_url = "https://example.com/avatar.png"
+        self.captain.userprofile.save()
+
+    def _incident(self, **overrides):
+        values = {
+            "title": "Timeline incident",
+            "severity": IncidentSeverity.P1,
+            "captain": self.captain,
+        }
+        values.update(overrides)
+        return Incident.objects.create(**values)
+
+    def _url(self, incident):
+        return f"/api/ui/incidents/{incident.incident_number}/timeline-events/"
+
+    def test_authenticated_api_request_is_creation_actor(self):
+        self.client.force_authenticate(self.reader)
+        response = self.client.post(
+            "/api/incidents/",
+            {
+                "title": "Created through API",
+                "severity": "P1",
+                "captain": self.captain.email,
+                "reporter": self.reader.email,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 201
+        incident = Incident.objects.get(title="Created through API")
+        assert incident.timeline_events.get().actor == self.reader
+
+    def test_returns_chronological_nonpaginated_events_and_nullable_actors(self):
+        incident = self._incident()
+        later = datetime(2026, 8, 20, 16, tzinfo=UTC)
+        earlier = datetime(2026, 8, 20, 15, tzinfo=UTC)
+        record_status_changed(
+            incident,
+            "Active",
+            "Mitigated",
+            actor=self.captain,
+            occurred_at=later,
+        )
+        record_incident_created(
+            incident,
+            severity="P1",
+            occurred_at=earlier,
+        )
+
+        self.client.force_authenticate(self.reader)
+        response = self.client.get(self._url(incident))
+
+        assert response.status_code == 200
+        assert isinstance(response.data, list)
+        assert [item["event_type"] for item in response.data] == [
+            "incident_created",
+            "status_changed",
+        ]
+        assert response.data[0]["actor"] is None
+        assert response.data[1]["actor"] == {
+            "email": "captain@example.com",
+            "name": "Timeline Captain",
+            "avatar_url": "https://example.com/avatar.png",
+        }
+        assert response.data[1]["summary"] == "Status changed: Active → Mitigated"
+        assert response.data[1]["payload"] == {
+            "old": "Active",
+            "new": "Mitigated",
+        }
+        assert response.data[1]["link_url"] == ""
+        assert response.data[1]["external_id"] == ""
+
+    def test_empty_and_read_only(self):
+        incident = self._incident()
+        self.client.force_authenticate(self.reader)
+        assert self.client.get(self._url(incident)).data == []
+        assert self.client.post(self._url(incident), {}).status_code == 405
+
+    def test_nonexistent_incident_returns_404(self, settings):
+        self.client.force_authenticate(self.reader)
+        response = self.client.get(
+            f"/api/ui/incidents/{settings.PROJECT_KEY}-99999/timeline-events/"
+        )
+        assert response.status_code == 404
+
+    @pytest.mark.parametrize("role", ["captain", "reporter", "participant"])
+    def test_authorized_private_roles_can_read(self, role):
+        kwargs = {"is_private": True}
+        if role == "captain":
+            kwargs["captain"] = self.reader
+        elif role == "reporter":
+            kwargs["reporter"] = self.reader
+        incident = self._incident(**kwargs)
+        if role == "participant":
+            incident.participants.add(self.reader)
+        record_incident_created(incident, severity="P1")
+
+        self.client.force_authenticate(self.reader)
+        response = self.client.get(self._url(incident))
+        assert response.status_code == 200
+        assert len(response.data) == 1
+
+    @patch(
+        "firetower.incidents.views.sync_incident_participants_from_slack",
+        return_value=ParticipantsSyncStats(),
+    )
+    def test_unauthorized_private_incident_returns_404_without_data(self, _):
+        incident = self._incident(is_private=True)
+        record_incident_created(incident, severity="P1")
+        self.client.force_authenticate(self.reader)
+        response = self.client.get(self._url(incident))
+        assert response.status_code == 404
+
+    @patch("firetower.incidents.views.sync_incident_participants_from_slack")
+    def test_private_slack_member_fallback_sync(self, sync):
+        incident = self._incident(is_private=True)
+        record_incident_created(incident, severity="P1")
+
+        def add_reader(inc, force=False):
+            assert force is True
+            inc.participants.add(self.reader)
+            return ParticipantsSyncStats(added=1)
+
+        sync.side_effect = add_reader
+        self.client.force_authenticate(self.reader)
+        response = self.client.get(self._url(incident))
+        assert response.status_code == 200
+        assert len(response.data) == 1
+
+    @patch(
+        "firetower.incidents.views.sync_incident_participants_from_slack",
+        return_value=ParticipantsSyncStats(),
+    )
+    def test_current_visibility_exposes_complete_history_after_becoming_public(self, _):
+        incident = self._incident(is_private=True)
+        record_title_changed(incident, "Secret title", "Private-period title")
+
+        self.client.force_authenticate(self.reader)
+        assert self.client.get(self._url(incident)).status_code == 404
+
+        Incident.objects.filter(pk=incident.pk).update(is_private=False)
+        response = self.client.get(self._url(incident))
+        assert response.status_code == 200
+        assert [item["summary"] for item in response.data] == [
+            "Title changed: Secret title → Private-period title"
+        ]

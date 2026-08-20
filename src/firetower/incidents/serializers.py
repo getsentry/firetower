@@ -10,6 +10,7 @@ from django.db.models.functions import Lower
 from django.utils import timezone
 from rest_framework import serializers
 
+from firetower.auth.serializers import UserSerializer
 from firetower.auth.services import get_or_create_user_from_email
 
 from .allocation import (
@@ -31,6 +32,7 @@ from .models import (
     IncidentStatus,
     Tag,
     TagType,
+    TimelineEvent,
 )
 from .timeline.events import (
     record_captain_changed,
@@ -40,6 +42,7 @@ from .timeline.events import (
     record_title_changed,
     record_visibility_changed,
 )
+from .timeline.render import render_timeline_event
 
 
 @dataclass
@@ -242,6 +245,30 @@ class IncidentStatusSerializer(serializers.ModelSerializer):
         model = Incident
         fields = ["id", "status"]
         read_only_fields = ["id", "status"]
+
+
+class TimelineEventSerializer(serializers.ModelSerializer):
+    actor = UserSerializer(read_only=True, allow_null=True)
+    summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimelineEvent
+        fields = [
+            "id",
+            "source",
+            "event_type",
+            "occurred_at",
+            "created_at",
+            "actor",
+            "summary",
+            "payload",
+            "link_url",
+            "external_id",
+        ]
+        read_only_fields = fields
+
+    def get_summary(self, obj: TimelineEvent) -> str:
+        return render_timeline_event(obj)
 
 
 class IncidentReadSerializer(serializers.ModelSerializer):
