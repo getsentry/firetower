@@ -73,12 +73,14 @@ function TimelineRow({event}: {event: TimelineEvent}) {
         <div className="text-content-secondary mt-space-xs gap-space-sm flex flex-wrap items-center text-xs">
           {event.actor ? (
             <span className="gap-space-xs flex items-center">
-              <Avatar
-                name={event.actor.name}
-                src={event.actor.avatar_url}
-                size="sm"
-                className="!h-5 !w-5 !text-[10px]"
-              />
+              <span aria-hidden="true">
+                <Avatar
+                  name={event.actor.name}
+                  src={event.actor.avatar_url}
+                  size="sm"
+                  className="!h-5 !w-5 !text-[10px]"
+                />
+              </span>
               {event.actor.name}
             </span>
           ) : (

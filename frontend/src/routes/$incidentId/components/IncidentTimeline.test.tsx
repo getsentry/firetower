@@ -98,10 +98,10 @@ describe('IncidentTimeline', () => {
     const {container} = renderTimeline();
 
     expect(await screen.findByText('Taylor Osler')).toBeInTheDocument();
-    expect(screen.getByRole('img', {name: 'Taylor Osler'})).toHaveAttribute(
-      'src',
-      'https://example.com/taylor.png'
-    );
+    const avatar = container.querySelector('img[src="https://example.com/taylor.png"]');
+    expect(avatar).toBeInTheDocument();
+    expect(avatar?.parentElement).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByRole('img', {name: 'Taylor Osler'})).not.toBeInTheDocument();
     expect(screen.getByText('Firetower')).toBeInTheDocument();
 
     const firstTime = container.querySelector('time');
