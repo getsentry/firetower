@@ -254,6 +254,7 @@ class TestBackfillSubmission:
         assert incident.severity == IncidentSeverity.P2
         assert incident.captain == self.user
         assert incident.reporter == self.user
+        assert incident.timeline_events.get().actor == self.user
 
         slack_link = ExternalLink.objects.get(
             incident=incident, type=ExternalLinkType.SLACK
