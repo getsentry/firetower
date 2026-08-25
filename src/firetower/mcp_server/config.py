@@ -55,7 +55,7 @@ class MCPConfig:
             google_client_secret=_require("MCP_GOOGLE_CLIENT_SECRET"),
             base_url=_require("MCP_BASE_URL"),
             service_account=_require("FIRETOWER_SERVICE_ACCOUNT"),
-            firetower_url=os.environ.get("FIRETOWER_URL"),
+            firetower_url=(os.environ.get("FIRETOWER_URL") or "").strip() or None,
             jwt_signing_key=os.environ.get("MCP_JWT_SIGNING_KEY"),
             allowed_redirect_uris=allowed_redirect_uris,
             host=os.environ.get("MCP_HOST", "0.0.0.0"),
