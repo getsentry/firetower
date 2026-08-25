@@ -197,7 +197,7 @@ jobs:
             --container firetower-backend --image "${{ env.BACKEND_IMAGE_REF }}"
 
   deploy-mcp-test:
-    needs: [build-mcp, changes, deploy-db-migration-test]
+    needs: [build-mcp, changes]
     if: ${{ inputs.mcp_build_only != true && inputs.environment == 'test' && needs.changes.outputs.mcp == 'true' }}
     runs-on: ubuntu-latest
     steps:
