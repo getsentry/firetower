@@ -17,13 +17,44 @@ def gate_spy(monkeypatch):
     return spy
 
 
-def test_get_incident_calls_sdk(monkeypatch, gate_spy):
+@pytest.mark.parametrize("incident_id", ["INC-2000", "TESTINC-2239"])
+def test_get_incident_calls_sdk(monkeypatch, gate_spy, incident_id):
     client = MagicMock()
-    client.get_incident.return_value = {"id": "INC-2000"}
+    client.get_incident.return_value = {"id": incident_id}
     monkeypatch.setattr(firetower, "get_client", lambda: client)
 
-    assert tools.get_incident("INC-2000") == {"id": "INC-2000"}
-    client.get_incident.assert_called_once_with("INC-2000")
+    assert tools.get_incident(incident_id) == {"id": incident_id}
+    client.get_incident.assert_called_once_with(incident_id)
+
+
+@pytest.mark.parametrize(
+    "incident_id",
+    [
+        "../INC-2000",
+        "INC-2000/details",
+        r"INC-2000\details",
+        "INC-2000?view=full",
+        "INC-2000#timeline",
+        "INC%2D2000",
+        " INC-2000",
+        "INC-2000\n",
+        "inc-2000",
+    ],
+)
+def test_get_incident_rejects_invalid_ids_before_audit_or_sdk(
+    monkeypatch, gate_spy, incident_id
+):
+    audit = MagicMock()
+    get_client = MagicMock()
+    monkeypatch.setattr(tools, "_audit", audit)
+    monkeypatch.setattr(firetower, "get_client", get_client)
+
+    with pytest.raises(ToolError, match=r"^Invalid incident ID\.$"):
+        tools.get_incident(incident_id)
+
+    gate_spy.assert_called_once_with()
+    audit.assert_not_called()
+    get_client.assert_not_called()
 
 
 def test_list_incidents_forwards_filters(monkeypatch, gate_spy):

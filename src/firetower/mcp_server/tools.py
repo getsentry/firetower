@@ -7,6 +7,7 @@ only non-private incidents, so no tool can surface private data.
 """
 
 import logging
+import re
 from typing import Any
 
 from fastmcp import FastMCP
@@ -17,6 +18,9 @@ from firetower.mcp_server import firetower
 from firetower.mcp_server.auth import requester_email, require_sentry_account
 
 logger = logging.getLogger(__name__)
+
+_INCIDENT_ID_PATTERN = re.compile(r"[A-Z][A-Z0-9]*-[0-9]+")
+_INVALID_INCIDENT_ID_MESSAGE = "Invalid incident ID."
 
 
 def _audit(tool: str, **params: Any) -> None:
@@ -105,6 +109,8 @@ def get_incident(incident_id: str) -> dict[str, Any]:
     """Get full detail for a single incident by id (e.g. "INC-2000"), including
     participants, tags, external links, and timeline milestones."""
     require_sentry_account()
+    if _INCIDENT_ID_PATTERN.fullmatch(incident_id) is None:
+        raise ToolError(_INVALID_INCIDENT_ID_MESSAGE)
     _audit("get_incident", incident_id=incident_id)
     try:
         return firetower.get_client().get_incident(incident_id)
