@@ -33,6 +33,10 @@ from firetower.slack_app.handlers.new_incident import (
     handle_severity_action,
     handle_tag_options,
 )
+from firetower.slack_app.handlers.page import (
+    handle_page_command,
+    handle_page_submission,
+)
 from firetower.slack_app.handlers.reopen import handle_reopen_command
 from firetower.slack_app.handlers.resolved import (
     handle_resolved_command,
@@ -83,6 +87,7 @@ KNOWN_SUBCOMMANDS = {
     "ic",
     "status",
     "statuspage",
+    "page",
     "dumpslack",
 }
 
@@ -176,6 +181,8 @@ def handle_command(
                 handle_subject_command(ack, body, command, respond, new_subject=args)
         elif subcommand in ("captain", "ic"):
             handle_captain_command(ack, body, command, respond)
+        elif subcommand == "page":
+            handle_page_command(ack, body, command, respond)
         elif subcommand == "status":
             handle_status_command(ack, body, command, respond)
         elif subcommand == "statuspage":
@@ -270,6 +277,9 @@ def _register_views(app: App) -> None:
     )
     app.view("statuspage_modal")(
         _with_metrics("statuspage_modal")(handle_statuspage_submission)
+    )
+    app.view("page_incident_modal")(
+        _with_metrics("page_incident_modal")(handle_page_submission)
     )
     app.action("severity")(_with_metrics("severity_action")(handle_severity_action))
     app.action("component_impact_select")(
