@@ -109,7 +109,7 @@ def _create_fallback_channel(
         reporter_slack_id=slack_user_id,
         description=description,
     )
-    decorate_incident_channel(ctx, _slack_service)
+    _decoration = decorate_incident_channel(ctx, _slack_service)
 
     # PD paging (after decoration, unlike normal path which pages early)
     try:
