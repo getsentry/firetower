@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import {useSuspenseInfiniteQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
+import {Button} from 'components/Button';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {Spinner} from 'components/Spinner';
@@ -9,6 +10,7 @@ import {arraysEqual} from 'utils/arrays';
 import {z} from 'zod';
 
 import {FilterPanel, FilterTrigger} from './components/AdvancedFilters';
+import {CreateIncidentDialog} from './components/CreateIncidentDialog';
 import {IncidentCard} from './components/IncidentCard';
 import {IncidentListSkeleton} from './components/IncidentListSkeleton';
 import {StatusFilter} from './components/StatusFilter';
@@ -43,15 +45,25 @@ const incidentListSearchSchema = z.object({
 function IncidentsLayout({children}: {children: React.ReactNode}) {
   const {activeCount} = useActiveFilters();
   const [open, setOpen] = useState(activeCount > 0);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   return (
     <div className="gap-space-lg flex flex-col">
       <div className="flex items-center justify-between">
         <StatusFilter />
-        <FilterTrigger open={open} onToggle={() => setOpen(prev => !prev)} />
+        <div className="gap-space-sm flex items-center">
+          <Button variant="primary" size="sm" onClick={() => setShowCreateDialog(true)}>
+            Create Incident
+          </Button>
+          <FilterTrigger open={open} onToggle={() => setOpen(prev => !prev)} />
+        </div>
       </div>
       {open ? <FilterPanel /> : null}
       {children}
+      <CreateIncidentDialog
+        isOpen={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+      />
     </div>
   );
 }
