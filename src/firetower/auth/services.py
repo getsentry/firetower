@@ -230,7 +230,7 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
         return None
 
     try:
-        external_profile = ExternalProfile.objects.get(
+        external_profile = ExternalProfile.objects.select_related("user").get(
             type=ExternalProfileType.SLACK,
             external_id=slack_user_id,
         )
