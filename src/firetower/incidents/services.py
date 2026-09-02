@@ -116,6 +116,7 @@ def sync_incident_participants_from_slack(
             logger.info(f"Skipping bot: {slack_user_id}")
             continue
 
+        user: User | None
         if slack_user_id in slack_id_to_user:
             logger.info(f"Found existing user for Slack ID: {slack_user_id}")
             user = slack_id_to_user[slack_user_id]
