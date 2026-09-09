@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from time import time as _time
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -23,6 +24,7 @@ from firetower.incidents.tasks import (
     datadog_log,
     schedule_demo,
     send_action_item_reminder,
+    send_stale_incident_reminder,
     send_statuspage_followup_reminder,
     send_statuspage_reminder,
 )
@@ -1188,3 +1190,601 @@ class TestSendActionItemReminder:
 
         action_item.refresh_from_db()
         assert action_item.last_nag is not None
+
+
+@pytest.mark.django_db
+class TestSendStaleIncidentReminder:
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "status": IncidentStatus.ACTIVE,
+            "severity": IncidentSeverity.P1,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def _make_link(
+        self, incident, link_type, url="https://sentry.slack.com/archives/C12345"
+    ):
+        return ExternalLink.objects.create(
+            incident=incident,
+            type=link_type,
+            url=url,
+        )
+
+    def _stale_high_sev_ts(self):
+        return _time() - (3 * 60 * 60)  # 3 hours ago (exceeds 2h P0/P1 threshold)
+
+    def _stale_low_sev_ts(self):
+        return _time() - (25 * 60 * 60)  # 25 hours ago (exceeds 24h P2+ threshold)
+
+    def _between_thresholds_ts(self):
+        return _time() - (12 * 60 * 60)  # 12 hours ago (stale for P0/P1 but not P2+)
+
+    def _recent_ts(self):
+        return _time() - (30 * 60)  # 30 minutes ago
+
+    def test_posts_reminder_for_stale_p0_active_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._stale_high_sev_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "no Slack activity" in msg
+        assert "2 hours" in msg
+
+    def test_posts_reminder_for_stale_p1_active_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._stale_high_sev_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "2 hours" in msg
+
+    def test_posts_reminder_for_stale_p2_active_incident(self):
+        incident = self._make_incident(severity=IncidentSeverity.P2)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._stale_low_sev_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "24 hours" in msg
+
+    def test_p2_uses_24h_threshold(self):
+        incident = self._make_incident(severity=IncidentSeverity.P2)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._between_thresholds_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_p3_uses_24h_threshold(self):
+        incident = self._make_incident(severity=IncidentSeverity.P3)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._between_thresholds_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_p0_fires_at_2h_not_24h(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._stale_high_sev_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+
+    def test_skips_incident_with_recent_activity(self):
+        incident = self._make_incident()
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = self._recent_ts()
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_posts_reminder_for_stale_mitigated_incident(self):
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._stale_high_sev_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "has been mitigated" in msg
+        assert "resolved" in msg
+
+    def test_skips_mitigated_with_recent_activity(self):
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = self._recent_ts()
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_active_message_suggests_mitigated_and_resolved(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._stale_high_sev_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "mitigated" in msg
+        assert "resolved" in msg
+
+    def test_mitigated_message_suggests_only_resolved(self):
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._stale_high_sev_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "resolved" in msg
+        assert "mitigated` or" not in msg
+
+    def test_skips_done_incident(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_canceled_incident(self):
+        incident = self._make_incident(status=IncidentStatus.CANCELED)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_postmortem_incident(self):
+        incident = self._make_incident(status=IncidentStatus.POSTMORTEM)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_when_no_slack_link(self):
+        self._make_incident()
+
+        mock_slack = MagicMock()
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_when_channel_id_not_parsed(self):
+        incident = self._make_incident()
+        self._make_link(incident, ExternalLinkType.SLACK, url="https://bad-url")
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = None
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_when_activity_ts_is_none(self):
+        incident = self._make_incident()
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = None
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_skips_when_no_active_or_mitigated_incidents(self):
+        mock_slack = MagicMock()
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_includes_ic_slack_mention(self):
+        captain = User.objects.create_user(
+            username="captain@example.com", email="captain@example.com"
+        )
+        ExternalProfile.objects.create(
+            user=captain, type=ExternalProfileType.SLACK, external_id="U_CAPTAIN"
+        )
+        incident = self._make_incident(captain=captain)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._stale_high_sev_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "\n<@U_CAPTAIN>" in msg
+
+    def test_omits_ic_without_slack_profile(self):
+        captain = User.objects.create_user(
+            username="captain@example.com",
+            email="captain@example.com",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        incident = self._make_incident(captain=captain)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = (
+            self._stale_high_sev_ts()
+        )
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "Jane Doe" not in msg
+
+    def test_processes_mixed_active_and_mitigated_incidents(self):
+        active_stale = self._make_incident(title="Active stale")
+        self._make_link(
+            active_stale,
+            ExternalLinkType.SLACK,
+            url="https://sentry.slack.com/archives/C11111",
+        )
+        mitigated_stale = self._make_incident(
+            title="Mitigated stale", status=IncidentStatus.MITIGATED
+        )
+        self._make_link(
+            mitigated_stale,
+            ExternalLinkType.SLACK,
+            url="https://sentry.slack.com/archives/C22222",
+        )
+        active_recent = self._make_incident(title="Active recent")
+        self._make_link(
+            active_recent,
+            ExternalLinkType.SLACK,
+            url="https://sentry.slack.com/archives/C33333",
+        )
+
+        stale_ts = self._stale_high_sev_ts()
+        recent_ts = self._recent_ts()
+
+        mock_slack = MagicMock()
+
+        def parse_channel(url):
+            for cid in ("C11111", "C22222", "C33333"):
+                if cid in url:
+                    return cid
+            return None
+
+        def get_activity(channel_id):
+            if channel_id in ("C11111", "C22222"):
+                return stale_ts
+            return recent_ts
+
+        mock_slack.parse_channel_id_from_url.side_effect = parse_channel
+        mock_slack.get_latest_channel_activity_ts.side_effect = get_activity
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        assert mock_slack.post_message.call_count == 2
+        posted_channels = {c[0][0] for c in mock_slack.post_message.call_args_list}
+        assert posted_channels == {"C11111", "C22222"}
+
+    def test_respects_custom_high_severity_threshold(self):
+        incident = self._make_incident(severity=IncidentSeverity.P0)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        six_hours_ago = _time() - (6 * 60 * 60)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = six_hours_ago
+
+        custom_slack = {**settings.SLACK, "STALE_THRESHOLD_HIGH_SEVERITY_MINUTES": 480}
+        with (
+            patch(
+                "firetower.incidents.tasks.slack_activity.SlackService",
+                return_value=mock_slack,
+            ),
+            patch.object(settings, "SLACK", custom_slack),
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_respects_custom_low_severity_threshold(self):
+        incident = self._make_incident(severity=IncidentSeverity.P3)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        four_hours_ago = _time() - (4 * 60 * 60)
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = four_hours_ago
+
+        custom_slack = {**settings.SLACK, "STALE_THRESHOLD_LOW_SEVERITY_MINUTES": 180}
+        with (
+            patch(
+                "firetower.incidents.tasks.slack_activity.SlackService",
+                return_value=mock_slack,
+            ),
+            patch.object(settings, "SLACK", custom_slack),
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "3 hours" in msg
+
+    def test_does_not_repeat_reminder_without_new_activity(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        stale_ts = self._stale_high_sev_ts()
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+
+        incident.refresh_from_db()
+        assert incident.last_stale_reminder_sent_at is not None
+
+        mock_slack.reset_mock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_sends_again_after_new_activity(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        stale_ts = self._stale_high_sev_ts()
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+
+        mock_slack.reset_mock()
+        new_stale_ts = _time() - (3 * 60 * 60)
+        incident.refresh_from_db()
+        incident.last_stale_reminder_sent_at = timezone.now() - timedelta(hours=4)
+        incident.save(update_fields=["last_stale_reminder_sent_at"])
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = new_stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+
+    def test_does_not_record_reminder_on_post_failure(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        stale_ts = self._stale_high_sev_ts()
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+        mock_slack.post_message.return_value = None
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+        incident.refresh_from_db()
+        assert incident.last_stale_reminder_sent_at is None
+
+    def test_one_incident_error_does_not_block_others(self):
+        inc_ok = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(inc_ok, ExternalLinkType.SLACK)
+
+        inc_bad = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(inc_bad, ExternalLinkType.SLACK)
+
+        stale_ts = self._stale_high_sev_ts()
+
+        call_count = 0
+
+        def parse_channel(url):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RuntimeError("boom")
+            return "C12345"
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.side_effect = parse_channel
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()

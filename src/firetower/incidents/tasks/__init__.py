@@ -5,6 +5,11 @@ from django_q.tasks import Schedule
 from firetower.incidents.models import Incident
 from firetower.incidents.tasks.action_items import send_action_item_reminder
 from firetower.incidents.tasks.decorators import datadog_log
+from firetower.incidents.tasks.slack_activity import (
+    STALE_ACTIVE_INCIDENT_REMINDER_MESSAGE,
+    STALE_MITIGATED_INCIDENT_REMINDER_MESSAGE,
+    send_stale_incident_reminder,
+)
 from firetower.incidents.tasks.statuspage import (
     STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE,
     STATUSPAGE_REMINDER_MESSAGE,
@@ -14,11 +19,14 @@ from firetower.incidents.tasks.statuspage import (
 
 __all__ = [
     "SCHEDULES",
+    "STALE_ACTIVE_INCIDENT_REMINDER_MESSAGE",
+    "STALE_MITIGATED_INCIDENT_REMINDER_MESSAGE",
     "STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE",
     "STATUSPAGE_REMINDER_MESSAGE",
     "datadog_log",
     "schedule_demo",
     "send_action_item_reminder",
+    "send_stale_incident_reminder",
     "send_statuspage_followup_reminder",
     "send_statuspage_reminder",
 ]
@@ -34,6 +42,12 @@ SCHEDULES = {
     },
     "send_action_item_reminder": {
         "func": "firetower.incidents.tasks.send_action_item_reminder",
+        "schedule_type": Schedule.MINUTES,
+        "minutes": 30,
+        "repeats": -1,
+    },
+    "send_stale_incident_reminder": {
+        "func": "firetower.incidents.tasks.send_stale_incident_reminder",
         "schedule_type": Schedule.MINUTES,
         "minutes": 30,
         "repeats": -1,

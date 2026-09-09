@@ -671,3 +671,181 @@ class TestIsSlackGuest:
         mock_response = MagicMock()
         client.users_info.side_effect = SlackApiError("error", mock_response)
         assert is_slack_guest(client, "U123") is False
+
+
+class TestGetLatestChannelActivityTs:
+    SLACK_CONFIG = {
+        "BOT_TOKEN": "xoxb-test-token",
+        "TEAM_ID": "sentry",
+    }
+
+    def _make_service(self, mock_client):
+        with patch.object(settings, "SLACK", self.SLACK_CONFIG):
+            with patch(
+                "firetower.integrations.services.slack.WebClient",
+                return_value=mock_client,
+            ):
+                return SlackService()
+
+    def test_returns_latest_top_level_human_message(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {"ts": "1000.0", "user": "U1", "type": "message"},
+                {"ts": "900.0", "user": "U2", "type": "message"},
+            ],
+        }
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") == 1000.0
+
+    def test_skips_bot_messages(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {"ts": "1000.0", "bot_id": "B1", "type": "message"},
+                {"ts": "900.0", "user": "U1", "type": "message"},
+            ],
+        }
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") == 900.0
+
+    def test_skips_messages_without_user(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {"ts": "1000.0", "type": "message"},
+                {"ts": "900.0", "user": "U1", "type": "message"},
+            ],
+        }
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") == 900.0
+
+    def test_checks_thread_replies(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {
+                    "ts": "900.0",
+                    "user": "U1",
+                    "type": "message",
+                    "reply_count": 2,
+                },
+            ],
+        }
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "messages": [
+                {"ts": "900.0", "user": "U1", "type": "message"},
+                {"ts": "1100.0", "user": "U2", "type": "message"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") == 1100.0
+
+    def test_thread_reply_newer_than_channel_message(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {"ts": "1000.0", "user": "U1", "type": "message"},
+                {
+                    "ts": "800.0",
+                    "user": "U2",
+                    "type": "message",
+                    "reply_count": 1,
+                },
+            ],
+        }
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "messages": [
+                {"ts": "800.0", "user": "U2", "type": "message"},
+                {"ts": "1200.0", "user": "U3", "type": "message"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") == 1200.0
+
+    def test_returns_none_when_no_human_messages(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {"ts": "1000.0", "bot_id": "B1", "type": "message"},
+            ],
+        }
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") is None
+
+    def test_returns_none_on_empty_channel(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [],
+        }
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") is None
+
+    def test_returns_none_on_api_failure(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.side_effect = Exception("API down")
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") is None
+
+    def test_returns_none_on_not_ok_response(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {"ok": False}
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") is None
+
+    def test_returns_none_without_client(self):
+        with patch.object(settings, "SLACK", {"BOT_TOKEN": None, "TEAM_ID": "t"}):
+            service = SlackService()
+        assert service.get_latest_channel_activity_ts("C123") is None
+
+    def test_ignores_thread_reply_failure(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {
+                    "ts": "900.0",
+                    "user": "U1",
+                    "type": "message",
+                    "reply_count": 1,
+                },
+            ],
+        }
+        mock_client.conversations_replies.side_effect = Exception("thread API down")
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") == 900.0
+
+    def test_checks_replies_on_bot_message_threads(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {
+                    "ts": "900.0",
+                    "bot_id": "B1",
+                    "type": "message",
+                    "reply_count": 1,
+                },
+            ],
+        }
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "messages": [
+                {"ts": "900.0", "bot_id": "B1", "type": "message"},
+                {"ts": "1100.0", "user": "U1", "type": "message"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") == 1100.0

@@ -492,6 +492,97 @@ class SlackService:
                 break
         return messages
 
+    def get_latest_channel_activity_ts(self, channel_id: str) -> float | None:
+        """Return the epoch timestamp of the most recent human message in the
+        channel or any of its threads.
+
+        Only top-level messages and thread replies from real users (non-bot) are
+        considered.  Returns ``None`` when there are no messages or the API call
+        fails.
+        """
+        if not self.client:
+            return None
+
+        try:
+            response = self.client.conversations_history(channel=channel_id, limit=50)
+        except Exception:
+            logger.exception(
+                "Failed to fetch recent history for channel %s", channel_id
+            )
+            return None
+
+        if not response.get("ok"):
+            return None
+
+        messages: list[dict[str, Any]] = response.get("messages") or []
+        latest: float | None = None
+
+        for msg in messages:
+            is_human = not msg.get("bot_id") and msg.get("user")
+
+            if is_human:
+                ts = float(msg["ts"])
+                if latest is None or ts > latest:
+                    latest = ts
+
+            if msg.get("reply_count"):
+                thread_latest = self._get_latest_thread_reply_ts(channel_id, msg["ts"])
+                if thread_latest is not None and (
+                    latest is None or thread_latest > latest
+                ):
+                    latest = thread_latest
+
+        return latest
+
+    def _get_latest_thread_reply_ts(
+        self, channel_id: str, thread_ts: str
+    ) -> float | None:
+        """Return the timestamp of the most recent human reply in a thread.
+
+        Paginates through all reply pages and tracks the latest human reply
+        across every page.
+        """
+        if not self.client:
+            return None
+
+        cursor: str | None = None
+        latest: float | None = None
+
+        try:
+            while True:
+                kwargs: dict[str, Any] = {
+                    "channel": channel_id,
+                    "ts": thread_ts,
+                    "limit": 200,
+                }
+                if cursor:
+                    kwargs["cursor"] = cursor
+
+                response = self.client.conversations_replies(**kwargs)
+
+                if not response.get("ok"):
+                    break
+
+                messages = response.get("messages") or []
+                for msg in messages:
+                    if msg["ts"] == thread_ts:
+                        continue
+                    if msg.get("bot_id") or not msg.get("user"):
+                        continue
+                    ts = float(msg["ts"])
+                    if latest is None or ts > latest:
+                        latest = ts
+
+                metadata = response.get("response_metadata") or {}
+                next_cursor = metadata.get("next_cursor") or ""
+                if not next_cursor:
+                    break
+                cursor = next_cursor
+        except Exception:
+            logger.exception("Failed to fetch latest reply for thread %s", thread_ts)
+
+        return latest
+
     def get_thread_replies(
         self, channel_id: str, thread_ts: str
     ) -> list[dict[str, Any]]:
