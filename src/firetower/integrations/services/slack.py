@@ -526,9 +526,7 @@ class SlackService:
                     latest = ts
 
             if msg.get("reply_count"):
-                thread_latest = self._get_latest_thread_reply_ts(
-                    channel_id, msg["ts"]
-                )
+                thread_latest = self._get_latest_thread_reply_ts(channel_id, msg["ts"])
                 if thread_latest is not None and (
                     latest is None or thread_latest > latest
                 ):
