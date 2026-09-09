@@ -72,6 +72,10 @@ class SlackConfig:
     incident_guide_message: str = ""
     slash_command: str = "/inc"
     triage_bot_user_id: str = ""
+    triage_bot_prompt: str = (
+        "We've been alerted by {alert_url}, "
+        "using Sentry, Datadog, and GoCD help triage this incident."
+    )
 
 
 @deserialize

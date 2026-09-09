@@ -952,12 +952,13 @@ def decorate_incident_channel(
             logger.exception(f"Failed to post description in {ctx.channel_name}")
 
     triage_bot_user_id = settings.SLACK.get("TRIAGE_BOT_USER_ID", "")
-    if ctx.alert_url and triage_bot_user_id:
+    triage_bot_prompt = settings.SLACK.get("TRIAGE_BOT_PROMPT", "")
+    if ctx.alert_url and triage_bot_user_id and triage_bot_prompt:
         try:
+            prompt = triage_bot_prompt.format(alert_url=ctx.alert_url)
             slack_service.post_message(
                 ctx.channel_id,
-                f"<@{triage_bot_user_id}> We've been alerted by {ctx.alert_url}, "
-                "using Sentry, Datadog, and GoCD help triage this incident.",
+                f"<@{triage_bot_user_id}> {prompt}",
             )
         except Exception:
             logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
