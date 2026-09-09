@@ -575,6 +575,9 @@ class TestOnVisibilityChanged:
             type=ExternalLinkType.SLACK,
             url="https://slack.com/archives/C12345",
         )
+        mock_slack.get_channel_info.return_value = {
+            "name": build_channel_name(incident)
+        }
 
         on_visibility_changed(incident)
 
@@ -599,6 +602,9 @@ class TestOnVisibilityChanged:
             type=ExternalLinkType.SLACK,
             url="https://slack.com/archives/C12345",
         )
+        mock_slack.get_channel_info.return_value = {
+            "name": build_channel_name(incident)
+        }
 
         on_visibility_changed(incident)
 
@@ -623,6 +629,9 @@ class TestOnVisibilityChanged:
             type=ExternalLinkType.SLACK,
             url="https://slack.com/archives/C12345",
         )
+        mock_slack.get_channel_info.return_value = {
+            "name": build_channel_name(incident)
+        }
 
         on_visibility_changed(incident)
 
@@ -631,6 +640,33 @@ class TestOnVisibilityChanged:
         msg = mock_slack.post_message.call_args[0][1]
         assert "public" in msg
         assert "Slack admin" not in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_conversion_when_channel_name_does_not_match_incident(
+        self, mock_slack
+    ):
+        """A spoofed/edited external link must not let a caller trigger the
+        admin conversion API against an arbitrary channel."""
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+        mock_slack.get_channel_info.return_value = {"name": "some-other-channel"}
+
+        on_visibility_changed(incident)
+
+        mock_slack.convert_channel_privacy.assert_not_called()
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "Slack admin" in msg
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
