@@ -1602,11 +1602,21 @@ def on_visibility_changed(incident: Incident) -> None:
         if channel_id:
             visibility = "private" if incident.is_private else "public"
             incident_url = _build_incident_url(incident)
-            message = (
-                f"This incident has been marked as *{visibility}* in Firetower. "
-                f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
-                f"<{incident_url}|View in Firetower>"
+            converted = _slack_service.convert_channel_privacy(
+                channel_id, incident.is_private
             )
+            if converted:
+                message = (
+                    f"This incident has been marked as *{visibility}* in Firetower, "
+                    f"and this channel has been converted to {visibility}.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
+            else:
+                message = (
+                    f"This incident has been marked as *{visibility}* in Firetower. "
+                    f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
             _slack_service.post_message(channel_id, message)
     except Exception:
         logger.exception(f"Error in on_visibility_changed for incident {incident.id}")
@@ -1727,11 +1737,21 @@ def on_incident_updated(
         try:
             visibility = "private" if incident.is_private else "public"
             incident_url = _build_incident_url(incident)
-            vis_message = (
-                f"This incident has been marked as *{visibility}* in Firetower. "
-                f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
-                f"<{incident_url}|View in Firetower>"
+            converted = _slack_service.convert_channel_privacy(
+                channel_id, incident.is_private
             )
+            if converted:
+                vis_message = (
+                    f"This incident has been marked as *{visibility}* in Firetower, "
+                    f"and this channel has been converted to {visibility}.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
+            else:
+                vis_message = (
+                    f"This incident has been marked as *{visibility}* in Firetower. "
+                    f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
             _slack_service.post_message(channel_id, vis_message)
         except Exception:
             logger.exception(

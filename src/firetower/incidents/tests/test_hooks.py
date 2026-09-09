@@ -561,8 +561,9 @@ class TestOnTitleChanged:
 @pytest.mark.django_db
 class TestOnVisibilityChanged:
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_private_message(self, mock_slack):
+    def test_posts_private_message_when_conversion_fails(self, mock_slack):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.convert_channel_privacy.return_value = False
 
         incident = Incident.objects.create(
             title="Test",
@@ -577,13 +578,16 @@ class TestOnVisibilityChanged:
 
         on_visibility_changed(incident)
 
+        mock_slack.convert_channel_privacy.assert_called_once_with("C12345", True)
         mock_slack.post_message.assert_called_once()
         msg = mock_slack.post_message.call_args[0][1]
         assert "private" in msg
+        assert "Slack admin" in msg
 
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_public_message(self, mock_slack):
+    def test_posts_public_message_when_conversion_fails(self, mock_slack):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.convert_channel_privacy.return_value = False
 
         incident = Incident.objects.create(
             title="Test",
@@ -598,9 +602,35 @@ class TestOnVisibilityChanged:
 
         on_visibility_changed(incident)
 
+        mock_slack.convert_channel_privacy.assert_called_once_with("C12345", False)
         mock_slack.post_message.assert_called_once()
         msg = mock_slack.post_message.call_args[0][1]
         assert "public" in msg
+        assert "Slack admin" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_confirmation_message_when_conversion_succeeds(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.convert_channel_privacy.return_value = True
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_visibility_changed(incident)
+
+        mock_slack.convert_channel_privacy.assert_called_once_with("C12345", False)
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "public" in msg
+        assert "Slack admin" not in msg
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -611,6 +641,7 @@ class TestOnVisibilityChanged:
 
         on_visibility_changed(incident)
 
+        mock_slack.convert_channel_privacy.assert_not_called()
         mock_slack.post_message.assert_not_called()
 
 
