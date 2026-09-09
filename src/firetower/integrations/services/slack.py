@@ -561,7 +561,7 @@ class SlackService:
                 response = self.client.conversations_replies(**kwargs)
 
                 if not response.get("ok"):
-                    return None
+                    break
 
                 messages = response.get("messages") or []
                 for msg in messages:
@@ -580,7 +580,6 @@ class SlackService:
                 cursor = next_cursor
         except Exception:
             logger.exception("Failed to fetch latest reply for thread %s", thread_ts)
-            return None
 
         return latest
 
