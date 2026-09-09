@@ -214,6 +214,33 @@ class SlackService:
                 )
             return False
 
+    def convert_channel_privacy(self, channel_id: str, is_private: bool) -> bool:
+        if not self.client:
+            logger.warning(
+                "Cannot convert channel privacy - Slack client not initialized"
+            )
+            return False
+
+        method = (
+            self.client.admin_conversations_convertToPrivate
+            if is_private
+            else self.client.admin_conversations_convertToPublic
+        )
+
+        try:
+            logger.info(
+                f"Converting channel {channel_id} to "
+                f"{'private' if is_private else 'public'}"
+            )
+            method(channel_id=channel_id)
+            return True
+        except SlackApiError as e:
+            logger.info(
+                f"Could not convert channel privacy via admin API: {e}",
+                extra={"channel_id": channel_id, "is_private": is_private},
+            )
+            return False
+
     def set_channel_topic(self, channel_id: str, topic: str) -> bool:
         if not self.client:
             logger.warning("Cannot set topic - Slack client not initialized")

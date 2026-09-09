@@ -1596,17 +1596,40 @@ def on_title_changed(incident: Incident) -> None:
     _sync_linear_title(incident)
 
 
+def _is_incidents_own_channel(incident: Incident, channel_id: str) -> bool:
+    """Verify channel_id actually names this incident's own channel before
+    allowing an admin-privileged action on it. Incident external links are
+    caller-editable, so this guards against a spoofed link pointing an admin
+    API call at an arbitrary workspace channel."""
+    channel_info = _slack_service.get_channel_info(channel_id)
+    if not channel_info:
+        return False
+    return channel_info.get("name") == build_channel_name(incident)
+
+
 def on_visibility_changed(incident: Incident) -> None:
     try:
         channel_id = _get_channel_id(incident)
         if channel_id:
             visibility = "private" if incident.is_private else "public"
             incident_url = _build_incident_url(incident)
-            message = (
-                f"This incident has been marked as *{visibility}* in Firetower. "
-                f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
-                f"<{incident_url}|View in Firetower>"
+            converted = _is_incidents_own_channel(
+                incident, channel_id
+            ) and _slack_service.convert_channel_privacy(
+                channel_id, incident.is_private
             )
+            if converted:
+                message = (
+                    f"This incident has been marked as *{visibility}* in Firetower, "
+                    f"and this channel has been converted to {visibility}.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
+            else:
+                message = (
+                    f"This incident has been marked as *{visibility}* in Firetower. "
+                    f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
             _slack_service.post_message(channel_id, message)
     except Exception:
         logger.exception(f"Error in on_visibility_changed for incident {incident.id}")
@@ -1727,11 +1750,23 @@ def on_incident_updated(
         try:
             visibility = "private" if incident.is_private else "public"
             incident_url = _build_incident_url(incident)
-            vis_message = (
-                f"This incident has been marked as *{visibility}* in Firetower. "
-                f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
-                f"<{incident_url}|View in Firetower>"
+            converted = _is_incidents_own_channel(
+                incident, channel_id
+            ) and _slack_service.convert_channel_privacy(
+                channel_id, incident.is_private
             )
+            if converted:
+                vis_message = (
+                    f"This incident has been marked as *{visibility}* in Firetower, "
+                    f"and this channel has been converted to {visibility}.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
+            else:
+                vis_message = (
+                    f"This incident has been marked as *{visibility}* in Firetower. "
+                    f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
             _slack_service.post_message(channel_id, vis_message)
         except Exception:
             logger.exception(
