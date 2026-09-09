@@ -107,6 +107,7 @@ class ChannelSetupContext:
     incident_url: str | None = None
     incident_number: str | None = None
     topic: str | None = None
+    alert_url: str | None = None
 
 
 def page_for_channel(
@@ -950,6 +951,17 @@ def decorate_incident_channel(
         except Exception:
             logger.exception(f"Failed to post description in {ctx.channel_name}")
 
+    triage_bot_user_id = settings.SLACK.get("TRIAGE_BOT_USER_ID", "")
+    if ctx.alert_url and triage_bot_user_id:
+        try:
+            slack_service.post_message(
+                ctx.channel_id,
+                f"<@{triage_bot_user_id}> We've been alerted by {ctx.alert_url}, "
+                "using Sentry, Datadog, and GoCD help triage this incident.",
+            )
+        except Exception:
+            logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
+
     ids_to_invite: list[str] = []
     if ctx.captain_slack_id:
         ids_to_invite.append(ctx.captain_slack_id)
@@ -1361,7 +1373,9 @@ def schedule_statuspage_followup_reminder(
     )
 
 
-def on_incident_created(incident: Incident, *, skip_paging: bool = False) -> None:
+def on_incident_created(
+    incident: Incident, *, skip_paging: bool = False, alert_url: str = ""
+) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
     # will get created=True; the other bails out without creating a second channel.
@@ -1452,6 +1466,7 @@ def on_incident_created(incident: Incident, *, skip_paging: bool = False) -> Non
             incident_url=incident_url,
             incident_number=incident.incident_number,
             topic=build_channel_topic(incident, captain_slack_id),
+            alert_url=alert_url,
         )
         status_channel_id = decorate_incident_channel(
             ctx,

@@ -356,6 +356,70 @@ class TestOnIncidentCreated:
         assert "Something is broken" in desc_calls[0][0][1]
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_triage_bot_message_when_alert_url_provided(
+        self, mock_slack, settings
+    ):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/12345")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 1
+        assert "https://sentry.io/issues/12345" in triage_calls[0][0][1]
+        assert "help triage this incident" in triage_calls[0][0][1]
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_triage_bot_message_without_alert_url(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 0
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_triage_bot_message_without_bot_user_id(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = ""
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/12345")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "triage" in c[0][1].lower()
+        ]
+        assert len(triage_calls) == 0
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_posts_ic_in_channel_message(self, mock_slack):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"

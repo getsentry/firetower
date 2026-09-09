@@ -172,6 +172,20 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
             },
             "label": {"type": "plain_text", "text": "Description"},
         },
+        {
+            "type": "input",
+            "block_id": "alert_url_block",
+            "optional": True,
+            "element": {
+                "type": "url_text_input",
+                "action_id": "alert_url",
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "https://sentry.io/issues/...",
+                },
+            },
+            "label": {"type": "plain_text", "text": "Alert URL"},
+        },
     ]
 
 
@@ -239,6 +253,10 @@ def parse_incident_form_values(view: dict, resolve_tags: bool = True) -> dict[st
         values.get("captain_block", {}).get("captain_select", {}).get("selected_user")
     )
 
+    alert_url = (
+        values.get("alert_url_block", {}).get("alert_url", {}).get("value") or ""
+    ).strip()
+
     return {
         "title": title,
         "severity": severity,
@@ -249,6 +267,7 @@ def parse_incident_form_values(view: dict, resolve_tags: bool = True) -> dict[st
         "affected_service_tags": affected_service_tags,
         "affected_region_tags": affected_region_tags,
         "captain_slack_id": captain_slack_id,
+        "alert_url": alert_url,
     }
 
 
