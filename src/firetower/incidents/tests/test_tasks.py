@@ -1723,7 +1723,10 @@ class TestSendStaleIncidentReminder:
         mock_slack.post_message.assert_called_once()
 
         mock_slack.reset_mock()
-        new_stale_ts = _time() - (3 * 60 * 60) + 60
+        new_stale_ts = _time() - (3 * 60 * 60)
+        incident.refresh_from_db()
+        incident.last_stale_reminder_sent_at = timezone.now() - timedelta(hours=4)
+        incident.save(update_fields=["last_stale_reminder_sent_at"])
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
         mock_slack.get_latest_channel_activity_ts.return_value = new_stale_ts
 

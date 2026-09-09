@@ -526,7 +526,9 @@ class SlackService:
                     latest = ts
 
             if msg.get("reply_count"):
-                thread_latest = self._get_latest_thread_reply_ts(channel_id, msg["ts"])
+                thread_latest = self._get_latest_thread_reply_ts(
+                    channel_id, msg["ts"]
+                )
                 if thread_latest is not None and (
                     latest is None or thread_latest > latest
                 ):
@@ -539,14 +541,14 @@ class SlackService:
     ) -> float | None:
         """Return the timestamp of the most recent human reply in a thread.
 
-        Paginates to the last page of replies so the result is correct even for
-        very long threads.
+        Paginates through all reply pages and tracks the latest human reply
+        across every page.
         """
         if not self.client:
             return None
 
         cursor: str | None = None
-        last_messages: list[dict[str, Any]] = []
+        latest: float | None = None
 
         try:
             while True:
@@ -563,10 +565,18 @@ class SlackService:
                 if not response.get("ok"):
                     return None
 
-                last_messages = response.get("messages") or []
-                next_cursor = (
-                    response.get("response_metadata", {}).get("next_cursor") or ""
-                )
+                messages = response.get("messages") or []
+                for msg in messages:
+                    if msg["ts"] == thread_ts:
+                        continue
+                    if msg.get("bot_id") or not msg.get("user"):
+                        continue
+                    ts = float(msg["ts"])
+                    if latest is None or ts > latest:
+                        latest = ts
+
+                metadata = response.get("response_metadata") or {}
+                next_cursor = metadata.get("next_cursor") or ""
                 if not next_cursor:
                     break
                 cursor = next_cursor
@@ -574,13 +584,7 @@ class SlackService:
             logger.exception("Failed to fetch latest reply for thread %s", thread_ts)
             return None
 
-        for msg in reversed(last_messages):
-            if msg["ts"] == thread_ts:
-                continue
-            if msg.get("bot_id") or not msg.get("user"):
-                continue
-            return float(msg["ts"])
-        return None
+        return latest
 
     def get_thread_replies(
         self, channel_id: str, thread_ts: str
