@@ -518,11 +518,12 @@ class SlackService:
         latest: float | None = None
 
         for msg in messages:
-            if msg.get("bot_id") or not msg.get("user"):
-                continue
-            ts = float(msg["ts"])
-            if latest is None or ts > latest:
-                latest = ts
+            is_human = not msg.get("bot_id") and msg.get("user")
+
+            if is_human:
+                ts = float(msg["ts"])
+                if latest is None or ts > latest:
+                    latest = ts
 
             if msg.get("reply_count"):
                 thread_latest = self._get_latest_thread_reply_ts(channel_id, msg["ts"])
@@ -536,22 +537,44 @@ class SlackService:
     def _get_latest_thread_reply_ts(
         self, channel_id: str, thread_ts: str
     ) -> float | None:
-        """Return the timestamp of the most recent human reply in a thread."""
+        """Return the timestamp of the most recent human reply in a thread.
+
+        Paginates to the last page of replies so the result is correct even for
+        very long threads.
+        """
         if not self.client:
             return None
+
+        cursor: str | None = None
+        last_messages: list[dict[str, Any]] = []
+
         try:
-            response = self.client.conversations_replies(
-                channel=channel_id, ts=thread_ts, limit=1, latest="", inclusive=False
-            )
+            while True:
+                kwargs: dict[str, Any] = {
+                    "channel": channel_id,
+                    "ts": thread_ts,
+                    "limit": 200,
+                }
+                if cursor:
+                    kwargs["cursor"] = cursor
+
+                response = self.client.conversations_replies(**kwargs)
+
+                if not response.get("ok"):
+                    return None
+
+                last_messages = response.get("messages") or []
+                next_cursor = (
+                    response.get("response_metadata", {}).get("next_cursor") or ""
+                )
+                if not next_cursor:
+                    break
+                cursor = next_cursor
         except Exception:
             logger.exception("Failed to fetch latest reply for thread %s", thread_ts)
             return None
 
-        if not response.get("ok"):
-            return None
-
-        raw: list[dict[str, Any]] = response.get("messages") or []
-        for msg in reversed(raw):
+        for msg in reversed(last_messages):
             if msg["ts"] == thread_ts:
                 continue
             if msg.get("bot_id") or not msg.get("user"):

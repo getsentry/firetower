@@ -2,6 +2,7 @@ import logging
 import time
 
 from django.conf import settings
+from django.utils import timezone
 
 from firetower.incidents.hooks import HIGH_SEVERITIES
 from firetower.incidents.models import (
@@ -87,13 +88,18 @@ def send_stale_incident_reminder() -> None:
         if (now - latest_ts) < threshold_seconds:
             continue
 
+        if incident.last_stale_reminder_sent_at is not None:
+            last_sent = incident.last_stale_reminder_sent_at.timestamp()
+            if last_sent > latest_ts:
+                continue
+
         if incident.status == IncidentStatus.MITIGATED:
             template = STALE_MITIGATED_INCIDENT_REMINDER_MESSAGE
         else:
             template = STALE_ACTIVE_INCIDENT_REMINDER_MESSAGE
 
         stale_duration = _format_duration(threshold_minutes)
-        logger.debug(
+        logger.info(
             "Sending stale incident reminder for %s (%s, %s)",
             incident.incident_number,
             incident.status,
@@ -105,3 +111,5 @@ def send_stale_incident_reminder() -> None:
             ic_mention=_build_ic_mention(incident),
         )
         slack.post_message(channel_id, message)
+        incident.last_stale_reminder_sent_at = timezone.now()
+        incident.save(update_fields=["last_stale_reminder_sent_at"])

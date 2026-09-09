@@ -742,6 +742,7 @@ class TestGetLatestChannelActivityTs:
                 {"ts": "900.0", "user": "U1", "type": "message"},
                 {"ts": "1100.0", "user": "U2", "type": "message"},
             ],
+            "response_metadata": {"next_cursor": ""},
         }
         service = self._make_service(mock_client)
         assert service.get_latest_channel_activity_ts("C123") == 1100.0
@@ -766,6 +767,7 @@ class TestGetLatestChannelActivityTs:
                 {"ts": "800.0", "user": "U2", "type": "message"},
                 {"ts": "1200.0", "user": "U3", "type": "message"},
             ],
+            "response_metadata": {"next_cursor": ""},
         }
         service = self._make_service(mock_client)
         assert service.get_latest_channel_activity_ts("C123") == 1200.0
@@ -823,3 +825,27 @@ class TestGetLatestChannelActivityTs:
         mock_client.conversations_replies.side_effect = Exception("thread API down")
         service = self._make_service(mock_client)
         assert service.get_latest_channel_activity_ts("C123") == 900.0
+
+    def test_checks_replies_on_bot_message_threads(self):
+        mock_client = MagicMock()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "messages": [
+                {
+                    "ts": "900.0",
+                    "bot_id": "B1",
+                    "type": "message",
+                    "reply_count": 1,
+                },
+            ],
+        }
+        mock_client.conversations_replies.return_value = {
+            "ok": True,
+            "messages": [
+                {"ts": "900.0", "bot_id": "B1", "type": "message"},
+                {"ts": "1100.0", "user": "U1", "type": "message"},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        }
+        service = self._make_service(mock_client)
+        assert service.get_latest_channel_activity_ts("C123") == 1100.0

@@ -188,6 +188,7 @@ class Incident(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     participants_last_synced_at = models.DateTimeField(null=True, blank=True)
     action_items_last_synced_at = models.DateTimeField(null=True, blank=True)
+    last_stale_reminder_sent_at = models.DateTimeField(null=True, blank=True)
     linear_parent_issue_id = models.CharField(max_length=255, null=True, blank=True)
 
     # Milestone timestamps (for postmortem)

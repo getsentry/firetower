@@ -1,4 +1,4 @@
-from django.db import migrations
+from django.db import migrations, models
 
 from firetower.incidents.tasks import SCHEDULES
 
@@ -25,4 +25,9 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(create_schedule, delete_schedule),
+        migrations.AddField(
+            model_name="incident",
+            name="last_stale_reminder_sent_at",
+            field=models.DateTimeField(blank=True, null=True),
+        ),
     ]

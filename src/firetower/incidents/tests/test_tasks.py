@@ -1670,3 +1670,67 @@ class TestSendStaleIncidentReminder:
         mock_slack.post_message.assert_called_once()
         msg = mock_slack.post_message.call_args[0][1]
         assert "3 hours" in msg
+
+    def test_does_not_repeat_reminder_without_new_activity(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        stale_ts = self._stale_high_sev_ts()
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+
+        incident.refresh_from_db()
+        assert incident.last_stale_reminder_sent_at is not None
+
+        mock_slack.reset_mock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_not_called()
+
+    def test_sends_again_after_new_activity(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        stale_ts = self._stale_high_sev_ts()
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+
+        mock_slack.reset_mock()
+        new_stale_ts = _time() - (3 * 60 * 60) + 60
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = new_stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
