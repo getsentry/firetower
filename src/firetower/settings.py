@@ -257,6 +257,8 @@ class SlackSettings(TypedDict):
     ALWAYS_INVITED_IDS: list[str]
     INCIDENT_GUIDE_MESSAGE: str
     SLASH_COMMAND: str
+    STALE_THRESHOLD_HIGH_SEVERITY_MINUTES: int
+    STALE_THRESHOLD_LOW_SEVERITY_MINUTES: int
 
 
 SLACK: SlackSettings = {
@@ -267,6 +269,8 @@ SLACK: SlackSettings = {
     "ALWAYS_INVITED_IDS": config.slack.always_invited_ids,
     "INCIDENT_GUIDE_MESSAGE": config.slack.incident_guide_message,
     "SLASH_COMMAND": config.slack.slash_command,
+    "STALE_THRESHOLD_HIGH_SEVERITY_MINUTES": config.slack.reminder_stale_state_threshold_high_severity_minutes,
+    "STALE_THRESHOLD_LOW_SEVERITY_MINUTES": config.slack.reminder_stale_state_threshold_low_severity_minutes,
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
