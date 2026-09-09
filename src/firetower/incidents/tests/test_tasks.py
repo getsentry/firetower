@@ -1737,3 +1737,54 @@ class TestSendStaleIncidentReminder:
             send_stale_incident_reminder()
 
         mock_slack.post_message.assert_called_once()
+
+    def test_does_not_record_reminder_on_post_failure(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(incident, ExternalLinkType.SLACK)
+
+        stale_ts = self._stale_high_sev_ts()
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+        mock_slack.post_message.return_value = None
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()
+        incident.refresh_from_db()
+        assert incident.last_stale_reminder_sent_at is None
+
+    def test_one_incident_error_does_not_block_others(self):
+        inc_ok = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(inc_ok, ExternalLinkType.SLACK)
+
+        inc_bad = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(inc_bad, ExternalLinkType.SLACK)
+
+        stale_ts = self._stale_high_sev_ts()
+
+        call_count = 0
+
+        def parse_channel(url):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RuntimeError("boom")
+            return "C12345"
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.side_effect = parse_channel
+        mock_slack.get_latest_channel_activity_ts.return_value = stale_ts
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.post_message.assert_called_once()

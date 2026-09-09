@@ -61,7 +61,9 @@ def _format_duration(minutes: int) -> str:
 
 @datadog_log
 def send_stale_incident_reminder() -> None:
-    incidents = Incident.objects.filter(status__in=STALE_STATUSES)
+    incidents = Incident.objects.filter(status__in=STALE_STATUSES).prefetch_related(
+        "external_links"
+    )
     if not incidents.exists():
         return
 
@@ -70,46 +72,69 @@ def send_stale_incident_reminder() -> None:
     now = time.time()
 
     for incident in incidents:
-        slack_link = incident.external_links.filter(type=ExternalLinkType.SLACK).first()
-        if not slack_link:
-            continue
+        try:
+            _process_stale_incident(incident, slack, slash_command, now)
+        except Exception:
+            logger.exception(
+                "Failed to process stale reminder for %s",
+                incident.incident_number,
+            )
 
-        channel_id = slack.parse_channel_id_from_url(slack_link.url)
-        if not channel_id:
-            continue
 
-        latest_ts = slack.get_latest_channel_activity_ts(channel_id)
-        if latest_ts is None:
-            # No human messages found in channel (empty or all bot messages)
-            continue
+def _process_stale_incident(
+    incident: Incident,
+    slack: SlackService,
+    slash_command: str,
+    now: float,
+) -> None:
+    slack_link = next(
+        (
+            link
+            for link in incident.external_links.all()
+            if link.type == ExternalLinkType.SLACK
+        ),
+        None,
+    )
+    if not slack_link:
+        return
 
-        threshold_minutes = _get_stale_threshold_minutes(incident)
-        threshold_seconds = threshold_minutes * 60
-        if (now - latest_ts) < threshold_seconds:
-            continue
+    channel_id = slack.parse_channel_id_from_url(slack_link.url)
+    if not channel_id:
+        return
 
-        if incident.last_stale_reminder_sent_at is not None:
-            last_sent = incident.last_stale_reminder_sent_at.timestamp()
-            if last_sent > latest_ts:
-                continue
+    threshold_minutes = _get_stale_threshold_minutes(incident)
+    threshold_seconds = threshold_minutes * 60
 
-        if incident.status == IncidentStatus.MITIGATED:
-            template = STALE_MITIGATED_INCIDENT_REMINDER_MESSAGE
-        else:
-            template = STALE_ACTIVE_INCIDENT_REMINDER_MESSAGE
+    latest_ts = slack.get_latest_channel_activity_ts(channel_id)
+    if latest_ts is None:
+        return
 
-        stale_duration = _format_duration(threshold_minutes)
-        logger.info(
-            "Sending stale incident reminder for %s (%s, %s)",
-            incident.incident_number,
-            incident.status,
-            incident.severity,
-        )
-        message = template.format(
-            slash_command=slash_command,
-            stale_duration=stale_duration,
-            ic_mention=_build_ic_mention(incident),
-        )
-        slack.post_message(channel_id, message)
+    if (now - latest_ts) < threshold_seconds:
+        return
+
+    if incident.last_stale_reminder_sent_at is not None:
+        last_sent = incident.last_stale_reminder_sent_at.timestamp()
+        if last_sent > latest_ts:
+            return
+
+    if incident.status == IncidentStatus.MITIGATED:
+        template = STALE_MITIGATED_INCIDENT_REMINDER_MESSAGE
+    else:
+        template = STALE_ACTIVE_INCIDENT_REMINDER_MESSAGE
+
+    stale_duration = _format_duration(threshold_minutes)
+    logger.info(
+        "Sending stale incident reminder for %s (%s, %s)",
+        incident.incident_number,
+        incident.status,
+        incident.severity,
+    )
+    message = template.format(
+        slash_command=slash_command,
+        stale_duration=stale_duration,
+        ic_mention=_build_ic_mention(incident),
+    )
+    result = slack.post_message(channel_id, message)
+    if result is not None:
         incident.last_stale_reminder_sent_at = timezone.now()
         incident.save(update_fields=["last_stale_reminder_sent_at"])
