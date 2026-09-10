@@ -488,8 +488,11 @@ class TestOnIncidentCreated:
         on_incident_created(incident, alert_url="https://sentry.io/issues/1")
 
         invite_calls = mock_slack.invite_to_channel.call_args_list
-        invited_ids = invite_calls[0][0][1] if invite_calls else []
-        assert "U_TRIAGE_BOT" in invited_ids
+        all_invited = [uid for call in invite_calls for uid in call[0][1]]
+        assert "U_TRIAGE_BOT" in all_invited
+        bot_call = [c for c in invite_calls if "U_TRIAGE_BOT" in c[0][1]]
+        assert len(bot_call) == 1
+        assert bot_call[0][0][1] == ["U_TRIAGE_BOT"]
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_triage_bot_prompt_with_unknown_placeholder(self, mock_slack, settings):
