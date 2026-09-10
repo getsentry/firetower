@@ -978,11 +978,12 @@ def decorate_incident_channel(
             logger.exception(f"Failed to invite users to {ctx.channel_name}")
 
     if should_ping_triage_bot:
-        if triage_bot_user_id not in ids_to_invite:
-            try:
-                slack_service.invite_to_channel(ctx.channel_id, [triage_bot_user_id])
-            except Exception:
-                logger.exception(f"Failed to invite triage bot to {ctx.channel_name}")
+        # Always invite the triage bot, if it's in ids_to_invite this is a no op
+        try:
+            slack_service.invite_to_channel(ctx.channel_id, [triage_bot_user_id])
+        except Exception:
+            logger.exception(f"Failed to invite triage bot to {ctx.channel_name}")
+
         try:
             prompt = triage_bot_prompt.format_map(
                 defaultdict(str, alert_url=ctx.alert_url)
