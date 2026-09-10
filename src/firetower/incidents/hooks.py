@@ -955,7 +955,10 @@ def decorate_incident_channel(
     triage_bot_user_id = settings.SLACK.get("TRIAGE_BOT_USER_ID", "")
     triage_bot_prompt = settings.SLACK.get("TRIAGE_BOT_PROMPT", "")
     should_ping_triage_bot = bool(
-        ctx.alert_url and triage_bot_user_id and triage_bot_prompt
+        not ctx.is_private
+        and ctx.alert_url
+        and triage_bot_user_id
+        and triage_bot_prompt
     )
 
     ids_to_invite: list[str] = []

@@ -516,6 +516,32 @@ class TestOnIncidentCreated:
         assert "{unknown}" not in msg
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_no_triage_bot_message_for_private_incident(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = "Alert: {alert_url}"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Private Incident",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/1")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 0
+
+        invite_calls = mock_slack.invite_to_channel.call_args_list
+        for call in invite_calls:
+            assert "U_TRIAGE_BOT" not in call[0][1]
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_posts_ic_in_channel_message(self, mock_slack):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
