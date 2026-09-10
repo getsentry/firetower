@@ -63,7 +63,7 @@ always_invited_ids = []
 incident_guide_message = "This is the message posted whenever a new incident slack channel is created."
 slash_command = "/inc"
 triage_bot_user_id = ""
-triage_bot_prompt = "We've been alerted by {alert_url}, using Sentry, Datadog, and GoCD help triage this incident."
+triage_bot_prompt = "We've been alerted by {alert_url}, run incident triage for this issue."
 
 [auth]
 iap_enabled = false
