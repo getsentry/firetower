@@ -474,6 +474,48 @@ class TestOnIncidentCreated:
         assert len(triage_calls) == 0
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_triage_bot_invited_before_mention(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = "Alert: {alert_url}"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/1")
+
+        invite_calls = mock_slack.invite_to_channel.call_args_list
+        invited_ids = invite_calls[0][0][1] if invite_calls else []
+        assert "U_TRIAGE_BOT" in invited_ids
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_triage_bot_prompt_with_unknown_placeholder(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = "Alert: {alert_url} extra: {unknown}"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/1")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 1
+        msg = triage_calls[0][0][1]
+        assert "https://sentry.io/issues/1" in msg
+        assert "{unknown}" not in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_posts_ic_in_channel_message(self, mock_slack):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"

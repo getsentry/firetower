@@ -181,7 +181,24 @@ class TestIncidentWriteSerializerHooks:
         )
         assert serializer.is_valid(), serializer.errors
         incident = serializer.save()
-        mock_hook.assert_called_once_with(incident, skip_paging=False)
+        mock_hook.assert_called_once_with(incident, skip_paging=False, alert_url="")
+
+    @patch("firetower.incidents.serializers.on_incident_created")
+    def test_create_forwards_alert_url_to_hook(self, mock_hook):
+        serializer = IncidentWriteSerializer(
+            data={
+                "title": "Test",
+                "severity": "P1",
+                "captain": "captain@example.com",
+                "reporter": "reporter@example.com",
+            },
+            context={"alert_url": "https://sentry.io/issues/99"},
+        )
+        assert serializer.is_valid(), serializer.errors
+        incident = serializer.save()
+        mock_hook.assert_called_once_with(
+            incident, skip_paging=False, alert_url="https://sentry.io/issues/99"
+        )
 
     @patch("firetower.incidents.serializers.on_incident_updated")
     def test_update_calls_on_incident_updated_with_status(self, mock_hook):

@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -953,15 +954,9 @@ def decorate_incident_channel(
 
     triage_bot_user_id = settings.SLACK.get("TRIAGE_BOT_USER_ID", "")
     triage_bot_prompt = settings.SLACK.get("TRIAGE_BOT_PROMPT", "")
-    if ctx.alert_url and triage_bot_user_id and triage_bot_prompt:
-        try:
-            prompt = triage_bot_prompt.format(alert_url=ctx.alert_url)
-            slack_service.post_message(
-                ctx.channel_id,
-                f"<@{triage_bot_user_id}> {prompt}",
-            )
-        except Exception:
-            logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
+    should_ping_triage_bot = bool(
+        ctx.alert_url and triage_bot_user_id and triage_bot_prompt
+    )
 
     ids_to_invite: list[str] = []
     if ctx.captain_slack_id:
@@ -973,11 +968,25 @@ def decorate_incident_channel(
         for uid in always_invited:
             if uid not in ids_to_invite:
                 ids_to_invite.append(uid)
+    if should_ping_triage_bot and triage_bot_user_id not in ids_to_invite:
+        ids_to_invite.append(triage_bot_user_id)
     if ids_to_invite:
         try:
             slack_service.invite_to_channel(ctx.channel_id, ids_to_invite)
         except Exception:
             logger.exception(f"Failed to invite users to {ctx.channel_name}")
+
+    if should_ping_triage_bot:
+        try:
+            prompt = triage_bot_prompt.format_map(
+                defaultdict(str, alert_url=ctx.alert_url)
+            )
+            slack_service.post_message(
+                ctx.channel_id,
+                f"<@{triage_bot_user_id}> {prompt}",
+            )
+        except Exception:
+            logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
 
     try:
         _invite_oncall_to_channel(
