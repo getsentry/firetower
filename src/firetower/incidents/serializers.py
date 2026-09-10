@@ -561,7 +561,9 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
 
         if settings.HOOKS_ENABLED and not self.context.get("skip_hooks"):
             on_incident_created(
-                incident, skip_paging=self.context.get("skip_paging", False)
+                incident,
+                skip_paging=self.context.get("skip_paging", False),
+                alert_url=self.context.get("alert_url", ""),
             )
 
         return incident

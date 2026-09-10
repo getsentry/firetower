@@ -257,6 +257,8 @@ class SlackSettings(TypedDict):
     ALWAYS_INVITED_IDS: list[str]
     INCIDENT_GUIDE_MESSAGE: str
     SLASH_COMMAND: str
+    TRIAGE_BOT_USER_ID: str
+    TRIAGE_BOT_PROMPT: str
 
 
 SLACK: SlackSettings = {
@@ -267,6 +269,8 @@ SLACK: SlackSettings = {
     "ALWAYS_INVITED_IDS": config.slack.always_invited_ids,
     "INCIDENT_GUIDE_MESSAGE": config.slack.incident_guide_message,
     "SLASH_COMMAND": config.slack.slash_command,
+    "TRIAGE_BOT_USER_ID": config.slack.triage_bot_user_id,
+    "TRIAGE_BOT_PROMPT": config.slack.triage_bot_prompt,
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)

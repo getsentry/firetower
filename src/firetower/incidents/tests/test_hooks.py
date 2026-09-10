@@ -356,6 +356,195 @@ class TestOnIncidentCreated:
         assert "Something is broken" in desc_calls[0][0][1]
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_triage_bot_message_when_alert_url_provided(
+        self, mock_slack, settings
+    ):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = (
+            "We've been alerted by {alert_url}, "
+            "using Sentry, Datadog, and GoCD help triage this incident."
+        )
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/12345")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 1
+        assert "https://sentry.io/issues/12345" in triage_calls[0][0][1]
+        assert "help triage this incident" in triage_calls[0][0][1]
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_triage_bot_message_uses_custom_prompt(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = (
+            "Alert fired: {alert_url} — please investigate."
+        )
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/99")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 1
+        assert (
+            triage_calls[0][0][1]
+            == "<@U_TRIAGE_BOT> Alert fired: https://sentry.io/issues/99 — please investigate."
+        )
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_triage_bot_message_without_alert_url(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = "Alert: {alert_url}"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 0
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_triage_bot_message_without_bot_user_id(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = ""
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = "Alert: {alert_url}"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/12345")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "triage" in c[0][1].lower() or "Alert:" in c[0][1]
+        ]
+        assert len(triage_calls) == 0
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_triage_bot_message_without_prompt(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = ""
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/12345")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 0
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_triage_bot_invited_before_mention(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = "Alert: {alert_url}"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/1")
+
+        invite_calls = mock_slack.invite_to_channel.call_args_list
+        all_invited = [uid for call in invite_calls for uid in call[0][1]]
+        assert "U_TRIAGE_BOT" in all_invited
+        bot_call = [c for c in invite_calls if "U_TRIAGE_BOT" in c[0][1]]
+        assert len(bot_call) == 1
+        assert bot_call[0][0][1] == ["U_TRIAGE_BOT"]
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_triage_bot_prompt_with_unknown_placeholder(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = "Alert: {alert_url} extra: {unknown}"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/1")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 1
+        msg = triage_calls[0][0][1]
+        assert "https://sentry.io/issues/1" in msg
+        assert "{unknown}" not in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_no_triage_bot_message_for_private_incident(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = "Alert: {alert_url}"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Private Incident",
+            severity=IncidentSeverity.P1,
+            is_private=True,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/1")
+
+        triage_calls = [
+            c
+            for c in mock_slack.post_message.call_args_list
+            if "<@U_TRIAGE_BOT>" in c[0][1]
+        ]
+        assert len(triage_calls) == 0
+
+        invite_calls = mock_slack.invite_to_channel.call_args_list
+        for call in invite_calls:
+            assert "U_TRIAGE_BOT" not in call[0][1]
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_posts_ic_in_channel_message(self, mock_slack):
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
