@@ -548,6 +548,67 @@ class TestTriggerSlackDump:
 
         client.chat_postMessage.assert_called()
 
+    def test_archived_channel_swallows_error_without_exception_log(self):
+        client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.get.return_value = "is_archived"
+        client.chat_postMessage.side_effect = SlackApiError(
+            message="is_archived", response=mock_response
+        )
+        mock_incident = MagicMock(is_private=False)
+        mock_incident.captain = None
+        mock_page = {"id": "page-id", "url": "https://notion.so/page-id"}
+        mock_notion_link = MagicMock(url="")
+        mock_notion = MagicMock()
+        mock_notion.create_postmortem_page.return_value = mock_page
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=mock_notion,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch("firetower.slack_app.handlers.dumpslack.settings") as mock_settings,
+            patch("firetower.slack_app.handlers.dumpslack.logger") as mock_logger,
+        ):
+            mock_settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                mock_notion_link,
+                True,
+            )
+            mock_el.objects.select_for_update.return_value.get.return_value = (
+                mock_notion_link
+            )
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        mock_logger.exception.assert_not_called()
+        mock_logger.info.assert_any_call(
+            "Channel %s is archived, skipping completion message for page %s",
+            "C123",
+            "https://notion.so/page-id",
+        )
+
+    def test_archived_channel_swallows_private_incident_error(self):
+        client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.get.return_value = "is_archived"
+        client.chat_postMessage.side_effect = SlackApiError(
+            message="is_archived", response=mock_response
+        )
+        mock_incident = MagicMock(is_private=True)
+        with patch("firetower.slack_app.handlers.dumpslack.logger") as mock_logger:
+            _trigger_slack_dump(client, "C123", mock_incident)
+
+        mock_logger.exception.assert_not_called()
+        mock_logger.info.assert_any_call(
+            "Channel %s is archived, skipping private incident message",
+            "C123",
+        )
+
 
 class TestHandleDumpslackCommand:
     def _make_args(self, notion_config=None, channel_id="C123"):
