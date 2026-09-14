@@ -110,12 +110,21 @@ class SlackService:
             }
 
         except SlackApiError as e:
-            if e.response.get("error") == "users_not_found":
+            error = e.response.get("error")
+            if error == "users_not_found":
                 logger.info(f"User not found in Slack: {email}")
+            elif error == "ratelimited":
+                logger.warning(
+                    "Slack user profile lookup rate limited",
+                    extra={
+                        "slack_error": error,
+                        "retry_after": e.response.headers.get("Retry-After"),
+                    },
+                )
             else:
                 logger.error(
-                    f"Error fetching Slack user profile: {e}",
-                    extra={"email": email},
+                    "Slack user profile lookup failed",
+                    extra={"slack_error": error},
                 )
             return None
 

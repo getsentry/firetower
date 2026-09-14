@@ -127,6 +127,37 @@ class TestSlackService:
 
                 assert profile is None
 
+    def test_get_user_profile_by_email_rate_limited(self):
+        mock_slack_config = {
+            "BOT_TOKEN": "xoxb-test-token",
+            "TEAM_ID": "sentry",
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            with patch("firetower.integrations.services.slack.WebClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+
+                mock_response = MagicMock()
+                mock_response.get.return_value = "ratelimited"
+                mock_response.headers = {"Retry-After": "30"}
+                mock_client.users_lookupByEmail.side_effect = SlackApiError(
+                    "ratelimited", mock_response
+                )
+
+                service = SlackService()
+                with patch(
+                    "firetower.integrations.services.slack.logger"
+                ) as mock_logger:
+                    profile = service.get_user_profile_by_email("test@example.com")
+
+                assert profile is None
+                mock_logger.warning.assert_called_once_with(
+                    "Slack user profile lookup rate limited",
+                    extra={"slack_error": "ratelimited", "retry_after": "30"},
+                )
+                mock_logger.error.assert_not_called()
+
     def test_get_user_profile_without_client(self):
         """Test that profile fetch returns None when Slack client not initialized."""
         mock_slack_config = {
