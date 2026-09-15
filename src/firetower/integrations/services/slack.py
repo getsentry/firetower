@@ -6,6 +6,7 @@ and retrieve user profile information (name, avatar).
 """
 
 import logging
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -65,12 +66,15 @@ class SlackService:
         if self.client is None:
             logger.warning("Slack client not initialized - missing bot token")
 
-    def get_user_profile_by_email(self, email: str) -> dict | None:
+    def get_user_profile_by_email(
+        self, email: str, *, retry_on_rate_limit: bool = False
+    ) -> dict | None:
         """
         Get user profile information from Slack by email.
 
         Args:
             email: User's email address
+            retry_on_rate_limit: Wait and retry once when Slack rate limits the lookup
 
         Returns:
             dict with 'slack_user_id', 'name', 'first_name', 'last_name', 'avatar_url', or None if not found
@@ -79,54 +83,67 @@ class SlackService:
             logger.warning("Cannot fetch user - Slack client not initialized")
             return None
 
-        try:
-            logger.info(f"Fetching Slack profile for: {email}")
-            response = self.client.users_lookupByEmail(email=email)
+        attempts = 2 if retry_on_rate_limit else 1
+        for attempt in range(attempts):
+            try:
+                logger.info(f"Fetching Slack profile for: {email}")
+                response = self.client.users_lookupByEmail(email=email)
 
-            user: dict[str, Any] = response.get("user", {})
-            profile = user.get("profile", {})
+                user: dict[str, Any] = response.get("user", {})
+                profile = user.get("profile", {})
 
-            slack_user_id = user.get("id", "")
-            real_name = user.get("real_name", "")
-            display_name = profile.get("display_name", "")
-            name = display_name or real_name
+                slack_user_id = user.get("id", "")
+                real_name = user.get("real_name", "")
+                display_name = profile.get("display_name", "")
+                name = display_name or real_name
 
-            first_name = ""
-            last_name = ""
-            if real_name:
-                parts = real_name.strip().split(None, 1)
-                first_name = parts[0] if len(parts) > 0 else ""
-                last_name = parts[1] if len(parts) > 1 else ""
+                first_name = ""
+                last_name = ""
+                if real_name:
+                    parts = real_name.strip().split(None, 1)
+                    first_name = parts[0] if len(parts) > 0 else ""
+                    last_name = parts[1] if len(parts) > 1 else ""
 
-            avatar_url = profile.get("image_512", "")
+                avatar_url = profile.get("image_512", "")
 
-            logger.info(f"Found Slack profile for {email}")
-            return {
-                "slack_user_id": slack_user_id,
-                "name": name,
-                "first_name": first_name,
-                "last_name": last_name,
-                "avatar_url": avatar_url,
-            }
+                logger.info(f"Found Slack profile for {email}")
+                return {
+                    "slack_user_id": slack_user_id,
+                    "name": name,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "avatar_url": avatar_url,
+                }
 
-        except SlackApiError as e:
-            error = e.response.get("error")
-            if error == "users_not_found":
-                logger.info(f"User not found in Slack: {email}")
-            elif error == "ratelimited":
-                logger.warning(
-                    "Slack user profile lookup rate limited",
-                    extra={
-                        "slack_error": error,
-                        "retry_after": e.response.headers.get("retry-after"),
-                    },
-                )
-            else:
-                logger.error(
-                    "Slack user profile lookup failed",
-                    extra={"slack_error": error},
-                )
-            return None
+            except SlackApiError as e:
+                error = e.response.get("error")
+                retry_after = e.response.headers.get("retry-after")
+                if error == "ratelimited" and attempt + 1 < attempts:
+                    delay = int(retry_after or 1)
+                    logger.info(
+                        "Retrying Slack user profile lookup after rate limit",
+                        extra={"slack_error": error, "retry_after": delay},
+                    )
+                    time.sleep(delay)
+                    continue
+                if error == "users_not_found":
+                    logger.info(f"User not found in Slack: {email}")
+                elif error == "ratelimited":
+                    logger.warning(
+                        "Slack user profile lookup rate limited",
+                        extra={
+                            "slack_error": error,
+                            "retry_after": retry_after,
+                        },
+                    )
+                else:
+                    logger.error(
+                        "Slack user profile lookup failed",
+                        extra={"slack_error": error},
+                    )
+                return None
+
+        return None
 
     def parse_channel_id_from_url(self, url: str) -> str | None:
         """

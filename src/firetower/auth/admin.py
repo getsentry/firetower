@@ -37,7 +37,7 @@ class UserAdmin(BaseUserAdmin):
         skipped_count = 0
 
         for user in queryset:
-            if sync_user_profile_from_slack(user):
+            if sync_user_profile_from_slack(user, retry_on_rate_limit=True):
                 updated_count += 1
             else:
                 skipped_count += 1

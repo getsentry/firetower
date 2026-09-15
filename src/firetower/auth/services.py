@@ -85,12 +85,15 @@ def _get_or_create_user_by_email(
         return existing
 
 
-def sync_user_profile_from_slack(user: User) -> bool:
+def sync_user_profile_from_slack(
+    user: User, *, retry_on_rate_limit: bool = False
+) -> bool:
     """
     Sync a user's profile (name, avatar, Slack ID) from Slack.
 
     Args:
         user: User instance to sync
+        retry_on_rate_limit: Wait and retry once when Slack rate limits the lookup
 
     Returns:
         True if profile was updated, False otherwise
@@ -99,7 +102,9 @@ def sync_user_profile_from_slack(user: User) -> bool:
         logger.warning(f"Cannot sync user {user.username} - no email address")
         return False
 
-    slack_profile = _slack_service.get_user_profile_by_email(user.email)
+    slack_profile = _slack_service.get_user_profile_by_email(
+        user.email, retry_on_rate_limit=retry_on_rate_limit
+    )
 
     if not slack_profile:
         logger.info(f"No Slack profile found for {user.email}")
