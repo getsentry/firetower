@@ -834,7 +834,7 @@ requires-dist = [
     { name = "djangorestframework", specifier = ">=3.18.1" },
     { name = "google-auth", specifier = ">=2.37.0" },
     { name = "notion-client", specifier = ">=3.0.0,<4.0.0" },
-    { name = "openrouter", specifier = ">=0.11.34" },
+    { name = "openrouter", specifier = ">=1.1.139" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.11" },
     { name = "pyserde", extras = ["toml"], specifier = ">=0.28.0" },
     { name = "requests", specifier = ">=2.32.0" },
@@ -1534,7 +1534,7 @@ wheels = [
 
 [[package]]
 name = "openrouter"
-version = "1.1.53"
+version = "1.1.139"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpcore" },
@@ -1542,9 +1542,9 @@ dependencies = [
     { name = "jsonpath-python" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/a2/65460740e0d4d14393fa879fe4b90d1170802fe891ba8a00826fc1636ace/openrouter-1.1.53.tar.gz", hash = "sha256:7897cbed1ec1a6493c9d046a0da4dbffd8183546620fc3f0190269ec829e7f74", size = 424208, upload-time = "2026-08-13T18:27:47.301Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/20/a4/56b718c7a1268d99cb23ebd476abda14152c727cbdd36e437f72b6249d9b/openrouter-1.1.139.tar.gz", hash = "sha256:178d9a1e086e281950af111a220fbc1c5030594a95cf0b73e1413acdddb28df4", size = 455457, upload-time = "2026-09-11T15:26:48.974Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/41/e7/f48382993b1f564e693d0e3c87835e86cc8639403d7dddde849b9cd39c7b/openrouter-1.1.53-py3-none-any.whl", hash = "sha256:b94982316cc35e5dc468907882c904a12c340d3c16d43f5f6d589ea0076e2afe", size = 919893, upload-time = "2026-08-13T18:27:45.779Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/80/3f7d954454dd8f29664a17acc4229d634726774a8e120bfa05841bb665e2/openrouter-1.1.139-py3-none-any.whl", hash = "sha256:77ab093f67935c7ccf74dbae3087bf08b3645aa1d10a63c5224ab158cd10d1dc", size = 977476, upload-time = "2026-09-11T15:26:47.548Z" },
 ]
 
 [[package]]
