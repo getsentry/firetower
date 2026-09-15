@@ -6,7 +6,7 @@ from django.core.validators import URLValidator, validate_email
 from django.db import IntegrityError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
-from firetower.integrations.services import SlackService
+from firetower.integrations.services import SlackRateLimitRetry, SlackService
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
@@ -86,14 +86,14 @@ def _get_or_create_user_by_email(
 
 
 def sync_user_profile_from_slack(
-    user: User, *, retry_on_rate_limit: bool = False
+    user: User, *, rate_limit_retry: SlackRateLimitRetry | None = None
 ) -> bool:
     """
     Sync a user's profile (name, avatar, Slack ID) from Slack.
 
     Args:
         user: User instance to sync
-        retry_on_rate_limit: Wait and retry once when Slack rate limits the lookup
+        rate_limit_retry: Shared retry budget for Slack rate limits
 
     Returns:
         True if profile was updated, False otherwise
@@ -103,7 +103,7 @@ def sync_user_profile_from_slack(
         return False
 
     slack_profile = _slack_service.get_user_profile_by_email(
-        user.email, retry_on_rate_limit=retry_on_rate_limit
+        user.email, rate_limit_retry=rate_limit_retry
     )
 
     if not slack_profile:
