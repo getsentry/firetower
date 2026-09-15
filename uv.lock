@@ -596,15 +596,15 @@ wheels = [
 
 [[package]]
 name = "django-q2"
-version = "1.9.0"
+version = "1.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "django-picklefield" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fc/e6/21375bed54a4be1339f6ee31e4173d361d457dbe91db7bff130b52566126/django_q2-1.9.0.tar.gz", hash = "sha256:ef7facca96fae9c11ddf2c5252d3817975c7a9a6d989fa0d65487d8823d57799", size = 77218, upload-time = "2025-12-04T22:11:29.336Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c8/6d/d5e103f31e64d61ad20da154200105d9f80a8e7b582afe80a377c70a1e3e/django_q2-1.11.1.tar.gz", hash = "sha256:640caf961f9098f26e00a22b743c4eb63da681a5390829b1ed951db677866e67", size = 100892, upload-time = "2026-08-26T02:47:43.592Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/b7/8282f9815fc9df3187d9303a6f54e0388e02742255dee1fed7b4019a03ae/django_q2-1.9.0-py3-none-any.whl", hash = "sha256:4eded27644b0ffb291839c9f9c12fea6c0dec63ebd891fa6881b0b446098a49d", size = 89615, upload-time = "2025-12-04T22:11:28.079Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/77/5448ec49605848eae6d6812994e71a312c2535821cf93853e1756e0b26a8/django_q2-1.11.1-py3-none-any.whl", hash = "sha256:b7e7cc030811babc1824de6c5888faec9e84ecd21572401bfdf48770ea67805f", size = 129780, upload-time = "2026-08-26T02:47:42.108Z" },
 ]
 
 [[package]]
@@ -830,7 +830,7 @@ requires-dist = [
     { name = "django-cors-headers", specifier = ">=4.9.0" },
     { name = "django-fernet-encrypted-fields", specifier = ">=0.4.0" },
     { name = "django-kubernetes", specifier = ">=1.1.0" },
-    { name = "django-q2", specifier = ">=1.7.4" },
+    { name = "django-q2", specifier = ">=1.11.1" },
     { name = "djangorestframework", specifier = ">=3.15.2" },
     { name = "google-auth", specifier = ">=2.37.0" },
     { name = "notion-client", specifier = ">=3.0.0,<4.0.0" },
