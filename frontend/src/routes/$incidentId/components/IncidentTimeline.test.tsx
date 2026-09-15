@@ -40,9 +40,9 @@ const events: TimelineEvent[] = [
     occurred_at: '2026-08-20T15:00:00Z',
     created_at: '2026-08-20T15:00:01Z',
     actor: {
-      email: 'taylor@example.com',
-      name: 'Taylor Osler',
-      avatar_url: 'https://example.com/taylor.png',
+      email: 'person@example.com',
+      name: 'Example Person',
+      avatar_url: 'https://example.com/person.png',
     },
     summary: 'Incident created at severity P1',
     payload: {severity: 'P1'},
@@ -97,11 +97,11 @@ describe('IncidentTimeline', () => {
 
     const {container} = renderTimeline();
 
-    expect(await screen.findByText('Taylor Osler')).toBeInTheDocument();
-    const avatar = container.querySelector('img[src="https://example.com/taylor.png"]');
+    expect(await screen.findByText('Example Person')).toBeInTheDocument();
+    const avatar = container.querySelector('img[src="https://example.com/person.png"]');
     expect(avatar).toBeInTheDocument();
     expect(avatar?.parentElement).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.queryByRole('img', {name: 'Taylor Osler'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', {name: 'Example Person'})).not.toBeInTheDocument();
     expect(screen.getByText('Firetower')).toBeInTheDocument();
 
     const firstTime = container.querySelector('time');
