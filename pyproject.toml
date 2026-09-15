@@ -50,7 +50,7 @@ prod = [
 ]
 mcp = [
     "fastmcp>=3.4.1",
-    "pyjwt[crypto]>=2.10",
+    "pyjwt[crypto]>=2.14.0",
     "firetower-sdk",
 ]
 
