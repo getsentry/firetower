@@ -1,14 +1,14 @@
 import {useState} from 'react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {useNavigate} from '@tanstack/react-router';
+import {cva} from 'class-variance-authority';
 import {Button} from 'components/Button';
 import {Input} from 'components/Input';
 import {Label} from 'components/Label';
-import {cva} from 'class-variance-authority';
 import {cn} from 'utils/cn';
 
-import {currentUserQueryOptions} from '../queries/currentUserQueryOptions';
 import {createIncidentMutationOptions} from '../queries/createIncidentMutationOptions';
+import {currentUserQueryOptions} from '../queries/currentUserQueryOptions';
 import {SeveritySchema} from '../types';
 
 const overlay = cva(['fixed', 'inset-0', 'z-50', 'bg-black/50']);
@@ -44,6 +44,7 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
   const [description, setDescription] = useState('');
 
   const handleClose = () => {
+    if (createIncident.isPending) return;
     setTitle('');
     setSeverity('P3');
     setDescription('');
@@ -53,18 +54,22 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser || !title.trim()) return;
+    if (!currentUser || !title.trim() || createIncident.isPending) return;
 
-    const result = await createIncident.mutateAsync({
-      title: title.trim(),
-      severity,
-      description: description.trim() || undefined,
-      captain: currentUser.email,
-      reporter: currentUser.email,
-    });
+    try {
+      const result = await createIncident.mutateAsync({
+        title: title.trim(),
+        severity,
+        description: description.trim() || undefined,
+        captain: currentUser.email,
+        reporter: currentUser.email,
+      });
 
-    handleClose();
-    navigate({to: '/$incidentId', params: {incidentId: result.id}});
+      handleClose();
+      navigate({to: '/$incidentId', params: {incidentId: result.id}});
+    } catch {
+      // Error state is handled by createIncident.isError
+    }
   };
 
   if (!isOpen) return null;
@@ -116,7 +121,8 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
           </div>
           <div className="gap-space-xs flex flex-col">
             <Label htmlFor="incident-description">
-              Description <span className="text-content-disabled font-normal">(optional)</span>
+              Description{' '}
+              <span className="text-content-disabled font-normal">(optional)</span>
             </Label>
             <textarea
               id="incident-description"
@@ -144,7 +150,7 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
             <Button
               variant="primary"
               type="submit"
-              disabled={!title.trim()}
+              disabled={!title.trim() || !currentUser}
               loading={createIncident.isPending}
             >
               Create
