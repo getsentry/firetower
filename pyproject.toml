@@ -10,7 +10,7 @@ dependencies = [
     "datadog-api-client==2.54.0",
     "django>=5.2.15,<6",
     "django-cors-headers>=4.9.0",
-    "django-fernet-encrypted-fields>=0.3.1",
+    "django-fernet-encrypted-fields>=0.4.0",
     "django-kubernetes>=1.1.0",
     "djangorestframework>=3.15.2",
     "google-auth>=2.37.0",
@@ -19,8 +19,8 @@ dependencies = [
     "notion-client>=3.0.0,<4.0.0",
     "requests>=2.32.0",
     "django-q2>=1.7.4",
-    "slack-bolt>=1.27.0",
-    "slack-sdk>=3.31.0",
+    "slack-bolt>=1.30.0",
+    "slack-sdk>=3.44.1",
     "sentry-sdk>=2.62.0",
     "openrouter>=0.11.34",
 ]
@@ -36,7 +36,7 @@ dev = [
     "pyupgrade>=3.20.0",
     "pytest>=9.0.3",
     "pytest-cov>=6.0.0",
-    "pytest-django>=4.8.0",
+    "pytest-django>=4.14.0",
     "ruff>=0.12.11",
     "ty>=0.0.1a19",
     "django-stubs>=5.2.7",
@@ -48,6 +48,14 @@ prod = [
     "granian>=2.6.0",
     "sentry-sdk[django]>=2.62.0",
 ]
+mcp = [
+    "fastmcp>=3.4.1",
+    "pyjwt[crypto]>=2.14.0",
+    "firetower-sdk",
+]
+
+[tool.uv.sources]
+firetower-sdk = { path = "sdk", editable = true }
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "firetower.settings"
