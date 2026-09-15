@@ -140,7 +140,7 @@ class TestSlackService:
 
                 mock_response = MagicMock()
                 mock_response.get.return_value = "ratelimited"
-                mock_response.headers = {"Retry-After": "30"}
+                mock_response.headers = {"retry-after": "30"}
                 mock_client.users_lookupByEmail.side_effect = SlackApiError(
                     "ratelimited", mock_response
                 )

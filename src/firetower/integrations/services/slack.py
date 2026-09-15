@@ -118,7 +118,7 @@ class SlackService:
                     "Slack user profile lookup rate limited",
                     extra={
                         "slack_error": error,
-                        "retry_after": e.response.headers.get("Retry-After"),
+                        "retry_after": e.response.headers.get("retry-after"),
                     },
                 )
             else:
