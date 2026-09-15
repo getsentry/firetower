@@ -340,6 +340,14 @@ class TestTimelineRenderer:
         event = TimelineEvent(event_type=event_type, payload=payload)
         assert render_timeline_event(event) == expected
 
+    def test_malformed_payload_has_fallback_summary(self):
+        event = TimelineEvent(
+            event_type=TimelineEventType.STATUS_CHANGED,
+            payload={"old": "Active"},
+        )
+
+        assert render_timeline_event(event) == "Timeline event could not be rendered."
+
 
 @pytest.mark.django_db
 class TestTimelineEventAPI:
