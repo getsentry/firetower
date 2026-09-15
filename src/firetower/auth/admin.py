@@ -40,9 +40,7 @@ class UserAdmin(BaseUserAdmin):
         rate_limit_retry = SlackRateLimitRetry()
 
         for user in queryset:
-            if sync_user_profile_from_slack(
-                user, rate_limit_retry=rate_limit_retry
-            ):
+            if sync_user_profile_from_slack(user, rate_limit_retry=rate_limit_retry):
                 updated_count += 1
             else:
                 skipped_count += 1
