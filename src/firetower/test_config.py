@@ -19,6 +19,7 @@ _SECRET_ENV_VARS = (
     "PAGERDUTY_ESCALATION_KEY_PROD_ENG",
     "STATUSPAGE_API_KEY",
     "NOTION_INTEGRATION_TOKEN",
+    "OPENROUTER_API_KEY",
 )
 
 
@@ -142,6 +143,17 @@ def test_present_section_token_from_env(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert config.statuspage is not None
     assert config.statuspage.api_key == "env-sp-key"
+
+
+def test_genai_api_key_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "env-openrouter-key")
+    data = _minimal_config()
+    data["genai"] = {"api_key": ""}
+
+    config = ConfigFile.from_dict(data)
+
+    assert config.genai is not None
+    assert config.genai.api_key == "env-openrouter-key"
 
 
 def test_pagerduty_escalation_key_from_env(monkeypatch: pytest.MonkeyPatch) -> None:

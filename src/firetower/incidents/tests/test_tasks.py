@@ -1046,9 +1046,12 @@ class TestSendActionItemReminder:
         mock_sync.assert_not_called()
         mock_service.assert_not_called()
 
-    def test_skips_done_action_item(self, mock_linear):
+    @pytest.mark.parametrize(
+        "status", [ActionItemStatus.DONE, ActionItemStatus.CANCELED]
+    )
+    def test_skips_completed_action_item(self, mock_linear, status):
         incident = self._make_incident()
-        self._make_action_item(incident, status=ActionItemStatus.DONE)
+        self._make_action_item(incident, status=status)
 
         send_action_item_reminder()
 

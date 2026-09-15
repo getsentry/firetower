@@ -307,6 +307,7 @@ NOTION: dict | None = (
 )
 GENAI: dict | None = (
     {
+        "API_KEY": config.genai.api_key,
         "MODEL": config.genai.model,
     }
     if config.genai
