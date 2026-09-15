@@ -1,7 +1,8 @@
+from typing import Any
+
 import pytest
-from pytest_django.fixtures import SettingsWrapper
 
 
 @pytest.fixture(autouse=True)
-def _disable_linear(settings: SettingsWrapper) -> None:
+def _disable_linear(settings: Any) -> None:
     settings.LINEAR = None
