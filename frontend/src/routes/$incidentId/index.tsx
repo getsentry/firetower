@@ -64,11 +64,11 @@ function Incident() {
 
       <div className="flex flex-col gap-4 md:flex-row">
         <section className="order-2 flex flex-col gap-4 md:order-1 md:flex-[2]">
-          <IncidentTimeline incidentId={incident.id} />
           <ActionItemsList
             incidentId={params.incidentId}
             linearUrl={incident.external_links.linear}
           />
+          <IncidentTimeline incidentId={incident.id} />
         </section>
 
         <aside className="order-1 flex flex-col gap-4 md:order-2 md:flex-1">
