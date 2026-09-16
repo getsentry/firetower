@@ -46,8 +46,9 @@ class TestUserAdminActions:
 
         # Verify sync was called for each user
         assert mock_sync.call_count == 2
-        mock_sync.assert_any_call(user1)
-        mock_sync.assert_any_call(user2)
+        rate_limit_retry = mock_sync.call_args_list[0].kwargs["rate_limit_retry"]
+        mock_sync.assert_any_call(user1, rate_limit_retry=rate_limit_retry)
+        mock_sync.assert_any_call(user2, rate_limit_retry=rate_limit_retry)
 
     @patch("firetower.auth.admin.sync_user_profile_from_slack")
     def test_sync_with_slack_reports_stats(self, mock_sync, admin, mock_request):
