@@ -65,6 +65,17 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, createIncident.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser || !title.trim() || createIncident.isPending) return;
