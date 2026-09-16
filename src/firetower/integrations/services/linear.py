@@ -23,6 +23,7 @@ LINEAR_STATE_TYPE_MAP = {
     "started": "In Progress",
     "completed": "Done",
     "canceled": "Canceled",
+    "duplicate": "Canceled",
 }
 
 TOKEN_LIFETIME = timedelta(days=30)

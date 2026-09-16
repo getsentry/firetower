@@ -7,6 +7,7 @@ import {GetHelpLink} from 'components/GetHelpLink';
 import {ActionItemsList} from './components/ActionItemsList';
 import {IncidentDetailSkeleton} from './components/IncidentDetailSkeleton';
 import {IncidentSummary} from './components/IncidentSummary';
+import {IncidentTimeline} from './components/IncidentTimeline';
 import {LinksList} from './components/LinksList';
 import {MilestonesCard} from './components/MilestonesCard';
 import {ParticipantsList} from './components/ParticipantsList';
@@ -67,6 +68,7 @@ function Incident() {
             incidentId={params.incidentId}
             linearUrl={incident.external_links.linear}
           />
+          <IncidentTimeline incidentId={incident.id} />
         </section>
 
         <aside className="order-1 flex flex-col gap-4 md:order-2 md:flex-1">
