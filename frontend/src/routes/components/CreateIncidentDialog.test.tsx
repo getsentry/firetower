@@ -196,4 +196,37 @@ describe('CreateIncidentDialog', () => {
       expect(onClose).toHaveBeenCalled();
     });
   });
+
+  it('closes dialog when Escape key is pressed', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderDialog({isOpen: true, onClose});
+
+    await user.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('prevents Escape from closing dialog while mutation is pending', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    let resolvePost: (value: unknown) => void;
+    mockApiPost.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolvePost = resolve;
+      })
+    );
+    renderDialog({isOpen: true, onClose});
+
+    await user.type(screen.getByLabelText('Title'), 'Test incident');
+    await user.click(screen.getByRole('button', {name: 'Create'}));
+
+    await user.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+
+    resolvePost!({id: 'INC-999', title: 'Test', severity: 'P3'});
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
 });
