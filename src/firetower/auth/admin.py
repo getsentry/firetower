@@ -9,6 +9,8 @@ from django.db.models import ForeignKey, QuerySet
 from django.forms import ModelChoiceField
 from django.http import HttpRequest
 
+from firetower.integrations.services import SlackRateLimitRetry
+
 from .models import ExternalProfile, UserProfile
 from .services import sync_user_profile_from_slack
 
@@ -35,9 +37,10 @@ class UserAdmin(BaseUserAdmin):
         """Sync selected users' profiles (name, avatar) from Slack."""
         updated_count = 0
         skipped_count = 0
+        rate_limit_retry = SlackRateLimitRetry()
 
         for user in queryset:
-            if sync_user_profile_from_slack(user):
+            if sync_user_profile_from_slack(user, rate_limit_retry=rate_limit_retry):
                 updated_count += 1
             else:
                 skipped_count += 1

@@ -346,6 +346,7 @@ class TestNewIncidentSubmission:
         assert incident.severity == IncidentSeverity.P1
         assert incident.captain == self.user
         assert incident.reporter == self.user
+        assert incident.timeline_events.get().actor == self.user
         client.chat_postMessage.assert_called_once()
 
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
