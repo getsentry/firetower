@@ -481,6 +481,28 @@ class TestLinearService:
             input_data = call_args[0][1]["input"]
             assert input_data["projectId"] == "project-1"
 
+    def test_create_issue_with_priority(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "test-id",
+                "CLIENT_SECRET": "test-secret",
+            }
+            service = LinearService()
+
+        with patch.object(
+            service,
+            "_graphql",
+            return_value={
+                "issueCreate": {
+                    "success": True,
+                    "issue": {"id": "id", "identifier": "E-1", "url": "url"},
+                }
+            },
+        ) as mock_gql:
+            service.create_issue("Title", "Desc", "team-1", priority=1)
+
+        assert mock_gql.call_args[0][1]["input"]["priority"] == 1
+
     def test_create_issue_failure(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
             mock_settings.LINEAR = {
@@ -564,6 +586,22 @@ class TestLinearService:
             assert result is True
             call_args = mock_gql.call_args
             assert call_args[0][1]["input"]["title"] == "New title"
+
+    def test_update_issue_with_no_priority(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "test-id",
+                "CLIENT_SECRET": "test-secret",
+            }
+            service = LinearService()
+
+        with patch.object(
+            service, "_graphql", return_value={"issueUpdate": {"success": True}}
+        ) as mock_gql:
+            result = service.update_issue("issue-id", priority=0)
+
+        assert result is True
+        assert mock_gql.call_args[0][1]["input"]["priority"] == 0
 
     def test_get_workflow_states_caches(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
@@ -888,6 +926,7 @@ class TestCreateLinearParentIssuePrivacy:
 
         call_args = mock_service.update_issue.call_args
         assert call_args[1]["title"] == "Private Incident"
+        assert call_args[1]["priority"] == 2
 
 
 @pytest.mark.django_db

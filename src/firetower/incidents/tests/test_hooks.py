@@ -3830,6 +3830,33 @@ class TestOnIncidentUpdated:
         assert any("- Status:" in m for m in messages)
         assert any("private" in m for m in messages)
 
+    @pytest.mark.parametrize(
+        ("severity", "priority"),
+        [
+            (IncidentSeverity.P0, 1),
+            (IncidentSeverity.P1, 2),
+            (IncidentSeverity.P2, 3),
+            (IncidentSeverity.P3, 4),
+            (IncidentSeverity.P4, 0),
+        ],
+    )
+    @patch("firetower.incidents.hooks._get_linear_service")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_syncs_linear_priority_on_severity_change(
+        self, mock_slack, mock_get_linear, settings, severity, priority
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_slack.parse_channel_id_from_url.return_value = None
+        incident = self._make_incident(
+            severity=severity, linear_parent_issue_id="linear-issue-id"
+        )
+
+        on_incident_updated(incident, old_severity=IncidentSeverity.P2)
+
+        mock_get_linear.return_value.update_issue.assert_any_call(
+            "linear-issue-id", priority=priority
+        )
+
     @patch("firetower.incidents.hooks._get_linear_service")
     @patch("firetower.incidents.hooks._slack_service")
     def test_syncs_linear_assignee_on_captain_change(
