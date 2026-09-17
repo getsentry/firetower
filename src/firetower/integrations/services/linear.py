@@ -468,6 +468,7 @@ class LinearService:
         project_id: str | None = None,
         state_id: str | None = None,
         assignee_id: str | None = None,
+        priority: int | None = None,
     ) -> dict[str, Any] | None:
         mutation = """
         mutation($input: IssueCreateInput!) {
@@ -492,6 +493,8 @@ class LinearService:
             input_data["stateId"] = state_id
         if assignee_id:
             input_data["assigneeId"] = assignee_id
+        if priority is not None:
+            input_data["priority"] = priority
 
         data = self._graphql(mutation, {"input": input_data}, retryable=False)
         if not data:
@@ -556,6 +559,7 @@ class LinearService:
         description: str | None = None,
         state_id: str | None = None,
         assignee_id: str | None = None,
+        priority: int | None = None,
     ) -> bool:
         mutation = """
         mutation($id: String!, $input: IssueUpdateInput!) {
@@ -573,6 +577,8 @@ class LinearService:
             input_data["stateId"] = state_id
         if assignee_id is not None:
             input_data["assigneeId"] = assignee_id
+        if priority is not None:
+            input_data["priority"] = priority
 
         if not input_data:
             return True

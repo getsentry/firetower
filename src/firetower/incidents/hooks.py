@@ -40,6 +40,13 @@ def _get_linear_service() -> LinearService:
 
 
 HIGH_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
+LINEAR_PRIORITY_BY_SEVERITY: dict[str, int] = {
+    IncidentSeverity.P0: 1,
+    IncidentSeverity.P1: 2,
+    IncidentSeverity.P2: 3,
+    IncidentSeverity.P3: 4,
+    IncidentSeverity.P4: 0,
+}
 ACTIVE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 # Statuses that mean the incident has been responded to/mitigated, at which
 # point any PagerDuty pages Firetower triggered should be auto-resolved.
@@ -1070,6 +1077,20 @@ def _sync_linear_assignee(incident: Incident) -> None:
         )
 
 
+def _sync_linear_priority(incident: Incident) -> None:
+    if not settings.LINEAR or not incident.linear_parent_issue_id:
+        return
+    try:
+        _get_linear_service().update_issue(
+            incident.linear_parent_issue_id,
+            priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to update Linear issue priority for incident {incident.id}"
+        )
+
+
 LINEAR_PARENT_DESCRIPTION = (
     "Add action items as sub-issues (child issues) of this ticket to have "
     "them tracked by Firetower. "
@@ -1143,6 +1164,7 @@ def populate_linear_parent(
             description=LINEAR_PARENT_DESCRIPTION,
             state_id=started_state_id,
             assignee_id=captain_linear_id,
+            priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
         )
     except Exception:
         logger.exception(
@@ -1241,6 +1263,7 @@ def create_linear_parent_issue(
                 description=LINEAR_PARENT_DESCRIPTION,
                 state_id=started_state_id,
                 assignee_id=captain_linear_id,
+                priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
             ):
                 linear_link.delete()
                 logger.warning(
@@ -1254,6 +1277,7 @@ def create_linear_parent_issue(
                 team_id,
                 project_id,
                 assignee_id=captain_linear_id,
+                priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
             )
             if not issue:
                 linear_link.delete()
@@ -1533,6 +1557,8 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
     except Exception:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
 
+    _sync_linear_priority(incident)
+
     if (
         old_severity not in HIGH_SEVERITIES
         and incident.severity in HIGH_SEVERITIES
@@ -1810,6 +1836,9 @@ def on_incident_updated(
             logger.exception(
                 f"Failed to resolve pages in on_incident_updated for incident {incident.id}"
             )
+
+    if old_severity is not None:
+        _sync_linear_priority(incident)
 
     # Severity escalation: page, invite oncall, create status channel, schedule reminders
     if (
