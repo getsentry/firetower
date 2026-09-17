@@ -351,6 +351,11 @@ class TestSlackService:
         )
         assert service.convert_channel_privacy("C12345", is_private=False) is False
 
+    def test_convert_channel_privacy_unexpected_error_falls_back(self):
+        service, mock_client = self._make_service()
+        mock_client.admin_conversations_convertToPublic.side_effect = TimeoutError
+        assert service.convert_channel_privacy("C12345", is_private=False) is False
+
     def test_set_channel_topic_success(self):
         service, mock_client = self._make_service()
         assert service.set_channel_topic("C12345", "test topic") is True
@@ -545,6 +550,11 @@ class TestSlackService:
         url = service.build_channel_url("C12345")
         assert url == "https://sentry.slack.com/archives/C12345"
         assert service.parse_channel_id_from_url(url) == "C12345"
+
+    def test_get_channel_info_unexpected_error_returns_none(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_info.side_effect = TimeoutError
+        assert service.get_channel_info("C12345") is None
 
     def test_get_channel_history_returns_all_messages(self):
         service, mock_client = self._make_service()

@@ -281,6 +281,12 @@ class SlackService:
                 extra={"channel_id": channel_id, "is_private": is_private},
             )
             return False
+        except Exception:
+            logger.exception(
+                "Unexpected error converting channel privacy via admin API",
+                extra={"channel_id": channel_id, "is_private": is_private},
+            )
+            return False
 
     def set_channel_topic(self, channel_id: str, topic: str) -> bool:
         if not self.client:
@@ -477,6 +483,12 @@ class SlackService:
         except SlackApiError as e:
             logger.error(
                 f"Error fetching channel info: {e}",
+                extra={"channel_id": channel_id},
+            )
+            return None
+        except Exception:
+            logger.exception(
+                "Unexpected error fetching channel info",
                 extra={"channel_id": channel_id},
             )
             return None
