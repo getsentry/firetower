@@ -361,7 +361,8 @@ def _create_incident_via_db(
     }
 
     serializer = IncidentWriteSerializer(
-        data=data, context={"skip_paging": skip_paging}
+        data=data,
+        context={"skip_paging": skip_paging, "acting_user": user},
     )
     if not serializer.is_valid():
         logger.error(f"Incident validation failed: {serializer.errors}")

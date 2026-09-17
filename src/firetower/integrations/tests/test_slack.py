@@ -7,7 +7,11 @@ from unittest.mock import MagicMock, patch
 
 from slack_sdk.errors import SlackApiError
 
-from firetower.integrations.services.slack import SlackService, is_slack_guest
+from firetower.integrations.services.slack import (
+    SlackRateLimitRetry,
+    SlackService,
+    is_slack_guest,
+)
 
 # Set up Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "firetower.settings")
@@ -126,6 +130,85 @@ class TestSlackService:
                 profile = service.get_user_profile_by_email("nonexistent@example.com")
 
                 assert profile is None
+
+    def test_get_user_profile_by_email_rate_limited(self):
+        mock_slack_config = {
+            "BOT_TOKEN": "xoxb-test-token",
+            "TEAM_ID": "sentry",
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            with patch("firetower.integrations.services.slack.WebClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+
+                mock_response = MagicMock()
+                mock_response.get.return_value = "ratelimited"
+                mock_response.headers = {"retry-after": "30"}
+                mock_client.users_lookupByEmail.side_effect = SlackApiError(
+                    "ratelimited", mock_response
+                )
+
+                service = SlackService()
+                with patch(
+                    "firetower.integrations.services.slack.logger"
+                ) as mock_logger:
+                    profile = service.get_user_profile_by_email("test@example.com")
+
+                assert profile is None
+                mock_logger.warning.assert_called_once_with(
+                    "Slack user profile lookup rate limited",
+                    extra={"slack_error": "ratelimited", "retry_after": "30"},
+                )
+                mock_logger.error.assert_not_called()
+
+    def test_get_user_profile_by_email_retries_rate_limit(self):
+        mock_slack_config = {
+            "BOT_TOKEN": "xoxb-test-token",
+            "TEAM_ID": "sentry",
+        }
+        slack_profile = {
+            "user": {
+                "id": "U12345",
+                "real_name": "John Doe",
+                "profile": {},
+            }
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            with patch("firetower.integrations.services.slack.WebClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+
+                mock_response = MagicMock()
+                mock_response.get.return_value = "ratelimited"
+                mock_response.headers = {"retry-after": "60"}
+                mock_client.users_lookupByEmail.side_effect = [
+                    SlackApiError("ratelimited", mock_response),
+                    slack_profile,
+                ]
+
+                service = SlackService()
+                rate_limit_retry = SlackRateLimitRetry()
+                with patch("firetower.integrations.services.slack.time.sleep") as sleep:
+                    profile = service.get_user_profile_by_email(
+                        "test@example.com", rate_limit_retry=rate_limit_retry
+                    )
+
+                assert profile is not None
+                assert profile["slack_user_id"] == "U12345"
+                sleep.assert_called_once_with(30)
+                assert rate_limit_retry.remaining == 0
+                assert mock_client.users_lookupByEmail.call_count == 2
+
+    def test_rate_limit_retry_is_shared_and_capped(self):
+        rate_limit_retry = SlackRateLimitRetry()
+
+        with patch("firetower.integrations.services.slack.time.sleep") as sleep:
+            assert rate_limit_retry.wait("60") is True
+            assert rate_limit_retry.wait("60") is False
+
+        sleep.assert_called_once_with(30)
 
     def test_get_user_profile_without_client(self):
         """Test that profile fetch returns None when Slack client not initialized."""

@@ -516,6 +516,14 @@ class TestLinearService:
                             "state": {"type": "completed"},
                             "assignee": {"id": "user-1", "email": "dev@example.com"},
                         },
+                        {
+                            "id": "id-3",
+                            "identifier": "ENG-3",
+                            "title": "Duplicate task",
+                            "url": "https://linear.app/t/ENG-3",
+                            "state": {"type": "duplicate"},
+                            "assignee": None,
+                        },
                     ],
                     "pageInfo": {"hasNextPage": False, "endCursor": None},
                 }
@@ -533,11 +541,12 @@ class TestLinearService:
             issues = service.get_child_issues("parent-id")
 
             assert issues is not None
-            assert len(issues) == 2
+            assert len(issues) == 3
             assert issues[0]["status"] == "In Progress"
             assert issues[0]["relation_type"] == "child"
             assert issues[1]["status"] == "Done"
             assert issues[1]["assignee_email"] == "dev@example.com"
+            assert issues[2]["status"] == "Canceled"
 
     def test_update_issue(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:

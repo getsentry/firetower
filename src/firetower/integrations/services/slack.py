@@ -6,6 +6,7 @@ and retrieve user profile information (name, avatar).
 """
 
 import logging
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -14,6 +15,25 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 logger = logging.getLogger(__name__)
+
+
+class SlackRateLimitRetry:
+    def __init__(self, max_retries: int = 1, max_delay: int = 30) -> None:
+        self.remaining = max_retries
+        self.max_delay = max_delay
+
+    def wait(self, retry_after: str | None) -> bool:
+        if self.remaining == 0:
+            return False
+
+        self.remaining -= 1
+        delay = min(int(retry_after or 1), self.max_delay)
+        logger.info(
+            "Retrying Slack user profile lookup after rate limit",
+            extra={"slack_error": "ratelimited", "retry_after": delay},
+        )
+        time.sleep(delay)
+        return True
 
 
 def escape_slack_text(text: str) -> str:
@@ -65,12 +85,15 @@ class SlackService:
         if self.client is None:
             logger.warning("Slack client not initialized - missing bot token")
 
-    def get_user_profile_by_email(self, email: str) -> dict | None:
+    def get_user_profile_by_email(
+        self, email: str, *, rate_limit_retry: SlackRateLimitRetry | None = None
+    ) -> dict | None:
         """
         Get user profile information from Slack by email.
 
         Args:
             email: User's email address
+            rate_limit_retry: Shared retry budget for Slack rate limits
 
         Returns:
             dict with 'slack_user_id', 'name', 'first_name', 'last_name', 'avatar_url', or None if not found
@@ -110,12 +133,30 @@ class SlackService:
             }
 
         except SlackApiError as e:
-            if e.response.get("error") == "users_not_found":
+            error = e.response.get("error")
+            retry_after = e.response.headers.get("retry-after")
+            if (
+                error == "ratelimited"
+                and rate_limit_retry
+                and rate_limit_retry.wait(retry_after)
+            ):
+                return self.get_user_profile_by_email(
+                    email, rate_limit_retry=rate_limit_retry
+                )
+            if error == "users_not_found":
                 logger.info(f"User not found in Slack: {email}")
+            elif error == "ratelimited":
+                logger.warning(
+                    "Slack user profile lookup rate limited",
+                    extra={
+                        "slack_error": error,
+                        "retry_after": retry_after,
+                    },
+                )
             else:
                 logger.error(
-                    f"Error fetching Slack user profile: {e}",
-                    extra={"email": email},
+                    "Slack user profile lookup failed",
+                    extra={"slack_error": error},
                 )
             return None
 

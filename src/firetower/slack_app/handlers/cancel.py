@@ -3,6 +3,7 @@ from typing import Any
 
 from django.conf import settings
 
+from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.models import IncidentStatus
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.slack_app.handlers.utils import get_incident_from_channel
@@ -95,8 +96,12 @@ def handle_cancel_submission(ack: Any, body: dict, view: dict, client: Any) -> N
         )
         return
 
+    acting_user = get_or_create_user_from_slack_id(body.get("user", {}).get("id", ""))
     serializer = IncidentWriteSerializer(
-        instance=incident, data={"status": IncidentStatus.CANCELED}, partial=True
+        instance=incident,
+        data={"status": IncidentStatus.CANCELED},
+        partial=True,
+        context={"acting_user": acting_user},
     )
     if not serializer.is_valid():
         logger.error("Cancel status update failed: %s", serializer.errors)
