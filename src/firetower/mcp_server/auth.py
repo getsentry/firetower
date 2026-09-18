@@ -17,6 +17,7 @@ token is active and belongs to the same verified identity and OAuth client.
 import logging
 from typing import Any
 
+import httpx
 import jwt
 from fastmcp.exceptions import FastMCPError
 from fastmcp.server.auth.providers.google import GoogleProvider
@@ -28,6 +29,48 @@ logger = logging.getLogger(__name__)
 
 GOOGLE_JWKS_URI = "https://www.googleapis.com/oauth2/v3/certs"
 GOOGLE_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
+GOOGLE_GROUPS_LOOKUP_URL = "https://cloudidentity.googleapis.com/v1/groups:lookup"
+GOOGLE_GROUPS_API_URL = "https://cloudidentity.googleapis.com/v1"
+GOOGLE_GROUPS_READ_SCOPE = (
+    "https://www.googleapis.com/auth/cloud-identity.groups.readonly"
+)
+ACCESS_GROUP = "team@sentry.io"
+
+
+class GoogleGroupMembershipChecker:
+    async def is_member(self, access_token: str, email: str) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                headers = {"Authorization": f"Bearer {access_token}"}
+                lookup = await client.get(
+                    GOOGLE_GROUPS_LOOKUP_URL,
+                    params={"groupKey.id": ACCESS_GROUP},
+                    headers=headers,
+                )
+                if lookup.status_code != 200:
+                    logger.info(
+                        "Rejecting login: Google group lookup failed with %s",
+                        lookup.status_code,
+                    )
+                    return False
+                group_name = lookup.json().get("name")
+                if not isinstance(group_name, str) or not group_name.startswith(
+                    "groups/"
+                ):
+                    logger.info("Rejecting login: Google group lookup was malformed")
+                    return False
+
+                membership = await client.get(
+                    f"{GOOGLE_GROUPS_API_URL}/{group_name}/memberships:checkTransitiveMembership",
+                    params={"query": f"member_key_id == '{email}'"},
+                    headers=headers,
+                )
+                return membership.status_code == 200 and (
+                    membership.json().get("hasMembership") is True
+                )
+        except (httpx.HTTPError, ValueError):
+            logger.info("Rejecting login: Google group membership check failed")
+            return False
 
 
 class SentryGoogleProvider(GoogleProvider):
@@ -39,6 +82,7 @@ class SentryGoogleProvider(GoogleProvider):
         super().__init__(client_id=client_id, **kwargs)
         self._expected_audience = client_id
         self._jwks_client = jwt.PyJWKClient(GOOGLE_JWKS_URI)
+        self._group_membership_checker = GoogleGroupMembershipChecker()
 
     async def _extract_upstream_claims(
         self, idp_tokens: dict[str, Any]
@@ -87,11 +131,26 @@ class SentryGoogleProvider(GoogleProvider):
                 "Access denied: only verified @sentry.io accounts are allowed."
             )
 
-        logger.info("Admitted login for %s", claims.get("email"))
+        email = claims.get("email")
+        access_token = idp_tokens.get("access_token")
+        if (
+            not isinstance(email, str)
+            or not access_token
+            or not await self._group_membership_checker.is_member(access_token, email)
+        ):
+            logger.info(
+                "Rejecting login: %s is not a member of %s", email, ACCESS_GROUP
+            )
+            raise FastMCPError(
+                f"Access denied: only members of {ACCESS_GROUP} are allowed."
+            )
+
+        logger.info("Admitted login for %s", email)
         return {
             "hd": claims["hd"],
-            "email": claims.get("email"),
+            "email": email,
             "email_verified": claims["email_verified"],
+            "group": ACCESS_GROUP,
         }
 
     async def _verify_refresh_identity(
@@ -121,6 +180,7 @@ def require_sentry_account() -> None:
         not upstream
         or upstream.get("hd") != WORKSPACE_DOMAIN
         or not upstream.get("email_verified")
+        or upstream.get("group") != ACCESS_GROUP
     ):
         raise FastMCPError(
             "Access denied: only verified @sentry.io accounts are allowed."

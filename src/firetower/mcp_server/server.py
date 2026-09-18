@@ -13,7 +13,7 @@ from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from firetower.mcp_server.auth import SentryGoogleProvider
+from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE, SentryGoogleProvider
 from firetower.mcp_server.config import MCPConfig
 from firetower.mcp_server.tools import register_tools
 
@@ -31,7 +31,7 @@ def create_mcp(config: MCPConfig | None = None) -> FastMCP:
         "client_secret": config.google_client_secret,
         "base_url": config.base_url,
         "jwt_signing_key": config.jwt_signing_key,
-        "required_scopes": ["openid", "email"],
+        "required_scopes": ["openid", "email", GOOGLE_GROUPS_READ_SCOPE],
         "enable_cimd": False,
         "require_authorization_consent": True,  # confused-deputy mitigation
         # Native MCP clients use loopback callbacks, while hosted callbacks must

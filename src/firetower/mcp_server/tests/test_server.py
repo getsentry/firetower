@@ -9,6 +9,7 @@ import pytest
 from fastmcp import settings as fastmcp_settings
 from starlette.testclient import TestClient
 
+from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE
 from firetower.mcp_server.config import MCPConfig
 from firetower.mcp_server.server import create_mcp
 
@@ -126,6 +127,7 @@ def test_google_authorization_requests_openid_and_email_scopes(
     assert set(parse_qs(google_authorization_url.query)["scope"][0].split()) == {
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
+        GOOGLE_GROUPS_READ_SCOPE,
     }
 
 
