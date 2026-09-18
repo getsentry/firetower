@@ -431,7 +431,7 @@ class TestSyncLinearParentIssueStatus:
         [
             (IncidentStatus.ACTIVE, "started", "state-started"),
             (IncidentStatus.MITIGATED, "started", "state-started"),
-            (IncidentStatus.POSTMORTEM, "started", "state-started"),
+            (IncidentStatus.POSTMORTEM, "in_review", "state-in-review"),
             (IncidentStatus.DONE, "completed", "state-completed"),
             (IncidentStatus.CANCELED, "canceled", "state-canceled"),
         ],
@@ -445,6 +445,7 @@ class TestSyncLinearParentIssueStatus:
                 "started": "state-started",
                 "completed": "state-completed",
                 "canceled": "state-canceled",
+                "in_review": "state-in-review",
             }
             service.get_issue.return_value = {"state_type": "unstarted"}
             service.update_issue.return_value = True

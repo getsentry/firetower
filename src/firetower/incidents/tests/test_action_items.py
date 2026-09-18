@@ -562,6 +562,7 @@ class TestLinearService:
                         {"id": "s3", "name": "In Progress", "type": "started"},
                         {"id": "s4", "name": "Done", "type": "completed"},
                         {"id": "s5", "name": "Canceled", "type": "canceled"},
+                        {"id": "s6", "name": "In Review", "type": "started"},
                     ]
                 }
             }
@@ -571,6 +572,7 @@ class TestLinearService:
             states = service.get_workflow_states("team-1")
             assert states["completed"] == "s4"
             assert states["backlog"] == "s1"
+            assert states["in_review"] == "s6"
 
             states2 = service.get_workflow_states("team-1")
             assert states2 is states

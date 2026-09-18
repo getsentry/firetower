@@ -622,6 +622,10 @@ class LinearService:
             if state_type not in states:
                 states[state_type] = node["id"]
 
+            state_name = node.get("name", "").lower().replace(" ", "_")
+            if state_name and state_name not in states:
+                states[state_name] = node["id"]
+
         self._workflow_states_cache = states
         return states
 
