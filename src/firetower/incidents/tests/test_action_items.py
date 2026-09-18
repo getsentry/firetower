@@ -322,80 +322,22 @@ class TestSyncActionItemsFromLinear:
             assert stats.created == 1
             assert incident.action_items.count() == 1
 
-    def test_auto_completes_parent_when_all_done(self, settings):
+    def test_syncing_action_items_does_not_change_parent_status(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
         incident = self._make_incident(status=IncidentStatus.DONE)
-
         children = [
             _make_linear_issue(
-                id="id-1", identifier="ENG-1", title="T1", status="Done"
-            ),
-            _make_linear_issue(
-                id="id-2", identifier="ENG-2", title="T2", status="Canceled"
-            ),
+                id="id-1", identifier="ENG-1", title="T1", status="In Progress"
+            )
         ]
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_service = mock_get.return_value
             mock_service.get_child_issues.return_value = children
-            mock_service.get_workflow_states.return_value = {
-                "completed": "state-done",
-                "backlog": "state-backlog",
-            }
-            mock_service.update_issue.return_value = True
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", state_id="state-done"
-            )
-
-    def test_sets_parent_to_started_when_incomplete_items(self, settings):
-        settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident(status=IncidentStatus.DONE)
-
-        children = [
-            _make_linear_issue(
-                id="id-1", identifier="ENG-1", title="T1", status="Done"
-            ),
-            _make_linear_issue(
-                id="id-2", identifier="ENG-2", title="T2", status="In Progress"
-            ),
-        ]
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_service = mock_get.return_value
-            mock_service.get_child_issues.return_value = children
-            mock_service.get_workflow_states.return_value = {
-                "completed": "state-done",
-                "started": "state-started",
-            }
-            mock_service.update_issue.return_value = True
-
-            sync_action_items_from_linear(incident, force=True)
-
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", state_id="state-started"
-            )
-
-    def test_completes_parent_when_no_action_items(self, settings):
-        settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident(status=IncidentStatus.DONE)
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_service = mock_get.return_value
-            mock_service.get_child_issues.return_value = []
-            mock_service.get_workflow_states.return_value = {
-                "completed": "state-done",
-                "backlog": "state-backlog",
-            }
-            mock_service.update_issue.return_value = True
-
-            sync_action_items_from_linear(incident, force=True)
-
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", state_id="state-done"
-            )
+            mock_service.update_issue.assert_not_called()
 
     def test_does_not_push_parent_assignee_on_sync(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
@@ -620,6 +562,7 @@ class TestLinearService:
                         {"id": "s3", "name": "In Progress", "type": "started"},
                         {"id": "s4", "name": "Done", "type": "completed"},
                         {"id": "s5", "name": "Canceled", "type": "canceled"},
+                        {"id": "s6", "name": "In Review", "type": "started"},
                     ]
                 }
             }
@@ -629,6 +572,7 @@ class TestLinearService:
             states = service.get_workflow_states("team-1")
             assert states["completed"] == "s4"
             assert states["backlog"] == "s1"
+            assert states["in_review"] == "s6"
 
             states2 = service.get_workflow_states("team-1")
             assert states2 is states

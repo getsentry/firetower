@@ -3522,6 +3522,16 @@ class TestOnIncidentUpdated:
         msg = mock_slack.post_message.call_args[0][1]
         assert "- Status: Active -> Mitigated" in msg
 
+    @patch("firetower.incidents.hooks.sync_linear_parent_issue_status")
+    def test_syncs_linear_parent_status_when_incident_status_changes(
+        self, mock_sync_status
+    ):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+
+        on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
+
+        mock_sync_status.assert_called_once_with(incident)
+
     @patch("firetower.incidents.hooks._slack_service")
     def test_includes_actor_attribution(self, mock_slack):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
