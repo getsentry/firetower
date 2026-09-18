@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
+from django.test import override_settings
 from rest_framework.test import APIClient
 
 from firetower.incidents.models import (
@@ -616,6 +617,33 @@ class TestIncidentAPIViews:
         assert incident.reporter == self.reporter
         assert incident.status == IncidentStatus.ACTIVE  # Default
 
+    @override_settings(
+        READ_ONLY_NON_PRIVATE_SERVICE_ACCOUNTS={
+            "firetower-api-mcp-test@example.iam.gserviceaccount.com"
+        }
+    )
+    def test_read_only_service_account_cannot_create_incident(self):
+        service_account = User.objects.create_user(
+            username="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+            email="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+        )
+        self.client.force_authenticate(user=service_account)
+
+        response = self.client.post(
+            "/api/incidents/",
+            {
+                "title": "Forbidden Incident",
+                "severity": IncidentSeverity.P1,
+                "is_private": False,
+                "captain": self.captain.email,
+                "reporter": self.reporter.email,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 403
+        assert Incident.objects.count() == 0
+
     def test_create_incident_with_optional_fields(self):
         """Test creating incident with optional fields"""
         self.client.force_authenticate(user=self.user)
@@ -803,6 +831,34 @@ class TestIncidentAPIViews:
         assert response.status_code == 200
         incident.refresh_from_db()
         assert incident.title == "Updated Title"
+
+    @override_settings(
+        READ_ONLY_NON_PRIVATE_SERVICE_ACCOUNTS={
+            "firetower-api-mcp-test@example.iam.gserviceaccount.com"
+        }
+    )
+    def test_read_only_service_account_cannot_update_incident(self):
+        service_account = User.objects.create_user(
+            username="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+            email="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+        )
+        incident = Incident.objects.create(
+            title="Original Title",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        self.client.force_authenticate(user=service_account)
+
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/",
+            {"title": "Forbidden Update"},
+            format="json",
+        )
+
+        assert response.status_code == 403
+        incident.refresh_from_db()
+        assert incident.title == "Original Title"
 
     def test_update_incident_as_reporter(self):
         """Test reporter can update incident"""

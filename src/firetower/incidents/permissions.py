@@ -3,6 +3,10 @@ from typing import TYPE_CHECKING, Any
 from rest_framework import permissions
 from rest_framework.request import Request
 
+from firetower.auth.service_accounts import (
+    is_read_only_non_private_service_account,
+)
+
 from .models import Incident
 
 # Prevents circular import at runtime
@@ -43,10 +47,15 @@ class IncidentPermission(permissions.BasePermission):
     - READ: User must have visibility to the incident (respects is_visible_to_user)
     - CREATE: Any authenticated user can create
     - UPDATE: Same as read permissions (anyone who can see can update)
+    - MCP API identities: Read-only regardless of incident visibility
     """
 
     def has_permission(self, request: Request, view: "APIView") -> bool:
-        return request.user and request.user.is_authenticated
+        if not (request.user and request.user.is_authenticated):
+            return False
+        return request.method in permissions.SAFE_METHODS or not (
+            is_read_only_non_private_service_account(request.user)
+        )
 
     def has_object_permission(
         self, request: Request, view: "APIView", obj: Any
