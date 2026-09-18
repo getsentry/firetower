@@ -3,7 +3,7 @@
 import asyncio
 import time
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import jwt
 import pytest
@@ -42,6 +42,17 @@ def _provider(jwks_public_key=None, audience=TEST_AUD):
         key=jwks_public_key or _KEY.public_key()
     )
     provider._jwks_client = jwks
+    provider._token_validator = SimpleNamespace(
+        verify_token=AsyncMock(
+            return_value=SimpleNamespace(
+                claims={
+                    "aud": audience,
+                    "email": "a@sentry.io",
+                    "email_verified": True,
+                }
+            )
+        )
+    )
     return provider
 
 
@@ -138,6 +149,28 @@ def test_admits_refresh_with_expired_login_id_token():
         "email": "a@sentry.io",
         "email_verified": True,
     }
+
+
+def test_rejects_expired_token_without_active_access_token():
+    expired = _id_token(
+        exp=int(time.time()) - 3600,
+        hd="sentry.io",
+        email="a@sentry.io",
+        email_verified=True,
+    )
+    with pytest.raises(FastMCPError):
+        _extract({"id_token": expired})
+
+
+def test_rejects_expired_token_for_different_access_token_identity():
+    expired = _id_token(
+        exp=int(time.time()) - 3600,
+        hd="sentry.io",
+        email="different@sentry.io",
+        email_verified=True,
+    )
+    with pytest.raises(FastMCPError):
+        _extract({"id_token": expired, "access_token": "opaque"})
 
 
 def test_rejects_expired_token_with_bad_signature():

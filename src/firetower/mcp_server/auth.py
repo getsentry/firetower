@@ -8,13 +8,10 @@ issues its own token. A per-tool fallback re-checks the embedded
 
 Token refresh note: ``OAuthProxy`` re-calls ``_extract_upstream_claims`` on
 every upstream refresh, passing the *merged* ``raw_token_data``. Google refresh
-responses carry no ``id_token``, but fastmcp merges the refresh response into the
-stored token data (``{**stored, **refresh_response}``), so the original
-login-time ``id_token`` survives. That token's ``exp`` is in the past by then, so
-we re-verify identity (signature, audience, issuer, hd, email_verified) but skip
-expiry/not-before verification: a successful upstream refresh already proves the
-session is live, and the identity facts we gate on are immutable. Verifying
-``exp`` here would lock out legitimate users on their first refresh (~1h).
+responses carry no ``id_token``, so the original login token is expired by then.
+Initial login verifies its expiry normally. On refresh, an expired ID token is
+accepted only after Google's token verifier confirms that the current access
+token is active and belongs to the same verified identity and OAuth client.
 """
 
 import logging
@@ -57,13 +54,22 @@ class SentryGoogleProvider(GoogleProvider):
                 signing_key.key,
                 algorithms=["RS256"],
                 audience=self._expected_audience,
-                # On refresh, fastmcp re-extracts from the merged raw_token_data,
-                # which still holds the (now-expired) login-time id_token. Skip
-                # exp/nbf here: the upstream refresh already proved liveness and
-                # the identity facts we gate on are immutable. Signature, aud,
-                # and issuer are still fully verified.
-                options={"verify_exp": False, "verify_nbf": False},
             )
+        except jwt.ExpiredSignatureError:
+            try:
+                claims = jwt.decode(
+                    id_token,
+                    signing_key.key,
+                    algorithms=["RS256"],
+                    audience=self._expected_audience,
+                    options={"verify_exp": False, "verify_nbf": False},
+                )
+            except (jwt.InvalidTokenError, jwt.PyJWKClientError) as exc:
+                logger.info("Rejecting refresh: invalid Google id token: %s", exc)
+                raise FastMCPError(
+                    "Access denied: invalid Google identity token."
+                ) from exc
+            await self._verify_refresh_identity(idp_tokens, claims)
         except (jwt.InvalidTokenError, jwt.PyJWKClientError) as exc:
             logger.info("Rejecting login: invalid Google id token: %s", exc)
             raise FastMCPError("Access denied: invalid Google identity token.") from exc
@@ -87,6 +93,24 @@ class SentryGoogleProvider(GoogleProvider):
             "email": claims.get("email"),
             "email_verified": claims["email_verified"],
         }
+
+    async def _verify_refresh_identity(
+        self, idp_tokens: dict[str, Any], id_token_claims: dict[str, Any]
+    ) -> None:
+        access_token = idp_tokens.get("access_token")
+        verified = (
+            await self._token_validator.verify_token(access_token)
+            if access_token
+            else None
+        )
+        claims = verified.claims if verified else {}
+        if (
+            claims.get("aud") != self._expected_audience
+            or claims.get("email") != id_token_claims.get("email")
+            or not claims.get("email_verified")
+        ):
+            logger.info("Rejecting refresh: current Google access token mismatch")
+            raise FastMCPError("Access denied: invalid Google identity token.")
 
 
 def require_sentry_account() -> None:
