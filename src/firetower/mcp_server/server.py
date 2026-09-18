@@ -32,7 +32,7 @@ def create_mcp(config: MCPConfig | None = None) -> FastMCP:
         "base_url": config.base_url,
         "jwt_signing_key": config.jwt_signing_key,
         "required_scopes": ["openid", "email"],
-        "enable_cimd": True,  # Offer CIMD alongside the provider's standard DCR
+        "enable_cimd": False,
         "require_authorization_consent": True,  # confused-deputy mitigation
         # Native MCP clients use loopback callbacks, while hosted callbacks must
         # be explicitly trusted. Required so arbitrary redirect URIs never fall open.

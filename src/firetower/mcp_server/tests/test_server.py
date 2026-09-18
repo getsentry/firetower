@@ -67,6 +67,13 @@ def test_health_is_public_while_mcp_requires_oauth(mcp_client: TestClient):
     assert mcp_response.headers["www-authenticate"].startswith("Bearer ")
 
 
+def test_oauth_metadata_disables_cimd(mcp_client: TestClient):
+    response = mcp_client.get("/.well-known/oauth-authorization-server")
+
+    assert response.status_code == 200
+    assert response.json().get("client_id_metadata_document_supported") is not True
+
+
 def test_pi_dcr_registration_accepts_loopback_callback(mcp_client: TestClient):
     registration_response = mcp_client.post("/register", json=PI_DCR_METADATA)
 
