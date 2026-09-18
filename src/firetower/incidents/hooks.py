@@ -18,6 +18,10 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
 )
+from firetower.incidents.services import (
+    get_linear_parent_issue_state_id,
+    sync_linear_parent_issue_status,
+)
 from firetower.integrations.services import (
     DatadogService,
     LinearService,
@@ -1094,11 +1098,9 @@ def _sync_linear_priority(incident: Incident) -> None:
 LINEAR_PARENT_DESCRIPTION = (
     "Add action items as sub-issues (child issues) of this ticket to have "
     "them tracked by Firetower. "
-    "Do not update title, status or captain here, use Firetower for that.\n\n"
-    "Firetower will mark this ticket as completed once the incident is "
-    "resolved and all action items are done. "
-    "Firetower will reopen this ticket if the incident is reopened, or if "
-    "there are still unfinished action items. "
+    "Do not update title, status or captain here; use Firetower for those.\n\n"
+    "This ticket's status mirrors the associated Firetower incident and is "
+    "independent of its action items. "
     "If you have questions, please reach out to #team-sre."
 )
 
@@ -1151,18 +1153,16 @@ def populate_linear_parent(
     if not linear_config or not uuid:
         return
 
-    team_id = str(linear_config.get("TEAM_ID", ""))
     linear_service = _get_linear_service()
 
     try:
-        states = linear_service.get_workflow_states(team_id) if team_id else None
-        started_state_id = states.get("started") if states else None
+        state_id = get_linear_parent_issue_state_id(incident, linear_service)
         captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
         linear_service.update_issue(
             uuid,
             title=_linear_issue_title(incident, sync_identifiers=True),
             description=LINEAR_PARENT_DESCRIPTION,
-            state_id=started_state_id,
+            state_id=state_id,
             assignee_id=captain_linear_id,
             priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
         )
@@ -1255,13 +1255,12 @@ def create_linear_parent_issue(
                 )
                 return
 
-            states = linear_service.get_workflow_states(team_id)
-            started_state_id = states.get("started") if states else None
+            state_id = get_linear_parent_issue_state_id(incident, linear_service)
             if not linear_service.update_issue(
                 issue["id"],
                 title=title,
                 description=LINEAR_PARENT_DESCRIPTION,
-                state_id=started_state_id,
+                state_id=state_id,
                 assignee_id=captain_linear_id,
                 priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
             ):
@@ -1271,11 +1270,13 @@ def create_linear_parent_issue(
                 )
                 return
         else:
+            state_id = get_linear_parent_issue_state_id(incident, linear_service)
             issue = linear_service.create_issue(
                 title,
                 LINEAR_PARENT_DESCRIPTION,
                 team_id,
                 project_id,
+                state_id=state_id,
                 assignee_id=captain_linear_id,
                 priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
             )
@@ -1800,6 +1801,15 @@ def on_incident_updated(
             )
 
     # --- Side effects ---
+
+    # Status change: mirror the lifecycle state to the Linear parent ticket.
+    if old_status is not None:
+        try:
+            sync_linear_parent_issue_status(incident)
+        except Exception:
+            logger.exception(
+                f"Failed to sync Linear parent status for incident {incident.id}"
+            )
 
     # Status change: trigger slack dump for resolve-like statuses
     if (

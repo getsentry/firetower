@@ -6,7 +6,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
-from jinja2 import Environment, TemplateError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import (
@@ -15,7 +14,6 @@ from firetower.auth.services import (
 )
 from firetower.incidents.models import (
     ActionItem,
-    ActionItemStatus,
     ExternalLinkType,
     Incident,
     IncidentStatus,
@@ -184,104 +182,55 @@ def _resolve_assignees(
     return resolved
 
 
-COMPLETED_STATUSES = {ActionItemStatus.DONE, ActionItemStatus.CANCELED}
-
-_PARENT_STATUS_TEMPLATE_ENV = Environment(autoescape=False)
-
-
-def _comment_parent_issue_status_change(
-    incident: Incident,
-    linear_service: LinearService,
-    target_state: str,
-    statuses: list[str],
-) -> None:
-    if not settings.LINEAR or not incident.linear_parent_issue_id:
-        return
-
-    template_key = (
-        "PARENT_STATUS_COMMENT_COMPLETED"
-        if target_state == "completed"
-        else "PARENT_STATUS_COMMENT_STARTED"
-    )
-    template_source = settings.LINEAR.get(template_key, "")
-    if not template_source or not template_source.strip():
-        return
-
-    completed_action_items = sum(1 for s in statuses if s in COMPLETED_STATUSES)
-    try:
-        comment = _PARENT_STATUS_TEMPLATE_ENV.from_string(template_source).render(
-            incident=incident,
-            total_action_items=len(statuses),
-            completed_action_items=completed_action_items,
-            target_state=target_state,
-        )
-    except TemplateError:
-        logger.exception(
-            f"Failed to render parent status comment template for incident {incident.id}"
-        )
-        return
-
-    try:
-        linear_service.create_comment(incident.linear_parent_issue_id, comment)
-    except Exception:
-        logger.exception(
-            f"Failed to post parent status comment for incident {incident.id}"
-        )
+LINEAR_STATE_BY_INCIDENT_STATUS: dict[str, str] = {
+    IncidentStatus.ACTIVE: "started",
+    IncidentStatus.MITIGATED: "started",
+    IncidentStatus.POSTMORTEM: "started",
+    IncidentStatus.DONE: "completed",
+    IncidentStatus.CANCELED: "canceled",
+}
 
 
-def _update_parent_issue_status(
+def get_linear_parent_issue_state_id(
     incident: Incident, linear_service: LinearService
-) -> None:
-    if not settings.LINEAR or not incident.linear_parent_issue_id:
-        return
-    team_id = str(settings.LINEAR.get("TEAM_ID", ""))
-    if not team_id:
-        return
+) -> str | None:
+    """Return the Linear workflow state that represents an incident's status."""
+    linear_config = settings.LINEAR
+    if not linear_config:
+        return None
 
-    statuses = list(incident.action_items.values_list("status", flat=True))
-    incident_done = incident.status in (IncidentStatus.DONE, IncidentStatus.CANCELED)
-    all_complete = incident_done and (
-        not statuses or all(s in COMPLETED_STATUSES for s in statuses)
-    )
+    team_id = str(linear_config.get("TEAM_ID", ""))
+    target_state = LINEAR_STATE_BY_INCIDENT_STATUS.get(incident.status)
+    if not team_id or not target_state:
+        return None
 
     states = linear_service.get_workflow_states(team_id)
-    if not states:
+    return states.get(target_state) if states else None
+
+
+def sync_linear_parent_issue_status(incident: Incident) -> None:
+    """Set the Linear parent issue state from the incident, never its action items."""
+    if not settings.LINEAR or not incident.linear_parent_issue_id:
         return
 
-    target_state = "completed" if all_complete else "started"
+    linear_service = _get_linear_service()
+    target_state = LINEAR_STATE_BY_INCIDENT_STATUS.get(incident.status)
+    state_id = get_linear_parent_issue_state_id(incident, linear_service)
+    if not target_state or not state_id:
+        return
 
     parent_issue = linear_service.get_issue(incident.linear_parent_issue_id)
-    if not parent_issue:
-        return
-
-    # Never override a manually-cancelled parent issue. Firetower only ever
-    # drives the parent to "started" or "completed", so a "canceled" state
-    # reflects a deliberate human decision and must not be reopened to
-    # "started" (or forced to "completed") on subsequent syncs.
-    current_state_type = parent_issue.get("state_type")
-    if current_state_type in ("canceled", target_state):
-        return
-
-    state_id = states.get(target_state)
-    if not state_id:
+    if not parent_issue or parent_issue.get("state_type") == target_state:
         return
 
     if linear_service.update_issue(incident.linear_parent_issue_id, state_id=state_id):
-        _comment_parent_issue_status_change(
-            incident, linear_service, target_state, statuses
-        )
         return
 
-    # The underlying Linear error is logged by LinearService without any
-    # incident context, so name the incident and its parent here. Without this
-    # a persistently mislinked parent just emits an anonymous GraphQL error
-    # every sync, with nothing tying it back to the row that needs fixing.
     logger.warning(
-        "Failed to set Linear parent %s to %s for incident %s (team %s)",
+        "Failed to set Linear parent %s to %s for incident %s",
         incident.linear_parent_issue_id,
         target_state,
         incident.incident_number,
-        team_id,
     )
 
 
@@ -396,13 +345,6 @@ def sync_action_items_from_linear(
 
         incident.action_items_last_synced_at = timezone.now()
         incident.save(update_fields=["action_items_last_synced_at"])
-
-    try:
-        _update_parent_issue_status(incident, linear_service)
-    except Exception:
-        logger.exception(
-            f"Failed to update Linear parent issue status for incident {incident.id}"
-        )
 
     logger.info(
         f"Action item sync complete for incident {incident.id}: "
