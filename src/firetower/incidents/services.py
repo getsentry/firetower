@@ -101,12 +101,27 @@ def sync_incident_participants_from_slack(
     existing_participant_ids = set(incident.participants.values_list("id", flat=True))
     new_participants = []
 
+    # Filter out bots up front so the bulk query only covers real users
+    non_bot_slack_ids = [uid for uid in slack_member_ids if not uid.startswith("B")]
+
+    # Bulk-fetch all existing ExternalProfiles in one query to avoid N+1
+    known_profiles = ExternalProfile.objects.filter(
+        type=ExternalProfileType.SLACK,
+        external_id__in=non_bot_slack_ids,
+    ).select_related("user")
+    slack_id_to_user = {ep.external_id: ep.user for ep in known_profiles}
+
     for slack_user_id in slack_member_ids:
         if slack_user_id.startswith("B"):
             logger.info(f"Skipping bot: {slack_user_id}")
             continue
 
-        user = get_or_create_user_from_slack_id(slack_user_id)
+        user: User | None
+        if slack_user_id in slack_id_to_user:
+            logger.info(f"Found existing user for Slack ID: {slack_user_id}")
+            user = slack_id_to_user[slack_user_id]
+        else:
+            user = get_or_create_user_from_slack_id(slack_user_id)
 
         if not user:
             logger.info(

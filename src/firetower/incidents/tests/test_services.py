@@ -357,12 +357,11 @@ class TestSyncIncidentParticipantsFromSlack:
                 with patch(
                     "firetower.incidents.services.get_or_create_user_from_slack_id"
                 ) as mock_get_user:
-                    mock_get_user.return_value = slack_user
-
                     stats = sync_incident_participants_from_slack(incident)
 
-                    assert mock_get_user.call_count == 1
-                    mock_get_user.assert_called_once_with("U11111")
+                    # U11111 is resolved via the bulk ExternalProfile prefetch;
+                    # get_or_create_user_from_slack_id should not be called for it.
+                    mock_get_user.assert_not_called()
                     assert stats.added == 1
                     assert stats.errors == []
 
