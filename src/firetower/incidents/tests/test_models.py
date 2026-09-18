@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.test import override_settings
 from django.utils import timezone
 
 from firetower.incidents.models import (
@@ -574,6 +575,36 @@ class TestFilterVisibleToUser:
         assert public in filtered
         assert user_private in filtered
         assert other_private not in filtered
+
+    @override_settings(
+        READ_ONLY_NON_PRIVATE_SERVICE_ACCOUNTS={
+            "firetower-api-mcp-test@example.iam.gserviceaccount.com"
+        }
+    )
+    def test_read_only_service_account_never_sees_private_incidents(self):
+        service_account = User.objects.create_user(
+            username="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+            email="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+        )
+        public = Incident.objects.create(
+            title="Public",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        private = Incident.objects.create(
+            title="Private",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=service_account,
+            reporter=service_account,
+        )
+        private.participants.add(service_account)
+
+        filtered = filter_visible_to_user(Incident.objects.all(), service_account)
+
+        assert list(filtered) == [public]
 
     def test_participant_sees_private_incident(self):
         """Test participants can see private incidents they're involved in"""

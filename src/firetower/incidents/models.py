@@ -7,6 +7,10 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models, transaction
 from django.db.models import Q, QuerySet
 
+from firetower.auth.service_accounts import (
+    is_read_only_non_private_service_account,
+)
+
 INCIDENT_ID_START = 2000
 
 
@@ -482,6 +486,9 @@ def filter_visible_to_user(
     # Anonymous users see no incidents. IAP should prevent this, but just in case.
     if not user.is_authenticated:
         return queryset.none()
+
+    if is_read_only_non_private_service_account(user):
+        return queryset.filter(is_private=False)
 
     return queryset.filter(
         Q(is_private=False) | Q(captain=user) | Q(reporter=user) | Q(participants=user)
