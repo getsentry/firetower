@@ -1,6 +1,6 @@
 import pytest
 
-from firetower.mcp_server.config import MCPConfig
+from firetower.mcp_server.config import ConfigError, MCPConfig
 
 
 @pytest.fixture
@@ -9,9 +9,19 @@ def required_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MCP_GOOGLE_CLIENT_SECRET", "test-client-secret")
     monkeypatch.setenv("MCP_BASE_URL", "https://mcp.example.com")
     monkeypatch.setenv("FIRETOWER_SERVICE_ACCOUNT", "test@example.com")
+    monkeypatch.setenv("MCP_JWT_SIGNING_KEY", "test-signing-key")
     monkeypatch.setenv(
         "MCP_ALLOWED_REDIRECT_URIS", "https://client.example.com/callback"
     )
+
+
+def test_jwt_signing_key_is_required(
+    monkeypatch: pytest.MonkeyPatch, required_env: None
+) -> None:
+    monkeypatch.delenv("MCP_JWT_SIGNING_KEY")
+
+    with pytest.raises(ConfigError, match="MCP_JWT_SIGNING_KEY"):
+        MCPConfig.from_env()
 
 
 @pytest.mark.parametrize("value", ["", " \t "])
