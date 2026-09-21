@@ -392,6 +392,7 @@ REST_FRAMEWORK = {
 # Google IAP Authentication Configuration
 IAP_ENABLED = config.auth.iap_enabled
 IAP_AUDIENCE = config.auth.iap_audience
+
 # Validate IAP settings in production
 if IAP_ENABLED and not IAP_AUDIENCE:
     raise Exception(
