@@ -598,6 +598,8 @@ class TestFilterVisibleToUser:
 
         filtered = filter_visible_to_user(Incident.objects.all(), service_account)
 
+        assert public.is_visible_to_user(service_account)
+        assert not private.is_visible_to_user(service_account)
         assert list(filtered) == [public]
 
     def test_participant_sees_private_incident(self):

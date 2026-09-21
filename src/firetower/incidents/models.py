@@ -330,6 +330,9 @@ class Incident(models.Model):
         return links
 
     def is_visible_to_user(self, user: User) -> bool:
+        if is_google_service_account(user):
+            return not self.is_private
+
         if not self.is_private:
             return True
 
