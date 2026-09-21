@@ -44,6 +44,7 @@ ISSUE_FIELDS = """
     url
     priority
     state {
+        id
         type
     }
     assignee {
@@ -438,6 +439,7 @@ class LinearService:
             "identifier": issue["identifier"],
             "title": issue["title"],
             "url": issue["url"],
+            "state_id": (issue.get("state") or {}).get("id", ""),
             "state_type": (issue.get("state") or {}).get("type", ""),
         }
 
@@ -621,6 +623,10 @@ class LinearService:
             state_type = node.get("type", "")
             if state_type not in states:
                 states[state_type] = node["id"]
+
+            state_name = node.get("name", "").lower().replace(" ", "_")
+            if state_name and state_name not in states:
+                states[state_name] = node["id"]
 
         self._workflow_states_cache = states
         return states
