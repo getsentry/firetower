@@ -220,7 +220,7 @@ def sync_linear_parent_issue_status(incident: Incident) -> None:
         return
 
     parent_issue = linear_service.get_issue(incident.linear_parent_issue_id)
-    if not parent_issue or parent_issue.get("state_type") == target_state:
+    if not parent_issue or parent_issue.get("state_id") == state_id:
         return
 
     if linear_service.update_issue(incident.linear_parent_issue_id, state_id=state_id):

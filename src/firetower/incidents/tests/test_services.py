@@ -447,7 +447,7 @@ class TestSyncLinearParentIssueStatus:
                 "done": "state-done",
                 "canceled": "state-canceled",
             }
-            service.get_issue.return_value = {"state_type": "unstarted"}
+            service.get_issue.return_value = {"state_id": "state-unstarted"}
             service.update_issue.return_value = True
 
             sync_linear_parent_issue_status(incident)
@@ -460,7 +460,7 @@ class TestSyncLinearParentIssueStatus:
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             service = mock_get.return_value
             service.get_workflow_states.return_value = {"done": "state-done"}
-            service.get_issue.return_value = {"state_type": "started"}
+            service.get_issue.return_value = {"state_id": "state-in-progress"}
             service.update_issue.return_value = True
 
             sync_linear_parent_issue_status(incident)
@@ -475,7 +475,36 @@ class TestSyncLinearParentIssueStatus:
             service.get_workflow_states.return_value = {
                 "in_progress": "state-in-progress"
             }
-            service.get_issue.return_value = {"state_type": "canceled"}
+            service.get_issue.return_value = {"state_id": "state-canceled"}
+            service.update_issue.return_value = True
+
+            sync_linear_parent_issue_status(incident)
+
+        service.update_issue.assert_called_once_with(
+            "lin-123", state_id="state-in-progress"
+        )
+
+    def test_skips_update_when_parent_already_matches_incident(self):
+        incident = self._make_incident(status=IncidentStatus.DONE)
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            service = mock_get.return_value
+            service.get_workflow_states.return_value = {"done": "state-done"}
+            service.get_issue.return_value = {"state_id": "state-done"}
+
+            sync_linear_parent_issue_status(incident)
+
+        service.update_issue.assert_not_called()
+
+    def test_reopens_an_in_review_parent_when_incident_reopens(self):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            service = mock_get.return_value
+            service.get_workflow_states.return_value = {
+                "in_progress": "state-in-progress"
+            }
+            service.get_issue.return_value = {"state_id": "state-in-review"}
             service.update_issue.return_value = True
 
             sync_linear_parent_issue_status(incident)

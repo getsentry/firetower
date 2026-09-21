@@ -44,6 +44,7 @@ ISSUE_FIELDS = """
     url
     priority
     state {
+        id
         type
     }
     assignee {
@@ -438,6 +439,7 @@ class LinearService:
             "identifier": issue["identifier"],
             "title": issue["title"],
             "url": issue["url"],
+            "state_id": (issue.get("state") or {}).get("id", ""),
             "state_type": (issue.get("state") or {}).get("type", ""),
         }
 
