@@ -572,7 +572,9 @@ class TestLinearService:
             states = service.get_workflow_states("team-1")
             assert states["completed"] == "s4"
             assert states["backlog"] == "s1"
+            assert states["in_progress"] == "s3"
             assert states["in_review"] == "s6"
+            assert states["done"] == "s4"
 
             states2 = service.get_workflow_states("team-1")
             assert states2 is states

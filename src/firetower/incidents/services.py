@@ -183,10 +183,10 @@ def _resolve_assignees(
 
 
 LINEAR_STATE_BY_INCIDENT_STATUS: dict[str, str] = {
-    IncidentStatus.ACTIVE: "started",
-    IncidentStatus.MITIGATED: "started",
+    IncidentStatus.ACTIVE: "in_progress",
+    IncidentStatus.MITIGATED: "in_progress",
     IncidentStatus.POSTMORTEM: "in_review",
-    IncidentStatus.DONE: "completed",
+    IncidentStatus.DONE: "done",
     IncidentStatus.CANCELED: "canceled",
 }
 

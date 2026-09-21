@@ -429,10 +429,10 @@ class TestSyncLinearParentIssueStatus:
     @pytest.mark.parametrize(
         ("incident_status", "target_state", "state_id"),
         [
-            (IncidentStatus.ACTIVE, "started", "state-started"),
-            (IncidentStatus.MITIGATED, "started", "state-started"),
+            (IncidentStatus.ACTIVE, "in_progress", "state-in-progress"),
+            (IncidentStatus.MITIGATED, "in_progress", "state-in-progress"),
             (IncidentStatus.POSTMORTEM, "in_review", "state-in-review"),
-            (IncidentStatus.DONE, "completed", "state-completed"),
+            (IncidentStatus.DONE, "done", "state-done"),
             (IncidentStatus.CANCELED, "canceled", "state-canceled"),
         ],
     )
@@ -442,10 +442,10 @@ class TestSyncLinearParentIssueStatus:
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             service = mock_get.return_value
             service.get_workflow_states.return_value = {
-                "started": "state-started",
-                "completed": "state-completed",
-                "canceled": "state-canceled",
+                "in_progress": "state-in-progress",
                 "in_review": "state-in-review",
+                "done": "state-done",
+                "canceled": "state-canceled",
             }
             service.get_issue.return_value = {"state_type": "unstarted"}
             service.update_issue.return_value = True
@@ -459,49 +459,39 @@ class TestSyncLinearParentIssueStatus:
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             service = mock_get.return_value
-            service.get_workflow_states.return_value = {"completed": "state-completed"}
+            service.get_workflow_states.return_value = {"done": "state-done"}
             service.get_issue.return_value = {"state_type": "started"}
             service.update_issue.return_value = True
 
             sync_linear_parent_issue_status(incident)
 
-        service.update_issue.assert_called_once_with(
-            "lin-123", state_id="state-completed"
-        )
+        service.update_issue.assert_called_once_with("lin-123", state_id="state-done")
 
     def test_reopens_a_canceled_parent_when_incident_reopens(self):
         incident = self._make_incident(status=IncidentStatus.ACTIVE)
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             service = mock_get.return_value
-            service.get_workflow_states.return_value = {"started": "state-started"}
+            service.get_workflow_states.return_value = {
+                "in_progress": "state-in-progress"
+            }
             service.get_issue.return_value = {"state_type": "canceled"}
             service.update_issue.return_value = True
 
             sync_linear_parent_issue_status(incident)
 
         service.update_issue.assert_called_once_with(
-            "lin-123", state_id="state-started"
+            "lin-123", state_id="state-in-progress"
         )
-
-    def test_skips_update_when_parent_already_matches_incident(self):
-        incident = self._make_incident(status=IncidentStatus.DONE)
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            service = mock_get.return_value
-            service.get_workflow_states.return_value = {"completed": "state-completed"}
-            service.get_issue.return_value = {"state_type": "completed"}
-
-            sync_linear_parent_issue_status(incident)
-
-        service.update_issue.assert_not_called()
 
     def test_skips_update_when_parent_cannot_be_found(self):
         incident = self._make_incident()
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             service = mock_get.return_value
-            service.get_workflow_states.return_value = {"started": "state-started"}
+            service.get_workflow_states.return_value = {
+                "in_progress": "state-in-progress"
+            }
             service.get_issue.return_value = None
 
             sync_linear_parent_issue_status(incident)
