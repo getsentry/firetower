@@ -5,7 +5,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from django.test import override_settings
 from django.utils import timezone
 
 from firetower.incidents.models import (
@@ -576,15 +575,10 @@ class TestFilterVisibleToUser:
         assert user_private in filtered
         assert other_private not in filtered
 
-    @override_settings(
-        READ_ONLY_NON_PRIVATE_SERVICE_ACCOUNTS={
-            "firetower-api-mcp-test@example.iam.gserviceaccount.com"
-        }
-    )
-    def test_read_only_service_account_never_sees_private_incidents(self):
+    def test_google_service_account_never_sees_private_incidents(self):
         service_account = User.objects.create_user(
-            username="firetower-api-mcp-test@example.iam.gserviceaccount.com",
-            email="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+            username="123456789@cloudbuild.gserviceaccount.com",
+            email="123456789@cloudbuild.gserviceaccount.com",
         )
         public = Incident.objects.create(
             title="Public",

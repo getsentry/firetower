@@ -3,9 +3,7 @@ from typing import TYPE_CHECKING, Any
 from rest_framework import permissions
 from rest_framework.request import Request
 
-from firetower.auth.service_accounts import (
-    is_read_only_non_private_service_account,
-)
+from firetower.auth.service_accounts import is_google_service_account
 
 from .models import Incident
 
@@ -54,7 +52,7 @@ class IncidentPermission(permissions.BasePermission):
         if not (request.user and request.user.is_authenticated):
             return False
         return request.method in permissions.SAFE_METHODS or not (
-            is_read_only_non_private_service_account(request.user)
+            is_google_service_account(request.user)
         )
 
     def has_object_permission(

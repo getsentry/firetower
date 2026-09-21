@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
-from django.test import override_settings
 from rest_framework.test import APIClient
 
 from firetower.incidents.models import (
@@ -617,12 +616,7 @@ class TestIncidentAPIViews:
         assert incident.reporter == self.reporter
         assert incident.status == IncidentStatus.ACTIVE  # Default
 
-    @override_settings(
-        READ_ONLY_NON_PRIVATE_SERVICE_ACCOUNTS={
-            "firetower-api-mcp-test@example.iam.gserviceaccount.com"
-        }
-    )
-    def test_read_only_service_account_cannot_create_incident(self):
+    def test_google_service_account_cannot_create_incident(self):
         service_account = User.objects.create_user(
             username="firetower-api-mcp-test@example.iam.gserviceaccount.com",
             email="firetower-api-mcp-test@example.iam.gserviceaccount.com",
@@ -832,15 +826,10 @@ class TestIncidentAPIViews:
         incident.refresh_from_db()
         assert incident.title == "Updated Title"
 
-    @override_settings(
-        READ_ONLY_NON_PRIVATE_SERVICE_ACCOUNTS={
-            "firetower-api-mcp-test@example.iam.gserviceaccount.com"
-        }
-    )
-    def test_read_only_service_account_cannot_update_incident(self):
+    def test_google_service_account_cannot_update_incident(self):
         service_account = User.objects.create_user(
-            username="firetower-api-mcp-test@example.iam.gserviceaccount.com",
-            email="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+            username="123456789-compute@developer.gserviceaccount.com",
+            email="123456789-compute@developer.gserviceaccount.com",
         )
         incident = Incident.objects.create(
             title="Original Title",

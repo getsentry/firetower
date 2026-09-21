@@ -7,9 +7,7 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models, transaction
 from django.db.models import Q, QuerySet
 
-from firetower.auth.service_accounts import (
-    is_read_only_non_private_service_account,
-)
+from firetower.auth.service_accounts import is_google_service_account
 
 INCIDENT_ID_START = 2000
 
@@ -487,7 +485,7 @@ def filter_visible_to_user(
     if not user.is_authenticated:
         return queryset.none()
 
-    if is_read_only_non_private_service_account(user):
+    if is_google_service_account(user):
         return queryset.filter(is_private=False)
 
     return queryset.filter(
