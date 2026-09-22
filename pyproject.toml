@@ -54,6 +54,11 @@ mcp = [
     "firetower-sdk",
 ]
 
+[[tool.uv.index]]
+name = "sfw"
+url = "https://sfw.security.sentry.io/pypi/simple"
+default = true
+
 [tool.uv.sources]
 firetower-sdk = { path = "sdk", editable = true }
 

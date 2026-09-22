@@ -1,4 +1,8 @@
 version: 2
+registries:
+  sfw:
+    type: python-index
+    url: https://sfw.security.sentry.io/pypi/simple
 updates:
   # Python dependencies (uv reads pyproject.toml + uv.lock). Dependabot opens
   # bump PRs only — nothing auto-merges. Review each PR; for a fastmcp bump,
@@ -6,6 +10,8 @@ updates:
   # since the MCP server's auth relies on fastmcp OAuthProxy internals.
   - package-ecosystem: "uv"
     directory: "/"
+    registries:
+      - sfw
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
