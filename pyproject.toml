@@ -45,7 +45,7 @@ dev = [
 ]
 prod = [
     "ddtrace==4.15.1",
-    "granian>=2.6.0",
+    "granian>=2.8.3",
     "sentry-sdk[django]>=2.62.0",
 ]
 mcp = [
