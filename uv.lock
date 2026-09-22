@@ -836,7 +836,7 @@ requires-dist = [
     { name = "notion-client", specifier = ">=3.0.0,<4.0.0" },
     { name = "openrouter", specifier = ">=1.1.139" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.11" },
-    { name = "pyserde", extras = ["toml"], specifier = ">=0.28.0" },
+    { name = "pyserde", extras = ["toml"], specifier = ">=0.33.1" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "sentry-sdk", specifier = ">=2.62.0" },
     { name = "slack-bolt", specifier = ">=1.30.0" },
@@ -1908,7 +1908,7 @@ wheels = [
 
 [[package]]
 name = "pyserde"
-version = "0.28.0"
+version = "0.33.1"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
     { name = "beartype" },
@@ -1916,11 +1916,10 @@ dependencies = [
     { name = "jinja2" },
     { name = "plum-dispatch" },
     { name = "typing-extensions" },
-    { name = "typing-inspect" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/a4/64/76c583fbd52a10e710f98605b5ec29471fcfe38b1ff26faa1f8db3184a84/pyserde-0.28.0.tar.gz", hash = "sha256:bf6b7899e7763551a2c6897be08b07290f4faaf3335f0dfa7b3f64cbf885acf9", size = 485398, upload-time = "2026-01-08T11:35:23.972Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/b0/b5/8858a66b9c54110d6e322f1229c6d7e4865bb5b10a80a7372f3264d87976/pyserde-0.33.1.tar.gz", hash = "sha256:42523c6468e04cdffbe5272960852ac4f3fb5e978e2654e0875f9a243ec010ef", size = 503109, upload-time = "2026-09-19T12:51:26.627Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/f1/51/d73d4795c2bb4f98a3bb43bbd649cc88a6fb036af2161d820526cd08700a/pyserde-0.28.0-py3-none-any.whl", hash = "sha256:718c6620e55b706810321c6f7b99ffb5067344b5a48da5d68e01b31bab7dabc4", size = 47650, upload-time = "2026-01-08T11:35:22.526Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/32/69/2a03822577ac9f270060cbb36f82957b837cd16e38e025c5d1d697b609e6/pyserde-0.33.1-py3-none-any.whl", hash = "sha256:5eba9e033e3e836e30429a63f2753838c720fbddc8bf3c3cf8f327e0caebb121", size = 53376, upload-time = "2026-09-19T12:51:25.395Z" },
 ]
 
 [package.optional-dependencies]
@@ -2418,19 +2417,6 @@ source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 sdist = { url = "https://sfw.security.sentry.io/pypi/packages/72/94/1a15dd82efb362ac84269196e94cf00f187f7ed21c242792a923cdb1c61f/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466", size = 109391, upload-time = "2025-08-25T13:49:26.313Z" }
 wheels = [
     { url = "https://sfw.security.sentry.io/pypi/packages/18/67/36e9267722cc04a6b9f15c7f3441c2363321a3ea07da7ae0c0707beb2a9c/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548", size = 44614, upload-time = "2025-08-25T13:49:24.86Z" },
-]
-
-[[package]]
-name = "typing-inspect"
-version = "0.9.0"
-source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
-dependencies = [
-    { name = "mypy-extensions" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/dc/74/1789779d91f1961fa9438e9a8710cdae6bd138c80d7303996933d117264a/typing_inspect-0.9.0.tar.gz", hash = "sha256:b23fc42ff6f6ef6954e4852c1fb512cdd18dbea03134f91f856a95ccc9461f78", size = 13825, upload-time = "2023-05-24T20:25:47.612Z" }
-wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/65/f3/107a22063bf27bdccf2024833d3445f4eea42b2e598abfbd46f6a63b6cb0/typing_inspect-0.9.0-py3-none-any.whl", hash = "sha256:9ee6fc59062311ef8547596ab6b955e1b8aa46242d854bfc78f4f6b0eff35f9f", size = 8827, upload-time = "2023-05-24T20:25:45.287Z" },
 ]
 
 [[package]]
