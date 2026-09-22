@@ -7,7 +7,11 @@ from unittest.mock import MagicMock, patch
 
 from slack_sdk.errors import SlackApiError
 
-from firetower.integrations.services.slack import SlackService, is_slack_guest
+from firetower.integrations.services.slack import (
+    SlackRateLimitRetry,
+    SlackService,
+    is_slack_guest,
+)
 
 # Set up Django settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "firetower.settings")
@@ -127,6 +131,85 @@ class TestSlackService:
 
                 assert profile is None
 
+    def test_get_user_profile_by_email_rate_limited(self):
+        mock_slack_config = {
+            "BOT_TOKEN": "xoxb-test-token",
+            "TEAM_ID": "sentry",
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            with patch("firetower.integrations.services.slack.WebClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+
+                mock_response = MagicMock()
+                mock_response.get.return_value = "ratelimited"
+                mock_response.headers = {"retry-after": "30"}
+                mock_client.users_lookupByEmail.side_effect = SlackApiError(
+                    "ratelimited", mock_response
+                )
+
+                service = SlackService()
+                with patch(
+                    "firetower.integrations.services.slack.logger"
+                ) as mock_logger:
+                    profile = service.get_user_profile_by_email("test@example.com")
+
+                assert profile is None
+                mock_logger.warning.assert_called_once_with(
+                    "Slack user profile lookup rate limited",
+                    extra={"slack_error": "ratelimited", "retry_after": "30"},
+                )
+                mock_logger.error.assert_not_called()
+
+    def test_get_user_profile_by_email_retries_rate_limit(self):
+        mock_slack_config = {
+            "BOT_TOKEN": "xoxb-test-token",
+            "TEAM_ID": "sentry",
+        }
+        slack_profile = {
+            "user": {
+                "id": "U12345",
+                "real_name": "John Doe",
+                "profile": {},
+            }
+        }
+
+        with patch.object(settings, "SLACK", mock_slack_config):
+            with patch("firetower.integrations.services.slack.WebClient") as MockClient:
+                mock_client = MagicMock()
+                MockClient.return_value = mock_client
+
+                mock_response = MagicMock()
+                mock_response.get.return_value = "ratelimited"
+                mock_response.headers = {"retry-after": "60"}
+                mock_client.users_lookupByEmail.side_effect = [
+                    SlackApiError("ratelimited", mock_response),
+                    slack_profile,
+                ]
+
+                service = SlackService()
+                rate_limit_retry = SlackRateLimitRetry()
+                with patch("firetower.integrations.services.slack.time.sleep") as sleep:
+                    profile = service.get_user_profile_by_email(
+                        "test@example.com", rate_limit_retry=rate_limit_retry
+                    )
+
+                assert profile is not None
+                assert profile["slack_user_id"] == "U12345"
+                sleep.assert_called_once_with(30)
+                assert rate_limit_retry.remaining == 0
+                assert mock_client.users_lookupByEmail.call_count == 2
+
+    def test_rate_limit_retry_is_shared_and_capped(self):
+        rate_limit_retry = SlackRateLimitRetry()
+
+        with patch("firetower.integrations.services.slack.time.sleep") as sleep:
+            assert rate_limit_retry.wait("60") is True
+            assert rate_limit_retry.wait("60") is False
+
+        sleep.assert_called_once_with(30)
+
     def test_get_user_profile_without_client(self):
         """Test that profile fetch returns None when Slack client not initialized."""
         mock_slack_config = {
@@ -236,6 +319,42 @@ class TestSlackService:
             "name_taken", mock_response
         )
         assert service.create_channel("inc-2014") is None
+
+    def test_convert_channel_privacy_to_public_success(self):
+        service, mock_client = self._make_service()
+        assert service.convert_channel_privacy("C12345", is_private=False) is True
+        mock_client.admin_conversations_convertToPublic.assert_called_once_with(
+            channel_id="C12345"
+        )
+        mock_client.admin_conversations_convertToPrivate.assert_not_called()
+
+    def test_convert_channel_privacy_to_private_success(self):
+        service, mock_client = self._make_service()
+        assert service.convert_channel_privacy("C12345", is_private=True) is True
+        mock_client.admin_conversations_convertToPrivate.assert_called_once_with(
+            channel_id="C12345"
+        )
+        mock_client.admin_conversations_convertToPublic.assert_not_called()
+
+    def test_convert_channel_privacy_no_client(self):
+        mock_slack_config = {"BOT_TOKEN": None, "TEAM_ID": "sentry"}
+        with patch.object(settings, "SLACK", mock_slack_config):
+            service = SlackService()
+        assert service.convert_channel_privacy("C12345", is_private=False) is False
+
+    def test_convert_channel_privacy_api_error_falls_back(self):
+        service, mock_client = self._make_service()
+        mock_response = MagicMock()
+        mock_response.get.return_value = "missing_scope"
+        mock_client.admin_conversations_convertToPublic.side_effect = SlackApiError(
+            "missing_scope", mock_response
+        )
+        assert service.convert_channel_privacy("C12345", is_private=False) is False
+
+    def test_convert_channel_privacy_unexpected_error_falls_back(self):
+        service, mock_client = self._make_service()
+        mock_client.admin_conversations_convertToPublic.side_effect = TimeoutError
+        assert service.convert_channel_privacy("C12345", is_private=False) is False
 
     def test_set_channel_topic_success(self):
         service, mock_client = self._make_service()
@@ -431,6 +550,11 @@ class TestSlackService:
         url = service.build_channel_url("C12345")
         assert url == "https://sentry.slack.com/archives/C12345"
         assert service.parse_channel_id_from_url(url) == "C12345"
+
+    def test_get_channel_info_unexpected_error_returns_none(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_info.side_effect = TimeoutError
+        assert service.get_channel_info("C12345") is None
 
     def test_get_channel_history_returns_all_messages(self):
         service, mock_client = self._make_service()

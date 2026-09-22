@@ -561,8 +561,9 @@ class TestOnTitleChanged:
 @pytest.mark.django_db
 class TestOnVisibilityChanged:
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_private_message(self, mock_slack):
+    def test_posts_private_message_when_conversion_fails(self, mock_slack):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.convert_channel_privacy.return_value = False
 
         incident = Incident.objects.create(
             title="Test",
@@ -574,15 +575,78 @@ class TestOnVisibilityChanged:
             type=ExternalLinkType.SLACK,
             url="https://slack.com/archives/C12345",
         )
+        mock_slack.get_channel_info.return_value = {
+            "name": build_channel_name(incident)
+        }
 
         on_visibility_changed(incident)
 
+        mock_slack.convert_channel_privacy.assert_called_once_with("C12345", True)
         mock_slack.post_message.assert_called_once()
         msg = mock_slack.post_message.call_args[0][1]
         assert "private" in msg
+        assert "Slack admin" in msg
 
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_public_message(self, mock_slack):
+    def test_posts_public_message_when_conversion_fails(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.convert_channel_privacy.return_value = False
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+        mock_slack.get_channel_info.return_value = {
+            "name": build_channel_name(incident)
+        }
+
+        on_visibility_changed(incident)
+
+        mock_slack.convert_channel_privacy.assert_called_once_with("C12345", False)
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "public" in msg
+        assert "Slack admin" in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_confirmation_message_when_conversion_succeeds(self, mock_slack):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.convert_channel_privacy.return_value = True
+
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+        mock_slack.get_channel_info.return_value = {
+            "name": build_channel_name(incident)
+        }
+
+        on_visibility_changed(incident)
+
+        mock_slack.convert_channel_privacy.assert_called_once_with("C12345", False)
+        mock_slack.post_message.assert_called_once()
+        msg = mock_slack.post_message.call_args[0][1]
+        assert "public" in msg
+        assert "Slack admin" not in msg
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_conversion_when_channel_name_does_not_match_incident(
+        self, mock_slack
+    ):
+        """A spoofed/edited external link must not let a caller trigger the
+        admin conversion API against an arbitrary channel."""
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
 
         incident = Incident.objects.create(
@@ -595,12 +659,14 @@ class TestOnVisibilityChanged:
             type=ExternalLinkType.SLACK,
             url="https://slack.com/archives/C12345",
         )
+        mock_slack.get_channel_info.return_value = {"name": "some-other-channel"}
 
         on_visibility_changed(incident)
 
+        mock_slack.convert_channel_privacy.assert_not_called()
         mock_slack.post_message.assert_called_once()
         msg = mock_slack.post_message.call_args[0][1]
-        assert "public" in msg
+        assert "Slack admin" in msg
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_noop_without_slack_link(self, mock_slack):
@@ -611,6 +677,7 @@ class TestOnVisibilityChanged:
 
         on_visibility_changed(incident)
 
+        mock_slack.convert_channel_privacy.assert_not_called()
         mock_slack.post_message.assert_not_called()
 
 
@@ -3455,6 +3522,16 @@ class TestOnIncidentUpdated:
         msg = mock_slack.post_message.call_args[0][1]
         assert "- Status: Active -> Mitigated" in msg
 
+    @patch("firetower.incidents.hooks.sync_linear_parent_issue_status")
+    def test_syncs_linear_parent_status_when_incident_status_changes(
+        self, mock_sync_status
+    ):
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+
+        on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
+
+        mock_sync_status.assert_called_once_with(incident)
+
     @patch("firetower.incidents.hooks._slack_service")
     def test_includes_actor_attribution(self, mock_slack):
         mock_slack.parse_channel_id_from_url.return_value = "C12345"
@@ -3762,6 +3839,33 @@ class TestOnIncidentUpdated:
         messages = [c[0][1] for c in mock_slack.post_message.call_args_list]
         assert any("- Status:" in m for m in messages)
         assert any("private" in m for m in messages)
+
+    @pytest.mark.parametrize(
+        ("severity", "priority"),
+        [
+            (IncidentSeverity.P0, 1),
+            (IncidentSeverity.P1, 2),
+            (IncidentSeverity.P2, 3),
+            (IncidentSeverity.P3, 4),
+            (IncidentSeverity.P4, 0),
+        ],
+    )
+    @patch("firetower.incidents.hooks._get_linear_service")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_syncs_linear_priority_on_severity_change(
+        self, mock_slack, mock_get_linear, settings, severity, priority
+    ):
+        settings.LINEAR = {"TEAM_ID": "team-1"}
+        mock_slack.parse_channel_id_from_url.return_value = None
+        incident = self._make_incident(
+            severity=severity, linear_parent_issue_id="linear-issue-id"
+        )
+
+        on_incident_updated(incident, old_severity=IncidentSeverity.P2)
+
+        mock_get_linear.return_value.update_issue.assert_any_call(
+            "linear-issue-id", priority=priority
+        )
 
     @patch("firetower.incidents.hooks._get_linear_service")
     @patch("firetower.incidents.hooks._slack_service")

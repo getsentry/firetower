@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.utils import timezone
 
 from firetower.incidents.models import (
     ExternalLink,
@@ -13,6 +16,9 @@ from firetower.incidents.models import (
     IncidentStatus,
     Tag,
     TagType,
+    TimelineEvent,
+    TimelineEventSource,
+    TimelineEventType,
     filter_visible_to_user,
 )
 
@@ -324,6 +330,56 @@ class TestIncident:
         assert "jira" not in links
         assert "datadog" not in links
         assert len(links) == 1
+
+
+@pytest.mark.django_db
+class TestTimelineEvent:
+    def test_enums_and_string(self):
+        incident = Incident.objects.create(title="Test", severity=IncidentSeverity.P1)
+        event = TimelineEvent.objects.create(
+            incident=incident,
+            source=TimelineEventSource.INTERNAL,
+            event_type=TimelineEventType.INCIDENT_CREATED,
+            occurred_at=timezone.now(),
+            payload={"severity": "P1"},
+        )
+
+        assert TimelineEventSource.values == [
+            "USER",
+            "INTERNAL",
+            "STATUSPAGE",
+            "PAGERDUTY",
+        ]
+        assert len(TimelineEventType.values) == 10
+        assert str(event) == f"{incident.incident_number}: Incident created"
+
+    def test_ordering_cascade_and_actor_set_null(self):
+        actor = User.objects.create_user(username="actor@example.com")
+        incident = Incident.objects.create(title="Test", severity=IncidentSeverity.P1)
+        later = timezone.now()
+        earlier = later - timedelta(minutes=1)
+        second = TimelineEvent.objects.create(
+            incident=incident,
+            source=TimelineEventSource.INTERNAL,
+            event_type=TimelineEventType.STATUS_CHANGED,
+            occurred_at=later,
+            actor=actor,
+        )
+        first = TimelineEvent.objects.create(
+            incident=incident,
+            source=TimelineEventSource.INTERNAL,
+            event_type=TimelineEventType.INCIDENT_CREATED,
+            occurred_at=earlier,
+            actor=actor,
+        )
+
+        assert list(TimelineEvent.objects.all()) == [first, second]
+        actor.delete()
+        first.refresh_from_db()
+        assert first.actor is None
+
+        incident.delete()
+        assert TimelineEvent.objects.count() == 0
 
 
 @pytest.mark.django_db
