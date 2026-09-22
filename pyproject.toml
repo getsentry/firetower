@@ -40,7 +40,7 @@ dev = [
     "ruff>=0.12.11",
     "ty>=0.0.80",
     "django-stubs>=5.2.7",
-    "django-stubs-ext>=5.2.7",
+    "django-stubs-ext>=6.1.1",
     "blessed>=1.50.0",
 ]
 prod = [
