@@ -3,7 +3,7 @@
 import asyncio
 import time
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import jwt
 import pytest
@@ -11,7 +11,11 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from fastmcp.exceptions import FastMCPError
 
 from firetower.mcp_server import auth
-from firetower.mcp_server.auth import SentryGoogleProvider, require_sentry_account
+from firetower.mcp_server.auth import (
+    ACCESS_GROUP,
+    SentryGoogleProvider,
+    require_sentry_account,
+)
 
 TEST_AUD = "test-client-id.apps.googleusercontent.com"
 _KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -42,13 +46,30 @@ def _provider(jwks_public_key=None, audience=TEST_AUD):
         key=jwks_public_key or _KEY.public_key()
     )
     provider._jwks_client = jwks
+    provider._token_validator = SimpleNamespace(
+        verify_token=AsyncMock(
+            return_value=SimpleNamespace(
+                claims={
+                    "aud": audience,
+                    "email": "a@sentry.io",
+                    "email_verified": True,
+                }
+            )
+        )
+    )
+    provider._group_membership_checker = SimpleNamespace(
+        is_member=AsyncMock(return_value=True)
+    )
     return provider
 
 
-def _extract(idp_tokens: dict, **provider_kwargs) -> dict | None:
-    return asyncio.run(
-        _provider(**provider_kwargs)._extract_upstream_claims(idp_tokens)
-    )
+def _extract(
+    idp_tokens: dict, include_access_token: bool = True, **provider_kwargs
+) -> dict | None:
+    tokens = dict(idp_tokens)
+    if include_access_token and "id_token" in tokens:
+        tokens.setdefault("access_token", "opaque-google-token")
+    return asyncio.run(_provider(**provider_kwargs)._extract_upstream_claims(tokens))
 
 
 def test_admits_verified_sentry_account():
@@ -57,7 +78,25 @@ def test_admits_verified_sentry_account():
         "hd": "sentry.io",
         "email": "a@sentry.io",
         "email_verified": True,
+        "group": ACCESS_GROUP,
     }
+
+
+def test_rejects_sentry_account_outside_access_group():
+    provider = _provider()
+    provider._group_membership_checker.is_member.return_value = False
+    token = _id_token(hd="sentry.io", email="a@sentry.io", email_verified=True)
+
+    with pytest.raises(FastMCPError, match=ACCESS_GROUP):
+        asyncio.run(
+            provider._extract_upstream_claims(
+                {"id_token": token, "access_token": "opaque-google-token"}
+            )
+        )
+
+    provider._group_membership_checker.is_member.assert_awaited_once_with(
+        "opaque-google-token", "a@sentry.io"
+    )
 
 
 def test_rejects_wrong_domain():
@@ -137,7 +176,30 @@ def test_admits_refresh_with_expired_login_id_token():
         "hd": "sentry.io",
         "email": "a@sentry.io",
         "email_verified": True,
+        "group": ACCESS_GROUP,
     }
+
+
+def test_rejects_expired_token_without_active_access_token():
+    expired = _id_token(
+        exp=int(time.time()) - 3600,
+        hd="sentry.io",
+        email="a@sentry.io",
+        email_verified=True,
+    )
+    with pytest.raises(FastMCPError):
+        _extract({"id_token": expired}, include_access_token=False)
+
+
+def test_rejects_expired_token_for_different_access_token_identity():
+    expired = _id_token(
+        exp=int(time.time()) - 3600,
+        hd="sentry.io",
+        email="different@sentry.io",
+        email_verified=True,
+    )
+    with pytest.raises(FastMCPError):
+        _extract({"id_token": expired, "access_token": "opaque"})
 
 
 def test_rejects_expired_token_with_bad_signature():
@@ -175,6 +237,75 @@ def test_rejects_when_jwks_fetch_fails():
         asyncio.run(provider._extract_upstream_claims({"id_token": token}))
 
 
+def test_group_membership_checker_uses_transitive_membership(monkeypatch):
+    requests = []
+
+    class FakeResponse:
+        def __init__(self, status_code, body):
+            self.status_code = status_code
+            self._body = body
+
+        def json(self):
+            return self._body
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, url, *, params, headers):
+            requests.append((url, params, headers))
+            if url == auth.GOOGLE_GROUPS_LOOKUP_URL:
+                return FakeResponse(200, {"name": "groups/team"})
+            return FakeResponse(200, {"hasMembership": True})
+
+    monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **_kwargs: FakeClient())
+
+    assert asyncio.run(
+        auth.GoogleGroupMembershipChecker().is_member(
+            "access-token", "employee@sentry.io"
+        )
+    )
+    assert requests == [
+        (
+            auth.GOOGLE_GROUPS_LOOKUP_URL,
+            {"groupKey.id": ACCESS_GROUP},
+            {"Authorization": "Bearer access-token"},
+        ),
+        (
+            "https://cloudidentity.googleapis.com/v1/groups/team/"
+            "memberships:checkTransitiveMembership",
+            {"query": "member_key_id == 'employee@sentry.io'"},
+            {"Authorization": "Bearer access-token"},
+        ),
+    ]
+
+
+def test_group_membership_checker_fails_closed(monkeypatch):
+    class FakeResponse:
+        status_code = 403
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, *_args, **_kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(auth.httpx, "AsyncClient", lambda **_kwargs: FakeClient())
+
+    assert not asyncio.run(
+        auth.GoogleGroupMembershipChecker().is_member(
+            "access-token", "employee@sentry.io"
+        )
+    )
+
+
 def test_init_requires_client_id():
     with pytest.raises(ValueError):
         SentryGoogleProvider(client_id="", client_secret="x", base_url="https://x")
@@ -190,7 +321,13 @@ def test_fallback_admits_sentry(monkeypatch):
         auth,
         "get_access_token",
         lambda: _FakeToken(
-            {"upstream_claims": {"hd": "sentry.io", "email_verified": True}}
+            {
+                "upstream_claims": {
+                    "hd": "sentry.io",
+                    "email_verified": True,
+                    "group": ACCESS_GROUP,
+                }
+            }
         ),
     )
     require_sentry_account()  # no raise
@@ -202,6 +339,13 @@ def test_fallback_admits_sentry(monkeypatch):
         {},
         {"upstream_claims": {"hd": "evil.com", "email_verified": True}},
         {"upstream_claims": {"hd": "sentry.io", "email_verified": False}},
+        {
+            "upstream_claims": {
+                "hd": "sentry.io",
+                "email_verified": True,
+                "group": "contractors@sentry.io",
+            }
+        },
     ],
 )
 def test_fallback_rejects(monkeypatch, claims):
