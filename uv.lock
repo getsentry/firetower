@@ -3,7 +3,8 @@ revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '4'",
-    "python_full_version >= '3.14' and python_full_version < '4'",
+    "python_full_version >= '3.15' and python_full_version < '4'",
+    "python_full_version == '3.14.*'",
     "python_full_version == '3.13.*'",
     "python_full_version < '3.13'",
 ]
@@ -108,9 +109,27 @@ wheels = [
 name = "bytecode"
 version = "0.17.0"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
+resolution-markers = [
+    "python_full_version == '3.14.*'",
+    "python_full_version == '3.13.*'",
+    "python_full_version < '3.13'",
+]
 sdist = { url = "https://sfw.security.sentry.io/pypi/packages/98/c4/4818b392104bd426171fc2ce9c79c8edb4019ba6505747626d0f7107766c/bytecode-0.17.0.tar.gz", hash = "sha256:0c37efa5bd158b1b873f530cceea2c645611d55bd2dc2a4758b09f185749b6fd", size = 105863, upload-time = "2025-09-03T19:55:45.703Z" }
 wheels = [
     { url = "https://sfw.security.sentry.io/pypi/packages/ce/80/379e685099841f8501a19fb58b496512ef432331fed38276c3938ab09d8e/bytecode-0.17.0-py3-none-any.whl", hash = "sha256:64fb10cde1db7ef5cc39bd414ecebd54ba3b40e1c4cf8121ca5e72f170916ff8", size = 43045, upload-time = "2025-09-03T19:55:43.879Z" },
+]
+
+[[package]]
+name = "bytecode"
+version = "0.19.0"
+source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
+resolution-markers = [
+    "python_full_version >= '4'",
+    "python_full_version >= '3.15' and python_full_version < '4'",
+]
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/c6/e9/9f355e80d57fc271d35631883778564aeea02c35b4cfb4b64d84cb653aed/bytecode-0.19.0.tar.gz", hash = "sha256:fb733957396cb82301f3f79cd320aef262cd0592c93d6b4fd656771506999624", size = 106372, upload-time = "2026-08-21T21:17:40.082Z" }
+wheels = [
+    { url = "https://sfw.security.sentry.io/pypi/packages/ae/38/c8397880426bb56b139a0b53f69a4e54cf770c358b8c1ad872b3c88430d3/bytecode-0.19.0-py3-none-any.whl", hash = "sha256:7b32811d4a574f5ebcdc84ae8d37af928d980f31d6aa5aea2cab9f6d364489d1", size = 43277, upload-time = "2026-08-21T21:17:38.589Z" },
 ]
 
 [[package]]
@@ -482,43 +501,54 @@ wheels = [
 
 [[package]]
 name = "ddtrace"
-version = "4.8.2"
+version = "4.15.1"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
-    { name = "bytecode" },
+    { name = "bytecode", version = "0.17.0", source = { registry = "https://sfw.security.sentry.io/pypi/simple" }, marker = "python_full_version < '3.15'" },
+    { name = "bytecode", version = "0.19.0", source = { registry = "https://sfw.security.sentry.io/pypi/simple" }, marker = "python_full_version >= '3.15'" },
+    { name = "ddtrace-internal" },
     { name = "envier" },
     { name = "opentelemetry-api" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/38/e2/23cd82a84a660e6ad6ac0395f3de084c66cd35f1fa74b058c63308d5878b/ddtrace-4.8.2.tar.gz", hash = "sha256:37315ba2e56562b0dad3ebfbd86a33717890f5af2363e552b04adb206275b6c0", size = 2282984, upload-time = "2026-05-06T22:04:43.034Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/eb/01/80bec86ed82b684d8bb487c4a5f23519506159d5e89b553ebf001169b011/ddtrace-4.15.1.tar.gz", hash = "sha256:4cd507f1e6a689fb322b48c4eee907a1c9b201f85d1287f61183c6f628725fe9", size = 2639634, upload-time = "2026-09-17T20:01:37.774Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/0e/9a/e7de52a89512418a816ef3c5002e536112caf69f8da46b7b14faf6efa66c/ddtrace-4.8.2-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:dd369fd92dad3d7b27a337029b6747fcd9787822cd7749e2ab67499f98432b1c", size = 7459037, upload-time = "2026-05-06T22:02:59.342Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/39/78/288f1fffeb43fc2ac8795b97b63458eb2e9062522b7b93e3150a21953200/ddtrace-4.8.2-cp312-cp312-macosx_14_0_x86_64.whl", hash = "sha256:1f60bf80a520010415c7f4f4307d15a53dbef3477310092116fe6998ca4b5bbd", size = 7875846, upload-time = "2026-05-06T22:03:02.236Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/81/2c/59df1eceee663bf5af2b74420cdc14d0e8c7238890fae7a2b6223ebf1e7d/ddtrace-4.8.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:37e63566f9f149d9a4878255d8bbc7e370e6ebd59f2a451780d7aafa264669a5", size = 8930305, upload-time = "2026-05-06T22:03:04.646Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/a0/6e/07bc66ba2637b060f10ff5a980bf1e094acde5df827aab173aa00a43f72c/ddtrace-4.8.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:554c16300a4bc98701d2ddb6d13c50d9284be255d74cda517ab1e1aedc2d7c88", size = 9230307, upload-time = "2026-05-06T22:03:07.461Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/ca/d8/e6ced3ea3de7aa28c77197f291d2c8becb40dc7ba36bfa3523f847e225c9/ddtrace-4.8.2-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:c12f2741a3dbd9696648f50b75561676667720cdafd7cc38cc7cee73fb5eda49", size = 9946018, upload-time = "2026-05-06T22:03:10.052Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/3c/1b/ab58894350410ae687b3cf071ebc90e4a1b47b90457c458016bc3ea3e0b1/ddtrace-4.8.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:d96c2b7be0eef0197a7e40eaf85d7d68eca10decca41a360e38a850b8e36a656", size = 10304847, upload-time = "2026-05-06T22:03:13.068Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/7a/df/cd915ef7331fca911a9822e347d6673768062968b73d805a4348c73db7a1/ddtrace-4.8.2-cp312-cp312-win32.whl", hash = "sha256:c88fb45cbd5c198649e20b9990db17bfabb7cd3758bb67ed488adece6b0ebede", size = 5571020, upload-time = "2026-05-06T22:03:15.871Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/29/12/f4831fc6085905697df891b2dc34b0588bcd992f8c00cd03eeba2f07a175/ddtrace-4.8.2-cp312-cp312-win_amd64.whl", hash = "sha256:5a5ea1b4c9ccfd85b29aeb85fa6fc4ad2548a08ad96e71f593fb217496286a8b", size = 6142827, upload-time = "2026-05-06T22:03:18.381Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/fa/49/93b7a7d76a955f304501fe93b837ed2558018e083302dfd053999cbf40c9/ddtrace-4.8.2-cp312-cp312-win_arm64.whl", hash = "sha256:3d60fec5c56b68e2fa8a219c09b88a312420b6f817e4565b80f4cfe5c53b0b85", size = 5825139, upload-time = "2026-05-06T22:03:20.514Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/8c/ac/bff27c18639cfcabedb78cac0fa9e3dfc84c82bc161b7ecd8418afbaba3a/ddtrace-4.8.2-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:5d46e3c97dced9bc2349aac4a6c53f2f7e4af64c9cb10d6fbdfb214fa0147d5c", size = 7452075, upload-time = "2026-05-06T22:03:22.757Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/e6/e0/5f4cec8c1559bb7fd3959e088143114efe93e81f80888933320337b4c3f0/ddtrace-4.8.2-cp313-cp313-macosx_14_0_x86_64.whl", hash = "sha256:ebfa8915bdf6ff7ad0afd90d847edd70a933990edbdfa9373047c42a41259c97", size = 7869321, upload-time = "2026-05-06T22:03:25.026Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/ea/f3/8b5aac1d538d6dcbd686b915f83e3c4e22d7d0f5952987640e6e61f48869/ddtrace-4.8.2-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:dd9a893fcfa0fe90678bfe6bc3c88b3c759ae8013b162abdeb7eeb7fa12ce026", size = 8925282, upload-time = "2026-05-06T22:03:27.453Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/f0/c9/40051e1faa01ae2a3f4e2850d8bcaef020f00198dfb8aab5d79663685f68/ddtrace-4.8.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:77c9b66d5c63349bcf4b1e9de7e01ec77dc6a531bf2f1586b27ab34078135e50", size = 9220747, upload-time = "2026-05-06T22:03:30.482Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/88/20/65828f6f3da757400718b0cfe51f2a9b444a51cd36d919589937deb7d1b4/ddtrace-4.8.2-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:7b36dde10b90390f3cb5b8314ec76d3b15789b9e8436feffa8d15905a92f2be9", size = 9942181, upload-time = "2026-05-06T22:03:33.345Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/9f/c7/b81826878f876d6b23778e56376eec892e3f9a44e85b2ef26ae83688d299/ddtrace-4.8.2-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:043294548afce23b42ef2d87754e130b659e42a6ff59aa9d9bc136f708ef9d75", size = 10296616, upload-time = "2026-05-06T22:03:36.566Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/15/ff/487c4689dfb015f96db779684d10cb46f6601fcb2f86119ef7bc1a0189bb/ddtrace-4.8.2-cp313-cp313-win32.whl", hash = "sha256:42b481320e0a3d853b0ea14b5abdc7ac7572466e75d5e7be39cafb843e3ce782", size = 5568593, upload-time = "2026-05-06T22:03:40.259Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/1b/15/aa79a26e89f4d0eb1a68ee3ceb01eceeb04b8d0e315fc2571b827fd39faa/ddtrace-4.8.2-cp313-cp313-win_amd64.whl", hash = "sha256:9326174b26ecf7d8313b0dffb6bbdfbe16d7c8053a9ed7fe07803b30f51733f7", size = 6140575, upload-time = "2026-05-06T22:03:42.791Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/5a/e8/bb64a48cf51ac4e36bc04d02ac7eb478c0a5e5eaddf83abd89f5fceb470b/ddtrace-4.8.2-cp313-cp313-win_arm64.whl", hash = "sha256:fe7c127c3ccbd0331fb252df04a3ef9c768f17b7a8937c2da59dbc711d9d652e", size = 5822426, upload-time = "2026-05-06T22:03:45.449Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/da/94/6031404328a4c0b163c192f80197f48becfd4e9adb2a7004a87879c21081/ddtrace-4.8.2-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:c4377185fdfaad0020c33ce4115a59a296f605c6996c05c18bc24a8fdd36c79e", size = 7455917, upload-time = "2026-05-06T22:03:47.929Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/e4/1c/a66a51cef651ed63c5ff9fa22817dfde0a4d4ac63683ed2acc08326ebaee/ddtrace-4.8.2-cp314-cp314-macosx_14_0_x86_64.whl", hash = "sha256:e23b7d53a7d0a51204b73192146d3479cf4e651acec8f7e2ca762ecf1b030d9a", size = 7872360, upload-time = "2026-05-06T22:03:50.695Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/7d/0d/e9463160ee8629624ec0ac21152c5deb0d102305f5d61f2c6c99afcf2a70/ddtrace-4.8.2-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:6ea103c4cb1e37cf6f91c2b7dc5b1442ee876f6242ef77231f6a7e27cfef8c15", size = 8934592, upload-time = "2026-05-06T22:03:53.716Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/70/c5/86d50261d780c0100614cfbe5ddb0b78a68a189173f99b1f6350b8895a65/ddtrace-4.8.2-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:dbbd89c392a4e10591a6fc664c088c8efe01dfb51ae48075a75833ed554b7dc4", size = 9224242, upload-time = "2026-05-06T22:03:56.705Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/bf/48/fbbf7c5e3093b21acd4239d1bfb3a13598d95f545d239cd6983f7fae19ca/ddtrace-4.8.2-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:88d3719fc4d1f0d0d944e7b96dbac384775f5e72c80159ee868724d9a304f6a2", size = 9952604, upload-time = "2026-05-06T22:04:00.026Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/30/62/0d23c0ec22ebd02ff3f7fca7cdfdfedce4a51e1b96c5a2451c11690612df/ddtrace-4.8.2-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:e6d94b79da45abfb90694f0539c3676465a04fe061b87cadbefcbf102a39f3d0", size = 10301829, upload-time = "2026-05-06T22:04:03.535Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/22/8e/bc16dbe8ce88839514f15018f335c01826c6022842a27014ba24148f4bfc/ddtrace-4.8.2-cp314-cp314-win32.whl", hash = "sha256:15b6a0b6cf877e52f560f696bf71d1107f4b0df90f24449e5603de2ab1ee4da6", size = 5667349, upload-time = "2026-05-06T22:04:06.744Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/0e/4e/0fe0120a7c1c41c8705bf7cbdd89b6f2d6bb0fa4c9d28b7b0fec2f72f4ea/ddtrace-4.8.2-cp314-cp314-win_amd64.whl", hash = "sha256:018e0e3754c30e3ee5bfc6afbdbb909b13df2a6c7a65b2025c75eff9c59195e2", size = 6283540, upload-time = "2026-05-06T22:04:09.554Z" },
-    { url = "https://sfw.security.sentry.io/pypi/packages/c8/11/da2ca634d44370af6020707a14771ce49d21266898385ddf1053903e8d36/ddtrace-4.8.2-cp314-cp314-win_arm64.whl", hash = "sha256:2f8f1dc605fc08eb336f275e36f3c32d5471268d6a6ef6a2c8f77ad8e5358514", size = 5977663, upload-time = "2026-05-06T22:04:12.735Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/9d/ad/29a4c9701bd46ca5913b98a4c81aad181c30247845bf14c6cfee7dcc8517/ddtrace-4.15.1-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:90922fbcf63582a9dd2d5d337512e467c7baa4ad8de590080421d5d1eb6c922b", size = 7995385, upload-time = "2026-09-17T19:59:47.92Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/55/6c/270c227efb3dadc366c3c32f8c7b2d3d3053d1a236e7e7ddaa2fe841409f/ddtrace-4.15.1-cp312-cp312-macosx_14_0_x86_64.whl", hash = "sha256:b4f0d49dae2fb3b720e2da29847c347907d7ec9517b9a20cd67d22165e424fe1", size = 8378094, upload-time = "2026-09-17T19:59:50.328Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/a4/5a/8c0ef677fc4405d0d546f3f11bdf130c699dc1cf808534df4a3b31a908dc/ddtrace-4.15.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:a0518384dc0450970d8b64a084c744748d1eb6c11951c4811575cdb7f363b458", size = 9505450, upload-time = "2026-09-17T19:59:52.674Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/48/48/8a7331d72d5d5c276200b79caf2f82effcac1ddbe44e7eb4ed261abd0386/ddtrace-4.15.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:b25dd01ed0c4c9cb3c16e62809bfe61833f667adda864b986133b4ae8c2a5e40", size = 9763470, upload-time = "2026-09-17T19:59:55.746Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/ab/62/ac58944aaa6253a8bb0852b99479ac19e9697b3456afcfccb4e3c43ddd53/ddtrace-4.15.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:6185a74b9fe77eba9560d063791e9b0498a8c4fddc351402c9badde75b4bc8d0", size = 10504041, upload-time = "2026-09-17T19:59:58.411Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/e0/ec/f28f3846e1f422b902de2226913c0b1d7b66ad6e5e44bbb5f1f34d8b267e/ddtrace-4.15.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:40bbced854fd44711178043b0b3bc62e4ff80d78b03bb31dd3d787c931948c45", size = 10814512, upload-time = "2026-09-17T20:00:01.438Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/0a/ff/395d95b0f13b19e3864c123c5dac8c8999a15d4b03d5523f9d80c96e3811/ddtrace-4.15.1-cp312-cp312-win32.whl", hash = "sha256:9bff1ca0094f9fb57014b050f850c887da4a4da9f46d0798c83ad945383a9adb", size = 6747819, upload-time = "2026-09-17T20:00:04.444Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/dd/5b/bc78d1e1923fe5d54667fd4f697e7468eb13672b478e2787d93ab4998482/ddtrace-4.15.1-cp312-cp312-win_amd64.whl", hash = "sha256:f4853251f1ba91ed7392b275332e2a50ca26d5b8581dd17d4d225a3cfde09dfb", size = 7366405, upload-time = "2026-09-17T20:00:06.838Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/8b/77/664f9ecbfa0b74288995483614dce6d6a1a735add26edc1fa4afa801cc64/ddtrace-4.15.1-cp312-cp312-win_arm64.whl", hash = "sha256:04f2771baf847cef3444acf9826e4dae87c1df60c6449ccbf5b6e05d871744fa", size = 7349360, upload-time = "2026-09-17T20:00:10.028Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/e1/f2/43922ed415505b98c3def694bb32328d5bd30e2c01002b8c113646e63a7d/ddtrace-4.15.1-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:602f31be07818b160eb3f863f4386d67e38235445a27346395930d55650d5f61", size = 7989529, upload-time = "2026-09-17T20:00:12.757Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/7d/5a/7340791fe032f5b120e20bc3a134dbcfd4f536481cee8f061c473bb7b371/ddtrace-4.15.1-cp313-cp313-macosx_14_0_x86_64.whl", hash = "sha256:2cebb77f831a3cdf7db5ac527caa919091619ed141348ddd883a0af275bd52b3", size = 8372265, upload-time = "2026-09-17T20:00:15.503Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/fa/de/a9c907584232753505a51fed3ddb4875da390edea995f4c41808b1ea4533/ddtrace-4.15.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:02fa94a0146c533fcef424e0b22e18764fe3d65418f977937de8ea9732f9c477", size = 9499200, upload-time = "2026-09-17T20:00:18.327Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/02/b9/e285fc92117b3be03665d24aa4c3b56aa196f904c660def7db6a881e7269/ddtrace-4.15.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:9df5eea60b3cccd2cfca57f39dccde0d223b9897a02baff2619559c9d2df0553", size = 9755799, upload-time = "2026-09-17T20:00:21.584Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/d6/c9/0cb77429a831818005d5f11686cec0bd6c499e678557e15c8f1bd9366b6e/ddtrace-4.15.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:0053d0c38e3660a2d79ee80e37ca442c2f98a6d6fab713cb1c93543dfd89e268", size = 10500910, upload-time = "2026-09-17T20:00:24.728Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/de/6e/c25af1c13cffc74664d74148c181067bde23d221aa081f68f229dd33fa63/ddtrace-4.15.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:7de09b5b309686d8cd763e40151eeb49afab98cbc8c1fd76f21928e29fc35550", size = 10808110, upload-time = "2026-09-17T20:00:27.617Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/58/a7/5bdc30905f5e6d123ce45585907a6a8e6a938e4fc3e639a10302b20f29b8/ddtrace-4.15.1-cp313-cp313-win32.whl", hash = "sha256:d0285bcdf6c0598cc27747b98ef55e2139f35542deec02454ff3f77fec828ba6", size = 6745079, upload-time = "2026-09-17T20:00:31.031Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/fa/d0/bb6b2f547515e8d65d8271be28852140e99d980e60f57c5a498a6b0bfe9a/ddtrace-4.15.1-cp313-cp313-win_amd64.whl", hash = "sha256:2db94234e2f5cc13db77e55871be2287ddba72169a0ca9b371d77f958b38df0f", size = 7362073, upload-time = "2026-09-17T20:00:33.969Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/1b/39/b4a6684e100508de93ddf912e876ae8a9b3d350420c54fc6975f9d40744e/ddtrace-4.15.1-cp313-cp313-win_arm64.whl", hash = "sha256:a4af92519741686a26ec63d109a12fa2315e22f08d3abd740e1881b8e09088a5", size = 7346025, upload-time = "2026-09-17T20:00:36.972Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/9b/00/4de1343c0181186aed7d50375bb7879271b1efb71a9a9dfd0b9c1a86d3e5/ddtrace-4.15.1-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:7833038a1b589632df7e7a0a070676feefba08cf0f9fe4d92f2d43ff121c38a9", size = 7995785, upload-time = "2026-09-17T20:00:40.029Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/c5/c4/8bf06ea16410c2dcbc3d8a84e814d864bea3a650c9c91d1c7181414b62a6/ddtrace-4.15.1-cp314-cp314-macosx_14_0_x86_64.whl", hash = "sha256:534e7f8d6fd81bb37aa753388c3f63f3fe119a4f465ba70224facfe10df303e8", size = 8379514, upload-time = "2026-09-17T20:00:43.035Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/cb/c3/bfb20dcbee8362cb201a0e64914ef759b2c073fd8018cebbe9bff73b0d1d/ddtrace-4.15.1-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:5f824e12343d0afddcf70812916041a6892262bcd70cf45cd27d6f1b6f5f64b3", size = 9510684, upload-time = "2026-09-17T20:00:45.872Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/83/4e/c083a6d35e46dc4ae8365b37171e552dbb12a75b8fcadfadd0b24dffd11e/ddtrace-4.15.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:b5d1d784fa078397b793d237f284c7985b49bb6049f1ed8d254e8089bc2b3bff", size = 9762617, upload-time = "2026-09-17T20:00:49.077Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/ba/2f/ad7e1d111fc3421b319ff525042d35a70d0d700d570d13b3cd17ac046373/ddtrace-4.15.1-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:6d5be6252f4e05ca30c342b8b69b9ddc1a0ac1e9c542a1a8dd20591f734b82d6", size = 10512083, upload-time = "2026-09-17T20:00:52.642Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/bb/d8/4dace7e3f9b97f55bfde534df890ac5a40212dd8e0401b7a229fbc614222/ddtrace-4.15.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:ed844cb7021695a6d85a19e93855558e954d1e9ff9ed791796c9dfcc0c2a9393", size = 10816722, upload-time = "2026-09-17T20:00:56.642Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/98/63/cde8941219da34fe4c7eb2894078433ed2ce8adda3122e7bea6b76945678/ddtrace-4.15.1-cp314-cp314-win32.whl", hash = "sha256:e4e2bb81d0327d3f8466e5d8b67427cc33e44c86d45b26686308c317c5e876e3", size = 6857984, upload-time = "2026-09-17T20:00:59.789Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/93/99/2db437d0b321730e807098daf87ca498bdf3064c565108d034a33b1aaeb9/ddtrace-4.15.1-cp314-cp314-win_amd64.whl", hash = "sha256:07464ad72033ed93863e071c7a2ff0981cdc7813a2123659a117dfb12b2ec58f", size = 7530179, upload-time = "2026-09-17T20:01:03.19Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/85/26/59eff452117550a88d697135f79ee323c4b2b8d283be0ae996d067ce22d1/ddtrace-4.15.1-cp314-cp314-win_arm64.whl", hash = "sha256:e7785472f921838002ebe97cdf9968b22ba189445755a1307f1e2f340c84d766", size = 7546191, upload-time = "2026-09-17T20:01:06.335Z" },
+]
+
+[[package]]
+name = "ddtrace-internal"
+version = "0.1.0"
+source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/0f/51/6dc02752dca5920d6627fb92b7e0611f594a823bbd57ed31167571d819bc/ddtrace_internal-0.1.0.tar.gz", hash = "sha256:7390721276ab5f174cb103088be7d0de22d452f2817c949e8bde1182ff5b961e", size = 2504, upload-time = "2026-07-15T18:35:10.062Z" }
+wheels = [
+    { url = "https://sfw.security.sentry.io/pypi/packages/93/ad/3cae600fdfc41f54653c14339ac1f125381a6fc2a823d5e685b627ff152e/ddtrace_internal-0.1.0-py3-none-any.whl", hash = "sha256:8eeac4a812e003cebafc8be35ef05103ae2b132893dfbcee00a67f4af81404a2", size = 2495, upload-time = "2026-07-15T18:35:09.295Z" },
 ]
 
 [[package]]
@@ -863,7 +893,7 @@ mcp = [
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.14.0" },
 ]
 prod = [
-    { name = "ddtrace", specifier = "==4.8.2" },
+    { name = "ddtrace", specifier = "==4.15.1" },
     { name = "granian", specifier = ">=2.6.0" },
     { name = "sentry-sdk", extras = ["django"], specifier = ">=2.62.0" },
 ]
