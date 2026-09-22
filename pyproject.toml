@@ -21,7 +21,7 @@ dependencies = [
     "django-q2>=1.11.1",
     "slack-bolt>=1.30.0",
     "slack-sdk>=3.44.1",
-    "sentry-sdk>=2.62.0",
+    "sentry-sdk>=2.69.2",
     "openrouter>=1.1.139",
 ]
 
