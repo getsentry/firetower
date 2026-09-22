@@ -41,7 +41,7 @@ dev = [
     "ty>=0.0.80",
     "django-stubs>=5.2.7",
     "django-stubs-ext>=5.2.7",
-    "blessed>=1.39.0",
+    "blessed>=1.50.0",
 ]
 prod = [
     "ddtrace==4.8.2",
