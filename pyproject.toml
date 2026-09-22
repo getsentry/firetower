@@ -13,20 +13,20 @@ dependencies = [
     "django-fernet-encrypted-fields>=0.4.0",
     "django-kubernetes>=1.1.0",
     "djangorestframework>=3.18.1",
-    "google-auth>=2.37.0",
+    "google-auth>=2.58.0",
     "psycopg[binary]>=3.2.11",
-    "pyserde[toml]>=0.28.0",
+    "pyserde[toml]>=0.33.1",
     "notion-client>=3.0.0,<4.0.0",
-    "requests>=2.32.0",
+    "requests>=2.34.2",
     "django-q2>=1.11.1",
     "slack-bolt>=1.30.0",
     "slack-sdk>=3.44.1",
-    "sentry-sdk>=2.62.0",
+    "sentry-sdk>=2.69.2",
     "openrouter>=1.1.139",
 ]
 
 [build-system]
-requires = ["uv_build>=0.8.2,<0.9.0"]
+requires = ["uv_build>=0.12.17,<0.13.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
@@ -39,13 +39,13 @@ dev = [
     "pytest-django>=4.14.0",
     "ruff>=0.12.11",
     "ty>=0.0.80",
-    "django-stubs>=5.2.7",
+    "django-stubs>=6.1.1",
     "django-stubs-ext>=5.2.7",
-    "blessed>=1.39.0",
+    "blessed>=1.50.0",
 ]
 prod = [
-    "ddtrace==4.8.2",
-    "granian>=2.6.0",
+    "ddtrace==4.15.1",
+    "granian>=2.8.3",
     "sentry-sdk[django]>=2.62.0",
 ]
 mcp = [
@@ -53,6 +53,11 @@ mcp = [
     "pyjwt[crypto]>=2.14.0",
     "firetower-sdk",
 ]
+
+[[tool.uv.index]]
+name = "sfw"
+url = "https://sfw.security.sentry.io/pypi/simple"
+default = true
 
 [tool.uv.sources]
 firetower-sdk = { path = "sdk", editable = true }
