@@ -106,7 +106,7 @@ ALLOWED_HOSTS = [
     "::1",
     "firetower.getsentry.net",
     "test.firetower.getsentry.net",
-    ".run.app",  # generated Cloud Run host used for private service-to-service calls
+    "firetower-test-srjzwe3tcq-uw.a.run.app",
     "firetower",
     "backend",  # name from the nginx proxy_pass
 ]
