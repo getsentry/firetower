@@ -14,6 +14,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE, SentryGoogleProvider
+from firetower.mcp_server.branding import FIRETOWER_ICON
 from firetower.mcp_server.config import MCPConfig
 from firetower.mcp_server.tools import register_tools
 
@@ -39,7 +40,7 @@ def create_mcp(config: MCPConfig | None = None) -> FastMCP:
         "allowed_client_redirect_uris": list(config.allowed_redirect_uris),
     }
     auth = SentryGoogleProvider(**provider_kwargs)
-    mcp = FastMCP(name="firetower", auth=auth)
+    mcp = FastMCP(name="Firetower", icons=[FIRETOWER_ICON], auth=auth)
     mcp.custom_route("/health", methods=["GET"], include_in_schema=False)(health)
     register_tools(mcp)
     return mcp

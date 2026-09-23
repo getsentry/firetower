@@ -10,6 +10,7 @@ from fastmcp import settings as fastmcp_settings
 from starlette.testclient import TestClient
 
 from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE
+from firetower.mcp_server.branding import FIRETOWER_ICON
 from firetower.mcp_server.config import MCPConfig
 from firetower.mcp_server.server import create_mcp
 
@@ -111,6 +112,11 @@ def test_google_authorization_requests_openid_and_email_scopes(
 
     assert consent_response.status_code == 200
     assert csrf_token is not None
+    assert 'alt="Firetower"' in consent_response.text
+    assert f'src="{FIRETOWER_ICON.src}"' in consent_response.text
+    assert (
+        "https://gofastmcp.com/assets/brand/blue-logo.png" not in consent_response.text
+    )
     consent_response = mcp_client.post(
         consent_url,
         data={
