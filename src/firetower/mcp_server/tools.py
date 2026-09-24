@@ -104,9 +104,15 @@ def list_incidents(
     Dates are ISO 8601. Each tag/email filter is a list (OR within a filter);
     put each value in its own list element, not comma-separated. The newest 10
     matching incidents are returned by default; pass ``limit`` to control the
-    return size. Results are paginated; pass ``page`` to fetch more. Pass
-    ``fields`` to return only selected incident fields, such as ``id``,
-    ``captain``, and ``severity``. Valid fields are: id, title, description,
+    return size. Results are paginated; pass ``page`` to fetch more.
+
+    Always pass ``fields`` with only the fields needed for the task to minimize
+    context usage. For discovery, prefer ``["id", "title", "status",
+    "severity"]`` and add fields only when needed. Omit ``fields`` only when
+    full incident records are explicitly required. For full details about one
+    known incident, use ``get_incident`` instead of relisting full records.
+
+    Valid fields are: id, title, description,
     impact_summary, status, severity, service_tier, is_private, captain,
     reporter, participants, affected_service_tags, affected_region_tags,
     root_cause_tags, impact_type_tags, external_links, created_at, updated_at,
