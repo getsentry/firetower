@@ -4,7 +4,7 @@ from base64 import b64encode
 
 from mcp.types import Icon
 
-_FIRETOWER_ICON_SVG = """\
+FIRETOWER_ICON_SVG = """\
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g clip-path="url(#clip0_2_18)">
 <mask id="path-1-outside-1_2_18" maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32" fill="black">
@@ -40,7 +40,7 @@ _FIRETOWER_ICON_SVG = """\
 
 FIRETOWER_ICON = Icon(
     src=(
-        "data:image/svg+xml;base64," + b64encode(_FIRETOWER_ICON_SVG.encode()).decode()
+        "data:image/svg+xml;base64," + b64encode(FIRETOWER_ICON_SVG.encode()).decode()
     ),
     mimeType="image/svg+xml",
     sizes=["32x32"],

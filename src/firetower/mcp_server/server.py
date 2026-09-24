@@ -11,10 +11,10 @@ import logging
 
 from fastmcp import FastMCP
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import PlainTextResponse, Response
 
 from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE, SentryGoogleProvider
-from firetower.mcp_server.branding import FIRETOWER_ICON
+from firetower.mcp_server.branding import FIRETOWER_ICON, FIRETOWER_ICON_SVG
 from firetower.mcp_server.config import MCPConfig
 from firetower.mcp_server.tools import register_tools
 
@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 async def health(_request: Request) -> PlainTextResponse:
     return PlainTextResponse("ok")
+
+
+async def favicon(_request: Request) -> Response:
+    return Response(
+        FIRETOWER_ICON_SVG,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 def create_mcp(config: MCPConfig | None = None) -> FastMCP:
@@ -42,6 +50,7 @@ def create_mcp(config: MCPConfig | None = None) -> FastMCP:
     auth = SentryGoogleProvider(**provider_kwargs)
     mcp = FastMCP(name="Firetower", icons=[FIRETOWER_ICON], auth=auth)
     mcp.custom_route("/health", methods=["GET"], include_in_schema=False)(health)
+    mcp.custom_route("/favicon.ico", methods=["GET"], include_in_schema=False)(favicon)
     register_tools(mcp)
     return mcp
 
