@@ -24,6 +24,34 @@ _INCIDENT_ID_PATTERN = re.compile(r"[A-Z][A-Z0-9]*-[0-9]+")
 _INVALID_INCIDENT_ID_MESSAGE = "Invalid incident ID."
 _DEFAULT_INCIDENT_LIMIT = 10
 _INVALID_INCIDENT_LIMIT_MESSAGE = "limit must be a positive integer."
+_INCIDENT_FIELDS = frozenset(
+    {
+        "id",
+        "title",
+        "description",
+        "impact_summary",
+        "status",
+        "severity",
+        "service_tier",
+        "is_private",
+        "captain",
+        "reporter",
+        "participants",
+        "affected_service_tags",
+        "affected_region_tags",
+        "root_cause_tags",
+        "impact_type_tags",
+        "external_links",
+        "created_at",
+        "updated_at",
+        "time_started",
+        "time_detected",
+        "time_analyzed",
+        "time_mitigated",
+        "time_recovered",
+        "total_downtime",
+    }
+)
 
 
 def _audit(tool: str, **params: Any) -> None:
@@ -61,6 +89,7 @@ def list_incidents(
     captain: list[str] | None = None,
     reporter: list[str] | None = None,
     participant: list[str] | None = None,
+    fields: Annotated[list[str], Field(min_length=1)] | None = None,
     page: int = 1,
     limit: Annotated[int, Field(ge=1)] = _DEFAULT_INCIDENT_LIMIT,
 ) -> dict[str, Any]:
@@ -75,10 +104,24 @@ def list_incidents(
     Dates are ISO 8601. Each tag/email filter is a list (OR within a filter);
     put each value in its own list element, not comma-separated. The newest 10
     matching incidents are returned by default; pass ``limit`` to control the
-    return size. Results are paginated; pass ``page`` to fetch more."""
+    return size. Results are paginated; pass ``page`` to fetch more. Pass
+    ``fields`` to return only selected incident fields, such as ``id``,
+    ``captain``, and ``severity``. Valid fields are: id, title, description,
+    impact_summary, status, severity, service_tier, is_private, captain,
+    reporter, participants, affected_service_tags, affected_region_tags,
+    root_cause_tags, impact_type_tags, external_links, created_at, updated_at,
+    time_started, time_detected, time_analyzed, time_mitigated, time_recovered,
+    and total_downtime."""
     require_sentry_account()
     if limit < 1:
         raise ToolError(_INVALID_INCIDENT_LIMIT_MESSAGE)
+    if fields is not None:
+        if not fields:
+            raise ToolError("fields must contain at least one incident field.")
+        unknown_fields = set(fields) - _INCIDENT_FIELDS
+        if unknown_fields:
+            unknown = ", ".join(sorted(unknown_fields))
+            raise ToolError(f"Unknown incident field(s): {unknown}.")
     _audit(
         "list_incidents",
         status=status,
@@ -93,6 +136,7 @@ def list_incidents(
         captain=captain,
         reporter=reporter,
         participant=participant,
+        fields=fields,
         page=page,
         limit=limit,
     )
@@ -124,7 +168,12 @@ def list_incidents(
                 break
             results.extend(page_results)
 
-        return {**response, "results": results[:limit]}
+        results = results[:limit]
+        if fields is not None:
+            results = [
+                {field: incident[field] for field in fields} for incident in results
+            ]
+        return {**response, "results": results}
     except FiretowerError as exc:
         raise _sanitized("list incidents", exc) from exc
 
