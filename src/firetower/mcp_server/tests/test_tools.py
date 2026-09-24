@@ -285,7 +285,7 @@ def test_list_incidents_fetches_additional_pages_for_large_limit(monkeypatch, ga
     assert client.list_incidents.call_args_list[1].kwargs["page"] == 2
 
 
-@pytest.mark.parametrize("limit", [0, -1])
+@pytest.mark.parametrize("limit", [0, -1, 101])
 def test_list_incidents_rejects_invalid_limit_before_audit_or_sdk(
     monkeypatch, gate_spy, limit
 ):
@@ -294,7 +294,7 @@ def test_list_incidents_rejects_invalid_limit_before_audit_or_sdk(
     monkeypatch.setattr(tools, "_audit", audit)
     monkeypatch.setattr(firetower, "get_client", get_client)
 
-    with pytest.raises(ToolError, match=r"^limit must be a positive integer\.$"):
+    with pytest.raises(ToolError, match=r"^limit must be between 1 and 100\.$"):
         tools.list_incidents(limit=limit)
 
     gate_spy.assert_called_once_with()
@@ -423,6 +423,7 @@ def test_tool_schemas_expose_allowed_values_and_pagination_constraints():
     )
     assert list_properties["page"]["minimum"] == 1
     assert list_properties["limit"]["minimum"] == 1
+    assert list_properties["limit"]["maximum"] == 100
 
     assert list_tool.output_schema == {
         "properties": {

@@ -64,7 +64,8 @@ class IncidentListResult(TypedDict):
 _INCIDENT_ID_PATTERN = re.compile(r"[A-Z][A-Z0-9]*-[0-9]+")
 _INVALID_INCIDENT_ID_MESSAGE = "Invalid incident ID."
 _DEFAULT_INCIDENT_LIMIT = 10
-_INVALID_INCIDENT_LIMIT_MESSAGE = "limit must be a positive integer."
+_MAX_INCIDENT_LIMIT = 100
+_INVALID_INCIDENT_LIMIT_MESSAGE = f"limit must be between 1 and {_MAX_INCIDENT_LIMIT}."
 _INVALID_INCIDENT_PAGE_MESSAGE = "page must be a positive integer."
 _FIRETOWER_API_PAGE_SIZE = 50
 _INCIDENT_FIELDS = frozenset(get_args(IncidentField))
@@ -131,7 +132,9 @@ def list_incidents(
     participant: list[str] | None = None,
     fields: Annotated[list[IncidentField], Field(min_length=1)] | None = None,
     page: Annotated[int, Field(ge=1)] = 1,
-    limit: Annotated[int, Field(ge=1)] = _DEFAULT_INCIDENT_LIMIT,
+    limit: Annotated[int, Field(ge=1, le=_MAX_INCIDENT_LIMIT)] = (
+        _DEFAULT_INCIDENT_LIMIT
+    ),
 ) -> IncidentListResult:
     """List incidents with optional filters. Use to find incidents matching a
     status, severity, service tier, date range, tag, captain, reporter, or participant.
@@ -143,8 +146,8 @@ def list_incidents(
 
     Dates are ISO 8601. Each tag/email filter is a list (OR within a filter);
     put each value in its own list element, not comma-separated. The newest 10
-    matching incidents are returned by default; pass ``limit`` to control the
-    return size. ``page`` uses that limit as its page size, so page 2 returns
+    matching incidents are returned by default; pass ``limit`` up to 100 to
+    control the return size. ``page`` uses that limit as its page size, so page 2 returns
     the next ``limit`` matching incidents. Responses contain ``count``,
     ``page``, ``limit``, ``has_more``, and ``results``. When ``has_more`` is
     true, request ``page + 1`` with the same filters, fields, and limit.
@@ -164,7 +167,7 @@ def list_incidents(
     require_sentry_account()
     if page < 1:
         raise ToolError(_INVALID_INCIDENT_PAGE_MESSAGE)
-    if limit < 1:
+    if not 1 <= limit <= _MAX_INCIDENT_LIMIT:
         raise ToolError(_INVALID_INCIDENT_LIMIT_MESSAGE)
     _validate_fields(fields)
     _audit(
