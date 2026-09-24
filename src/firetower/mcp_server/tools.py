@@ -8,11 +8,12 @@ only non-private incidents, so no tool can surface private data.
 
 import logging
 import re
-from typing import Any
+from typing import Annotated, Any
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from firetower_sdk.exceptions import FiretowerError
+from pydantic import Field
 
 from firetower.mcp_server import firetower
 from firetower.mcp_server.auth import requester_email, require_sentry_account
@@ -21,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 _INCIDENT_ID_PATTERN = re.compile(r"[A-Z][A-Z0-9]*-[0-9]+")
 _INVALID_INCIDENT_ID_MESSAGE = "Invalid incident ID."
+_DEFAULT_INCIDENT_LIMIT = 10
+_MAX_INCIDENT_LIMIT = 50
+_INVALID_INCIDENT_LIMIT_MESSAGE = f"limit must be between 1 and {_MAX_INCIDENT_LIMIT}."
 
 
 def _audit(tool: str, **params: Any) -> None:
@@ -58,6 +62,9 @@ def list_incidents(
     captain: list[str] | None = None,
     reporter: list[str] | None = None,
     page: int = 1,
+    limit: Annotated[int, Field(ge=1, le=_MAX_INCIDENT_LIMIT)] = (
+        _DEFAULT_INCIDENT_LIMIT
+    ),
 ) -> dict[str, Any]:
     """List incidents with optional filters. Use to find incidents matching a
     status, severity, service tier, date range, tag, captain, or reporter.
@@ -68,9 +75,12 @@ def list_incidents(
       service_tier: "T0", "T1", "T2", "T3", "T4"
 
     Dates are ISO 8601. Each tag/email filter is a list (OR within a filter);
-    put each value in its own list element, not comma-separated. Results are
-    paginated; pass ``page`` to fetch more."""
+    put each value in its own list element, not comma-separated. The newest 10
+    matching incidents are returned by default; pass ``limit`` to return up to
+    50. Results are paginated; pass ``page`` to fetch more."""
     require_sentry_account()
+    if not 1 <= limit <= _MAX_INCIDENT_LIMIT:
+        raise ToolError(_INVALID_INCIDENT_LIMIT_MESSAGE)
     _audit(
         "list_incidents",
         status=status,
@@ -85,9 +95,10 @@ def list_incidents(
         captain=captain,
         reporter=reporter,
         page=page,
+        limit=limit,
     )
     try:
-        return firetower.get_client().list_incidents(
+        response = firetower.get_client().list_incidents(
             statuses=status,
             severities=severity,
             service_tiers=service_tier,
@@ -101,6 +112,7 @@ def list_incidents(
             reporter=reporter,
             page=page,
         )
+        return {**response, "results": response["results"][:limit]}
     except FiretowerError as exc:
         raise _sanitized("list incidents", exc) from exc
 

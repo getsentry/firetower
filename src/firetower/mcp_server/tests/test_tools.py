@@ -93,6 +93,48 @@ def test_list_incidents_forwards_filters(monkeypatch, gate_spy):
 
 
 @pytest.mark.parametrize(
+    ("kwargs", "expected_count"),
+    [
+        ({}, 10),
+        ({"limit": 3}, 3),
+        ({"limit": 50}, 15),
+    ],
+)
+def test_list_incidents_limits_results(monkeypatch, gate_spy, kwargs, expected_count):
+    incidents = [{"id": f"INC-{number}"} for number in range(15, 0, -1)]
+    client = MagicMock()
+    client.list_incidents.return_value = {
+        "count": len(incidents),
+        "next": None,
+        "previous": None,
+        "results": incidents,
+    }
+    monkeypatch.setattr(firetower, "get_client", lambda: client)
+
+    response = tools.list_incidents(**kwargs)
+
+    assert response["count"] == len(incidents)
+    assert response["results"] == incidents[:expected_count]
+
+
+@pytest.mark.parametrize("limit", [0, -1, 51])
+def test_list_incidents_rejects_invalid_limit_before_audit_or_sdk(
+    monkeypatch, gate_spy, limit
+):
+    audit = MagicMock()
+    get_client = MagicMock()
+    monkeypatch.setattr(tools, "_audit", audit)
+    monkeypatch.setattr(firetower, "get_client", get_client)
+
+    with pytest.raises(ToolError, match=r"^limit must be between 1 and 50\.$"):
+        tools.list_incidents(limit=limit)
+
+    gate_spy.assert_called_once_with()
+    audit.assert_not_called()
+    get_client.assert_not_called()
+
+
+@pytest.mark.parametrize(
     "call",
     [
         lambda: tools.get_incident("INC-2000"),
