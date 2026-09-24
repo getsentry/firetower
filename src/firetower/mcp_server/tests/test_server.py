@@ -10,6 +10,7 @@ from fastmcp import settings as fastmcp_settings
 from starlette.testclient import TestClient
 
 from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE
+from firetower.mcp_server.branding import FIRETOWER_ICON
 from firetower.mcp_server.config import MCPConfig
 from firetower.mcp_server.server import create_mcp
 
@@ -68,6 +69,15 @@ def test_health_is_public_while_mcp_requires_oauth(mcp_client: TestClient):
     assert mcp_response.headers["www-authenticate"].startswith("Bearer ")
 
 
+def test_favicon_is_public_and_firetower_branded(mcp_client: TestClient):
+    response = mcp_client.get("/favicon.ico")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/svg+xml")
+    assert response.headers["cache-control"] == "public, max-age=86400"
+    assert "<svg" in response.text
+
+
 def test_oauth_metadata_disables_cimd(mcp_client: TestClient):
     response = mcp_client.get("/.well-known/oauth-authorization-server")
 
@@ -111,6 +121,11 @@ def test_google_authorization_requests_openid_and_email_scopes(
 
     assert consent_response.status_code == 200
     assert csrf_token is not None
+    assert 'alt="Firetower"' in consent_response.text
+    assert f'src="{FIRETOWER_ICON.src}"' in consent_response.text
+    assert (
+        "https://gofastmcp.com/assets/brand/blue-logo.png" not in consent_response.text
+    )
     consent_response = mcp_client.post(
         consent_url,
         data={

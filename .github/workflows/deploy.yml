@@ -13,12 +13,6 @@ on:
         type: environment
         default: test
         required: true
-      mcp_build_only:
-        description: Build and push the MCP image without running migrations or deployments
-        type: boolean
-        default: false
-        required: false
-
 env:
   BACKEND_IMAGE_REF: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower:${{ github.sha }}
   MCP_IMAGE_REF: us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_SLUG }}/firetower-docker/firetower-mcp:${{ github.sha }}
@@ -26,7 +20,6 @@ env:
 
 jobs:
   build:
-    if: ${{ inputs.mcp_build_only != true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -115,7 +108,7 @@ jobs:
 
   deploy-db-migration-test:
     needs: [build]
-    if: ${{ inputs.mcp_build_only != true && inputs.environment == 'test' }}
+    if: ${{ inputs.environment == 'test' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -136,7 +129,7 @@ jobs:
 
   deploy-db-migration-prod:
     needs: [build]
-    if: ${{ inputs.mcp_build_only != true && github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
+    if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -157,7 +150,7 @@ jobs:
 
   deploy-test:
     needs: [deploy-db-migration-test]
-    if: ${{ inputs.mcp_build_only != true && inputs.environment == 'test' }}
+    if: ${{ inputs.environment == 'test' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -198,7 +191,7 @@ jobs:
 
   deploy-mcp-test:
     needs: [build-mcp, changes]
-    if: ${{ inputs.mcp_build_only != true && inputs.environment == 'test' && needs.changes.outputs.mcp == 'true' }}
+    if: ${{ (github.event_name == 'push' || inputs.environment == 'test') && needs.changes.outputs.mcp == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -218,7 +211,7 @@ jobs:
 
   deploy-mcp-prod:
     needs: [build-mcp, changes]
-    if: ${{ inputs.mcp_build_only != true && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.environment == 'prod' && needs.changes.outputs.mcp == 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.environment == 'prod' && needs.changes.outputs.mcp == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -238,7 +231,7 @@ jobs:
 
   deploy-prod:
     needs: [deploy-db-migration-prod]
-    if: ${{ inputs.mcp_build_only != true && github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
+    if: ${{ github.ref == 'refs/heads/main' && ((!inputs.environment) || inputs.environment == 'prod') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
