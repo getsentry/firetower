@@ -9,11 +9,12 @@ only non-private incidents, so no tool can surface private data.
 import logging
 import re
 from collections.abc import Sequence
-from typing import Annotated, Any, Literal, get_args
+from typing import Annotated, Any, Literal, TypedDict, get_args
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from firetower_sdk.exceptions import FiretowerError
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from firetower.mcp_server import firetower
@@ -51,6 +52,15 @@ IncidentField = Literal[
     "total_downtime",
 ]
 
+
+class IncidentListResult(TypedDict):
+    count: int
+    page: int
+    limit: int
+    has_more: bool
+    results: list[dict[str, Any]]
+
+
 _INCIDENT_ID_PATTERN = re.compile(r"[A-Z][A-Z0-9]*-[0-9]+")
 _INVALID_INCIDENT_ID_MESSAGE = "Invalid incident ID."
 _DEFAULT_INCIDENT_LIMIT = 10
@@ -58,6 +68,11 @@ _INVALID_INCIDENT_LIMIT_MESSAGE = "limit must be a positive integer."
 _INVALID_INCIDENT_PAGE_MESSAGE = "page must be a positive integer."
 _FIRETOWER_API_PAGE_SIZE = 50
 _INCIDENT_FIELDS = frozenset(get_args(IncidentField))
+_READ_ONLY_TOOL_ANNOTATIONS = ToolAnnotations(
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+)
 
 
 def _audit(tool: str, **params: Any) -> None:
@@ -117,7 +132,7 @@ def list_incidents(
     fields: Annotated[list[IncidentField], Field(min_length=1)] | None = None,
     page: Annotated[int, Field(ge=1)] = 1,
     limit: Annotated[int, Field(ge=1)] = _DEFAULT_INCIDENT_LIMIT,
-) -> dict[str, Any]:
+) -> IncidentListResult:
     """List incidents with optional filters. Use to find incidents matching a
     status, severity, service tier, date range, tag, captain, reporter, or participant.
 
@@ -131,7 +146,8 @@ def list_incidents(
     matching incidents are returned by default; pass ``limit`` to control the
     return size. ``page`` uses that limit as its page size, so page 2 returns
     the next ``limit`` matching incidents. Responses contain ``count``,
-    ``page``, ``limit``, ``has_more``, and ``results``.
+    ``page``, ``limit``, ``has_more``, and ``results``. When ``has_more`` is
+    true, request ``page + 1`` with the same filters, fields, and limit.
 
     Always pass ``fields`` with only the fields needed for the task to minimize
     context usage. For discovery, prefer ``["id", "title", "status",
@@ -243,4 +259,4 @@ TOOLS = (list_incidents, get_incident)
 
 def register_tools(mcp: FastMCP) -> None:
     for tool in TOOLS:
-        mcp.tool(tool)
+        mcp.tool(tool, annotations=_READ_ONLY_TOOL_ANNOTATIONS)

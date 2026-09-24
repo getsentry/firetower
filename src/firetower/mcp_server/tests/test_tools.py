@@ -10,6 +10,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from firetower_sdk.exceptions import FiretowerError
 
+from firetower.incidents.serializers import IncidentReadSerializer
 from firetower.mcp_server import firetower, tools
 
 
@@ -373,11 +374,16 @@ def test_mcp_pagination_matches_firetower_api_page_size():
     assert tools._FIRETOWER_API_PAGE_SIZE == settings.REST_FRAMEWORK["PAGE_SIZE"]
 
 
+def test_mcp_fields_match_service_api_serializer():
+    assert tools._INCIDENT_FIELDS == frozenset(IncidentReadSerializer.Meta.fields)
+
+
 def test_tool_schemas_expose_allowed_values_and_pagination_constraints():
     mcp = FastMCP("test")
     tools.register_tools(mcp)
     registered_tools = {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
-    list_properties = registered_tools["list_incidents"].parameters["properties"]
+    list_tool = registered_tools["list_incidents"]
+    list_properties = list_tool.parameters["properties"]
     detail_properties = registered_tools["get_incident"].parameters["properties"]
 
     def array_variant(property_schema):
@@ -417,3 +423,26 @@ def test_tool_schemas_expose_allowed_values_and_pagination_constraints():
     )
     assert list_properties["page"]["minimum"] == 1
     assert list_properties["limit"]["minimum"] == 1
+
+    assert list_tool.output_schema == {
+        "properties": {
+            "count": {"type": "integer"},
+            "page": {"type": "integer"},
+            "limit": {"type": "integer"},
+            "has_more": {"type": "boolean"},
+            "results": {
+                "items": {"additionalProperties": True, "type": "object"},
+                "type": "array",
+            },
+        },
+        "required": ["count", "page", "limit", "has_more", "results"],
+        "type": "object",
+    }
+    assert list_tool.description is not None
+    assert "request ``page + 1``" in list_tool.description
+
+    for tool in registered_tools.values():
+        assert tool.annotations is not None
+        assert tool.annotations.readOnlyHint is True
+        assert tool.annotations.destructiveHint is False
+        assert tool.annotations.idempotentHint is True
