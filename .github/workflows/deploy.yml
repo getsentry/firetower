@@ -198,7 +198,7 @@ jobs:
 
   deploy-mcp-test:
     needs: [build-mcp, changes]
-    if: ${{ inputs.mcp_build_only != true && inputs.environment == 'test' && needs.changes.outputs.mcp == 'true' }}
+    if: ${{ inputs.mcp_build_only != true && (github.event_name == 'push' || inputs.environment == 'test') && needs.changes.outputs.mcp == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
