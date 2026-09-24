@@ -74,6 +74,7 @@ def test_list_incidents_forwards_filters(monkeypatch, gate_spy):
         affected_region=["us"],
         captain=["a@sentry.io"],
         reporter=["b@sentry.io"],
+        participant=["c@sentry.io"],
         page=2,
     )
     kwargs = client.list_incidents.call_args.kwargs
@@ -89,6 +90,7 @@ def test_list_incidents_forwards_filters(monkeypatch, gate_spy):
     assert kwargs["affected_region"] == ["us"]
     assert kwargs["captain"] == ["a@sentry.io"]
     assert kwargs["reporter"] == ["b@sentry.io"]
+    assert kwargs["participant"] == ["c@sentry.io"]
     assert kwargs["page"] == 2
 
 

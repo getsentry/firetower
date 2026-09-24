@@ -244,6 +244,21 @@ class TestListIncidents:
                 "reporter": ["reporter@example.com", "other@example.com"],
             }
 
+    def test_with_participant_filter(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"results": [], "count": 0}
+            mock_response.content = b'{"results": []}'
+            mock_request.return_value = mock_response
+
+            client.list_incidents(participant=["participant@example.com"])
+
+            call_kwargs = mock_request.call_args[1]
+            assert call_kwargs["params"] == {
+                "page": 1,
+                "participant": ["participant@example.com"],
+            }
+
 
 class TestUpdateMethods:
     def test_update_status(self, client):

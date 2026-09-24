@@ -60,11 +60,12 @@ def list_incidents(
     affected_region: list[str] | None = None,
     captain: list[str] | None = None,
     reporter: list[str] | None = None,
+    participant: list[str] | None = None,
     page: int = 1,
     limit: Annotated[int, Field(ge=1)] = _DEFAULT_INCIDENT_LIMIT,
 ) -> dict[str, Any]:
     """List incidents with optional filters. Use to find incidents matching a
-    status, severity, service tier, date range, tag, captain, or reporter.
+    status, severity, service tier, date range, tag, captain, reporter, or participant.
 
     Valid values (pass exactly, case-sensitive):
       status: "Active", "Mitigated", "Postmortem", "Done", "Canceled"
@@ -91,6 +92,7 @@ def list_incidents(
         affected_region=affected_region,
         captain=captain,
         reporter=reporter,
+        participant=participant,
         page=page,
         limit=limit,
     )
@@ -108,6 +110,7 @@ def list_incidents(
             "affected_region": affected_region,
             "captain": captain,
             "reporter": reporter,
+            "participant": participant,
         }
         response = client.list_incidents(**filters, page=page)
         results = list(response["results"])
