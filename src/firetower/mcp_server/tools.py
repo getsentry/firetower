@@ -23,8 +23,7 @@ logger = logging.getLogger(__name__)
 _INCIDENT_ID_PATTERN = re.compile(r"[A-Z][A-Z0-9]*-[0-9]+")
 _INVALID_INCIDENT_ID_MESSAGE = "Invalid incident ID."
 _DEFAULT_INCIDENT_LIMIT = 10
-_MAX_INCIDENT_LIMIT = 50
-_INVALID_INCIDENT_LIMIT_MESSAGE = f"limit must be between 1 and {_MAX_INCIDENT_LIMIT}."
+_INVALID_INCIDENT_LIMIT_MESSAGE = "limit must be a positive integer."
 
 
 def _audit(tool: str, **params: Any) -> None:
@@ -62,9 +61,7 @@ def list_incidents(
     captain: list[str] | None = None,
     reporter: list[str] | None = None,
     page: int = 1,
-    limit: Annotated[int, Field(ge=1, le=_MAX_INCIDENT_LIMIT)] = (
-        _DEFAULT_INCIDENT_LIMIT
-    ),
+    limit: Annotated[int, Field(ge=1)] = _DEFAULT_INCIDENT_LIMIT,
 ) -> dict[str, Any]:
     """List incidents with optional filters. Use to find incidents matching a
     status, severity, service tier, date range, tag, captain, or reporter.
@@ -76,10 +73,10 @@ def list_incidents(
 
     Dates are ISO 8601. Each tag/email filter is a list (OR within a filter);
     put each value in its own list element, not comma-separated. The newest 10
-    matching incidents are returned by default; pass ``limit`` to return up to
-    50. Results are paginated; pass ``page`` to fetch more."""
+    matching incidents are returned by default; pass ``limit`` to control the
+    return size. Results are paginated; pass ``page`` to fetch more."""
     require_sentry_account()
-    if not 1 <= limit <= _MAX_INCIDENT_LIMIT:
+    if limit < 1:
         raise ToolError(_INVALID_INCIDENT_LIMIT_MESSAGE)
     _audit(
         "list_incidents",
@@ -98,21 +95,33 @@ def list_incidents(
         limit=limit,
     )
     try:
-        response = firetower.get_client().list_incidents(
-            statuses=status,
-            severities=severity,
-            service_tiers=service_tier,
-            created_after=created_after,
-            created_before=created_before,
-            affected_service=affected_service,
-            root_cause=root_cause,
-            impact_type=impact_type,
-            affected_region=affected_region,
-            captain=captain,
-            reporter=reporter,
-            page=page,
-        )
-        return {**response, "results": response["results"][:limit]}
+        client = firetower.get_client()
+        filters: dict[str, Any] = {
+            "statuses": status,
+            "severities": severity,
+            "service_tiers": service_tier,
+            "created_after": created_after,
+            "created_before": created_before,
+            "affected_service": affected_service,
+            "root_cause": root_cause,
+            "impact_type": impact_type,
+            "affected_region": affected_region,
+            "captain": captain,
+            "reporter": reporter,
+        }
+        response = client.list_incidents(**filters, page=page)
+        results = list(response["results"])
+        current_page = page
+
+        while len(results) < limit and isinstance(response.get("next"), str):
+            current_page += 1
+            response = client.list_incidents(**filters, page=current_page)
+            page_results = list(response["results"])
+            if not page_results:
+                break
+            results.extend(page_results)
+
+        return {**response, "results": results[:limit]}
     except FiretowerError as exc:
         raise _sanitized("list incidents", exc) from exc
 

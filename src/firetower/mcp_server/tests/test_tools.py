@@ -117,7 +117,34 @@ def test_list_incidents_limits_results(monkeypatch, gate_spy, kwargs, expected_c
     assert response["results"] == incidents[:expected_count]
 
 
-@pytest.mark.parametrize("limit", [0, -1, 51])
+def test_list_incidents_fetches_additional_pages_for_large_limit(monkeypatch, gate_spy):
+    incidents = [{"id": f"INC-{number}"} for number in range(100, 0, -1)]
+    client = MagicMock()
+    client.list_incidents.side_effect = [
+        {
+            "count": len(incidents),
+            "next": "https://firetower.example/api/incidents/?page=2",
+            "previous": None,
+            "results": incidents[:50],
+        },
+        {
+            "count": len(incidents),
+            "next": None,
+            "previous": "https://firetower.example/api/incidents/?page=1",
+            "results": incidents[50:],
+        },
+    ]
+    monkeypatch.setattr(firetower, "get_client", lambda: client)
+
+    response = tools.list_incidents(limit=75)
+
+    assert response["results"] == incidents[:75]
+    assert client.list_incidents.call_count == 2
+    assert client.list_incidents.call_args_list[0].kwargs["page"] == 1
+    assert client.list_incidents.call_args_list[1].kwargs["page"] == 2
+
+
+@pytest.mark.parametrize("limit", [0, -1])
 def test_list_incidents_rejects_invalid_limit_before_audit_or_sdk(
     monkeypatch, gate_spy, limit
 ):
@@ -126,7 +153,7 @@ def test_list_incidents_rejects_invalid_limit_before_audit_or_sdk(
     monkeypatch.setattr(tools, "_audit", audit)
     monkeypatch.setattr(firetower, "get_client", get_client)
 
-    with pytest.raises(ToolError, match=r"^limit must be between 1 and 50\.$"):
+    with pytest.raises(ToolError, match=r"^limit must be a positive integer\.$"):
         tools.list_incidents(limit=limit)
 
     gate_spy.assert_called_once_with()
