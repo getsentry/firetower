@@ -211,7 +211,7 @@ jobs:
 
   deploy-mcp-prod:
     needs: [build-mcp, changes]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.environment == 'prod' && needs.changes.outputs.mcp == 'true' }}
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.environment == 'prod') && needs.changes.outputs.mcp == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
