@@ -7,8 +7,8 @@ requires-python = ">=3.12"
 dependencies = [
     "cryptography>=50.0.0",
     "datadog==0.52.1",
-    "datadog-api-client==2.54.0",
-    "django>=5.2.15,<6",
+    "datadog-api-client==2.61.0",
+    "django>=6.1.1,<7",
     "django-cors-headers>=4.9.0",
     "django-fernet-encrypted-fields>=0.4.0",
     "django-kubernetes>=1.1.0",
@@ -22,7 +22,7 @@ dependencies = [
     "slack-bolt>=1.30.0",
     "slack-sdk>=3.44.1",
     "sentry-sdk>=2.69.2",
-    "openrouter>=1.1.139",
+    "openrouter>=1.2.32",
 ]
 
 [build-system]
@@ -44,7 +44,7 @@ dev = [
     "blessed>=1.50.0",
 ]
 prod = [
-    "ddtrace==4.15.1",
+    "ddtrace==4.15.2",
     "granian>=2.8.3",
     "sentry-sdk[django]>=2.70.0",
 ]
