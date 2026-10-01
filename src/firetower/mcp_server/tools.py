@@ -70,9 +70,9 @@ _INVALID_INCIDENT_PAGE_MESSAGE = "page must be a positive integer."
 _FIRETOWER_API_PAGE_SIZE = 50
 _INCIDENT_FIELDS = frozenset(get_args(IncidentField))
 _READ_ONLY_TOOL_ANNOTATIONS = ToolAnnotations(
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
 )
 
 
