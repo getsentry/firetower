@@ -626,16 +626,16 @@ wheels = [
 
 [[package]]
 name = "django"
-version = "5.2.16"
+version = "6.1.1"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "sqlparse" },
     { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/a9/26/889449d521ae508b26de715954faecd8bcf3f740affb81b2d146a83b42a5/django-5.2.16.tar.gz", hash = "sha256:59ea02020c3136fce14bef0bbece21a10a4febef5eed1c51c22ae468efa22200", size = 10890894, upload-time = "2026-07-07T13:52:17.005Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/f8/d4/8314b5bdef20832f0ac6ae3b3e4d4924e4759fa3b4af27609dd747e7a6be/django-6.1.1.tar.gz", hash = "sha256:7ab93536d8e677aa14554c56426290c69480bf2ee68d7513d4a22f57d6bfeb84", size = 11284905, upload-time = "2026-09-02T17:20:45.621Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/4e/13/1e5e3e4c15dcecb04281b3cb2a46a4670e1cef131068e202f6040df19224/django-5.2.16-py3-none-any.whl", hash = "sha256:04f354bf9d807a86ad1a8392fe3808d362358a8eafc322848e0e43e59b24371d", size = 8311943, upload-time = "2026-07-07T13:52:11.223Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/8d/ca/c1040a4fd15754ede7df15fd72fc2e123045b473b253ab5f5284e11c651e/django-6.1.1-py3-none-any.whl", hash = "sha256:585fb82bf15053c42cf52e67c2f1b54a032dca384759315fd6678ab1870d1d72", size = 8419512, upload-time = "2026-09-02T17:20:39.153Z" },
 ]
 
 [[package]]
@@ -920,7 +920,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=50.0.0" },
     { name = "datadog", specifier = "==0.52.1" },
     { name = "datadog-api-client", specifier = "==2.61.0" },
-    { name = "django", specifier = ">=5.2.15,<6" },
+    { name = "django", specifier = ">=6.1.1,<7" },
     { name = "django-cors-headers", specifier = ">=4.9.0" },
     { name = "django-fernet-encrypted-fields", specifier = ">=0.4.0" },
     { name = "django-kubernetes", specifier = ">=1.1.0" },
