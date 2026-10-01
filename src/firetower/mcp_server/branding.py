@@ -42,6 +42,6 @@ FIRETOWER_ICON = Icon(
     src=(
         "data:image/svg+xml;base64," + b64encode(FIRETOWER_ICON_SVG.encode()).decode()
     ),
-    mimeType="image/svg+xml",
+    mime_type="image/svg+xml",
     sizes=["32x32"],
 )
