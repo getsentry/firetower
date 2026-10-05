@@ -475,6 +475,6 @@ def test_tool_schemas_expose_allowed_values_and_pagination_constraints():
 
     for tool in registered_tools.values():
         assert tool.annotations is not None
-        assert tool.annotations.readOnlyHint is True
-        assert tool.annotations.destructiveHint is False
-        assert tool.annotations.idempotentHint is True
+        assert tool.annotations.read_only_hint is True
+        assert tool.annotations.destructive_hint is False
+        assert tool.annotations.idempotent_hint is True
