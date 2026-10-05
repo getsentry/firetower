@@ -146,11 +146,17 @@ def test_google_authorization_requests_openid_and_email_scopes(
     }
 
 
-def test_unallowed_external_callback_is_rejected_at_registration(
+def test_unallowed_external_callback_is_rejected_at_authorization(
     mcp_client: TestClient,
 ):
     metadata = {**PI_DCR_METADATA, "redirect_uris": [UNALLOWED_CALLBACK]}
     registration_response = mcp_client.post("/register", json=metadata)
 
-    assert registration_response.status_code == 400
-    assert "location" not in registration_response.headers
+    assert registration_response.status_code == 201
+    client_id = registration_response.json()["client_id"]
+    authorization_response = mcp_client.get(
+        "/authorize", params=_authorization_params(client_id, UNALLOWED_CALLBACK)
+    )
+
+    assert authorization_response.status_code == 400
+    assert "location" not in authorization_response.headers
