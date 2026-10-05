@@ -76,6 +76,7 @@ IncidentDetailField = Literal[
     "time_mitigated",
     "time_recovered",
     "total_downtime",
+    "action_items",
     "timeline",
 ]
 
@@ -273,10 +274,11 @@ def get_incident(
     fields: Annotated[list[IncidentDetailField], Field(min_length=1)] | None = None,
 ) -> dict[str, Any]:
     """Get an incident by id (e.g. "INC-2000"), including participants, tags,
-    external links, timeline milestones, and timeline events. Pass ``fields``
-    with only the fields needed for the task to minimize context usage. Request
-    ``timeline`` to return all events in chronological order. Omit ``fields``
-    only when the full incident record is explicitly required."""
+    external links, timeline milestones, action items, and timeline events. Pass
+    ``fields`` with only the fields needed for the task to minimize context
+    usage. Request ``action_items`` to return all action items in their display
+    order, or ``timeline`` to return all events in chronological order. Omit
+    ``fields`` only when the full incident record is explicitly required."""
     require_sentry_account()
     if _INCIDENT_ID_PATTERN.fullmatch(incident_id) is None:
         raise ToolError(_INVALID_INCIDENT_ID_MESSAGE)
@@ -285,6 +287,8 @@ def get_incident(
     try:
         client = firetower.get_client()
         incident = client.get_incident(incident_id)
+        if fields is None or "action_items" in fields:
+            incident["action_items"] = client.get_incident_action_items(incident_id)
         if fields is None or "timeline" in fields:
             incident["timeline"] = client.get_incident_timeline(incident_id)
         return _project_incident(incident, fields)

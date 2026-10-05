@@ -75,6 +75,33 @@ class TestGetIncident:
             assert exc_info.value.status_code == 404
 
 
+class TestGetIncidentActionItems:
+    def test_success(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            action_items = [
+                {
+                    "linear_identifier": "RELENG-123",
+                    "title": "Prevent recurrence",
+                    "status": "Todo",
+                }
+            ]
+            mock_response = MagicMock()
+            mock_response.json.return_value = action_items
+            mock_response.content = b'[{"linear_identifier": "RELENG-123"}]'
+            mock_request.return_value = mock_response
+
+            result = client.get_incident_action_items("INC-2000")
+
+            assert result == action_items
+            mock_request.assert_called_once_with(
+                method="GET",
+                url=("https://firetower.getsentry.net/api/incidents/INC-2000/action-items/"),
+                json=None,
+                params=None,
+                timeout=30,
+            )
+
+
 class TestGetIncidentTimeline:
     def test_success(self, client):
         with patch.object(client.session, "request") as mock_request:

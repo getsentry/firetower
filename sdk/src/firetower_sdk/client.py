@@ -94,6 +94,13 @@ class FiretowerClient:
         """Get an incident by ID."""
         return self._request("GET", f"/api/incidents/{incident_id}/")
 
+    def get_incident_action_items(self, incident_id: str) -> list[dict[str, Any]]:
+        """Get all action items for an incident."""
+        return cast(
+            list[dict[str, Any]],
+            self._request("GET", f"/api/incidents/{incident_id}/action-items/"),
+        )
+
     def get_incident_timeline(self, incident_id: str) -> list[dict[str, Any]]:
         """Get all timeline events for an incident in chronological order."""
         return cast(
