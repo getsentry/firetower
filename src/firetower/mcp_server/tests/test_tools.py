@@ -60,6 +60,11 @@ def test_get_incident_projects_timeline(monkeypatch, gate_spy):
         {
             "event_type": "status_changed",
             "summary": "Status changed: Active → Mitigated",
+            "actor": {
+                "email": "captain@example.com",
+                "name": "Timeline Captain",
+                "avatar_url": "https://example.com/avatar.png",
+            },
         }
     ]
     monkeypatch.setattr(firetower, "get_client", lambda: client)
@@ -71,6 +76,10 @@ def test_get_incident_projects_timeline(monkeypatch, gate_spy):
             {
                 "event_type": "status_changed",
                 "summary": "Status changed: Active → Mitigated",
+                "actor": {
+                    "email": "captain@example.com",
+                    "name": "Timeline Captain",
+                },
             }
         ]
     }
