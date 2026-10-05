@@ -434,6 +434,18 @@ class TestTimelineEventAPI:
         assert response.data[1]["link_url"] == ""
         assert response.data[1]["external_id"] == ""
 
+    def test_service_api_returns_timeline_events(self):
+        incident = self._incident()
+        record_incident_created(incident, severity="P1")
+        self.client.force_authenticate(self.reader)
+
+        response = self.client.get(
+            f"/api/incidents/{incident.incident_number}/timeline-events/"
+        )
+
+        assert response.status_code == 200
+        assert [event["event_type"] for event in response.data] == ["incident_created"]
+
     def test_empty_and_read_only(self):
         incident = self._incident()
         self.client.force_authenticate(self.reader)

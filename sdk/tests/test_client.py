@@ -75,6 +75,32 @@ class TestGetIncident:
             assert exc_info.value.status_code == 404
 
 
+class TestGetIncidentTimeline:
+    def test_success(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            events = [
+                {
+                    "event_type": "incident_created",
+                    "summary": "Incident created with severity P1",
+                }
+            ]
+            mock_response = MagicMock()
+            mock_response.json.return_value = events
+            mock_response.content = b'[{"event_type": "incident_created"}]'
+            mock_request.return_value = mock_response
+
+            result = client.get_incident_timeline("INC-2000")
+
+            assert result == events
+            mock_request.assert_called_once_with(
+                method="GET",
+                url=("https://firetower.getsentry.net/api/incidents/INC-2000/timeline-events/"),
+                json=None,
+                params=None,
+                timeout=30,
+            )
+
+
 class TestCreateIncident:
     def test_success(self, client):
         with patch.object(client.session, "request") as mock_request:
