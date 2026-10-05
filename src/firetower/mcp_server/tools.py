@@ -136,19 +136,6 @@ def _project_incident(
     return {field: incident[field] for field in fields}
 
 
-def _project_timeline(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    projected_events = []
-    for event in events:
-        projected_event = dict(event)
-        actor = event.get("actor")
-        if isinstance(actor, dict):
-            projected_event["actor"] = {
-                key: value for key, value in actor.items() if key != "avatar_url"
-            }
-        projected_events.append(projected_event)
-    return projected_events
-
-
 def _sanitized(action: str, error: FiretowerError) -> ToolError:
     """Log the raw upstream error but return a generic message to the client.
 
@@ -299,9 +286,7 @@ def get_incident(
         client = firetower.get_client()
         incident = client.get_incident(incident_id)
         if fields is None or "timeline" in fields:
-            incident["timeline"] = _project_timeline(
-                client.get_incident_timeline(incident_id)
-            )
+            incident["timeline"] = client.get_incident_timeline(incident_id)
         return _project_incident(incident, fields)
     except FiretowerError as exc:
         raise _sanitized("get incident", exc) from exc
