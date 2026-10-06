@@ -961,7 +961,7 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-django", specifier = ">=4.14.0" },
-    { name = "pyupgrade", specifier = ">=3.20.0" },
+    { name = "pyupgrade", specifier = ">=3.21.2" },
     { name = "ruff", specifier = ">=0.12.11" },
     { name = "ty", specifier = ">=0.0.84" },
 ]
@@ -2285,14 +2285,14 @@ wheels = [
 
 [[package]]
 name = "pyupgrade"
-version = "3.21.0"
+version = "3.21.2"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
     { name = "tokenize-rt" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/cb/11/b08f5e4d50575c944e4ea0a86f070a1ba2c0d5a4dc42fac571a605ada78d/pyupgrade-3.21.0.tar.gz", hash = "sha256:3e63a882ec1d16f5621736d938952df3cdc2446501fb049e711415cb8d273960", size = 45210, upload-time = "2025-10-09T19:32:26.448Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/7f/a1/dc63caaeed232b1c58eae1b7a75f262d64ab8435882f696ffa9b58c0c415/pyupgrade-3.21.2.tar.gz", hash = "sha256:1a361bea39deda78d1460f65d9dd548d3a36ff8171d2482298539b9dc11c9c06", size = 45455, upload-time = "2025-11-19T00:39:48.012Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/a4/4a/d18f2d6b2f9b90ec7e10843ea10e4cde0dc36091782443ee923e29d653bb/pyupgrade-3.21.0-py2.py3-none-any.whl", hash = "sha256:3a200cdc537980f371b4867f1d662e37166a7869d7713f309c1c3241c310c754", size = 62638, upload-time = "2025-10-09T19:32:25.086Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/16/8c/433dac11910989a90c40b10149d07ef7224232236971a562d3976790ec53/pyupgrade-3.21.2-py2.py3-none-any.whl", hash = "sha256:2ac7b95cbd176475041e4dfe8ef81298bd4654a244f957167bd68af37d52be9f", size = 62814, upload-time = "2025-11-19T00:39:46.958Z" },
 ]
 
 [[package]]
