@@ -100,7 +100,7 @@ export function EditableDateTimeField({
         ) : (
           <div className="flex items-center gap-space-xs">
             <span
-              className={`text-sm ${value ? 'text-content-primary' : 'text-content-tertiary italic'}`}
+              className={`text-sm ${value ? 'text-content-primary' : 'text-content-secondary italic'}`}
             >
               {formatDateTime(value) || placeholder}
             </span>

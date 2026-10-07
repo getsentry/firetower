@@ -202,7 +202,7 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
                 />
               ) : (
                 <span
-                  className={`text-sm ${incident[field] ? 'text-content-primary' : 'text-content-tertiary'}`}
+                  className={`text-sm ${incident[field] ? 'text-content-primary' : 'text-content-secondary'}`}
                 >
                   {formatDateTime(
                     incident[field] ? new Date(incident[field]) : undefined
