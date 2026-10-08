@@ -975,6 +975,45 @@ class TestActionItemViews:
         assert response.data[0]["relation_type"] == "child"
         assert response.data[0]["slo_deadline"] is None
 
+    def test_service_api_returns_all_action_items_in_display_order(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-unranked",
+            linear_identifier="ENG-2",
+            title="Unranked task",
+            status=ActionItemStatus.TODO,
+            priority=0,
+            url="https://linear.app/t/ENG-2",
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-urgent",
+            linear_identifier="ENG-1",
+            title="Urgent task",
+            status=ActionItemStatus.IN_PROGRESS,
+            priority=1,
+            url="https://linear.app/t/ENG-1",
+        )
+
+        with patch("firetower.incidents.views.sync_action_items_from_linear"):
+            response = self.client.get(
+                f"/api/incidents/{incident.incident_number}/action-items/"
+            )
+
+        assert response.status_code == 200
+        assert [item["linear_identifier"] for item in response.data] == [
+            "ENG-1",
+            "ENG-2",
+        ]
+        assert response.data[0]["title"] == "Urgent task"
+        assert response.data[0]["status"] == ActionItemStatus.IN_PROGRESS
+        assert response.data[0]["slo_deadline"] is None
+
     def test_list_action_items_includes_slo_deadline(self):
         incident = Incident.objects.create(
             title="Test Incident",
@@ -1130,6 +1169,25 @@ class TestActionItemViews:
 
         response = self.client.get(
             f"/api/ui/incidents/{incident.incident_number}/action-items/"
+        )
+
+        assert response.status_code == 404
+
+    def test_service_api_action_items_respects_privacy(self):
+        other_user = User.objects.create_user(
+            username="other-service@example.com",
+            email="other-service@example.com",
+        )
+        incident = Incident.objects.create(
+            title="Private Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=other_user,
+        )
+
+        response = self.client.get(
+            f"/api/incidents/{incident.incident_number}/action-items/"
         )
 
         assert response.status_code == 404

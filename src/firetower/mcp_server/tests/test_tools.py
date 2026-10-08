@@ -26,14 +26,19 @@ def gate_spy(monkeypatch):
 def test_get_incident_calls_sdk(monkeypatch, gate_spy, incident_id):
     client = MagicMock()
     client.get_incident.return_value = {"id": incident_id}
+    client.get_incident_action_items.return_value = [
+        {"linear_identifier": "RELENG-123"}
+    ]
     client.get_incident_timeline.return_value = [{"event_type": "incident_created"}]
     monkeypatch.setattr(firetower, "get_client", lambda: client)
 
     assert tools.get_incident(incident_id) == {
         "id": incident_id,
+        "action_items": [{"linear_identifier": "RELENG-123"}],
         "timeline": [{"event_type": "incident_created"}],
     }
     client.get_incident.assert_called_once_with(incident_id)
+    client.get_incident_action_items.assert_called_once_with(incident_id)
     client.get_incident_timeline.assert_called_once_with(incident_id)
 
 
@@ -50,6 +55,34 @@ def test_get_incident_projects_selected_fields(monkeypatch, gate_spy):
     response = tools.get_incident("INC-2000", fields=["id", "severity"])
 
     assert response == {"id": "INC-2000", "severity": "P1"}
+    client.get_incident_action_items.assert_not_called()
+    client.get_incident_timeline.assert_not_called()
+
+
+def test_get_incident_projects_action_items(monkeypatch, gate_spy):
+    client = MagicMock()
+    client.get_incident.return_value = {"id": "INC-2000", "severity": "P1"}
+    client.get_incident_action_items.return_value = [
+        {
+            "linear_identifier": "RELENG-123",
+            "title": "Prevent recurrence",
+            "status": "Todo",
+        }
+    ]
+    monkeypatch.setattr(firetower, "get_client", lambda: client)
+
+    response = tools.get_incident("INC-2000", fields=["action_items"])
+
+    assert response == {
+        "action_items": [
+            {
+                "linear_identifier": "RELENG-123",
+                "title": "Prevent recurrence",
+                "status": "Todo",
+            }
+        ]
+    }
+    client.get_incident_action_items.assert_called_once_with("INC-2000")
     client.get_incident_timeline.assert_not_called()
 
 
@@ -74,6 +107,7 @@ def test_get_incident_projects_timeline(monkeypatch, gate_spy):
             }
         ]
     }
+    client.get_incident_action_items.assert_not_called()
     client.get_incident_timeline.assert_called_once_with("INC-2000")
 
 
@@ -406,7 +440,10 @@ def test_mcp_pagination_matches_firetower_api_page_size():
 
 def test_mcp_fields_match_service_api_serializer():
     assert tools._INCIDENT_FIELDS == frozenset(IncidentReadSerializer.Meta.fields)
-    assert tools._INCIDENT_DETAIL_FIELDS == tools._INCIDENT_FIELDS | {"timeline"}
+    assert tools._INCIDENT_DETAIL_FIELDS == tools._INCIDENT_FIELDS | {
+        "action_items",
+        "timeline",
+    }
 
 
 def test_tool_schemas_expose_allowed_values_and_pagination_constraints():
@@ -449,8 +486,11 @@ def test_tool_schemas_expose_allowed_values_and_pagination_constraints():
     assert set(array_variant(list_properties["fields"])["items"]["enum"]) == (
         expected_fields
     )
-    assert set(array_variant(detail_properties["fields"])["items"]["enum"]) == (
-        expected_fields | {"timeline"}
+    detail_fields = set(array_variant(detail_properties["fields"])["items"]["enum"])
+    assert detail_fields == expected_fields | {"action_items", "timeline"}
+    assert "action_items" in detail_fields
+    assert "action_items" not in set(
+        array_variant(list_properties["fields"])["items"]["enum"]
     )
     assert list_properties["page"]["minimum"] == 1
     assert list_properties["limit"]["minimum"] == 1
