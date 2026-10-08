@@ -323,7 +323,7 @@ def test_list_incidents_rejects_invalid_page_before_audit_or_sdk(
     "call",
     [
         lambda: tools.get_incident("INC-2000"),
-        lambda: tools.list_incidents(),
+        tools.list_incidents,
     ],
 )
 def test_tools_invoke_gate(monkeypatch, gate_spy, call):

@@ -3,7 +3,7 @@ from typing import Any
 
 import requests
 
-from firetower_sdk.auth import JWTInterface, JwtAuth
+from firetower_sdk.auth import JwtAuth, JWTInterface
 from firetower_sdk.enums import IncidentSeverity, IncidentStatus, ServiceTier
 from firetower_sdk.exceptions import FiretowerError
 from firetower_sdk.utils import get_base_url
