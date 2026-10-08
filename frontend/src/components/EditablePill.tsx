@@ -22,14 +22,17 @@ const optionRowStyles = cva([
 const optionStyles = cva(['pointer-events-none']);
 
 const triggerStyles = cva([
-  'cursor-pointer',
-  'transition-all',
-  'hover:shadow-md',
-  'hover:scale-105',
-  'active:scale-95',
   'relative',
-  'rounded-full',
+  'inline-flex',
+  'cursor-pointer',
+  'items-center',
+  'rounded-radius-full',
+  'leading-none',
   'select-none',
+  'transition-all',
+  'hover:scale-105',
+  'hover:shadow-md',
+  'active:scale-95',
 ]);
 
 export interface EditablePillProps<T extends string> {
