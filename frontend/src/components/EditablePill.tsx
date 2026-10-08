@@ -6,19 +6,14 @@ import {Pill, type PillProps} from './Pill';
 import {Popover, PopoverContent, PopoverTrigger} from './Popover';
 import {Spinner} from './Spinner';
 
-const optionRowStyles = cva([
-  'w-full',
-  'cursor-pointer',
-  'flex',
-  'items-center',
-  'justify-center',
-  'px-space-sm',
-  'py-space-2xs',
-  'transition-colors',
-  'hover:bg-background-secondary',
-]);
+const optionRowStyles = cva(['group', 'w-fit', 'cursor-pointer', 'rounded-radius-full']);
 
-const optionStyles = cva(['pointer-events-none']);
+const optionStyles = cva([
+  'pointer-events-none',
+  'transition-[filter]',
+  'group-hover:brightness-90',
+  'dark:group-hover:brightness-110',
+]);
 
 const triggerStyles = cva([
   'relative',
@@ -133,7 +128,10 @@ export function EditablePill<T extends string>({
         </button>
       </PopoverTrigger>
       <PopoverContent className="p-space-0 overflow-hidden" onKeyDown={handleKeyDown}>
-        <div role="listbox" className="py-space-xs">
+        <div
+          role="listbox"
+          className="gap-space-xs p-space-sm flex flex-col items-center"
+        >
           {options.map((option, index) => {
             const optionVariant = getVariant
               ? getVariant(option)
@@ -143,12 +141,18 @@ export function EditablePill<T extends string>({
               <div
                 key={option}
                 tabIndex={-1}
-                className={cn(optionRowStyles(), isFocused && 'bg-background-secondary')}
+                className={cn(optionRowStyles())}
                 onClick={() => handleSelect(option)}
                 role="option"
                 aria-selected={option === value}
               >
-                <Pill variant={optionVariant} className={cn(optionStyles())}>
+                <Pill
+                  variant={optionVariant}
+                  className={cn(
+                    optionStyles(),
+                    isFocused && 'brightness-90 dark:brightness-110'
+                  )}
+                >
                   {option}
                 </Pill>
               </div>
