@@ -51,6 +51,33 @@ IncidentField = Literal[
     "time_recovered",
     "total_downtime",
 ]
+IncidentDetailField = Literal[
+    "id",
+    "title",
+    "description",
+    "impact_summary",
+    "status",
+    "severity",
+    "service_tier",
+    "is_private",
+    "captain",
+    "reporter",
+    "participants",
+    "affected_service_tags",
+    "affected_region_tags",
+    "root_cause_tags",
+    "impact_type_tags",
+    "external_links",
+    "created_at",
+    "updated_at",
+    "time_started",
+    "time_detected",
+    "time_analyzed",
+    "time_mitigated",
+    "time_recovered",
+    "total_downtime",
+    "timeline",
+]
 
 
 class IncidentListResult(TypedDict):
@@ -69,6 +96,7 @@ _INVALID_INCIDENT_LIMIT_MESSAGE = f"limit must be between 1 and {_MAX_INCIDENT_L
 _INVALID_INCIDENT_PAGE_MESSAGE = "page must be a positive integer."
 _FIRETOWER_API_PAGE_SIZE = 50
 _INCIDENT_FIELDS = frozenset(get_args(IncidentField))
+_INCIDENT_DETAIL_FIELDS = frozenset(get_args(IncidentDetailField))
 _READ_ONLY_TOOL_ANNOTATIONS = ToolAnnotations(
     read_only_hint=True,
     destructive_hint=False,
@@ -86,12 +114,15 @@ def _audit(tool: str, **params: Any) -> None:
     )
 
 
-def _validate_fields(fields: Sequence[str] | None) -> None:
+def _validate_fields(
+    fields: Sequence[str] | None,
+    allowed_fields: frozenset[str] = _INCIDENT_FIELDS,
+) -> None:
     if fields is None:
         return
     if not fields:
         raise ToolError("fields must contain at least one incident field.")
-    unknown_fields = set(fields) - _INCIDENT_FIELDS
+    unknown_fields = set(fields) - allowed_fields
     if unknown_fields:
         unknown = ", ".join(sorted(unknown_fields))
         raise ToolError(f"Unknown incident field(s): {unknown}.")
@@ -239,19 +270,23 @@ def list_incidents(
 
 def get_incident(
     incident_id: str,
-    fields: Annotated[list[IncidentField], Field(min_length=1)] | None = None,
+    fields: Annotated[list[IncidentDetailField], Field(min_length=1)] | None = None,
 ) -> dict[str, Any]:
     """Get an incident by id (e.g. "INC-2000"), including participants, tags,
-    external links, and timeline milestones. Pass ``fields`` with only the fields
-    needed for the task to minimize context usage. Omit it only when the full
-    incident record is explicitly required."""
+    external links, timeline milestones, and timeline events. Pass ``fields``
+    with only the fields needed for the task to minimize context usage. Request
+    ``timeline`` to return all events in chronological order. Omit ``fields``
+    only when the full incident record is explicitly required."""
     require_sentry_account()
     if _INCIDENT_ID_PATTERN.fullmatch(incident_id) is None:
         raise ToolError(_INVALID_INCIDENT_ID_MESSAGE)
-    _validate_fields(fields)
+    _validate_fields(fields, _INCIDENT_DETAIL_FIELDS)
     _audit("get_incident", incident_id=incident_id, fields=fields)
     try:
-        incident = firetower.get_client().get_incident(incident_id)
+        client = firetower.get_client()
+        incident = client.get_incident(incident_id)
+        if fields is None or "timeline" in fields:
+            incident["timeline"] = client.get_incident_timeline(incident_id)
         return _project_incident(incident, fields)
     except FiretowerError as exc:
         raise _sanitized("get incident", exc) from exc

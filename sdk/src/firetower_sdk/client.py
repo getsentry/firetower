@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -93,6 +93,13 @@ class FiretowerClient:
     def get_incident(self, incident_id: str) -> dict[str, Any]:
         """Get an incident by ID."""
         return self._request("GET", f"/api/incidents/{incident_id}/")
+
+    def get_incident_timeline(self, incident_id: str) -> list[dict[str, Any]]:
+        """Get all timeline events for an incident in chronological order."""
+        return cast(
+            list[dict[str, Any]],
+            self._request("GET", f"/api/incidents/{incident_id}/timeline-events/"),
+        )
 
     def get_incident_status(self, incident_id: str) -> dict[str, Any]:
         """Get the status of an incident by ID.
