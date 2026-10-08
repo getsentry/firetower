@@ -39,7 +39,7 @@ export const Header = () => {
 
   return (
     <header className="bg-background-primary border-secondary border-b">
-      <div className="px-space-md py-space-md md:px-space-xl mx-auto max-w-6xl">
+      <div className="px-space-md py-space-md md:px-space-lg mx-auto max-w-6xl">
         {isTopLevelRoute ? (
           <div className="relative flex items-center justify-between">
             <nav className="gap-space-2xs flex">
