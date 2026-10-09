@@ -6,6 +6,12 @@ sentry.io`` and ``email_verified`` during the federated login, before FastMCP
 issues its own token. A per-tool fallback re-checks the embedded
 ``upstream_claims`` for defense in depth.
 
+Bots (Junior) authenticate without a Google account via the RFC 7523 jwt-bearer
+grant (SEP-990 ID-JAG): when configured, the token endpoint accepts short-lived
+assertions signed by a trusted issuer whose JWKS we pin, and mints a FastMCP
+token marked ``fastmcp_grant == "id_jag"``. Those tokens skip the Google gates
+and are audited as ``bot:<subject>``.
+
 Token refresh note: ``OAuthProxy`` re-calls ``_extract_upstream_claims`` on
 every upstream refresh, passing the *merged* ``raw_token_data``. Google refresh
 responses carry no ``id_token``, so the original login token is expired by then.
@@ -15,11 +21,13 @@ token is active and belongs to the same verified identity and OAuth client.
 """
 
 import logging
-from typing import Any
+from typing import Any, TypeGuard
 
 import httpx
 import jwt
 from fastmcp.exceptions import FastMCPError
+from fastmcp.server.auth import AccessToken, IdentityAssertion
+from fastmcp.server.auth.identity_assertion import IdentityAssertionValidator
 from fastmcp.server.auth.providers.google import GoogleProvider
 from fastmcp.server.dependencies import get_access_token
 
@@ -35,6 +43,7 @@ GOOGLE_GROUPS_READ_SCOPE = (
     "https://www.googleapis.com/auth/cloud-identity.groups.readonly"
 )
 ACCESS_GROUP = "team@sentry.io"
+BOT_GRANT = "id_jag"
 
 
 class GoogleGroupMembershipChecker:
@@ -76,13 +85,39 @@ class GoogleGroupMembershipChecker:
 class SentryGoogleProvider(GoogleProvider):
     """GoogleProvider that only admits verified @sentry.io Workspace accounts."""
 
-    def __init__(self, *, client_id: str, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *,
+        client_id: str,
+        identity_assertion: IdentityAssertion | None = None,
+        **kwargs: Any,
+    ) -> None:
         if not client_id:
             raise ValueError("SentryGoogleProvider requires a non-empty client_id.")
         super().__init__(client_id=client_id, **kwargs)
+        # GoogleProvider does not forward identity_assertion to OAuthProxy, so
+        # mirror OAuthProxy.__init__'s wiring to enable the jwt-bearer grant.
+        if identity_assertion is not None:
+            self._identity_assertion = identity_assertion
+            self._identity_assertion_validator = IdentityAssertionValidator(
+                config=identity_assertion, audience=str(self.issuer_url)
+            )
         self._expected_audience = client_id
         self._jwks_client = jwt.PyJWKClient(GOOGLE_JWKS_URI)
         self._group_membership_checker = GoogleGroupMembershipChecker()
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        """Grant bot tokens the baseline scopes; they carry no Google scopes.
+
+        The bot's trust decision already happened at the token endpoint, where
+        its assertion was verified against the pinned issuer's JWKS.
+        """
+        result = await super().verify_token(token)
+        if _is_bot(result):
+            return result.model_copy(
+                update={"scopes": list(self.required_scopes or [])}
+            )
+        return result
 
     async def _extract_upstream_claims(
         self, idp_tokens: dict[str, Any]
@@ -184,9 +219,19 @@ class SentryGoogleProvider(GoogleProvider):
             raise FastMCPError("Access denied: invalid Google identity token.")
 
 
+def _is_bot(token: AccessToken | None) -> TypeGuard[AccessToken]:
+    return token is not None and token.claims.get("fastmcp_grant") == BOT_GRANT
+
+
 def require_sentry_account() -> None:
-    """Per-tool fallback gate (defense in depth) on the issued FastMCP token."""
+    """Per-tool fallback gate (defense in depth) on the issued FastMCP token.
+
+    Bot tokens are admitted: they can only be minted by our token endpoint after
+    the assertion verified against a pinned trusted issuer's JWKS.
+    """
     token = get_access_token()
+    if _is_bot(token):
+        return
     upstream = token.claims.get("upstream_claims") if token else None
     if (
         not upstream
@@ -206,16 +251,21 @@ def _requester_claim(claim: str) -> str | None:
         token = get_access_token()
     except Exception:
         return None
+    if _is_bot(token):
+        if claim != "sub":
+            return None
+        return f"bot:{token.subject or token.claims.get('sub')}"
     upstream = token.claims.get("upstream_claims") if token else None
     value = upstream.get(claim) if upstream else None
     return value if isinstance(value, str) else None
 
 
 def requester_email() -> str | None:
-    """Verified email of the authenticated requester, for audit logging."""
+    """Verified email of the authenticated requester (None for bots), for audit logging."""
     return _requester_claim("email")
 
 
 def requester_subject() -> str | None:
-    """Immutable Google subject of the requester, for audit logging."""
+    """Immutable Google subject of the requester, or ``bot:<subject>`` for bot
+    tokens, for audit logging."""
     return _requester_claim("sub")

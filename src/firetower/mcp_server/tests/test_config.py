@@ -39,3 +39,25 @@ def test_custom_firetower_url_is_trimmed(
     monkeypatch.setenv("FIRETOWER_URL", "  https://firetower.example.com  ")
 
     assert MCPConfig.from_env().firetower_url == "https://firetower.example.com"
+
+
+@pytest.mark.parametrize("name", ["MCP_BOT_ISSUER", "MCP_BOT_JWKS_URL"])
+def test_bot_auth_requires_issuer_and_jwks_together(
+    monkeypatch: pytest.MonkeyPatch, required_env: None, name: str
+) -> None:
+    monkeypatch.setenv(name, "https://junior.example")
+
+    with pytest.raises(ConfigError, match="must be set together"):
+        MCPConfig.from_env()
+
+
+def test_bot_auth_is_configured_from_env(
+    monkeypatch: pytest.MonkeyPatch, required_env: None
+) -> None:
+    monkeypatch.setenv("MCP_BOT_ISSUER", "https://junior.example")
+    monkeypatch.setenv("MCP_BOT_JWKS_URL", "https://junior.example/jwks.json")
+
+    config = MCPConfig.from_env()
+
+    assert config.bot_issuer == "https://junior.example"
+    assert config.bot_jwks_url == "https://junior.example/jwks.json"

@@ -14,6 +14,8 @@ from firetower.mcp_server import auth
 from firetower.mcp_server.auth import (
     ACCESS_GROUP,
     SentryGoogleProvider,
+    requester_email,
+    requester_subject,
     require_sentry_account,
 )
 
@@ -342,8 +344,9 @@ def test_init_requires_client_id():
 
 
 class _FakeToken:
-    def __init__(self, claims: dict):
+    def __init__(self, claims: dict, subject: str | None = None):
         self.claims = claims
+        self.subject = subject
 
 
 def test_fallback_admits_sentry(monkeypatch):
@@ -409,3 +412,14 @@ def test_fallback_rejects_when_no_token(monkeypatch):
     monkeypatch.setattr(auth, "get_access_token", lambda: None)
     with pytest.raises(FastMCPError):
         require_sentry_account()
+
+
+def test_fallback_admits_bot_grant_and_audits_as_bot(monkeypatch):
+    monkeypatch.setattr(
+        auth,
+        "get_access_token",
+        lambda: _FakeToken({"fastmcp_grant": "id_jag"}, subject="firetower"),
+    )
+    require_sentry_account()  # no raise
+    assert requester_subject() == "bot:firetower"
+    assert requester_email() is None

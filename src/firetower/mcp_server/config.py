@@ -37,6 +37,8 @@ class MCPConfig:
     allowed_redirect_uris: tuple[str, ...]
     host: str
     port: int
+    bot_issuer: str | None = None
+    bot_jwks_url: str | None = None
 
     @classmethod
     def from_env(cls) -> "MCPConfig":
@@ -50,6 +52,12 @@ class MCPConfig:
             raise ConfigError(
                 "MCP_ALLOWED_REDIRECT_URIS must list at least one redirect URI."
             )
+        bot_issuer = (os.environ.get("MCP_BOT_ISSUER") or "").strip() or None
+        bot_jwks_url = (os.environ.get("MCP_BOT_JWKS_URL") or "").strip() or None
+        if bool(bot_issuer) != bool(bot_jwks_url):
+            raise ConfigError(
+                "MCP_BOT_ISSUER and MCP_BOT_JWKS_URL must be set together."
+            )
         return cls(
             google_client_id=_require("MCP_GOOGLE_CLIENT_ID"),
             google_client_secret=_require("MCP_GOOGLE_CLIENT_SECRET"),
@@ -60,4 +68,6 @@ class MCPConfig:
             allowed_redirect_uris=allowed_redirect_uris,
             host=os.environ.get("MCP_HOST", "0.0.0.0"),
             port=int(os.environ.get("PORT", "8080")),
+            bot_issuer=bot_issuer,
+            bot_jwks_url=bot_jwks_url,
         )
