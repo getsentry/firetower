@@ -26,6 +26,10 @@ class JsonFormatter(logging.Formatter):
                 if key not in _STANDARD_LOG_RECORD_FIELDS and not key.startswith("_")
             }
         )
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        if record.stack_info:
+            payload["stack"] = self.formatStack(record.stack_info)
         return json.dumps(payload, default=str, separators=(",", ":"))
 
 

@@ -23,7 +23,7 @@ from firetower.mcp_server.logging import (
 )
 from firetower.mcp_server.tools import register_tools
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("firetower.mcp_server.server")
 
 
 async def health(_request: Request) -> PlainTextResponse:

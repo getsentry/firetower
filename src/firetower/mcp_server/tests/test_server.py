@@ -158,6 +158,10 @@ def test_unallowed_external_callback_is_rejected_at_registration(
     assert "location" not in registration_response.headers
 
 
+def test_server_uses_configured_logger_namespace():
+    assert server.logger.name == "firetower.mcp_server.server"
+
+
 def test_main_configures_audit_logging_and_disables_access_logs(monkeypatch):
     config = MagicMock(host="0.0.0.0", port=8080)
     mcp = MagicMock()

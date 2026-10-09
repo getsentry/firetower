@@ -1,5 +1,6 @@
 import json
 import logging
+import sys
 from collections.abc import AsyncIterator
 from io import StringIO
 from unittest.mock import MagicMock
@@ -39,6 +40,25 @@ def test_json_formatter_preserves_structured_audit_fields():
     assert payload["event"] == "mcp_tool_call"
     assert payload["actor_sub"] == "google-subject"
     assert payload["params"] == {"incident_id": "INC-2000"}
+
+
+def test_json_formatter_preserves_exception_information():
+    try:
+        raise ValueError("safe failure detail")
+    except ValueError:
+        record = logging.LogRecord(
+            name="firetower.mcp_server.server",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="Request failed",
+            args=(),
+            exc_info=sys.exc_info(),
+        )
+
+    payload = json.loads(JsonFormatter().format(record))
+
+    assert "ValueError: safe failure detail" in payload["exception"]
 
 
 def test_oauth_access_log_omits_query_parameters(monkeypatch):
