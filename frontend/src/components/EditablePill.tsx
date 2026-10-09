@@ -134,7 +134,7 @@ export function EditablePill<T extends string>({
         </button>
       </PopoverTrigger>
       <PopoverContent className="p-space-0 overflow-hidden" onKeyDown={handleKeyDown}>
-        <div role="listbox" className="p-space-xs flex flex-col items-center">
+        <div role="listbox" className="p-space-xs flex flex-col">
           {options.map((option, index) => {
             const optionVariant = getVariant
               ? getVariant(option)
