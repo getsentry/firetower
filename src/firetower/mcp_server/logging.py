@@ -3,9 +3,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.requests import Request
-from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 _STANDARD_LOG_RECORD_FIELDS = frozenset(logging.makeLogRecord({}).__dict__) | {
     "asctime",
@@ -31,24 +29,31 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, default=str, separators=(",", ":"))
 
 
-class SafeOAuthAccessLogMiddleware(BaseHTTPMiddleware):
+class SafeOAuthAccessLogMiddleware:
     _SENSITIVE_PATHS = frozenset({"/authorize", "/consent", "/auth/callback"})
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
-        response = await call_next(request)
-        if request.url.path in self._SENSITIVE_PATHS:
-            logging.getLogger("firetower.mcp_server.oauth_access").info(
-                "MCP OAuth request",
-                extra={
-                    "event": "mcp_oauth_request",
-                    "method": request.method,
-                    "path": request.url.path,
-                    "status_code": response.status_code,
-                },
-            )
-        return response
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["path"] not in self._SENSITIVE_PATHS:
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_access_log(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                logging.getLogger("firetower.mcp_server.oauth_access").info(
+                    "MCP OAuth request",
+                    extra={
+                        "event": "mcp_oauth_request",
+                        "method": scope["method"],
+                        "path": scope["path"],
+                        "status_code": message["status"],
+                    },
+                )
+            await send(message)
+
+        await self.app(scope, receive, send_with_access_log)
 
 
 class RedactFastMCPOAuthFilter(logging.Filter):
@@ -80,6 +85,11 @@ def configure_mcp_logging() -> None:
         logger.propagate = False
         logger.setLevel(logging.INFO)
 
-    fastmcp_logger = logging.getLogger("fastmcp")
-    for fastmcp_handler in fastmcp_logger.handlers:
-        fastmcp_handler.addFilter(RedactFastMCPOAuthFilter())
+    oauth_handler = logging.StreamHandler()
+    oauth_handler.setFormatter(formatter)
+    oauth_handler.addFilter(RedactFastMCPOAuthFilter())
+
+    oauth_logger = logging.getLogger("fastmcp.server.auth.oauth_proxy")
+    oauth_logger.handlers = [oauth_handler]
+    oauth_logger.propagate = False
+    oauth_logger.setLevel(logging.INFO)
