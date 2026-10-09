@@ -34,7 +34,7 @@ export function DowntimeField({
           </div>
         ) : (
           <span
-            className={`text-sm ${value != null ? 'text-content-primary' : 'text-content-tertiary'}`}
+            className={`text-sm ${value != null ? 'text-content-primary' : 'text-content-secondary'}`}
           >
             {value != null ? `${value} min` : 'Not set'}
           </span>

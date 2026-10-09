@@ -11,25 +11,28 @@ const optionRowStyles = cva([
   'cursor-pointer',
   'flex',
   'items-center',
+  'justify-center',
   'rounded-radius-md',
-  'transition-all',
-  'hover:bg-gray-100',
-  'dark:hover:bg-neutral-800',
-  'p-space-xs',
-  '-m-space-xs',
+  'px-space-xs',
+  'py-space-2xs',
+  'transition-colors',
+  'hover:bg-background-tertiary',
 ]);
 
 const optionStyles = cva(['pointer-events-none']);
 
 const triggerStyles = cva([
-  'cursor-pointer',
-  'transition-all',
-  'hover:shadow-md',
-  'hover:scale-105',
-  'active:scale-95',
   'relative',
-  'rounded-full',
+  'inline-flex',
+  'cursor-pointer',
+  'items-center',
+  'rounded-radius-full',
+  'leading-none',
   'select-none',
+  'transition-all',
+  'hover:scale-105',
+  'hover:shadow-md',
+  'active:scale-95',
 ]);
 
 export interface EditablePillProps<T extends string> {
@@ -130,11 +133,8 @@ export function EditablePill<T extends string>({
           </Pill>
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        className="gap-space-xs p-space-sm flex flex-col"
-        onKeyDown={handleKeyDown}
-      >
-        <div role="listbox">
+      <PopoverContent className="p-space-0 overflow-hidden" onKeyDown={handleKeyDown}>
+        <div role="listbox" className="p-space-xs flex flex-col">
           {options.map((option, index) => {
             const optionVariant = getVariant
               ? getVariant(option)
@@ -144,10 +144,7 @@ export function EditablePill<T extends string>({
               <div
                 key={option}
                 tabIndex={-1}
-                className={cn(
-                  optionRowStyles(),
-                  isFocused && 'bg-gray-100 dark:bg-neutral-700'
-                )}
+                className={cn(optionRowStyles(), isFocused && 'bg-background-tertiary')}
                 onClick={() => handleSelect(option)}
                 role="option"
                 aria-selected={option === value}
