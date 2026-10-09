@@ -132,9 +132,12 @@ class SentryGoogleProvider(GoogleProvider):
             )
 
         email = claims.get("email")
+        subject = claims.get("sub")
         access_token = idp_tokens.get("access_token")
         if (
             not isinstance(email, str)
+            or not isinstance(subject, str)
+            or not subject
             or not access_token
             or not await self._group_membership_checker.is_member(access_token, email)
         ):
@@ -145,8 +148,16 @@ class SentryGoogleProvider(GoogleProvider):
                 f"Access denied: only members of {ACCESS_GROUP} are allowed."
             )
 
-        logger.info("Admitted login for %s", email)
+        logger.info(
+            "Admitted MCP login",
+            extra={
+                "event": "mcp_login_admitted",
+                "actor_email": email,
+                "actor_sub": subject,
+            },
+        )
         return {
+            "sub": subject,
             "hd": claims["hd"],
             "email": email,
             "email_verified": claims["email_verified"],
@@ -165,6 +176,7 @@ class SentryGoogleProvider(GoogleProvider):
         claims = verified.claims if verified else {}
         if (
             claims.get("aud") != self._expected_audience
+            or claims.get("sub") != id_token_claims.get("sub")
             or claims.get("email") != id_token_claims.get("email")
             or not claims.get("email_verified")
         ):
@@ -178,6 +190,8 @@ def require_sentry_account() -> None:
     upstream = token.claims.get("upstream_claims") if token else None
     if (
         not upstream
+        or not isinstance(upstream.get("sub"), str)
+        or not upstream["sub"]
         or upstream.get("hd") != WORKSPACE_DOMAIN
         or not upstream.get("email_verified")
         or upstream.get("group") != ACCESS_GROUP
@@ -187,15 +201,21 @@ def require_sentry_account() -> None:
         )
 
 
-def requester_email() -> str | None:
-    """Verified email of the authenticated requester, for audit logging.
-
-    Returns None outside a request context (e.g. in tests) so callers can log
-    defensively without depending on the gate having run.
-    """
+def _requester_claim(claim: str) -> str | None:
     try:
         token = get_access_token()
     except Exception:
         return None
     upstream = token.claims.get("upstream_claims") if token else None
-    return upstream.get("email") if upstream else None
+    value = upstream.get(claim) if upstream else None
+    return value if isinstance(value, str) else None
+
+
+def requester_email() -> str | None:
+    """Verified email of the authenticated requester, for audit logging."""
+    return _requester_claim("email")
+
+
+def requester_subject() -> str | None:
+    """Immutable Google subject of the requester, for audit logging."""
+    return _requester_claim("sub")

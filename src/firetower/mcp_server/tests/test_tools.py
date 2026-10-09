@@ -22,6 +22,26 @@ def gate_spy(monkeypatch):
     return spy
 
 
+def test_audit_logs_structured_immutable_identity(monkeypatch):
+    log = MagicMock()
+    monkeypatch.setattr(tools.logger, "info", log)
+    monkeypatch.setattr(tools, "requester_email", lambda: "user@sentry.io")
+    monkeypatch.setattr(tools, "requester_subject", lambda: "google-subject")
+
+    tools._audit("get_incident", incident_id="INC-2000", fields=None)
+
+    log.assert_called_once_with(
+        "MCP tool call",
+        extra={
+            "event": "mcp_tool_call",
+            "actor_email": "user@sentry.io",
+            "actor_sub": "google-subject",
+            "tool": "get_incident",
+            "params": {"incident_id": "INC-2000"},
+        },
+    )
+
+
 @pytest.mark.parametrize("incident_id", ["INC-2000", "TESTINC-2239"])
 def test_get_incident_calls_sdk(monkeypatch, gate_spy, incident_id):
     client = MagicMock()
@@ -421,11 +441,21 @@ def test_list_incidents_sanitizes_errors(monkeypatch, gate_spy):
     client.list_incidents.side_effect = FiretowerError(
         "Firetower API error (403): {raw body}", status_code=403
     )
+    log = MagicMock()
     monkeypatch.setattr(firetower, "get_client", lambda: client)
+    monkeypatch.setattr(tools.logger, "info", log)
 
     with pytest.raises(ToolError) as exc:
         tools.list_incidents()
     assert "raw body" not in str(exc.value)
+    log.assert_any_call(
+        "Firetower API request failed",
+        extra={
+            "event": "firetower_api_error",
+            "action": "list incidents",
+            "status_code": 403,
+        },
+    )
 
 
 def test_register_tools_registers_all():

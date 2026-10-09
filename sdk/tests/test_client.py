@@ -73,6 +73,8 @@ class TestGetIncident:
                 client.get_incident("INC-9999")
 
             assert exc_info.value.status_code == 404
+            assert str(exc_info.value) == "Firetower API error (404)"
+            assert "Not found" not in str(exc_info.value)
 
 
 class TestGetIncidentActionItems:
