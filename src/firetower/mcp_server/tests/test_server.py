@@ -71,8 +71,12 @@ def mcp_client(mcp_config: MCPConfig) -> Iterator[TestClient]:
         yield client
 
 
+class _JWKSServer(http.server.HTTPServer):
+    requests = 0
+
+
 @pytest.fixture
-def bot_jwks_url() -> Iterator[str]:
+def bot_jwks_server() -> Iterator[_JWKSServer]:
     jwk = json.loads(RSAAlgorithm.to_jwk(BOT_KEY.public_key())) | {
         "kid": "junior-test",
         "alg": "RS256",
@@ -82,6 +86,7 @@ def bot_jwks_url() -> Iterator[str]:
 
     class JWKSHandler(http.server.BaseHTTPRequestHandler):
         def do_GET(self) -> None:
+            server.requests += 1
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -90,14 +95,25 @@ def bot_jwks_url() -> Iterator[str]:
         def log_message(self, *_args: object) -> None:
             pass
 
-    server = http.server.HTTPServer(("127.0.0.1", 0), JWKSHandler)
+    server = _JWKSServer(("127.0.0.1", 0), JWKSHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield f"http://127.0.0.1:{server.server_port}/jwks.json"
+    yield server
     server.shutdown()
 
 
+@pytest.fixture
+def bot_mcp_config(mcp_config: MCPConfig, bot_jwks_server: _JWKSServer) -> MCPConfig:
+    return dataclasses.replace(
+        mcp_config,
+        bot_issuer=BOT_ISSUER,
+        bot_jwks_url=f"http://127.0.0.1:{bot_jwks_server.server_port}/jwks.json",
+    )
+
+
 def _bot_token(
-    client: TestClient, signing_key: rsa.RSAPrivateKey = BOT_KEY
+    client: TestClient,
+    signing_key: rsa.RSAPrivateKey = BOT_KEY,
+    kid: str = "junior-test",
 ) -> httpx.Response:
     registration = client.post(
         "/register",
@@ -122,7 +138,7 @@ def _bot_token(
         },
         signing_key,
         algorithm="RS256",
-        headers={"typ": "oauth-id-jag+jwt", "kid": "junior-test"},
+        headers={"typ": "oauth-id-jag+jwt", "kid": kid},
     )
     return client.post(
         "/token",
@@ -280,19 +296,17 @@ def test_main_configures_audit_logging_and_disables_access_logs(monkeypatch):
 
 
 def test_bot_assertion_mints_token_that_can_call_read_tools(
-    mcp_config: MCPConfig,
-    bot_jwks_url: str,
+    bot_mcp_config: MCPConfig,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ):
-    config = dataclasses.replace(
-        mcp_config, bot_issuer=BOT_ISSUER, bot_jwks_url=bot_jwks_url
-    )
     sdk = MagicMock()
     sdk.list_incidents.return_value = {"count": 0, "results": []}
     monkeypatch.setattr(firetower, "get_client", lambda: sdk)
 
-    with TestClient(create_mcp(config).http_app(), follow_redirects=False) as client:
+    with TestClient(
+        create_mcp(bot_mcp_config).http_app(), follow_redirects=False
+    ) as client:
         assert (
             _bot_token(client, rsa.generate_private_key(65537, 2048)).status_code == 401
         )
@@ -344,6 +358,22 @@ def test_bot_assertion_mints_token_that_can_call_read_tools(
     ]
     assert audit.actor_sub == "bot:firetower"
     assert audit.actor_email is None
+
+
+def test_unknown_bot_key_ids_do_not_refetch_jwks_during_cooldown(
+    bot_mcp_config: MCPConfig, bot_jwks_server: _JWKSServer
+):
+    with TestClient(
+        create_mcp(bot_mcp_config).http_app(), follow_redirects=False
+    ) as client:
+        responses = [
+            _bot_token(client, kid=f"attacker-{uuid.uuid4()}") for _ in range(3)
+        ]
+        valid = _bot_token(client)
+
+    assert [r.status_code for r in responses] == [401, 401, 401]
+    assert valid.status_code == 200, valid.text
+    assert bot_jwks_server.requests == 1
 
 
 def test_bot_assertions_are_rejected_when_not_configured(

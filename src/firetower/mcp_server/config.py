@@ -9,6 +9,7 @@ See ``.env.mcp.example`` for the full list of variables.
 
 import os
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 WORKSPACE_DOMAIN = "sentry.io"
 
@@ -21,6 +22,20 @@ def _require(name: str) -> str:
     value = os.environ.get(name)
     if not value:
         raise ConfigError(f"Missing required environment variable: {name}")
+    return value
+
+
+def _optional_https_url(name: str) -> str | None:
+    value = (os.environ.get(name) or "").strip()
+    if not value:
+        return None
+    try:
+        parts = urlsplit(value)
+        hostname = parts.hostname
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be an absolute https:// URL.") from exc
+    if parts.scheme != "https" or not hostname:
+        raise ConfigError(f"{name} must be an absolute https:// URL.")
     return value
 
 
@@ -52,8 +67,8 @@ class MCPConfig:
             raise ConfigError(
                 "MCP_ALLOWED_REDIRECT_URIS must list at least one redirect URI."
             )
-        bot_issuer = (os.environ.get("MCP_BOT_ISSUER") or "").strip() or None
-        bot_jwks_url = (os.environ.get("MCP_BOT_JWKS_URL") or "").strip() or None
+        bot_issuer = _optional_https_url("MCP_BOT_ISSUER")
+        bot_jwks_url = _optional_https_url("MCP_BOT_JWKS_URL")
         if bool(bot_issuer) != bool(bot_jwks_url):
             raise ConfigError(
                 "MCP_BOT_ISSUER and MCP_BOT_JWKS_URL must be set together."

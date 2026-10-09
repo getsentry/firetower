@@ -20,7 +20,10 @@ accepted only after Google's token verifier confirms that the current access
 token is active and belongs to the same verified identity and OAuth client.
 """
 
+import asyncio
 import logging
+import time
+from collections.abc import Callable
 from typing import Any, TypeGuard
 
 import httpx
@@ -29,6 +32,7 @@ from fastmcp.exceptions import FastMCPError
 from fastmcp.server.auth import AccessToken, IdentityAssertion
 from fastmcp.server.auth.identity_assertion import IdentityAssertionValidator
 from fastmcp.server.auth.providers.google import GoogleProvider
+from fastmcp.server.auth.providers.jwt import JWTVerifier
 from fastmcp.server.dependencies import get_access_token
 
 from firetower.mcp_server.config import WORKSPACE_DOMAIN
@@ -44,6 +48,7 @@ GOOGLE_GROUPS_READ_SCOPE = (
 )
 ACCESS_GROUP = "team@sentry.io"
 BOT_GRANT = "id_jag"
+BOT_JWKS_REFRESH_COOLDOWN_SECONDS = 30.0
 
 
 class GoogleGroupMembershipChecker:
@@ -82,6 +87,81 @@ class GoogleGroupMembershipChecker:
             return False
 
 
+class CooldownJWTVerifier(JWTVerifier):
+    """JWTVerifier that rate-limits JWKS refreshes triggered by unknown key IDs.
+
+    FastMCP's ``JWTVerifier._get_jwks_key`` refetches the JWKS whenever a token's
+    ``kid`` is not cached, before any signature check, so unauthenticated callers
+    could make us fetch the bot issuer's JWKS once per request by sending random
+    ``kid`` values. Here, cached keys stay on the fast path; any refresh is
+    serialized behind a lock and allowed at most once per cooldown globally, so
+    distinct attacker key IDs cannot fan out and none of them are retained. A
+    legitimately rotated key becomes usable after at most one cooldown.
+
+    Relies on FastMCP 4.0.10 internals: ``_get_jwks_key``, ``_jwks_cache``,
+    ``_jwks_cache_time``, and ``_cache_ttl``.
+    """
+
+    def __init__(
+        self,
+        *,
+        refresh_cooldown_seconds: float = BOT_JWKS_REFRESH_COOLDOWN_SECONDS,
+        clock: Callable[[], float] = time.monotonic,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self._refresh_cooldown_seconds = refresh_cooldown_seconds
+        self._clock = clock
+        self._refresh_lock = asyncio.Lock()
+        self._last_refresh_at: float | None = None
+
+    def _has_cached_key(self, kid: str | None) -> bool:
+        if time.time() - self._jwks_cache_time >= self._cache_ttl:
+            return False
+        if kid:
+            return kid in self._jwks_cache
+        return len(self._jwks_cache) == 1
+
+    async def _get_jwks_key(self, kid: str | None) -> str:
+        if self._has_cached_key(kid):
+            return await super()._get_jwks_key(kid)
+        async with self._refresh_lock:
+            if self._has_cached_key(kid):
+                return await super()._get_jwks_key(kid)
+            now = self._clock()
+            if (
+                self._last_refresh_at is not None
+                and now - self._last_refresh_at < self._refresh_cooldown_seconds
+            ):
+                raise ValueError("Unknown JWKS key ID; refresh is cooling down")
+            self._last_refresh_at = now
+            return await super()._get_jwks_key(kid)
+
+
+class CooldownIdentityAssertionValidator(IdentityAssertionValidator):
+    """IdentityAssertionValidator whose per-issuer verifiers rate-limit JWKS refreshes.
+
+    Mirrors FastMCP 4.0.10's private ``_get_verifier`` (lazy, cached per issuer
+    in ``_verifiers``), swapping in ``CooldownJWTVerifier``.
+    """
+
+    async def _get_verifier(self, issuer: str) -> JWTVerifier:
+        verifier = self._verifiers.get(issuer)
+        if verifier is not None:
+            return verifier
+        jwks_uri = (self.config.jwks_uris or {}).get(
+            issuer
+        ) or await self._discover_jwks_uri(issuer)
+        verifier = CooldownJWTVerifier(
+            jwks_uri=jwks_uri,
+            issuer=issuer,
+            audience=self.audience,
+            algorithm=(self.config.algorithms or {}).get(issuer, self.config.algorithm),
+        )
+        self._verifiers[issuer] = verifier
+        return verifier
+
+
 class SentryGoogleProvider(GoogleProvider):
     """GoogleProvider that only admits verified @sentry.io Workspace accounts."""
 
@@ -99,7 +179,7 @@ class SentryGoogleProvider(GoogleProvider):
         # mirror OAuthProxy.__init__'s wiring to enable the jwt-bearer grant.
         if identity_assertion is not None:
             self._identity_assertion = identity_assertion
-            self._identity_assertion_validator = IdentityAssertionValidator(
+            self._identity_assertion_validator = CooldownIdentityAssertionValidator(
                 config=identity_assertion, audience=str(self.issuer_url)
             )
         self._expected_audience = client_id

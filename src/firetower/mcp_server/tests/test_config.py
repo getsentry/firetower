@@ -61,3 +61,26 @@ def test_bot_auth_is_configured_from_env(
 
     assert config.bot_issuer == "https://junior.example"
     assert config.bot_jwks_url == "https://junior.example/jwks.json"
+
+
+@pytest.mark.parametrize("name", ["MCP_BOT_ISSUER", "MCP_BOT_JWKS_URL"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://junior.example",
+        "junior.example/jwks.json",
+        "/.well-known/jwks.json",
+        "https://",
+        "https:///jwks.json",
+        "https://[::1",
+    ],
+)
+def test_bot_auth_urls_must_be_absolute_https(
+    monkeypatch: pytest.MonkeyPatch, required_env: None, name: str, value: str
+) -> None:
+    monkeypatch.setenv("MCP_BOT_ISSUER", "https://junior.example")
+    monkeypatch.setenv("MCP_BOT_JWKS_URL", "https://junior.example/jwks.json")
+    monkeypatch.setenv(name, value)
+
+    with pytest.raises(ConfigError, match=f"{name} must be an absolute https://"):
+        MCPConfig.from_env()
