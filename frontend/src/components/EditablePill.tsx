@@ -10,9 +10,9 @@ const optionRowStyles = cva(['group', 'w-fit', 'cursor-pointer', 'rounded-radius
 
 const optionStyles = cva([
   'pointer-events-none',
-  'transition-[filter]',
-  'group-hover:brightness-90',
-  'dark:group-hover:brightness-110',
+  'transition-colors',
+  'group-hover:bg-background-secondary',
+  'group-hover:text-content-headings',
 ]);
 
 const triggerStyles = cva([
@@ -150,7 +150,7 @@ export function EditablePill<T extends string>({
                   variant={optionVariant}
                   className={cn(
                     optionStyles(),
-                    isFocused && 'brightness-90 dark:brightness-110'
+                    isFocused && 'bg-background-secondary text-content-headings'
                   )}
                 >
                   {option}
