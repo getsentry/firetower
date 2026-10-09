@@ -1,7 +1,8 @@
 """Firetower MCP server assembly.
 
 Hop 1 (client -> server): Google OAuth gated to the Sentry Workspace via
-``SentryGoogleProvider``. Hop 2 (server -> firetower): the tools read through
+``SentryGoogleProvider``, plus optional signed bot assertions (Junior) from a
+pinned issuer. Hop 2 (server -> firetower): the tools read through
 ``firetower_sdk`` as a single service identity (non-private incidents only).
 
 Deployed as its own Cloud Run service over Streamable HTTP.
@@ -10,6 +11,7 @@ Deployed as its own Cloud Run service over Streamable HTTP.
 import logging
 
 from fastmcp import FastMCP
+from fastmcp.server.auth import IdentityAssertion
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
@@ -40,12 +42,21 @@ async def favicon(_request: Request) -> Response:
 
 def create_mcp(config: MCPConfig | None = None) -> FastMCP:
     config = config or MCPConfig.from_env()
+    identity_assertion = (
+        IdentityAssertion(
+            trusted_issuers=[config.bot_issuer],
+            jwks_uris={config.bot_issuer: config.bot_jwks_url},
+        )
+        if config.bot_issuer and config.bot_jwks_url
+        else None
+    )
     provider_kwargs: dict = {
         "client_id": config.google_client_id,
         "client_secret": config.google_client_secret,
         "base_url": config.base_url,
         "jwt_signing_key": config.jwt_signing_key,
         "required_scopes": ["openid", "email", GOOGLE_GROUPS_READ_SCOPE],
+        "identity_assertion": identity_assertion,
         "enable_cimd": False,
         "require_authorization_consent": True,  # confused-deputy mitigation
         # Native MCP clients use loopback callbacks, while hosted callbacks must
