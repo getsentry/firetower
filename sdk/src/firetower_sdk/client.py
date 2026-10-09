@@ -47,11 +47,16 @@ class FiretowerClient:
             response.raise_for_status()
             return response.json() if response.content else {}
         except requests.exceptions.HTTPError as e:
-            error_msg = f"Firetower API error ({e.response.status_code}): {e.response.text}"
+            status_code = e.response.status_code if e.response is not None else None
+            error_msg = (
+                f"Firetower API error ({status_code})"
+                if status_code is not None
+                else "Firetower API error"
+            )
             logger.error(error_msg)
-            raise FiretowerError(error_msg, status_code=e.response.status_code) from e
+            raise FiretowerError(error_msg, status_code=status_code) from e
         except requests.exceptions.RequestException as e:
-            error_msg = f"Firetower API request failed: {e}"
+            error_msg = f"Firetower API request failed ({type(e).__name__})"
             logger.error(error_msg)
             raise FiretowerError(error_msg) from e
 

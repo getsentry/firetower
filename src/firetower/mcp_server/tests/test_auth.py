@@ -33,6 +33,7 @@ def _id_token(
         "aud": aud,
         "iss": iss,
         "exp": exp if exp is not None else int(time.time()) + 3600,
+        "sub": "google-subject",
         **claims,
     }
     return jwt.encode(payload, signing_key, algorithm="RS256")
@@ -51,6 +52,7 @@ def _provider(jwks_public_key=None, audience=TEST_AUD):
             return_value=SimpleNamespace(
                 claims={
                     "aud": audience,
+                    "sub": "google-subject",
                     "email": "a@sentry.io",
                     "email_verified": True,
                 }
@@ -75,6 +77,7 @@ def _extract(
 def test_admits_verified_sentry_account():
     token = _id_token(hd="sentry.io", email="a@sentry.io", email_verified=True)
     assert _extract({"id_token": token}) == {
+        "sub": "google-subject",
         "hd": "sentry.io",
         "email": "a@sentry.io",
         "email_verified": True,
@@ -113,6 +116,14 @@ def test_rejects_missing_hd():
 
 def test_rejects_unverified_email():
     token = _id_token(hd="sentry.io", email="a@sentry.io", email_verified=False)
+    with pytest.raises(FastMCPError):
+        _extract({"id_token": token})
+
+
+def test_rejects_missing_subject():
+    token = _id_token(
+        sub=None, hd="sentry.io", email="a@sentry.io", email_verified=True
+    )
     with pytest.raises(FastMCPError):
         _extract({"id_token": token})
 
@@ -173,6 +184,7 @@ def test_admits_refresh_with_expired_login_id_token():
         email_verified=True,
     )
     assert _extract({"id_token": expired, "access_token": "opaque"}) == {
+        "sub": "google-subject",
         "hd": "sentry.io",
         "email": "a@sentry.io",
         "email_verified": True,
@@ -200,6 +212,24 @@ def test_rejects_expired_token_for_different_access_token_identity():
     )
     with pytest.raises(FastMCPError):
         _extract({"id_token": expired, "access_token": "opaque"})
+
+
+def test_rejects_expired_token_for_different_access_token_subject():
+    provider = _provider()
+    provider._token_validator.verify_token.return_value.claims["sub"] = "other-subject"
+    expired = _id_token(
+        exp=int(time.time()) - 3600,
+        hd="sentry.io",
+        email="a@sentry.io",
+        email_verified=True,
+    )
+
+    with pytest.raises(FastMCPError):
+        asyncio.run(
+            provider._extract_upstream_claims(
+                {"id_token": expired, "access_token": "opaque"}
+            )
+        )
 
 
 def test_rejects_expired_token_with_bad_signature():
@@ -323,6 +353,7 @@ def test_fallback_admits_sentry(monkeypatch):
         lambda: _FakeToken(
             {
                 "upstream_claims": {
+                    "sub": "google-subject",
                     "hd": "sentry.io",
                     "email_verified": True,
                     "group": ACCESS_GROUP,
@@ -337,10 +368,30 @@ def test_fallback_admits_sentry(monkeypatch):
     "claims",
     [
         {},
-        {"upstream_claims": {"hd": "evil.com", "email_verified": True}},
-        {"upstream_claims": {"hd": "sentry.io", "email_verified": False}},
         {
             "upstream_claims": {
+                "sub": "google-subject",
+                "hd": "evil.com",
+                "email_verified": True,
+            }
+        },
+        {
+            "upstream_claims": {
+                "sub": "google-subject",
+                "hd": "sentry.io",
+                "email_verified": False,
+            }
+        },
+        {
+            "upstream_claims": {
+                "hd": "sentry.io",
+                "email_verified": True,
+                "group": ACCESS_GROUP,
+            }
+        },
+        {
+            "upstream_claims": {
+                "sub": "google-subject",
                 "hd": "sentry.io",
                 "email_verified": True,
                 "group": "contractors@sentry.io",

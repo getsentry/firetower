@@ -3,12 +3,14 @@
 import re
 from collections.abc import Iterator
 from pathlib import Path
+from unittest.mock import MagicMock
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastmcp import settings as fastmcp_settings
 from starlette.testclient import TestClient
 
+from firetower.mcp_server import server
 from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE
 from firetower.mcp_server.branding import FIRETOWER_ICON
 from firetower.mcp_server.config import MCPConfig
@@ -154,3 +156,28 @@ def test_unallowed_external_callback_is_rejected_at_registration(
 
     assert registration_response.status_code == 400
     assert "location" not in registration_response.headers
+
+
+def test_server_uses_configured_logger_namespace():
+    assert server.logger.name == "firetower.mcp_server.server"
+
+
+def test_main_configures_audit_logging_and_disables_access_logs(monkeypatch):
+    config = MagicMock(host="0.0.0.0", port=8080)
+    mcp = MagicMock()
+    configure_logging = MagicMock()
+    monkeypatch.setattr(server, "configure_mcp_logging", configure_logging)
+    monkeypatch.setattr(server.MCPConfig, "from_env", lambda: config)
+    monkeypatch.setattr(server, "create_mcp", lambda _config: mcp)
+
+    server.main()
+
+    configure_logging.assert_called_once_with()
+    mcp.run.assert_called_once()
+    run_kwargs = mcp.run.call_args.kwargs
+    assert run_kwargs["transport"] == "http"
+    assert run_kwargs["host"] == "0.0.0.0"
+    assert run_kwargs["port"] == 8080
+    assert run_kwargs["uvicorn_config"] == {"access_log": False}
+    assert len(run_kwargs["middleware"]) == 1
+    assert run_kwargs["middleware"][0].cls is server.SafeOAuthAccessLogMiddleware

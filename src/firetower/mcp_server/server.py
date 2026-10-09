@@ -10,15 +10,20 @@ Deployed as its own Cloud Run service over Streamable HTTP.
 import logging
 
 from fastmcp import FastMCP
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 
 from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE, SentryGoogleProvider
 from firetower.mcp_server.branding import FIRETOWER_ICON, FIRETOWER_ICON_SVG
 from firetower.mcp_server.config import MCPConfig
+from firetower.mcp_server.logging import (
+    SafeOAuthAccessLogMiddleware,
+    configure_mcp_logging,
+)
 from firetower.mcp_server.tools import register_tools
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("firetower.mcp_server.server")
 
 
 async def health(_request: Request) -> PlainTextResponse:
@@ -56,9 +61,19 @@ def create_mcp(config: MCPConfig | None = None) -> FastMCP:
 
 
 def main() -> None:
+    configure_mcp_logging()
     config = MCPConfig.from_env()
-    logger.info("Starting Firetower MCP server on %s:%s", config.host, config.port)
-    create_mcp(config).run(transport="http", host=config.host, port=config.port)
+    logger.info(
+        "Starting Firetower MCP server",
+        extra={"event": "mcp_server_start", "host": config.host, "port": config.port},
+    )
+    create_mcp(config).run(
+        transport="http",
+        host=config.host,
+        port=config.port,
+        middleware=[Middleware(SafeOAuthAccessLogMiddleware)],
+        uvicorn_config={"access_log": False},
+    )
 
 
 if __name__ == "__main__":

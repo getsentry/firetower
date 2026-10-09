@@ -18,7 +18,11 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from firetower.mcp_server import firetower
-from firetower.mcp_server.auth import requester_email, require_sentry_account
+from firetower.mcp_server.auth import (
+    requester_email,
+    requester_subject,
+    require_sentry_account,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +115,14 @@ def _audit(tool: str, **params: Any) -> None:
     """
     active = {k: v for k, v in params.items() if v is not None}
     logger.info(
-        "mcp tool call: tool=%s user=%s params=%s", tool, requester_email(), active
+        "MCP tool call",
+        extra={
+            "event": "mcp_tool_call",
+            "actor_email": requester_email(),
+            "actor_sub": requester_subject(),
+            "tool": tool,
+            "params": active,
+        },
     )
 
 
@@ -140,10 +151,17 @@ def _project_incident(
 def _sanitized(action: str, error: FiretowerError) -> ToolError:
     """Log the raw upstream error but return a generic message to the client.
 
-    ``FiretowerError`` messages embed the raw IAP/Django response body, which we
-    must not echo back to the MCP client. Map common statuses to friendly text.
+    Keep both client responses and MCP logs generic even if a future SDK change
+    adds upstream details to ``FiretowerError``. Map common statuses to friendly text.
     """
-    logger.info("Firetower %s failed: %s", action, error)
+    logger.info(
+        "Firetower API request failed",
+        extra={
+            "event": "firetower_api_error",
+            "action": action,
+            "status_code": error.status_code,
+        },
+    )
     if error.status_code in (401, 403, 404):
         return ToolError(f"Could not {action}: not found or not accessible.")
     return ToolError(f"Could not {action}: the firetower API is unavailable.")
