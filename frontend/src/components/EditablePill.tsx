@@ -7,10 +7,11 @@ import {Popover, PopoverContent, PopoverTrigger} from './Popover';
 import {Spinner} from './Spinner';
 
 const optionRowStyles = cva([
-  'w-fit',
+  'w-full',
   'cursor-pointer',
   'flex',
   'items-center',
+  'justify-center',
   'rounded-radius-md',
   'px-space-xs',
   'py-space-2xs',
