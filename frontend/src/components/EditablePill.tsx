@@ -6,14 +6,19 @@ import {Pill, type PillProps} from './Pill';
 import {Popover, PopoverContent, PopoverTrigger} from './Popover';
 import {Spinner} from './Spinner';
 
-const optionRowStyles = cva(['group', 'w-fit', 'cursor-pointer', 'rounded-radius-full']);
-
-const optionStyles = cva([
-  'pointer-events-none',
+const optionRowStyles = cva([
+  'w-fit',
+  'cursor-pointer',
+  'flex',
+  'items-center',
+  'rounded-radius-md',
+  'px-space-xs',
+  'py-space-2xs',
   'transition-colors',
-  'group-hover:bg-background-secondary',
-  'group-hover:text-content-headings',
+  'hover:bg-background-tertiary',
 ]);
+
+const optionStyles = cva(['pointer-events-none']);
 
 const triggerStyles = cva([
   'relative',
@@ -128,10 +133,7 @@ export function EditablePill<T extends string>({
         </button>
       </PopoverTrigger>
       <PopoverContent className="p-space-0 overflow-hidden" onKeyDown={handleKeyDown}>
-        <div
-          role="listbox"
-          className="gap-space-xs p-space-sm flex flex-col items-center"
-        >
+        <div role="listbox" className="p-space-xs flex flex-col items-center">
           {options.map((option, index) => {
             const optionVariant = getVariant
               ? getVariant(option)
@@ -141,18 +143,12 @@ export function EditablePill<T extends string>({
               <div
                 key={option}
                 tabIndex={-1}
-                className={cn(optionRowStyles())}
+                className={cn(optionRowStyles(), isFocused && 'bg-background-tertiary')}
                 onClick={() => handleSelect(option)}
                 role="option"
                 aria-selected={option === value}
               >
-                <Pill
-                  variant={optionVariant}
-                  className={cn(
-                    optionStyles(),
-                    isFocused && 'bg-background-secondary text-content-headings'
-                  )}
-                >
+                <Pill variant={optionVariant} className={cn(optionStyles())}>
                   {option}
                 </Pill>
               </div>
