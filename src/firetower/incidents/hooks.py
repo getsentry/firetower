@@ -1002,12 +1002,18 @@ def decorate_incident_channel(
             if ctx.reporter_slack_id:
                 feed_message = f"{feed_message} by <@{ctx.reporter_slack_id}>"
 
-            if not ctx.incident_url or not ctx.incident_number:
+            if ctx.incident_url and ctx.incident_number:
+                title = (
+                    f"<{ctx.incident_url}|{ctx.incident_number} "
+                    f"{escape_slack_text(ctx.title)}>"
+                )
+            else:
                 feed_message = f"{feed_message} (degraded mode)"
+                title = escape_slack_text(ctx.title)
 
             feed_message = (
                 f"{feed_message}.\n"
-                f"{escape_slack_text(ctx.title)}"
+                f"{title}"
                 f"\n\nFor those involved, please join <#{ctx.channel_id}>"
             )
             slack_service.post_message(feed_channel_id, feed_message)
