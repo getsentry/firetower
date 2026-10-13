@@ -50,14 +50,19 @@ def _record_event(
     *,
     actor: User | None,
     occurred_at: datetime | None,
+    source: TimelineEventSource = TimelineEventSource.INTERNAL,
+    link_url: str = "",
+    external_id: str = "",
 ) -> TimelineEvent:
     return TimelineEvent.objects.create(
         incident=incident,
-        source=TimelineEventSource.INTERNAL,
+        source=source,
         event_type=event_type,
         occurred_at=occurred_at or timezone.now(),
         actor=actor,
         payload=payload,
+        link_url=link_url,
+        external_id=external_id,
     )
 
 
@@ -174,4 +179,46 @@ def record_visibility_changed(
         payload,
         actor=actor,
         occurred_at=occurred_at,
+    )
+
+
+def record_statuspage_incident_created(
+    incident: Incident,
+    *,
+    sp_incident_id: str,
+    sp_url: str,
+    message: str,
+    occurred_at: datetime,
+    actor: User | None = None,
+) -> TimelineEvent:
+    payload: StatuspagePayload = {"message": message}
+    return _record_event(
+        incident,
+        TimelineEventType.STATUSPAGE_INCIDENT_CREATED,
+        payload,
+        actor=actor,
+        occurred_at=occurred_at,
+        source=TimelineEventSource.STATUSPAGE,
+        link_url=sp_url,
+        external_id=sp_incident_id,
+    )
+
+
+def record_statuspage_update_posted(
+    incident: Incident,
+    *,
+    sp_update_id: str,
+    message: str,
+    occurred_at: datetime,
+    actor: User | None = None,
+) -> TimelineEvent:
+    payload: StatuspagePayload = {"message": message}
+    return _record_event(
+        incident,
+        TimelineEventType.STATUSPAGE_UPDATE_POSTED,
+        payload,
+        actor=actor,
+        occurred_at=occurred_at,
+        source=TimelineEventSource.STATUSPAGE,
+        external_id=sp_update_id,
     )
