@@ -78,7 +78,7 @@ def handle_resolved_submission(ack: Any, body: dict, view: dict, client: Any) ->
         form = parse_incident_form_values(view)
 
         severity = form["severity"]
-        if severity in ("P0", "P1", "P2"):
+        if severity in ("P0", "P1"):
             target_status = IncidentStatus.POSTMORTEM
         else:
             target_status = IncidentStatus.DONE
