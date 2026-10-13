@@ -316,6 +316,12 @@ def build_channel_topic(incident: Incident, captain_slack_id: str | None = None)
     return topic[:SLACK_TOPIC_MAX_LENGTH]
 
 
+def _build_declared_text(severity: str, reporter_slack_id: str | None) -> str:
+    if reporter_slack_id:
+        return f"<@{reporter_slack_id}> declared a {severity} incident"
+    return f"A {severity} incident has been created"
+
+
 def _build_incident_url(incident: Incident) -> str:
     return f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
 
@@ -998,17 +1004,17 @@ def decorate_incident_channel(
     feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
     if feed_channel_id and not ctx.is_private:
         try:
+            declared = _build_declared_text(ctx.severity, ctx.reporter_slack_id)
             if ctx.incident_url and ctx.incident_number:
                 feed_message = (
-                    f"A {ctx.severity} incident has been created.\n"
+                    f"{declared}.\n"
                     f"<{ctx.incident_url}|{ctx.incident_number} "
                     f"{escape_slack_text(ctx.title)}>"
                     f"\n\nFor those involved, please join <#{ctx.channel_id}>"
                 )
             else:
                 feed_message = (
-                    f"A {ctx.severity} incident has been created "
-                    "(degraded mode).\n"
+                    f"{declared} (degraded mode).\n"
                     f"{escape_slack_text(ctx.title)}"
                     f"\n\nFor those involved, please join <#{ctx.channel_id}>"
                 )

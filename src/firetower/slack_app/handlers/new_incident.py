@@ -482,7 +482,7 @@ def handle_new_incident_submission(
             and not invoking_channel.startswith("D")  # skip DM channels
         ):
             channel_message = (
-                f"A {incident.severity} incident has been created.\n"
+                f"<@{slack_user_id}> declared a {incident.severity} incident.\n"
                 f"<{incident_url}|{incident.incident_number} {escape_slack_text(incident.title)}>"
             )
             if channel_id:

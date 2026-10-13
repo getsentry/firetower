@@ -249,6 +249,33 @@ class TestOnIncidentCreated:
         assert "P1" in feed_calls[0][0][1]
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_feed_message_mentions_reporter(self, mock_slack, settings):
+        settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        ExternalProfile.objects.create(
+            user=self.captain,
+            type=ExternalProfileType.SLACK,
+            external_id="U_REPORTER",
+        )
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P3,
+            captain=self.captain,
+            reporter=self.captain,
+        )
+
+        on_incident_created(incident)
+
+        feed_calls = [
+            c for c in mock_slack.post_message.call_args_list if c[0][0] == "C_FEED"
+        ]
+        assert len(feed_calls) == 1
+        assert feed_calls[0][0][1].startswith("<@U_REPORTER> declared a P3 incident.")
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_private_incident_skips_feed_channel(self, mock_slack, settings):
         settings.SLACK["INCIDENT_FEED_CHANNEL_ID"] = "C_FEED"
         mock_slack.create_channel.return_value = "C99999"

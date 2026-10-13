@@ -380,6 +380,12 @@ class TestNewIncidentSubmission:
         channels = [c[1]["channel"] for c in client.chat_postMessage.call_args_list]
         assert "C_INVOKE" in channels
         mock_slack_svc.join_channel.assert_called_once_with("C_INVOKE")
+        invoke_text = next(
+            c[1]["text"]
+            for c in client.chat_postMessage.call_args_list
+            if c[1]["channel"] == "C_INVOKE"
+        )
+        assert invoke_text.startswith("<@U_TEST> declared a P1 incident.")
 
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
     @patch("firetower.incidents.serializers.on_incident_created")
