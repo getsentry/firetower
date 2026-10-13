@@ -1000,14 +1000,14 @@ def decorate_incident_channel(
         try:
             if ctx.incident_url and ctx.incident_number:
                 feed_message = (
-                    f"A {ctx.severity} incident has been created by {ctx.reporter_slack_id}.\n"
+                    f"A {ctx.severity} incident has been created by <@{ctx.reporter_slack_id}>.\n"
                     f"<{ctx.incident_url}|{ctx.incident_number} "
                     f"{escape_slack_text(ctx.title)}>"
                     f"\n\nFor those involved, please join <#{ctx.channel_id}>"
                 )
             else:
                 feed_message = (
-                    f"A {ctx.severity} incident has been created by {ctx.reporter_slack_id}"
+                    f"A {ctx.severity} incident has been created by <@{ctx.reporter_slack_id}>"
                     "(degraded mode).\n"
                     f"{escape_slack_text(ctx.title)}"
                     f"\n\nFor those involved, please join <#{ctx.channel_id}>"
