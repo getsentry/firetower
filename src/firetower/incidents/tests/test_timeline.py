@@ -23,6 +23,8 @@ from firetower.incidents.timeline.events import (
     record_incident_created,
     record_severity_changed,
     record_status_changed,
+    record_statuspage_incident_created,
+    record_statuspage_update_posted,
     record_title_changed,
     record_visibility_changed,
 )
@@ -102,6 +104,43 @@ class TestTimelineEventHelpers:
         first, _ = users
         event = record_captain_changed(incident, first, None)
         assert event.payload == {"old": "First User", "new": None}
+
+    def test_statuspage_helpers(self, incident, users):
+        first, _ = users
+        created_at = datetime(2026, 8, 20, 15, tzinfo=UTC)
+        updated_at = datetime(2026, 8, 20, 16, tzinfo=UTC)
+
+        record_statuspage_incident_created(
+            incident,
+            sp_incident_id="sp-incident",
+            sp_url="https://status.example.com/incidents/sp-incident",
+            message="Investigating",
+            occurred_at=created_at,
+            actor=first,
+        )
+        record_statuspage_update_posted(
+            incident,
+            sp_update_id="sp-update",
+            message="Monitoring",
+            occurred_at=updated_at,
+        )
+
+        created, updated = incident.timeline_events.all()
+        assert created.source == TimelineEventSource.STATUSPAGE
+        assert created.event_type == TimelineEventType.STATUSPAGE_INCIDENT_CREATED
+        assert created.payload == {"message": "Investigating"}
+        assert created.external_id == "sp-incident"
+        assert created.link_url == "https://status.example.com/incidents/sp-incident"
+        assert created.occurred_at == created_at
+        assert created.actor == first
+
+        assert updated.source == TimelineEventSource.STATUSPAGE
+        assert updated.event_type == TimelineEventType.STATUSPAGE_UPDATE_POSTED
+        assert updated.payload == {"message": "Monitoring"}
+        assert updated.external_id == "sp-update"
+        assert updated.link_url == ""
+        assert updated.occurred_at == updated_at
+        assert updated.actor is None
 
 
 @pytest.mark.django_db

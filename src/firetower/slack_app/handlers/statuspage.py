@@ -1,11 +1,17 @@
 import json
 import logging
+from datetime import datetime
 from typing import Any
 
 import requests
 from django.db import transaction
+from django.utils.dateparse import parse_datetime
 
 from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.incidents.timeline.events import (
+    record_statuspage_incident_created,
+    record_statuspage_update_posted,
+)
 from firetower.integrations.services.slack import SlackService
 from firetower.integrations.services.statuspage import (
     COMPONENT_STATUS_OPTIONS,
@@ -20,6 +26,13 @@ from firetower.slack_app.handlers.utils import get_incident_from_channel
 logger = logging.getLogger(__name__)
 
 COMPONENT_BLOCK_PREFIX = "component_"
+
+
+def _parse_statuspage_timestamp(value: str) -> datetime:
+    timestamp = parse_datetime(value)
+    if timestamp is None:
+        raise ValueError(f"Invalid Statuspage timestamp: {value!r}")
+    return timestamp
 
 
 def _build_statuspage_modal(
@@ -537,6 +550,15 @@ def _process_statuspage_submission(
                     components=components or None,
                 )
                 statuspage_url = service.get_incident_url(result["id"])
+                statuspage_update = result["incident_updates"][0]
+                record_statuspage_update_posted(
+                    incident,
+                    sp_update_id=statuspage_update["id"],
+                    message=message,
+                    occurred_at=_parse_statuspage_timestamp(
+                        statuspage_update["created_at"]
+                    ),
+                )
                 attribution = f"<@{user_id}> " if user_id else ""
                 success_message = (
                     f"{attribution}updated the statuspage: {statuspage_url}"
@@ -552,6 +574,13 @@ def _process_statuspage_submission(
                 statuspage_url = service.get_incident_url(result["id"])
                 statuspage_link.url = statuspage_url
                 statuspage_link.save(update_fields=["url"])
+                record_statuspage_incident_created(
+                    incident,
+                    sp_incident_id=result["id"],
+                    sp_url=statuspage_url,
+                    message=message,
+                    occurred_at=_parse_statuspage_timestamp(result["created_at"]),
+                )
                 attribution = f"<@{user_id}> " if user_id else ""
                 success_message = (
                     f"{attribution}created a statuspage post: {statuspage_url}"
