@@ -1,10 +1,10 @@
-import {Suspense} from 'react';
+import {Suspense, type ReactNode} from 'react';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {CatchBoundary} from '@tanstack/react-router';
 import {Avatar} from 'components/Avatar';
 import {Card} from 'components/Card';
 import {Skeleton} from 'components/Skeleton';
-import {Activity, Radio, Siren, UserRound, type LucideIcon} from 'lucide-react';
+import {Activity, Siren, UserRound} from 'lucide-react';
 
 import type {
   TimelineEvent,
@@ -14,29 +14,36 @@ import {incidentTimelineQueryOptions} from '../queries/incidentTimelineQueryOpti
 
 interface SourceStyle {
   label: string;
-  Icon: LucideIcon;
+  icon: ReactNode;
   iconClassName: string;
 }
 
 const SOURCE_STYLES: Record<TimelineEventSource, SourceStyle> = {
   USER: {
     label: 'User',
-    Icon: UserRound,
+    icon: <UserRound className="h-4 w-4" aria-hidden="true" />,
     iconClassName: 'bg-background-secondary text-content-secondary',
   },
   INTERNAL: {
     label: 'Firetower',
-    Icon: Activity,
+    icon: <Activity className="h-4 w-4" aria-hidden="true" />,
     iconClassName: 'bg-background-secondary text-content-secondary',
   },
   STATUSPAGE: {
     label: 'Statuspage',
-    Icon: Radio,
+    icon: (
+      <img
+        src="/statuspage.svg"
+        alt=""
+        className="h-4 w-4 dark:invert"
+        aria-hidden="true"
+      />
+    ),
     iconClassName: 'bg-background-transparent-warning-muted text-content-warning',
   },
   PAGERDUTY: {
     label: 'PagerDuty',
-    Icon: Siren,
+    icon: <Siren className="h-4 w-4" aria-hidden="true" />,
     iconClassName: 'bg-background-transparent-danger-muted text-content-danger',
   },
 };
@@ -55,14 +62,13 @@ function formatDateTime(dateString: string): string {
 
 function TimelineRow({event}: {event: TimelineEvent}) {
   const sourceStyle = SOURCE_STYLES[event.source];
-  const SourceIcon = sourceStyle.Icon;
 
   return (
     <li className="group pb-space-xl gap-space-md relative grid grid-cols-[auto_1fr] last:pb-0">
       <div
         className={`z-10 flex h-7 w-7 items-center justify-center rounded-full ${sourceStyle.iconClassName}`}
       >
-        <SourceIcon className="h-4 w-4" aria-hidden="true" />
+        {sourceStyle.icon}
       </div>
       <span
         className="bg-background-secondary absolute top-7 bottom-0 left-3.5 w-px group-last:hidden"
