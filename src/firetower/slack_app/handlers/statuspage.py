@@ -272,6 +272,8 @@ def _build_statuspage_modal(
                     )
 
     metadata = {"channel_id": channel_id}
+    if is_update:
+        metadata["previous_status"] = latest_status
 
     return {
         "type": "modal",
@@ -389,9 +391,11 @@ def handle_statuspage_command(
 def _extract_submission_data(view: dict) -> dict[str, Any]:
     values = view.get("state", {}).get("values", {})
     raw_metadata = view.get("private_metadata", "")
+    previous_status = ""
     try:
         metadata = json.loads(raw_metadata)
         channel_id = metadata.get("channel_id", "")
+        previous_status = metadata.get("previous_status", "")
     except (json.JSONDecodeError, AttributeError):
         channel_id = raw_metadata
 
@@ -423,7 +427,7 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
                 component_id = block_id[len(COMPONENT_BLOCK_PREFIX) :]
                 components[component_id] = selected.get("value", "operational")
 
-    return {
+    data = {
         "channel_id": channel_id,
         "status": status,
         "title": title,
@@ -431,6 +435,9 @@ def _extract_submission_data(view: dict) -> dict[str, Any]:
         "impact": impact,
         "components": components,
     }
+    if previous_status:
+        data["previous_status"] = previous_status
+    return data
 
 
 def _build_component_warning_modal(
@@ -556,6 +563,8 @@ def _process_statuspage_submission(
                     sp_update_id=statuspage_update["id"],
                     sp_url=statuspage_url,
                     message=message,
+                    old_status=data.get("previous_status") or status,
+                    new_status=statuspage_update.get("status") or status,
                     occurred_at=_parse_statuspage_timestamp(
                         statuspage_update["created_at"]
                     ),

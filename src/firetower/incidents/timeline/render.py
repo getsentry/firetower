@@ -8,8 +8,13 @@ from firetower.incidents.timeline.events import (
     NotePayload,
     PagerDutyPayload,
     StatuspagePayload,
+    StatuspageUpdatePayload,
     VisibilityChangedPayload,
 )
+
+
+def _display_statuspage_status(status: str) -> str:
+    return status.replace("_", " ").title()
 
 
 def render_timeline_event(event: TimelineEvent) -> str:
@@ -46,8 +51,22 @@ def render_timeline_event(event: TimelineEvent) -> str:
                 statuspage_incident = cast(StatuspagePayload, event.payload)
                 return f'Statuspage incident posted: "{statuspage_incident["message"]}"'
             case TimelineEventType.STATUSPAGE_UPDATE_POSTED:
-                statuspage_update = cast(StatuspagePayload, event.payload)
-                return f'Statuspage update: "{statuspage_update["message"]}"'
+                statuspage_update = cast(StatuspageUpdatePayload, event.payload)
+                old_status = statuspage_update.get("old_status")
+                new_status = statuspage_update.get("new_status")
+                message = statuspage_update["message"]
+                if old_status and new_status:
+                    displayed_new_status = _display_statuspage_status(new_status)
+                    if old_status == new_status:
+                        return (
+                            f'Statuspage update ({displayed_new_status}): "{message}"'
+                        )
+                    displayed_old_status = _display_statuspage_status(old_status)
+                    return (
+                        f"Statuspage update: {displayed_old_status} → "
+                        f'{displayed_new_status} — "{message}"'
+                    )
+                return f'Statuspage update: "{message}"'
             case TimelineEventType.PAGERDUTY_INCIDENT_TRIGGERED:
                 pagerduty = cast(PagerDutyPayload, event.payload)
                 return f"PagerDuty page triggered for {pagerduty['service']}"
