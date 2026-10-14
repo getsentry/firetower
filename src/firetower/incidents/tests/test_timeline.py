@@ -121,6 +121,7 @@ class TestTimelineEventHelpers:
         record_statuspage_update_posted(
             incident,
             sp_update_id="sp-update",
+            sp_url="https://status.example.com/incidents/sp-incident",
             message="Monitoring",
             occurred_at=updated_at,
         )
@@ -138,7 +139,7 @@ class TestTimelineEventHelpers:
         assert updated.event_type == TimelineEventType.STATUSPAGE_UPDATE_POSTED
         assert updated.payload == {"message": "Monitoring"}
         assert updated.external_id == "sp-update"
-        assert updated.link_url == ""
+        assert updated.link_url == "https://status.example.com/incidents/sp-incident"
         assert updated.occurred_at == updated_at
         assert updated.actor is None
 

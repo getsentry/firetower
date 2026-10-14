@@ -554,6 +554,7 @@ def _process_statuspage_submission(
                 record_statuspage_update_posted(
                     incident,
                     sp_update_id=statuspage_update["id"],
+                    sp_url=statuspage_url,
                     message=message,
                     occurred_at=_parse_statuspage_timestamp(
                         statuspage_update["created_at"]

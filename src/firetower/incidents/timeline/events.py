@@ -208,6 +208,7 @@ def record_statuspage_update_posted(
     incident: Incident,
     *,
     sp_update_id: str,
+    sp_url: str,
     message: str,
     occurred_at: datetime,
     actor: User | None = None,
@@ -220,5 +221,6 @@ def record_statuspage_update_posted(
         actor=actor,
         occurred_at=occurred_at,
         source=TimelineEventSource.STATUSPAGE,
+        link_url=sp_url,
         external_id=sp_update_id,
     )

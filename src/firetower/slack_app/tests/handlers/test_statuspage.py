@@ -598,7 +598,7 @@ class TestStatuspageSubmission:
         assert event.event_type == TimelineEventType.STATUSPAGE_UPDATE_POSTED
         assert event.payload == {"message": "Found the cause"}
         assert event.external_id == "sp_update_123"
-        assert event.link_url == ""
+        assert event.link_url == "https://test.statuspage.io/incidents/existing_sp"
         assert event.occurred_at == datetime(2026, 8, 20, 16, tzinfo=UTC)
 
         msg = client.chat_postMessage.call_args[1]["text"]
