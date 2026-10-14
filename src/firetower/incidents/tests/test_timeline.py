@@ -123,8 +123,7 @@ class TestTimelineEventHelpers:
             sp_update_id="sp-update",
             sp_url="https://status.example.com/incidents/sp-incident",
             message="Monitoring",
-            old_status="identified",
-            new_status="monitoring",
+            status="monitoring",
             occurred_at=updated_at,
         )
 
@@ -141,8 +140,7 @@ class TestTimelineEventHelpers:
         assert updated.event_type == TimelineEventType.STATUSPAGE_UPDATE_POSTED
         assert updated.payload == {
             "message": "Monitoring",
-            "old_status": "identified",
-            "new_status": "monitoring",
+            "status": "monitoring",
         }
         assert updated.external_id == "sp-update"
         assert updated.link_url == "https://status.example.com/incidents/sp-incident"
@@ -374,11 +372,9 @@ class TestTimelineRenderer:
                 TimelineEventType.STATUSPAGE_UPDATE_POSTED,
                 {
                     "message": "The problem has been resolved",
-                    "old_status": "monitoring",
-                    "new_status": "resolved",
+                    "status": "resolved",
                 },
-                "Statuspage update: Monitoring → Resolved — "
-                '"The problem has been resolved"',
+                'Statuspage marked Resolved: "The problem has been resolved"',
             ),
             (
                 TimelineEventType.PAGERDUTY_INCIDENT_TRIGGERED,
@@ -398,21 +394,6 @@ class TestTimelineRenderer:
         )
 
         assert render_timeline_event(event) == 'Statuspage update: "Monitoring"'
-
-    def test_statuspage_update_without_status_change_renders_current_status(self):
-        event = TimelineEvent(
-            event_type=TimelineEventType.STATUSPAGE_UPDATE_POSTED,
-            payload={
-                "message": "Still monitoring",
-                "old_status": "monitoring",
-                "new_status": "monitoring",
-            },
-        )
-
-        assert (
-            render_timeline_event(event)
-            == 'Statuspage update (Monitoring): "Still monitoring"'
-        )
 
     def test_malformed_payload_has_fallback_summary(self):
         event = TimelineEvent(
