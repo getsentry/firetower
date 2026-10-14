@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '4'",
@@ -941,7 +941,7 @@ requires-dist = [
     { name = "django-q2", specifier = ">=1.11.1" },
     { name = "djangorestframework", specifier = ">=3.18.1" },
     { name = "google-auth", specifier = ">=2.59.1" },
-    { name = "notion-client", specifier = ">=3.0.0,<4.0.0" },
+    { name = "notion-client", specifier = ">=3.1.0,<4.0.0" },
     { name = "openrouter", specifier = ">=1.3.22" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.11" },
     { name = "pyserde", extras = ["toml"], specifier = ">=0.33.1" },
@@ -1794,14 +1794,14 @@ wheels = [
 
 [[package]]
 name = "notion-client"
-version = "3.0.0"
+version = "3.1.0"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
     { name = "httpx" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/a5/39/60afcbc0148c3dafaaefe851ae3f058077db49d66288dfb218a11a57b997/notion_client-3.0.0.tar.gz", hash = "sha256:05c4d2b4fa3491dc0de21c9c826277202ea8b8714077ee7f51a6e1a09ab23d0f", size = 31357, upload-time = "2026-02-16T11:15:48.024Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/c0/e3/4ac01384e86e2c381c21b87a0fefcdfe6d65577ae3153fad27e7e96c5d9c/notion_client-3.1.0.tar.gz", hash = "sha256:516e31326f855ec34559289b57be4e27ad656062f51f594c8f4ee3a608ee333d", size = 38781, upload-time = "2026-05-12T08:54:44.363Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/aa/ce/6b03f9aedd2edfcc28e23ced5c2582d543f6ddbb2be5c570533f02890b27/notion_client-3.0.0-py2.py3-none-any.whl", hash = "sha256:177fc3d2ace7e8ef69cf96f46269e8a66071c2c7c526194bf06ce7925853e759", size = 18746, upload-time = "2026-02-16T11:15:46.602Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/08/08/12645b24044301cb0d7908ec068c55c0d5724f39372891a1a27d630fdf50/notion_client-3.1.0-py2.py3-none-any.whl", hash = "sha256:7e3935f4dbc11231d8ad1fe404112e278501520342eaa35f86456f0df44a8aca", size = 23092, upload-time = "2026-05-12T08:54:43.135Z" },
 ]
 
 [[package]]
