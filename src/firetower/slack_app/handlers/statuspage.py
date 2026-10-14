@@ -556,19 +556,35 @@ def _process_statuspage_submission(
                     message=message,
                     components=components or None,
                 )
-                statuspage_url = service.get_incident_url(result["id"])
-                statuspage_update = result["incident_updates"][0]
-                record_statuspage_update_posted(
-                    incident,
-                    sp_update_id=statuspage_update["id"],
-                    sp_url=statuspage_url,
-                    message=message,
-                    old_status=data.get("previous_status") or status,
-                    new_status=statuspage_update.get("status") or status,
-                    occurred_at=_parse_statuspage_timestamp(
-                        statuspage_update["created_at"]
-                    ),
+                statuspage_url = service.get_incident_url(sp_id)
+                statuspage_updates = result.get("incident_updates")
+                statuspage_update = (
+                    statuspage_updates[0]
+                    if isinstance(statuspage_updates, list) and statuspage_updates
+                    else None
                 )
+                if (
+                    isinstance(statuspage_update, dict)
+                    and isinstance(statuspage_update.get("id"), str)
+                    and isinstance(statuspage_update.get("created_at"), str)
+                ):
+                    record_statuspage_update_posted(
+                        incident,
+                        sp_update_id=statuspage_update["id"],
+                        sp_url=statuspage_url,
+                        message=message,
+                        old_status=data.get("previous_status") or status,
+                        new_status=statuspage_update.get("status") or status,
+                        occurred_at=_parse_statuspage_timestamp(
+                            statuspage_update["created_at"]
+                        ),
+                    )
+                else:
+                    logger.error(
+                        "Statuspage update response for incident %s did not include "
+                        "timeline metadata",
+                        sp_id,
+                    )
                 attribution = f"<@{user_id}> " if user_id else ""
                 success_message = (
                     f"{attribution}updated the statuspage: {statuspage_url}"

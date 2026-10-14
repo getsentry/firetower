@@ -618,6 +618,43 @@ class TestStatuspageSubmission:
         assert "updated" in msg
         assert "<@U_SUBMITTER>" in msg
 
+    def test_incomplete_update_response_still_reports_success(self, incident):
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.STATUSPAGE,
+            url="https://test.statuspage.io/incidents/existing_sp",
+        )
+        ack = MagicMock()
+        body = {"user": {"id": "U_SUBMITTER"}}
+        view = self._make_view(
+            status="monitoring",
+            message="Monitoring",
+            previous_status="identified",
+        )
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.extract_incident_id_from_url.return_value = "existing_sp"
+            instance.update_incident.return_value = {"incident_updates": []}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/existing_sp"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        instance.get_incident_url.assert_called_once_with("existing_sp")
+        assert incident.timeline_events.count() == 0
+        assert client.chat_postEphemeral.call_count == 0
+        assert client.chat_postMessage.call_count == 2
+        assert all(
+            "updated the statuspage" in call.kwargs["text"]
+            for call in client.chat_postMessage.call_args_list
+        )
+
     def test_resolving_existing_statuspage_cancels_followup_reminder(self, incident):
         ExternalLink.objects.create(
             incident=incident,
