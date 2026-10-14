@@ -206,6 +206,17 @@ class TestRouting:
             mock_handler.assert_called_once()
 
     @patch("firetower.slack_app.bolt.statsd")
+    def test_page_routes(self, mock_statsd, incident):
+        ack = MagicMock()
+        respond = MagicMock()
+        body = {"text": "page", "channel_id": CHANNEL_ID}
+        command = {"command": "/ft"}
+
+        with patch("firetower.slack_app.bolt.handle_page_command") as mock_handler:
+            handle_command(ack=ack, body=body, command=command, respond=respond)
+            mock_handler.assert_called_once()
+
+    @patch("firetower.slack_app.bolt.statsd")
     def test_dumpslack_routes(self, mock_statsd, incident):
         ack = MagicMock()
         respond = MagicMock()
