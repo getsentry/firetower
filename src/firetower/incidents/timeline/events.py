@@ -39,6 +39,12 @@ class StatuspagePayload(TypedDict):
     message: str
 
 
+class StatuspageUpdatePayload(TypedDict):
+    message: str
+    old_status: str
+    new_status: str
+
+
 class PagerDutyPayload(TypedDict):
     service: str
 
@@ -210,10 +216,16 @@ def record_statuspage_update_posted(
     sp_update_id: str,
     sp_url: str,
     message: str,
+    old_status: str,
+    new_status: str,
     occurred_at: datetime,
     actor: User | None = None,
 ) -> TimelineEvent:
-    payload: StatuspagePayload = {"message": message}
+    payload: StatuspageUpdatePayload = {
+        "message": message,
+        "old_status": old_status,
+        "new_status": new_status,
+    }
     return _record_event(
         incident,
         TimelineEventType.STATUSPAGE_UPDATE_POSTED,

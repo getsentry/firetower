@@ -139,6 +139,7 @@ class TestBuildStatuspageModal:
             b for b in modal["blocks"] if b.get("block_id") == "status_block"
         )
         assert status_block["element"]["initial_option"]["value"] == "monitoring"
+        assert json.loads(modal["private_metadata"])["previous_status"] == "monitoring"
 
     def test_update_prefills_message_from_previous(self):
         sp_incident = {
@@ -394,6 +395,7 @@ class TestStatuspageSubmission:
         impact="major",
         channel_id=CHANNEL_ID,
         components=None,
+        previous_status=None,
     ):
         values: dict = {
             "status_block": {
@@ -421,6 +423,8 @@ class TestStatuspageSubmission:
                     }
                 }
         metadata = {"channel_id": channel_id}
+        if previous_status:
+            metadata["previous_status"] = previous_status
         return {
             "state": {"values": values},
             "private_metadata": json.dumps(metadata),
@@ -563,7 +567,11 @@ class TestStatuspageSubmission:
 
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
-        view = self._make_view(status="identified", message="Found the cause")
+        view = self._make_view(
+            status="identified",
+            message="Found the cause",
+            previous_status="investigating",
+        )
         client = MagicMock()
 
         with patch(
@@ -577,6 +585,7 @@ class TestStatuspageSubmission:
                 "incident_updates": [
                     {
                         "id": "sp_update_123",
+                        "status": "identified",
                         "created_at": "2026-08-20T16:00:00Z",
                     }
                 ],
@@ -596,7 +605,11 @@ class TestStatuspageSubmission:
         event = incident.timeline_events.get()
         assert event.source == TimelineEventSource.STATUSPAGE
         assert event.event_type == TimelineEventType.STATUSPAGE_UPDATE_POSTED
-        assert event.payload == {"message": "Found the cause"}
+        assert event.payload == {
+            "message": "Found the cause",
+            "old_status": "investigating",
+            "new_status": "identified",
+        }
         assert event.external_id == "sp_update_123"
         assert event.link_url == "https://test.statuspage.io/incidents/existing_sp"
         assert event.occurred_at == datetime(2026, 8, 20, 16, tzinfo=UTC)
@@ -613,7 +626,11 @@ class TestStatuspageSubmission:
         )
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
-        view = self._make_view(status="resolved", message="Resolved")
+        view = self._make_view(
+            status="resolved",
+            message="Resolved",
+            previous_status="monitoring",
+        )
         client = MagicMock()
 
         with (
@@ -635,6 +652,7 @@ class TestStatuspageSubmission:
                 "incident_updates": [
                     {
                         "id": "sp_update_resolved",
+                        "status": "resolved",
                         "created_at": "2026-08-20T17:00:00Z",
                     }
                 ],
@@ -647,6 +665,11 @@ class TestStatuspageSubmission:
 
         mock_cancel.assert_called_once_with(incident)
         mock_schedule.assert_not_called()
+        assert incident.timeline_events.get().payload == {
+            "message": "Resolved",
+            "old_status": "monitoring",
+            "new_status": "resolved",
+        }
 
     def test_empty_message_returns_error(self, incident):
         ack = MagicMock()
@@ -731,6 +754,7 @@ class TestStatuspageSubmission:
         view = self._make_view(
             status="resolved",
             components={"c1": "major_outage"},
+            previous_status="monitoring",
         )
         client = MagicMock()
 
@@ -758,6 +782,7 @@ class TestStatuspageSubmission:
             "message": "Looking into it",
             "impact": "major",
             "components": {"c1": "major_outage"},
+            "previous_status": "monitoring",
         }
         assert pushed_view["private_metadata"] == json.dumps(expected_data)
 
@@ -826,10 +851,13 @@ class TestExtractSubmissionData:
                     },
                 }
             },
-            "private_metadata": json.dumps({"channel_id": "C123"}),
+            "private_metadata": json.dumps(
+                {"channel_id": "C123", "previous_status": "monitoring"}
+            ),
         }
         data = _extract_submission_data(view)
         assert data["message"] == ""
+        assert data["previous_status"] == "monitoring"
 
 
 class TestStatuspageResetAndResolve:
