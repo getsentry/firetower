@@ -33,7 +33,7 @@ class MCPConfig:
     base_url: str
     service_account: str
     firetower_url: str | None
-    jwt_signing_key: str | None
+    jwt_signing_key: str
     allowed_redirect_uris: tuple[str, ...]
     host: str
     port: int
@@ -56,7 +56,7 @@ class MCPConfig:
             base_url=_require("MCP_BASE_URL"),
             service_account=_require("FIRETOWER_SERVICE_ACCOUNT"),
             firetower_url=(os.environ.get("FIRETOWER_URL") or "").strip() or None,
-            jwt_signing_key=os.environ.get("MCP_JWT_SIGNING_KEY"),
+            jwt_signing_key=_require("MCP_JWT_SIGNING_KEY"),
             allowed_redirect_uris=allowed_redirect_uris,
             host=os.environ.get("MCP_HOST", "0.0.0.0"),
             port=int(os.environ.get("PORT", "8080")),

@@ -616,6 +616,28 @@ class TestIncidentAPIViews:
         assert incident.reporter == self.reporter
         assert incident.status == IncidentStatus.ACTIVE  # Default
 
+    def test_google_service_account_cannot_create_incident(self):
+        service_account = User.objects.create_user(
+            username="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+            email="firetower-api-mcp-test@example.iam.gserviceaccount.com",
+        )
+        self.client.force_authenticate(user=service_account)
+
+        response = self.client.post(
+            "/api/incidents/",
+            {
+                "title": "Forbidden Incident",
+                "severity": IncidentSeverity.P1,
+                "is_private": False,
+                "captain": self.captain.email,
+                "reporter": self.reporter.email,
+            },
+            format="json",
+        )
+
+        assert response.status_code == 403
+        assert Incident.objects.count() == 0
+
     def test_create_incident_with_optional_fields(self):
         """Test creating incident with optional fields"""
         self.client.force_authenticate(user=self.user)
@@ -803,6 +825,29 @@ class TestIncidentAPIViews:
         assert response.status_code == 200
         incident.refresh_from_db()
         assert incident.title == "Updated Title"
+
+    def test_google_service_account_cannot_update_incident(self):
+        service_account = User.objects.create_user(
+            username="123456789-compute@developer.gserviceaccount.com",
+            email="123456789-compute@developer.gserviceaccount.com",
+        )
+        incident = Incident.objects.create(
+            title="Original Title",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        self.client.force_authenticate(user=service_account)
+
+        response = self.client.patch(
+            f"/api/incidents/{incident.incident_number}/",
+            {"title": "Forbidden Update"},
+            format="json",
+        )
+
+        assert response.status_code == 403
+        incident.refresh_from_db()
+        assert incident.title == "Original Title"
 
     def test_update_incident_as_reporter(self):
         """Test reporter can update incident"""

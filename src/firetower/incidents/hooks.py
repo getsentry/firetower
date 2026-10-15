@@ -998,20 +998,24 @@ def decorate_incident_channel(
     feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
     if feed_channel_id and not ctx.is_private:
         try:
+            feed_message = f"A {ctx.severity} incident has been created"
+            if ctx.reporter_slack_id:
+                feed_message = f"{feed_message} by <@{ctx.reporter_slack_id}>"
+
             if ctx.incident_url and ctx.incident_number:
-                feed_message = (
-                    f"A {ctx.severity} incident has been created.\n"
+                title = (
                     f"<{ctx.incident_url}|{ctx.incident_number} "
                     f"{escape_slack_text(ctx.title)}>"
-                    f"\n\nFor those involved, please join <#{ctx.channel_id}>"
                 )
             else:
-                feed_message = (
-                    f"A {ctx.severity} incident has been created "
-                    "(degraded mode).\n"
-                    f"{escape_slack_text(ctx.title)}"
-                    f"\n\nFor those involved, please join <#{ctx.channel_id}>"
-                )
+                feed_message = f"{feed_message} (degraded mode)"
+                title = escape_slack_text(ctx.title)
+
+            feed_message = (
+                f"{feed_message}.\n"
+                f"{title}"
+                f"\n\nFor those involved, please join <#{ctx.channel_id}>"
+            )
             slack_service.post_message(feed_channel_id, feed_message)
         except Exception:
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")

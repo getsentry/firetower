@@ -106,6 +106,9 @@ ALLOWED_HOSTS = [
     "::1",
     "firetower.getsentry.net",
     "test.firetower.getsentry.net",
+    # Firetower's stable Cloud Run URLs, used by the MCP services over private DNS.
+    "firetower-srjzwe3tcq-uw.a.run.app",
+    "firetower-test-srjzwe3tcq-uw.a.run.app",
     "firetower",
     "backend",  # name from the nginx proxy_pass
 ]

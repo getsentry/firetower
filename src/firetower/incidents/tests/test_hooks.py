@@ -767,8 +767,8 @@ class TestOnCaptainChanged:
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_invites_captain_to_status_channel_for_high_severity(self, mock_slack):
-        mock_slack.parse_channel_id_from_url.side_effect = (
-            lambda url: "C12345" if "C12345" in url else "CSTATUS"
+        mock_slack.parse_channel_id_from_url.side_effect = lambda url: (
+            "C12345" if "C12345" in url else "CSTATUS"
         )
 
         captain = User.objects.create_user(

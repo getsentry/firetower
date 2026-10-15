@@ -3,12 +3,16 @@
 import re
 from collections.abc import Iterator
 from pathlib import Path
+from unittest.mock import MagicMock
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastmcp import settings as fastmcp_settings
 from starlette.testclient import TestClient
 
+from firetower.mcp_server import server
+from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE
+from firetower.mcp_server.branding import FIRETOWER_ICON
 from firetower.mcp_server.config import MCPConfig
 from firetower.mcp_server.server import create_mcp
 
@@ -67,6 +71,22 @@ def test_health_is_public_while_mcp_requires_oauth(mcp_client: TestClient):
     assert mcp_response.headers["www-authenticate"].startswith("Bearer ")
 
 
+def test_favicon_is_public_and_firetower_branded(mcp_client: TestClient):
+    response = mcp_client.get("/favicon.ico")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/svg+xml")
+    assert response.headers["cache-control"] == "public, max-age=86400"
+    assert "<svg" in response.text
+
+
+def test_oauth_metadata_disables_cimd(mcp_client: TestClient):
+    response = mcp_client.get("/.well-known/oauth-authorization-server")
+
+    assert response.status_code == 200
+    assert response.json().get("client_id_metadata_document_supported") is not True
+
+
 def test_pi_dcr_registration_accepts_loopback_callback(mcp_client: TestClient):
     registration_response = mcp_client.post("/register", json=PI_DCR_METADATA)
 
@@ -103,6 +123,11 @@ def test_google_authorization_requests_openid_and_email_scopes(
 
     assert consent_response.status_code == 200
     assert csrf_token is not None
+    assert 'alt="Firetower"' in consent_response.text
+    assert f'src="{FIRETOWER_ICON.src}"' in consent_response.text
+    assert (
+        "https://gofastmcp.com/assets/brand/blue-logo.png" not in consent_response.text
+    )
     consent_response = mcp_client.post(
         consent_url,
         data={
@@ -119,28 +144,40 @@ def test_google_authorization_requests_openid_and_email_scopes(
     assert set(parse_qs(google_authorization_url.query)["scope"][0].split()) == {
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
+        GOOGLE_GROUPS_READ_SCOPE,
     }
 
 
-def test_unallowed_external_callback_fails_redirect_validation(
+def test_unallowed_external_callback_is_rejected_at_registration(
     mcp_client: TestClient,
 ):
     metadata = {**PI_DCR_METADATA, "redirect_uris": [UNALLOWED_CALLBACK]}
     registration_response = mcp_client.post("/register", json=metadata)
 
-    assert registration_response.status_code == 201
-    client_id = registration_response.json()["client_id"]
-    assert isinstance(client_id, str)
-    authorization_response = mcp_client.get(
-        "/authorize", params=_authorization_params(client_id, UNALLOWED_CALLBACK)
-    )
+    assert registration_response.status_code == 400
+    assert "location" not in registration_response.headers
 
-    assert authorization_response.status_code == 400
-    assert "location" not in authorization_response.headers
-    assert authorization_response.json() == {
-        "error": "invalid_request",
-        "error_description": (
-            f"Redirect URI '{UNALLOWED_CALLBACK}' does not match allowed patterns."
-        ),
-        "state": "test-state",
-    }
+
+def test_server_uses_configured_logger_namespace():
+    assert server.logger.name == "firetower.mcp_server.server"
+
+
+def test_main_configures_audit_logging_and_disables_access_logs(monkeypatch):
+    config = MagicMock(host="0.0.0.0", port=8080)
+    mcp = MagicMock()
+    configure_logging = MagicMock()
+    monkeypatch.setattr(server, "configure_mcp_logging", configure_logging)
+    monkeypatch.setattr(server.MCPConfig, "from_env", lambda: config)
+    monkeypatch.setattr(server, "create_mcp", lambda _config: mcp)
+
+    server.main()
+
+    configure_logging.assert_called_once_with()
+    mcp.run.assert_called_once()
+    run_kwargs = mcp.run.call_args.kwargs
+    assert run_kwargs["transport"] == "http"
+    assert run_kwargs["host"] == "0.0.0.0"
+    assert run_kwargs["port"] == 8080
+    assert run_kwargs["uvicorn_config"] == {"access_log": False}
+    assert len(run_kwargs["middleware"]) == 1
+    assert run_kwargs["middleware"][0].cls is server.SafeOAuthAccessLogMiddleware

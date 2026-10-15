@@ -50,6 +50,16 @@ urlpatterns = [
         name="incident-status-retrieve",
     ),
     path(
+        "incidents/<str:incident_id>/action-items/",
+        action_item_list,
+        name="incident-action-item-list",
+    ),
+    path(
+        "incidents/<str:incident_id>/timeline-events/",
+        timeline_event_list,
+        name="incident-timeline-event-list",
+    ),
+    path(
         "incidents/<str:incident_id>/sync-action-items/",
         sync_action_items,
         name="sync-action-items",

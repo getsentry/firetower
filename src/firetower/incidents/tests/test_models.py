@@ -575,6 +575,33 @@ class TestFilterVisibleToUser:
         assert user_private in filtered
         assert other_private not in filtered
 
+    def test_google_service_account_never_sees_private_incidents(self):
+        service_account = User.objects.create_user(
+            username="123456789@cloudbuild.gserviceaccount.com",
+            email="123456789@cloudbuild.gserviceaccount.com",
+        )
+        public = Incident.objects.create(
+            title="Public",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        private = Incident.objects.create(
+            title="Private",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=service_account,
+            reporter=service_account,
+        )
+        private.participants.add(service_account)
+
+        filtered = filter_visible_to_user(Incident.objects.all(), service_account)
+
+        assert public.is_visible_to_user(service_account)
+        assert not private.is_visible_to_user(service_account)
+        assert list(filtered) == [public]
+
     def test_participant_sees_private_incident(self):
         """Test participants can see private incidents they're involved in"""
         participant = User.objects.create_user(username="participant@example.com")

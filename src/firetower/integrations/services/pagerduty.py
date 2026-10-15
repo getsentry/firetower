@@ -87,7 +87,7 @@ class PagerDutyService:
         }
 
         url = f"{REST_API_URL}/oncalls"
-        params = {
+        params: dict[str, str | int] = {
             "escalation_policy_ids[]": escalation_policy_id,
             "limit": 100,
             "include[]": "users",
