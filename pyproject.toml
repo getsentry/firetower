@@ -8,7 +8,7 @@ dependencies = [
     "cryptography>=50.0.2",
     "datadog==0.52.1",
     "datadog-api-client==2.61.0",
-    "django>=6.1.1,<7",
+    "django>=6.1.2,<7",
     "django-cors-headers>=4.9.0",
     "django-fernet-encrypted-fields>=0.4.0",
     "django-kubernetes>=1.1.0",
@@ -32,19 +32,19 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.2",
-    "mypy>=2.3.1",
+    "mypy>=2.4.0",
     "pyupgrade>=3.21.2",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-django>=4.14.0",
-    "ruff>=0.16.10",
-    "ty>=0.0.84",
-    "django-stubs>=6.1.1",
+    "ruff>=0.17.0",
+    "ty>=0.0.86",
+    "django-stubs>=6.1.2",
     "django-stubs-ext>=5.2.7",
     "blessed>=1.50.0",
 ]
 prod = [
-    "ddtrace==4.15.4",
+    "ddtrace==4.15.6",
     "granian>=2.8.3",
     "sentry-sdk[django]>=2.71.0",
 ]
