@@ -942,7 +942,7 @@ requires-dist = [
     { name = "djangorestframework", specifier = ">=3.18.1" },
     { name = "google-auth", specifier = ">=2.59.1" },
     { name = "notion-client", specifier = ">=3.1.0,<4.0.0" },
-    { name = "openrouter", specifier = ">=1.3.22" },
+    { name = "openrouter", specifier = ">=1.3.43" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.11" },
     { name = "pyserde", extras = ["toml"], specifier = ">=0.33.1" },
     { name = "requests", specifier = ">=2.34.2" },
@@ -1818,7 +1818,7 @@ wheels = [
 
 [[package]]
 name = "openrouter"
-version = "1.3.22"
+version = "1.3.43"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
     { name = "httpcore" },
@@ -1826,9 +1826,9 @@ dependencies = [
     { name = "jsonpath-python" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/dd/b3/71ecd2ddebc925c1cd4406acebbc97cb34188b6357c033a89f4fe87ee5a9/openrouter-1.3.22.tar.gz", hash = "sha256:ef6541839640212aeaf95d631e8ef38338cd3cf045bd3bcf40be6770c23f0324", size = 583732, upload-time = "2026-10-02T21:51:35.554Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/8b/b3/618e7eb85cb241e1c5f6337246ff033de9a2d4757d31c8ebe00a4f345551/openrouter-1.3.43.tar.gz", hash = "sha256:90768136a7149ce3e94acc09e5ccd29d68d8d5bdbb99ee5af2e9a7ca4dfcbef7", size = 598052, upload-time = "2026-10-11T01:45:28.219Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/dc/44/7d0d0e18f747baebc99f8476da24e53ea12cf6c4c1157a350f9fe80aea95/openrouter-1.3.22-py3-none-any.whl", hash = "sha256:2dcb65356fb25059ae0b2489f4e3489e48e4d167686f2f6c889abe67c9ec5291", size = 1274728, upload-time = "2026-10-02T21:51:34.109Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/8d/6f/ce0f446b4250b74c3a757451fc78be20f3988e69716f8456cebc57b20dbb/openrouter-1.3.43-py3-none-any.whl", hash = "sha256:1e54964492d6466c865b94079e9b67034f0fed51c7fd9aa219e104e142b425ce", size = 1299909, upload-time = "2026-10-11T01:45:26.212Z" },
 ]
 
 [[package]]
