@@ -146,7 +146,7 @@ export function PillFilter<T extends PillVariant>({
 
         {isEditing && available.length > 0 ? (
           <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
-            <div className="p-space-sm max-h-[200px] overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="p-space-sm max-h-[200px] [scrollbar-width:none] overflow-y-auto [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {available.map((option, index) => (
                 <button
                   key={option}

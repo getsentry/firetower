@@ -23,10 +23,10 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
       >
         <div className="gap-space-xl flex justify-between">
           <div className="min-w-0 flex-1">
-            <h3 className="text-size-xl text-content-headings select-text font-semibold">
+            <h3 className="text-size-xl text-content-headings font-semibold select-text">
               {incident.title}
             </h3>
-            <span className="text-size-lg text-content-secondary mt-space-sm gap-space-xs flex select-text items-center font-regular leading-none">
+            <span className="text-size-lg text-content-secondary mt-space-sm gap-space-xs font-regular flex items-center leading-none select-text">
               {incident.is_private && <span aria-label="Private incident">🔒</span>}
               {incident.id}
             </span>
@@ -36,12 +36,12 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
               {incident.is_private && <Pill variant="private">Private</Pill>}
             </div>
             {incident.description ? (
-              <p className="text-content-secondary text-size-sm leading-comfortable line-clamp-1 mt-space-md select-none">
+              <p className="text-content-secondary text-size-sm leading-comfortable mt-space-md line-clamp-1 select-none">
                 {incident.description}
               </p>
             ) : null}
           </div>
-          <div className="text-size-sm text-content-secondary shrink-0 select-none text-right">
+          <div className="text-size-sm text-content-secondary shrink-0 text-right select-none">
             <time dateTime={incident.created_at}>
               {createdAt.toLocaleDateString('en-US', {
                 month: 'short',
