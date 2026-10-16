@@ -33,6 +33,7 @@ COPY frontend/vite.config.ts .
 COPY frontend/index.html .
 COPY frontend/env.ts .
 COPY frontend/public ./public/
+COPY frontend/scripts ./scripts/
 COPY frontend/src ./src/
 
 ENV VITE_API_URL="/api"

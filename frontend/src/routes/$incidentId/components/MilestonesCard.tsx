@@ -185,9 +185,9 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
           </Button>
         )}
       </div>
-      <div className="flex flex-col gap-space-md">
+      <div className="gap-space-md flex flex-col">
         {MILESTONES.map(({field, label}, index) => (
-          <div key={field} className="flex items-center gap-space-md">
+          <div key={field} className="gap-space-md flex items-center">
             <div className="text-content-secondary w-20 flex-none text-sm font-medium">
               {label}
             </div>
@@ -202,7 +202,7 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
                 />
               ) : (
                 <span
-                  className={`text-sm ${incident[field] ? 'text-content-primary' : 'text-content-tertiary'}`}
+                  className={`text-sm ${incident[field] ? 'text-content-primary' : 'text-content-secondary'}`}
                 >
                   {formatDateTime(
                     incident[field] ? new Date(incident[field]) : undefined
@@ -220,7 +220,7 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
         />
       </div>
       {isEditing && (
-        <div className="mt-space-lg flex items-center justify-end gap-space-xs">
+        <div className="mt-space-lg gap-space-xs flex items-center justify-end">
           <Button variant="primary" onClick={handleSave} loading={isSaving}>
             Save
           </Button>
