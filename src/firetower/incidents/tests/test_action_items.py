@@ -41,6 +41,7 @@ def _make_linear_issue(
     assignee_linear_id=None,
     priority=0,
     created_at=None,
+    sla_breaches_at=None,
 ):
     return {
         "id": id,
@@ -53,6 +54,7 @@ def _make_linear_issue(
         "assignee_linear_id": assignee_linear_id,
         "priority": priority,
         "created_at": created_at or timezone.now(),
+        "sla_breaches_at": sla_breaches_at,
     }
 
 
@@ -120,6 +122,133 @@ class TestSyncActionItemsFromLinear:
 
         item = incident.action_items.get(linear_issue_id="id-1")
         assert item.created_at == created_at
+
+    @pytest.mark.parametrize(
+        ("priority", "slo_days"),
+        [(1, 14), (2, 14), (3, 28)],
+    )
+    def test_sets_sla_during_first_sync(self, settings, priority, slo_days):
+        settings.LINEAR = {
+            "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": 14,
+            "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": 28,
+        }
+        incident = self._make_incident()
+        created_at = timezone.now() - timedelta(days=2)
+        children = [
+            _make_linear_issue(
+                id="id-1",
+                identifier="ENG-1",
+                title="Task 1",
+                priority=priority,
+                created_at=created_at,
+            ),
+        ]
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_service = mock_get.return_value
+            mock_service.get_child_issues.return_value = children
+            mock_service.get_workflow_states.return_value = None
+            mock_service.update_issue.return_value = True
+
+            sync_action_items_from_linear(incident, force=True)
+
+        mock_service.update_issue.assert_called_once_with(
+            "id-1",
+            sla_breaches_at=(created_at + timedelta(days=slo_days)).isoformat(),
+            sla_type="all",
+        )
+
+    def test_does_not_replace_existing_sla(self, settings):
+        settings.LINEAR = {"ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": 14}
+        incident = self._make_incident()
+        children = [
+            _make_linear_issue(
+                id="id-1",
+                identifier="ENG-1",
+                title="Task 1",
+                priority=1,
+                sla_breaches_at=timezone.now() + timedelta(days=7),
+            ),
+        ]
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_service = mock_get.return_value
+            mock_service.get_child_issues.return_value = children
+            mock_service.get_workflow_states.return_value = None
+
+            sync_action_items_from_linear(incident, force=True)
+
+        mock_service.update_issue.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("priority", "status"),
+        [(4, "Todo"), (1, "Done"), (1, "Canceled")],
+    )
+    def test_does_not_set_sla_for_ineligible_item(self, settings, priority, status):
+        settings.LINEAR = {"ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": 14}
+        incident = self._make_incident()
+        children = [
+            _make_linear_issue(
+                id="id-1",
+                identifier="ENG-1",
+                title="Task 1",
+                priority=priority,
+                status=status,
+            ),
+        ]
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_service = mock_get.return_value
+            mock_service.get_child_issues.return_value = children
+            mock_service.get_workflow_states.return_value = None
+
+            sync_action_items_from_linear(incident, force=True)
+
+        mock_service.update_issue.assert_not_called()
+
+    def test_does_not_set_sla_for_lower_severity_incident(self, settings):
+        settings.LINEAR = {"ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": 14}
+        incident = self._make_incident(severity=IncidentSeverity.P2)
+        children = [
+            _make_linear_issue(
+                id="id-1",
+                identifier="ENG-1",
+                title="Task 1",
+                priority=1,
+            ),
+        ]
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_service = mock_get.return_value
+            mock_service.get_child_issues.return_value = children
+            mock_service.get_workflow_states.return_value = None
+
+            sync_action_items_from_linear(incident, force=True)
+
+        mock_service.update_issue.assert_not_called()
+
+    def test_sla_failure_does_not_block_sync(self, settings):
+        settings.LINEAR = {"ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": 14}
+        incident = self._make_incident()
+        children = [
+            _make_linear_issue(
+                id="id-1",
+                identifier="ENG-1",
+                title="Task 1",
+                priority=1,
+            ),
+        ]
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_service = mock_get.return_value
+            mock_service.get_child_issues.return_value = children
+            mock_service.get_workflow_states.return_value = None
+            mock_service.update_issue.return_value = False
+
+            stats = sync_action_items_from_linear(incident, force=True)
+
+        assert stats.created == 1
+        assert incident.action_items.filter(linear_issue_id="id-1").exists()
 
     def test_ignores_related_issues(self):
         incident = self._make_incident()

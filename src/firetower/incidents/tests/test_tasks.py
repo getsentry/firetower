@@ -849,7 +849,6 @@ class TestSendActionItemReminder:
     def mock_linear(self):
         mock = MagicMock()
         mock.create_comment.return_value = True
-        mock.update_issue.return_value = True
         with patch(
             "firetower.incidents.tasks.action_items.LinearService",
             return_value=mock,
@@ -909,10 +908,10 @@ class TestSendActionItemReminder:
         synced_ids = {c.args[0].id for c in mock_sync.call_args_list}
         assert synced_ids == {incident.id}
 
-    def test_skips_incident_younger_than_global_floor(self, mock_sync):
-        self._make_incident(days_old=5)
+    def test_syncs_recent_incident_for_early_sla(self, mock_sync):
+        incident = self._make_incident(days_old=5)
         send_action_item_reminder()
-        mock_sync.assert_not_called()
+        mock_sync.assert_called_once_with(incident)
 
     def test_skips_incident_older_than_max_age(self, mock_sync):
         self._make_incident(days_old=120)
@@ -953,11 +952,6 @@ class TestSendActionItemReminder:
 
         send_action_item_reminder()
 
-        mock_linear.update_issue.assert_called_once_with(
-            action_item.linear_issue_id,
-            sla_breaches_at=(action_item.created_at + timedelta(days=14)).isoformat(),
-            sla_type="all",
-        )
         mock_linear.create_comment.assert_called_once_with(
             action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
@@ -980,11 +974,6 @@ class TestSendActionItemReminder:
 
         send_action_item_reminder()
 
-        mock_linear.update_issue.assert_called_once_with(
-            action_item.linear_issue_id,
-            sla_breaches_at=(action_item.created_at + timedelta(days=30)).isoformat(),
-            sla_type="all",
-        )
         mock_linear.create_comment.assert_called_once_with(
             action_item.linear_issue_id, self.CONFIGURED_MEDIUM_PRIORITY_COMMENT
         )
@@ -1009,7 +998,6 @@ class TestSendActionItemReminder:
 
         send_action_item_reminder()
 
-        mock_linear.update_issue.assert_not_called()
         mock_linear.create_comment.assert_not_called()
 
     def test_skips_medium_priority_under_twenty_one_days(self, mock_linear):
@@ -1036,18 +1024,16 @@ class TestSendActionItemReminder:
             urgent.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
 
-    def test_posts_comment_when_setting_sla_fails(self, mock_linear):
+    def test_reminder_does_not_reset_sla(self, mock_linear):
         incident = self._make_incident()
         action_item = self._make_action_item(incident)
-        mock_linear.update_issue.return_value = False
 
         send_action_item_reminder()
 
+        mock_linear.update_issue.assert_not_called()
         mock_linear.create_comment.assert_called_once_with(
             action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
-        action_item.refresh_from_db()
-        assert action_item.last_nag is not None
 
     def test_does_not_stamp_when_comment_returns_failure(self, mock_linear):
         incident = self._make_incident()

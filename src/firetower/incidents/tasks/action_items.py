@@ -85,12 +85,7 @@ def send_action_item_reminder() -> None:
         return
 
     now = timezone.now()
-    earliest_notify_after_days = (
-        min(tier.slo_days for tier in nag_tiers.values())
-        - ACTION_ITEM_REMINDER_NAG_EVERY_DAYS
-    )
     min_age = now - timedelta(days=ACTION_ITEM_REMINDER_MAX_AGE_DAYS)
-    max_age = now - timedelta(days=earliest_notify_after_days)
 
     def _action_item_eligible(action_item: ActionItem, incident: Incident) -> bool:
         if action_item.status not in [
@@ -170,23 +165,6 @@ def send_action_item_reminder() -> None:
             )
             return
         linear_service = LinearService()
-        sla_breaches_at = action_item.created_at + timedelta(days=tier.slo_days)
-        try:
-            if not linear_service.update_issue(
-                action_item.linear_issue_id,
-                sla_breaches_at=sla_breaches_at.isoformat(),
-                sla_type="all",
-            ):
-                logger.error(
-                    "Failed to set Linear SLA for action item %s",
-                    action_item.linear_identifier,
-                )
-        except Exception:
-            logger.exception(
-                "Failed to set Linear SLA for action item %s",
-                action_item.linear_identifier,
-            )
-
         try:
             success = linear_service.create_comment(
                 action_item.linear_issue_id, comment
@@ -207,7 +185,6 @@ def send_action_item_reminder() -> None:
 
     incidents = Incident.objects.filter(
         created_at__gte=min_age,
-        created_at__lte=max_age,
         severity__in=HIGH_SEVERITIES,
     ).exclude(status=IncidentStatus.CANCELED)
 

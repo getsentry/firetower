@@ -45,6 +45,7 @@ ISSUE_FIELDS = """
     url
     priority
     createdAt
+    slaBreachesAt
     state {
         id
         type
@@ -397,6 +398,7 @@ class LinearService:
         status = LINEAR_STATE_TYPE_MAP.get(state_type, "Todo")
         assignee = issue.get("assignee") or {}
         created_at = issue.get("createdAt")
+        sla_breaches_at = issue.get("slaBreachesAt")
         return {
             "id": issue["id"],
             "identifier": issue["identifier"],
@@ -405,6 +407,9 @@ class LinearService:
             "status": status,
             "priority": issue.get("priority", 0),
             "created_at": parse_datetime(created_at) if created_at else None,
+            "sla_breaches_at": (
+                parse_datetime(sla_breaches_at) if sla_breaches_at else None
+            ),
             "assignee_email": assignee.get("email"),
             "assignee_linear_id": assignee.get("id"),
             "relation_type": relation_type,
