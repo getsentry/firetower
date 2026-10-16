@@ -562,6 +562,8 @@ class LinearService:
         state_id: str | None = None,
         assignee_id: str | None = None,
         priority: int | None = None,
+        sla_breaches_at: str | None = None,
+        sla_type: str | None = None,
     ) -> bool:
         mutation = """
         mutation($id: String!, $input: IssueUpdateInput!) {
@@ -581,6 +583,10 @@ class LinearService:
             input_data["assigneeId"] = assignee_id
         if priority is not None:
             input_data["priority"] = priority
+        if sla_breaches_at is not None:
+            input_data["slaBreachesAt"] = sla_breaches_at
+        if sla_type is not None:
+            input_data["slaType"] = sla_type
 
         if not input_data:
             return True

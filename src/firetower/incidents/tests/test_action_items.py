@@ -529,6 +529,29 @@ class TestLinearService:
             call_args = mock_gql.call_args
             assert call_args[0][1]["input"]["title"] == "New title"
 
+    def test_update_issue_with_sla(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "test-id",
+                "CLIENT_SECRET": "test-secret",
+            }
+            service = LinearService()
+
+        with patch.object(
+            service, "_graphql", return_value={"issueUpdate": {"success": True}}
+        ) as mock_gql:
+            result = service.update_issue(
+                "issue-id",
+                sla_breaches_at="2026-11-01T12:00:00+00:00",
+                sla_type="all",
+            )
+
+        assert result is True
+        assert mock_gql.call_args[0][1]["input"] == {
+            "slaBreachesAt": "2026-11-01T12:00:00+00:00",
+            "slaType": "all",
+        }
+
     def test_update_issue_with_no_priority(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
             mock_settings.LINEAR = {

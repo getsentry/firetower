@@ -849,6 +849,7 @@ class TestSendActionItemReminder:
     def mock_linear(self):
         mock = MagicMock()
         mock.create_comment.return_value = True
+        mock.update_issue.return_value = True
         with patch(
             "firetower.incidents.tasks.action_items.LinearService",
             return_value=mock,
@@ -951,6 +952,11 @@ class TestSendActionItemReminder:
 
         send_action_item_reminder()
 
+        mock_linear.update_issue.assert_called_once_with(
+            action_item.linear_issue_id,
+            sla_breaches_at=(incident.created_at + timedelta(days=14)).isoformat(),
+            sla_type="all",
+        )
         mock_linear.create_comment.assert_called_once_with(
             action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
@@ -973,6 +979,11 @@ class TestSendActionItemReminder:
 
         send_action_item_reminder()
 
+        mock_linear.update_issue.assert_called_once_with(
+            action_item.linear_issue_id,
+            sla_breaches_at=(incident.created_at + timedelta(days=30)).isoformat(),
+            sla_type="all",
+        )
         mock_linear.create_comment.assert_called_once_with(
             action_item.linear_issue_id, self.CONFIGURED_MEDIUM_PRIORITY_COMMENT
         )
@@ -1010,6 +1021,19 @@ class TestSendActionItemReminder:
         mock_linear.create_comment.assert_called_once_with(
             urgent.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
+
+    def test_posts_comment_when_setting_sla_fails(self, mock_linear):
+        incident = self._make_incident()
+        action_item = self._make_action_item(incident)
+        mock_linear.update_issue.return_value = False
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
+        action_item.refresh_from_db()
+        assert action_item.last_nag is not None
 
     def test_does_not_stamp_when_comment_returns_failure(self, mock_linear):
         incident = self._make_incident()

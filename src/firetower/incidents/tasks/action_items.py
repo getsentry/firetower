@@ -167,8 +167,26 @@ def send_action_item_reminder() -> None:
                 f"Failed to render nag comment template for action item {action_item.linear_identifier}"
             )
             return
+        linear_service = LinearService()
+        sla_breaches_at = incident.created_at + timedelta(days=tier.slo_days)
         try:
-            success = LinearService().create_comment(
+            if not linear_service.update_issue(
+                action_item.linear_issue_id,
+                sla_breaches_at=sla_breaches_at.isoformat(),
+                sla_type="all",
+            ):
+                logger.error(
+                    "Failed to set Linear SLA for action item %s",
+                    action_item.linear_identifier,
+                )
+        except Exception:
+            logger.exception(
+                "Failed to set Linear SLA for action item %s",
+                action_item.linear_identifier,
+            )
+
+        try:
+            success = linear_service.create_comment(
                 action_item.linear_issue_id, comment
             )
         except Exception:
