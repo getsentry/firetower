@@ -104,7 +104,7 @@ def send_action_item_reminder() -> None:
         if not comments_by_priority.get(action_item.priority):
             return False
         notify_after_days = tier.slo_days - ACTION_ITEM_REMINDER_NAG_EVERY_DAYS
-        if incident.created_at > now - timedelta(days=notify_after_days):
+        if action_item.created_at > now - timedelta(days=notify_after_days):
             return False
         if action_item.last_nag is None:
             return True
@@ -151,13 +151,15 @@ def send_action_item_reminder() -> None:
         template_source = comments_by_priority[action_item.priority]
         tier = nag_tiers[action_item.priority]
         incident_age_days = (timezone.now() - incident.created_at).days
-        slo_passed = incident_age_days >= tier.slo_days
+        action_item_age_days = (timezone.now() - action_item.created_at).days
+        slo_passed = action_item_age_days >= tier.slo_days
         try:
             comment = _NAG_TEMPLATE_ENV.from_string(template_source).render(
                 slo_days=tier.slo_days,
                 incident_age_days=incident_age_days,
-                days_past_due=max(0, incident_age_days - tier.slo_days),
-                days_left=max(0, tier.slo_days - incident_age_days),
+                action_item_age_days=action_item_age_days,
+                days_past_due=max(0, action_item_age_days - tier.slo_days),
+                days_left=max(0, tier.slo_days - action_item_age_days),
                 slo_passed=slo_passed,
                 action_item=action_item,
                 incident=incident,
@@ -168,7 +170,7 @@ def send_action_item_reminder() -> None:
             )
             return
         linear_service = LinearService()
-        sla_breaches_at = incident.created_at + timedelta(days=tier.slo_days)
+        sla_breaches_at = action_item.created_at + timedelta(days=tier.slo_days)
         try:
             if not linear_service.update_issue(
                 action_item.linear_issue_id,

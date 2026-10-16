@@ -40,6 +40,7 @@ def _make_linear_issue(
     assignee_email=None,
     assignee_linear_id=None,
     priority=0,
+    created_at=None,
 ):
     return {
         "id": id,
@@ -51,6 +52,7 @@ def _make_linear_issue(
         "assignee_email": assignee_email,
         "assignee_linear_id": assignee_linear_id,
         "priority": priority,
+        "created_at": created_at or timezone.now(),
     }
 
 
@@ -98,6 +100,27 @@ class TestSyncActionItemsFromLinear:
             assert incident.action_items.count() == 2
             assert incident.action_items_last_synced_at is not None
 
+    def test_uses_linear_issue_creation_time(self):
+        incident = self._make_incident()
+        created_at = timezone.now() - timedelta(days=10)
+        children = [
+            _make_linear_issue(
+                id="id-1",
+                identifier="ENG-1",
+                title="Task 1",
+                created_at=created_at,
+            ),
+        ]
+
+        with patch("firetower.incidents.services._get_linear_service") as mock_get:
+            mock_get.return_value.get_child_issues.return_value = children
+            mock_get.return_value.get_workflow_states.return_value = None
+
+            sync_action_items_from_linear(incident, force=True)
+
+        item = incident.action_items.get(linear_issue_id="id-1")
+        assert item.created_at == created_at
+
     def test_ignores_related_issues(self):
         incident = self._make_incident()
 
@@ -139,6 +162,7 @@ class TestSyncActionItemsFromLinear:
 
     def test_updates_existing_action_items(self):
         incident = self._make_incident()
+        created_at = timezone.now() - timedelta(days=10)
         ActionItem.objects.create(
             incident=incident,
             linear_issue_id="id-1",
@@ -154,6 +178,7 @@ class TestSyncActionItemsFromLinear:
                 identifier="ENG-1",
                 title="New title",
                 status="In Progress",
+                created_at=created_at,
             ),
         ]
 
@@ -168,6 +193,7 @@ class TestSyncActionItemsFromLinear:
             item = incident.action_items.get(linear_issue_id="id-1")
             assert item.title == "New title"
             assert item.status == "In Progress"
+            assert item.created_at == created_at
 
     def test_deletes_stale_action_items(self):
         incident = self._make_incident()
@@ -1043,7 +1069,7 @@ class TestActionItemViews:
             status=IncidentStatus.ACTIVE,
             severity=IncidentSeverity.P1,
         )
-        ActionItem.objects.create(
+        high_item = ActionItem.objects.create(
             incident=incident,
             linear_issue_id="id-1",
             linear_identifier="ENG-1",
@@ -1051,8 +1077,9 @@ class TestActionItemViews:
             status=ActionItemStatus.TODO,
             priority=2,
             url="https://linear.app/t/ENG-1",
+            created_at=timezone.now() - timedelta(days=3),
         )
-        ActionItem.objects.create(
+        medium_item = ActionItem.objects.create(
             incident=incident,
             linear_issue_id="id-2",
             linear_identifier="ENG-2",
@@ -1060,6 +1087,7 @@ class TestActionItemViews:
             status=ActionItemStatus.TODO,
             priority=3,
             url="https://linear.app/t/ENG-2",
+            created_at=timezone.now() - timedelta(days=5),
         )
         ActionItem.objects.create(
             incident=incident,
@@ -1087,10 +1115,10 @@ class TestActionItemViews:
         assert response.status_code == 200
         items = {item["linear_identifier"]: item for item in response.data}
 
-        expected_high = (incident.created_at + timedelta(days=14)).isoformat()
+        expected_high = (high_item.created_at + timedelta(days=14)).isoformat()
         assert items["ENG-1"]["slo_deadline"] == expected_high
 
-        expected_medium = (incident.created_at + timedelta(days=30)).isoformat()
+        expected_medium = (medium_item.created_at + timedelta(days=30)).isoformat()
         assert items["ENG-2"]["slo_deadline"] == expected_medium
 
         assert items["ENG-3"]["slo_deadline"] is None

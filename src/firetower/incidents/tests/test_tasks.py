@@ -898,6 +898,7 @@ class TestSendActionItemReminder:
             "status": ActionItemStatus.TODO,
             "priority": 1,
             "url": f"https://linear.app/team/issue/{title}",
+            "created_at": incident.created_at,
         }
         defaults.update(kwargs)
         return ActionItem.objects.create(incident=incident, **defaults)
@@ -954,7 +955,7 @@ class TestSendActionItemReminder:
 
         mock_linear.update_issue.assert_called_once_with(
             action_item.linear_issue_id,
-            sla_breaches_at=(incident.created_at + timedelta(days=14)).isoformat(),
+            sla_breaches_at=(action_item.created_at + timedelta(days=14)).isoformat(),
             sla_type="all",
         )
         mock_linear.create_comment.assert_called_once_with(
@@ -981,7 +982,7 @@ class TestSendActionItemReminder:
 
         mock_linear.update_issue.assert_called_once_with(
             action_item.linear_issue_id,
-            sla_breaches_at=(incident.created_at + timedelta(days=30)).isoformat(),
+            sla_breaches_at=(action_item.created_at + timedelta(days=30)).isoformat(),
             sla_type="all",
         )
         mock_linear.create_comment.assert_called_once_with(
@@ -997,6 +998,19 @@ class TestSendActionItemReminder:
         mock_linear.create_comment.assert_called_once_with(
             action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
+
+    def test_uses_action_item_age_instead_of_incident_age(self, mock_linear):
+        incident = self._make_incident(days_old=45)
+        self._make_action_item(
+            incident,
+            priority=1,
+            created_at=timezone.now() - timedelta(days=5),
+        )
+
+        send_action_item_reminder()
+
+        mock_linear.update_issue.assert_not_called()
+        mock_linear.create_comment.assert_not_called()
 
     def test_skips_medium_priority_under_twenty_one_days(self, mock_linear):
         incident = self._make_incident(days_old=10)
@@ -1112,7 +1126,8 @@ class TestSendActionItemReminder:
 
     def test_renders_template_variables(self, mock_linear):
         template = (
-            "SLO={{ slo_days }} age={{ incident_age_days }} "
+            "SLO={{ slo_days }} action_age={{ action_item_age_days }} "
+            "incident_age={{ incident_age_days }} "
             "past={{ days_past_due }} left={{ days_left }} "
             "passed={{ slo_passed }} id={{ action_item.linear_identifier }} "
             "title={{ incident.title }}"
@@ -1126,7 +1141,7 @@ class TestSendActionItemReminder:
             send_action_item_reminder()
 
         expected = (
-            f"SLO=14 age=10 past=0 left=4 passed=False "
+            f"SLO=14 action_age=10 incident_age=10 past=0 left=4 passed=False "
             f"id={action_item.linear_identifier} title=Some outage"
         )
         mock_linear.create_comment.assert_called_once_with(

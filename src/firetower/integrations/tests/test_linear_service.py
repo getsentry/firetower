@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -764,6 +764,7 @@ class TestParseIssue:
             "title": "Fix bug",
             "url": "https://linear.app/team/issue/ENG-123",
             "priority": 2,
+            "createdAt": "2026-10-16T12:30:00.000Z",
             "state": {"type": "started"},
             "assignee": {"id": "user-1", "email": "alice@sentry.io"},
         }
@@ -777,6 +778,7 @@ class TestParseIssue:
             "url": "https://linear.app/team/issue/ENG-123",
             "status": "In Progress",
             "priority": 2,
+            "created_at": datetime(2026, 10, 16, 12, 30, tzinfo=UTC),
             "assignee_email": "alice@sentry.io",
             "assignee_linear_id": "user-1",
             "relation_type": "child",

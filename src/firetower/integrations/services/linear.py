@@ -8,6 +8,7 @@ from typing import Any
 import requests
 from django.conf import settings
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from firetower.integrations.models import LinearOAuthToken
 
@@ -43,6 +44,7 @@ ISSUE_FIELDS = """
     title
     url
     priority
+    createdAt
     state {
         id
         type
@@ -394,6 +396,7 @@ class LinearService:
         state_type = (issue.get("state") or {}).get("type", "")
         status = LINEAR_STATE_TYPE_MAP.get(state_type, "Todo")
         assignee = issue.get("assignee") or {}
+        created_at = issue.get("createdAt")
         return {
             "id": issue["id"],
             "identifier": issue["identifier"],
@@ -401,6 +404,7 @@ class LinearService:
             "url": issue["url"],
             "status": status,
             "priority": issue.get("priority", 0),
+            "created_at": parse_datetime(created_at) if created_at else None,
             "assignee_email": assignee.get("email"),
             "assignee_linear_id": assignee.get("id"),
             "relation_type": relation_type,

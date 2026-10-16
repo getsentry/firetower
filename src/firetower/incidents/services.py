@@ -295,12 +295,14 @@ def sync_action_items_from_linear(
         "relation_type",
         "assignee",
         "url",
+        "created_at",
         "updated_at",
     ]
 
     for issue in all_issues.values():
         seen_linear_ids.add(issue["id"])
         assignee = assignee_map.get(issue.get("assignee_email", ""))
+        created_at = issue.get("created_at")
 
         if issue["id"] in existing:
             ai = existing[issue["id"]]
@@ -311,6 +313,8 @@ def sync_action_items_from_linear(
             ai.relation_type = issue["relation_type"]
             ai.assignee = assignee
             ai.url = issue["url"]
+            if created_at is not None:
+                ai.created_at = created_at
             ai.updated_at = timezone.now()
             to_update.append(ai)
         else:
@@ -325,6 +329,7 @@ def sync_action_items_from_linear(
                     relation_type=issue["relation_type"],
                     assignee=assignee,
                     url=issue["url"],
+                    created_at=created_at or timezone.now(),
                 )
             )
 
