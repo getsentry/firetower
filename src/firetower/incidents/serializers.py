@@ -823,7 +823,7 @@ class ActionItemSerializer(serializers.ModelSerializer):
         slo_days = _get_action_item_slo_days().get(obj.priority)
         if not slo_days:
             return None
-        deadline = obj.incident.created_at + timedelta(days=slo_days)
+        deadline = obj.created_at + timedelta(days=slo_days)
         return deadline.isoformat()
 
 

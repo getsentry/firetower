@@ -97,7 +97,7 @@ adopt_on_create = false
 # default LinearService budget so a hung Linear can't hold the lock too long.
 alloc_timeout_seconds = 8
 alloc_max_retries = 1
-# SLO deadlines (days from incident creation) for action items by priority tier.
+# SLO deadlines (days from action item creation) for action items by priority tier.
 # High priority covers Linear priorities 1 (Urgent) and 2 (High).
 # Medium priority covers Linear priority 3 (Medium).
 # Priority 4 (Low) and 0 (No priority) have no SLO.

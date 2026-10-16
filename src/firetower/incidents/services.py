@@ -14,8 +14,10 @@ from firetower.auth.services import (
 )
 from firetower.incidents.models import (
     ActionItem,
+    ActionItemStatus,
     ExternalLinkType,
     Incident,
+    IncidentSeverity,
     IncidentStatus,
 )
 from firetower.integrations.services import LinearService, SlackService
@@ -145,6 +147,42 @@ class ActionItemsSyncStats:
     deleted: int = 0
     errors: list[str] = field(default_factory=list)
     skipped: bool = False
+
+
+def _get_action_item_slo_days(priority: int) -> int | None:
+    linear = settings.LINEAR or {}
+    if priority in (1, 2):
+        return linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 14)
+    if priority == 3:
+        return linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 30)
+    return None
+
+
+def _set_action_item_sla(linear_service: LinearService, issue: dict) -> None:
+    if issue["status"] not in (ActionItemStatus.TODO, ActionItemStatus.IN_PROGRESS):
+        return
+    if issue.get("sla_breaches_at") is not None:
+        return
+
+    created_at = issue.get("created_at")
+    slo_days = _get_action_item_slo_days(issue["priority"])
+    if created_at is None or not slo_days:
+        return
+
+    try:
+        success = linear_service.update_issue(
+            issue["id"],
+            sla_breaches_at=(created_at + timedelta(days=slo_days)).isoformat(),
+            sla_type="all",
+        )
+    except Exception:
+        logger.exception(
+            "Failed to set Linear SLA for action item %s", issue["identifier"]
+        )
+        return
+
+    if not success:
+        logger.error("Failed to set Linear SLA for action item %s", issue["identifier"])
 
 
 def _resolve_assignees(
@@ -295,12 +333,14 @@ def sync_action_items_from_linear(
         "relation_type",
         "assignee",
         "url",
+        "created_at",
         "updated_at",
     ]
 
     for issue in all_issues.values():
         seen_linear_ids.add(issue["id"])
         assignee = assignee_map.get(issue.get("assignee_email", ""))
+        created_at = issue.get("created_at")
 
         if issue["id"] in existing:
             ai = existing[issue["id"]]
@@ -311,6 +351,8 @@ def sync_action_items_from_linear(
             ai.relation_type = issue["relation_type"]
             ai.assignee = assignee
             ai.url = issue["url"]
+            if created_at is not None:
+                ai.created_at = created_at
             ai.updated_at = timezone.now()
             to_update.append(ai)
         else:
@@ -325,6 +367,7 @@ def sync_action_items_from_linear(
                     relation_type=issue["relation_type"],
                     assignee=assignee,
                     url=issue["url"],
+                    created_at=created_at or timezone.now(),
                 )
             )
 
@@ -345,6 +388,10 @@ def sync_action_items_from_linear(
 
         incident.action_items_last_synced_at = timezone.now()
         incident.save(update_fields=["action_items_last_synced_at"])
+
+    if incident.severity in (IncidentSeverity.P0, IncidentSeverity.P1):
+        for issue in all_issues.values():
+            _set_action_item_sla(linear_service, issue)
 
     logger.info(
         f"Action item sync complete for incident {incident.id}: "
