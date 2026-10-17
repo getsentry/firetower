@@ -1,10 +1,16 @@
 import json
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
 
-from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.incidents.models import (
+    ExternalLink,
+    ExternalLinkType,
+    TimelineEventSource,
+    TimelineEventType,
+)
 from firetower.slack_app.handlers.statuspage import (
     _build_statuspage_modal,
     _extract_submission_data,
@@ -431,7 +437,10 @@ class TestStatuspageSubmission:
         ) as MockService:
             instance = MockService.return_value
             instance.configured = True
-            instance.create_incident.return_value = {"id": "new_sp_123"}
+            instance.create_incident.return_value = {
+                "id": "new_sp_123",
+                "created_at": "2026-08-20T15:00:00Z",
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/new_sp_123"
             )
@@ -452,6 +461,14 @@ class TestStatuspageSubmission:
         )
         assert link.url == "https://test.statuspage.io/incidents/new_sp_123"
 
+        event = incident.timeline_events.get()
+        assert event.source == TimelineEventSource.STATUSPAGE
+        assert event.event_type == TimelineEventType.STATUSPAGE_INCIDENT_CREATED
+        assert event.payload == {"message": "Looking into it"}
+        assert event.external_id == "new_sp_123"
+        assert event.link_url == link.url
+        assert event.occurred_at == datetime(2026, 8, 20, 15, tzinfo=UTC)
+
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "created" in msg
         assert "<@U_SUBMITTER>" in msg
@@ -467,7 +484,10 @@ class TestStatuspageSubmission:
         ) as MockService:
             instance = MockService.return_value
             instance.configured = True
-            instance.create_incident.return_value = {"id": "sp_dual"}
+            instance.create_incident.return_value = {
+                "id": "sp_dual",
+                "created_at": "2026-08-20T15:00:00Z",
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/sp_dual"
             )
@@ -490,7 +510,10 @@ class TestStatuspageSubmission:
         ) as MockService:
             instance = MockService.return_value
             instance.configured = True
-            instance.create_incident.return_value = {"id": "sp_from_status"}
+            instance.create_incident.return_value = {
+                "id": "sp_from_status",
+                "created_at": "2026-08-20T15:00:00Z",
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/sp_from_status"
             )
@@ -513,7 +536,10 @@ class TestStatuspageSubmission:
         ) as MockService:
             instance = MockService.return_value
             instance.configured = True
-            instance.create_incident.return_value = {"id": "new_sp_456"}
+            instance.create_incident.return_value = {
+                "id": "new_sp_456",
+                "created_at": "2026-08-20T15:00:00Z",
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/new_sp_456"
             )
@@ -546,7 +572,16 @@ class TestStatuspageSubmission:
             instance = MockService.return_value
             instance.configured = True
             instance.extract_incident_id_from_url.return_value = "existing_sp"
-            instance.update_incident.return_value = {"id": "existing_sp"}
+            instance.update_incident.return_value = {
+                "id": "existing_sp",
+                "incident_updates": [
+                    {
+                        "id": "sp_update_123",
+                        "status": "identified",
+                        "created_at": "2026-08-20T16:00:00Z",
+                    }
+                ],
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/existing_sp"
             )
@@ -559,9 +594,53 @@ class TestStatuspageSubmission:
             message="Found the cause",
             components=None,
         )
+        event = incident.timeline_events.get()
+        assert event.source == TimelineEventSource.STATUSPAGE
+        assert event.event_type == TimelineEventType.STATUSPAGE_UPDATE_POSTED
+        assert event.payload == {
+            "message": "Found the cause",
+            "status": "identified",
+        }
+        assert event.external_id == "sp_update_123"
+        assert event.link_url == "https://test.statuspage.io/incidents/existing_sp"
+        assert event.occurred_at == datetime(2026, 8, 20, 16, tzinfo=UTC)
+
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "updated" in msg
         assert "<@U_SUBMITTER>" in msg
+
+    def test_incomplete_update_response_still_reports_success(self, incident):
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.STATUSPAGE,
+            url="https://test.statuspage.io/incidents/existing_sp",
+        )
+        ack = MagicMock()
+        body = {"user": {"id": "U_SUBMITTER"}}
+        view = self._make_view(status="monitoring", message="Monitoring")
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.extract_incident_id_from_url.return_value = "existing_sp"
+            instance.update_incident.return_value = {"incident_updates": []}
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/existing_sp"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        instance.get_incident_url.assert_called_once_with("existing_sp")
+        assert incident.timeline_events.count() == 0
+        assert client.chat_postEphemeral.call_count == 0
+        assert client.chat_postMessage.call_count == 2
+        assert all(
+            "updated the statuspage" in call.kwargs["text"]
+            for call in client.chat_postMessage.call_args_list
+        )
 
     def test_resolving_existing_statuspage_cancels_followup_reminder(self, incident):
         ExternalLink.objects.create(
@@ -588,7 +667,16 @@ class TestStatuspageSubmission:
             instance = MockService.return_value
             instance.configured = True
             instance.extract_incident_id_from_url.return_value = "existing_sp"
-            instance.update_incident.return_value = {"id": "existing_sp"}
+            instance.update_incident.return_value = {
+                "id": "existing_sp",
+                "incident_updates": [
+                    {
+                        "id": "sp_update_resolved",
+                        "status": "resolved",
+                        "created_at": "2026-08-20T17:00:00Z",
+                    }
+                ],
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/existing_sp"
             )
@@ -597,6 +685,10 @@ class TestStatuspageSubmission:
 
         mock_cancel.assert_called_once_with(incident)
         mock_schedule.assert_not_called()
+        assert incident.timeline_events.get().payload == {
+            "message": "Resolved",
+            "status": "resolved",
+        }
 
     def test_empty_message_returns_error(self, incident):
         ack = MagicMock()
@@ -653,6 +745,7 @@ class TestStatuspageSubmission:
         assert not ExternalLink.objects.filter(
             incident=incident, type=ExternalLinkType.STATUSPAGE
         ).exists()
+        assert incident.timeline_events.count() == 0
 
     def test_no_incident_for_channel(self, db):
         ack = MagicMock()

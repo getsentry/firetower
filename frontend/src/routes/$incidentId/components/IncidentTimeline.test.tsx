@@ -63,6 +63,19 @@ const events: TimelineEvent[] = [
   },
 ];
 
+const statuspageEvent: TimelineEvent = {
+  id: 3,
+  source: 'STATUSPAGE',
+  event_type: 'statuspage_incident_created',
+  occurred_at: '2026-08-20T15:05:00Z',
+  created_at: '2026-08-20T15:05:01Z',
+  actor: null,
+  summary: 'Statuspage incident posted: "Investigating"',
+  payload: {message: 'Investigating'},
+  link_url: 'https://status.example.com/incidents/123',
+  external_id: '123',
+};
+
 describe('IncidentTimeline', () => {
   beforeEach(() => {
     mockApiGet.mockReset();
@@ -117,6 +130,17 @@ describe('IncidentTimeline', () => {
         timeZoneName: 'short',
       })
     );
+  });
+
+  it('renders the branded Statuspage icon for Statuspage events', async () => {
+    mockApiGet.mockResolvedValue([statuspageEvent]);
+
+    const {container} = renderTimeline();
+
+    expect(await screen.findByText(statuspageEvent.summary)).toBeInTheDocument();
+    const icon = container.querySelector('img[src="/statuspage.svg"]');
+    expect(icon).toBeInTheDocument();
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('renders an optional external source link safely', async () => {
