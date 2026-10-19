@@ -1,7 +1,9 @@
 import pytest
 
 from firetower_sdk.utils import (
+    DEFAULT_BASE_URL,
     FIRETOWER_ID_CUTOFF,
+    get_base_url,
     get_firetower_url,
     is_firetower_incident_id,
 )
@@ -36,6 +38,24 @@ class TestIsFiretowerIncidentId:
 
     def test_cutoff_value(self):
         assert FIRETOWER_ID_CUTOFF == 2000
+
+
+class TestGetBaseUrl:
+    def test_absent_url_uses_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("FIRETOWER_URL", raising=False)
+
+        assert get_base_url() == DEFAULT_BASE_URL
+
+    @pytest.mark.parametrize("value", ["", " \t "])
+    def test_blank_url_uses_default(self, monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+        monkeypatch.setenv("FIRETOWER_URL", value)
+
+        assert get_base_url() == DEFAULT_BASE_URL
+
+    def test_custom_url_is_trimmed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FIRETOWER_URL", "  https://firetower.example.com  ")
+
+        assert get_base_url() == "https://firetower.example.com"
 
 
 class TestGetFiretowerUrl:

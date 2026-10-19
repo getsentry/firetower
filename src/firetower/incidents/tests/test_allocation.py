@@ -486,7 +486,7 @@ class TestPopulateLinearParent:
     ):
         incident = self._incident(settings)
         linear = mock_get_linear.return_value
-        linear.get_workflow_states.return_value = {"started": "state-started"}
+        linear.get_workflow_states.return_value = {"in_progress": "state-in-progress"}
         linear.update_issue.return_value = True
 
         populate_linear_parent(
@@ -495,7 +495,7 @@ class TestPopulateLinearParent:
 
         linear.get_issue.assert_not_called()
         assert linear.update_issue.call_args[0][0] == "uuid-verified"
-        assert linear.update_issue.call_args[1]["state_id"] == "state-started"
+        assert linear.update_issue.call_args[1]["state_id"] == "state-in-progress"
         linear.create_attachment.assert_called_once()
         assert linear.create_attachment.call_args[0][0] == "uuid-verified"
         mock_slack.add_bookmark.assert_called_once_with(

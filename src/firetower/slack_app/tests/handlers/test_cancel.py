@@ -81,6 +81,7 @@ class TestCancelSubmission:
         ack.assert_called_once()
         incident.refresh_from_db()
         assert incident.status == IncidentStatus.CANCELED
+        assert incident.timeline_events.get().actor == incident.captain
         client.chat_postMessage.assert_called_once()
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "Canceled" in msg

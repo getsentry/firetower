@@ -8,7 +8,7 @@ DEFAULT_BASE_URL = "https://firetower.getsentry.net"
 
 def get_base_url() -> str:
     """Get the Firetower base URL from environment variable or default."""
-    return os.environ.get("FIRETOWER_URL", DEFAULT_BASE_URL)
+    return (os.environ.get("FIRETOWER_URL") or "").strip() or DEFAULT_BASE_URL
 
 
 def is_firetower_incident_id(incident_id: str | int) -> bool:

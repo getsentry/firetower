@@ -23,6 +23,7 @@ LINEAR_STATE_TYPE_MAP = {
     "started": "In Progress",
     "completed": "Done",
     "canceled": "Canceled",
+    "duplicate": "Canceled",
 }
 
 TOKEN_LIFETIME = timedelta(days=30)
@@ -43,6 +44,7 @@ ISSUE_FIELDS = """
     url
     priority
     state {
+        id
         type
     }
     assignee {
@@ -437,6 +439,7 @@ class LinearService:
             "identifier": issue["identifier"],
             "title": issue["title"],
             "url": issue["url"],
+            "state_id": (issue.get("state") or {}).get("id", ""),
             "state_type": (issue.get("state") or {}).get("type", ""),
         }
 
@@ -467,6 +470,7 @@ class LinearService:
         project_id: str | None = None,
         state_id: str | None = None,
         assignee_id: str | None = None,
+        priority: int | None = None,
     ) -> dict[str, Any] | None:
         mutation = """
         mutation($input: IssueCreateInput!) {
@@ -491,6 +495,8 @@ class LinearService:
             input_data["stateId"] = state_id
         if assignee_id:
             input_data["assigneeId"] = assignee_id
+        if priority is not None:
+            input_data["priority"] = priority
 
         data = self._graphql(mutation, {"input": input_data}, retryable=False)
         if not data:
@@ -555,6 +561,7 @@ class LinearService:
         description: str | None = None,
         state_id: str | None = None,
         assignee_id: str | None = None,
+        priority: int | None = None,
     ) -> bool:
         mutation = """
         mutation($id: String!, $input: IssueUpdateInput!) {
@@ -572,6 +579,8 @@ class LinearService:
             input_data["stateId"] = state_id
         if assignee_id is not None:
             input_data["assigneeId"] = assignee_id
+        if priority is not None:
+            input_data["priority"] = priority
 
         if not input_data:
             return True
@@ -614,6 +623,10 @@ class LinearService:
             state_type = node.get("type", "")
             if state_type not in states:
                 states[state_type] = node["id"]
+
+            state_name = node.get("name", "").lower().replace(" ", "_")
+            if state_name and state_name not in states:
+                states[state_name] = node["id"]
 
         self._workflow_states_cache = states
         return states

@@ -322,80 +322,22 @@ class TestSyncActionItemsFromLinear:
             assert stats.created == 1
             assert incident.action_items.count() == 1
 
-    def test_auto_completes_parent_when_all_done(self, settings):
+    def test_syncing_action_items_does_not_change_parent_status(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
         incident = self._make_incident(status=IncidentStatus.DONE)
-
         children = [
             _make_linear_issue(
-                id="id-1", identifier="ENG-1", title="T1", status="Done"
-            ),
-            _make_linear_issue(
-                id="id-2", identifier="ENG-2", title="T2", status="Canceled"
-            ),
+                id="id-1", identifier="ENG-1", title="T1", status="In Progress"
+            )
         ]
 
         with patch("firetower.incidents.services._get_linear_service") as mock_get:
             mock_service = mock_get.return_value
             mock_service.get_child_issues.return_value = children
-            mock_service.get_workflow_states.return_value = {
-                "completed": "state-done",
-                "backlog": "state-backlog",
-            }
-            mock_service.update_issue.return_value = True
 
             sync_action_items_from_linear(incident, force=True)
 
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", state_id="state-done"
-            )
-
-    def test_sets_parent_to_started_when_incomplete_items(self, settings):
-        settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident(status=IncidentStatus.DONE)
-
-        children = [
-            _make_linear_issue(
-                id="id-1", identifier="ENG-1", title="T1", status="Done"
-            ),
-            _make_linear_issue(
-                id="id-2", identifier="ENG-2", title="T2", status="In Progress"
-            ),
-        ]
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_service = mock_get.return_value
-            mock_service.get_child_issues.return_value = children
-            mock_service.get_workflow_states.return_value = {
-                "completed": "state-done",
-                "started": "state-started",
-            }
-            mock_service.update_issue.return_value = True
-
-            sync_action_items_from_linear(incident, force=True)
-
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", state_id="state-started"
-            )
-
-    def test_completes_parent_when_no_action_items(self, settings):
-        settings.LINEAR = {"TEAM_ID": "team-1"}
-        incident = self._make_incident(status=IncidentStatus.DONE)
-
-        with patch("firetower.incidents.services._get_linear_service") as mock_get:
-            mock_service = mock_get.return_value
-            mock_service.get_child_issues.return_value = []
-            mock_service.get_workflow_states.return_value = {
-                "completed": "state-done",
-                "backlog": "state-backlog",
-            }
-            mock_service.update_issue.return_value = True
-
-            sync_action_items_from_linear(incident, force=True)
-
-            mock_service.update_issue.assert_any_call(
-                "parent-issue-id", state_id="state-done"
-            )
+            mock_service.update_issue.assert_not_called()
 
     def test_does_not_push_parent_assignee_on_sync(self, settings):
         settings.LINEAR = {"TEAM_ID": "team-1"}
@@ -481,6 +423,28 @@ class TestLinearService:
             input_data = call_args[0][1]["input"]
             assert input_data["projectId"] == "project-1"
 
+    def test_create_issue_with_priority(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "test-id",
+                "CLIENT_SECRET": "test-secret",
+            }
+            service = LinearService()
+
+        with patch.object(
+            service,
+            "_graphql",
+            return_value={
+                "issueCreate": {
+                    "success": True,
+                    "issue": {"id": "id", "identifier": "E-1", "url": "url"},
+                }
+            },
+        ) as mock_gql:
+            service.create_issue("Title", "Desc", "team-1", priority=1)
+
+        assert mock_gql.call_args[0][1]["input"]["priority"] == 1
+
     def test_create_issue_failure(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
             mock_settings.LINEAR = {
@@ -516,6 +480,14 @@ class TestLinearService:
                             "state": {"type": "completed"},
                             "assignee": {"id": "user-1", "email": "dev@example.com"},
                         },
+                        {
+                            "id": "id-3",
+                            "identifier": "ENG-3",
+                            "title": "Duplicate task",
+                            "url": "https://linear.app/t/ENG-3",
+                            "state": {"type": "duplicate"},
+                            "assignee": None,
+                        },
                     ],
                     "pageInfo": {"hasNextPage": False, "endCursor": None},
                 }
@@ -533,11 +505,12 @@ class TestLinearService:
             issues = service.get_child_issues("parent-id")
 
             assert issues is not None
-            assert len(issues) == 2
+            assert len(issues) == 3
             assert issues[0]["status"] == "In Progress"
             assert issues[0]["relation_type"] == "child"
             assert issues[1]["status"] == "Done"
             assert issues[1]["assignee_email"] == "dev@example.com"
+            assert issues[2]["status"] == "Canceled"
 
     def test_update_issue(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
@@ -556,6 +529,22 @@ class TestLinearService:
             call_args = mock_gql.call_args
             assert call_args[0][1]["input"]["title"] == "New title"
 
+    def test_update_issue_with_no_priority(self):
+        with patch("firetower.integrations.services.linear.settings") as mock_settings:
+            mock_settings.LINEAR = {
+                "CLIENT_ID": "test-id",
+                "CLIENT_SECRET": "test-secret",
+            }
+            service = LinearService()
+
+        with patch.object(
+            service, "_graphql", return_value={"issueUpdate": {"success": True}}
+        ) as mock_gql:
+            result = service.update_issue("issue-id", priority=0)
+
+        assert result is True
+        assert mock_gql.call_args[0][1]["input"]["priority"] == 0
+
     def test_get_workflow_states_caches(self):
         with patch("firetower.integrations.services.linear.settings") as mock_settings:
             mock_settings.LINEAR = {
@@ -573,6 +562,7 @@ class TestLinearService:
                         {"id": "s3", "name": "In Progress", "type": "started"},
                         {"id": "s4", "name": "Done", "type": "completed"},
                         {"id": "s5", "name": "Canceled", "type": "canceled"},
+                        {"id": "s6", "name": "In Review", "type": "started"},
                     ]
                 }
             }
@@ -582,6 +572,9 @@ class TestLinearService:
             states = service.get_workflow_states("team-1")
             assert states["completed"] == "s4"
             assert states["backlog"] == "s1"
+            assert states["in_progress"] == "s3"
+            assert states["in_review"] == "s6"
+            assert states["done"] == "s4"
 
             states2 = service.get_workflow_states("team-1")
             assert states2 is states
@@ -879,6 +872,7 @@ class TestCreateLinearParentIssuePrivacy:
 
         call_args = mock_service.update_issue.call_args
         assert call_args[1]["title"] == "Private Incident"
+        assert call_args[1]["priority"] == 2
 
 
 @pytest.mark.django_db
@@ -979,6 +973,45 @@ class TestActionItemViews:
         assert response.data[0]["linear_identifier"] == "ENG-1"
         assert response.data[0]["title"] == "Task 1"
         assert response.data[0]["relation_type"] == "child"
+        assert response.data[0]["slo_deadline"] is None
+
+    def test_service_api_returns_all_action_items_in_display_order(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-unranked",
+            linear_identifier="ENG-2",
+            title="Unranked task",
+            status=ActionItemStatus.TODO,
+            priority=0,
+            url="https://linear.app/t/ENG-2",
+        )
+        ActionItem.objects.create(
+            incident=incident,
+            linear_issue_id="id-urgent",
+            linear_identifier="ENG-1",
+            title="Urgent task",
+            status=ActionItemStatus.IN_PROGRESS,
+            priority=1,
+            url="https://linear.app/t/ENG-1",
+        )
+
+        with patch("firetower.incidents.views.sync_action_items_from_linear"):
+            response = self.client.get(
+                f"/api/incidents/{incident.incident_number}/action-items/"
+            )
+
+        assert response.status_code == 200
+        assert [item["linear_identifier"] for item in response.data] == [
+            "ENG-1",
+            "ENG-2",
+        ]
+        assert response.data[0]["title"] == "Urgent task"
+        assert response.data[0]["status"] == ActionItemStatus.IN_PROGRESS
         assert response.data[0]["slo_deadline"] is None
 
     def test_list_action_items_includes_slo_deadline(self):
@@ -1136,6 +1169,25 @@ class TestActionItemViews:
 
         response = self.client.get(
             f"/api/ui/incidents/{incident.incident_number}/action-items/"
+        )
+
+        assert response.status_code == 404
+
+    def test_service_api_action_items_respects_privacy(self):
+        other_user = User.objects.create_user(
+            username="other-service@example.com",
+            email="other-service@example.com",
+        )
+        incident = Incident.objects.create(
+            title="Private Incident",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=other_user,
+        )
+
+        response = self.client.get(
+            f"/api/incidents/{incident.incident_number}/action-items/"
         )
 
         assert response.status_code == 404

@@ -106,6 +106,9 @@ ALLOWED_HOSTS = [
     "::1",
     "firetower.getsentry.net",
     "test.firetower.getsentry.net",
+    # Firetower's stable Cloud Run URLs, used by the MCP services over private DNS.
+    "firetower-srjzwe3tcq-uw.a.run.app",
+    "firetower-test-srjzwe3tcq-uw.a.run.app",
     "firetower",
     "backend",  # name from the nginx proxy_pass
 ]
@@ -349,8 +352,6 @@ LINEAR: dict | None = (
         "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": config.linear.action_item_slo_days_medium_priority,
         "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": config.linear.action_item_nag_comment_high_priority,
         "ACTION_ITEM_NAG_COMMENT_MEDIUM_PRIORITY": config.linear.action_item_nag_comment_medium_priority,
-        "PARENT_STATUS_COMMENT_COMPLETED": config.linear.parent_status_comment_completed,
-        "PARENT_STATUS_COMMENT_STARTED": config.linear.parent_status_comment_started,
     }
     if config.linear
     else None

@@ -19,6 +19,10 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
 )
+from firetower.incidents.services import (
+    get_linear_parent_issue_state_id,
+    sync_linear_parent_issue_status,
+)
 from firetower.integrations.services import (
     DatadogService,
     LinearService,
@@ -41,6 +45,13 @@ def _get_linear_service() -> LinearService:
 
 
 HIGH_SEVERITIES = {IncidentSeverity.P0, IncidentSeverity.P1}
+LINEAR_PRIORITY_BY_SEVERITY: dict[str, int] = {
+    IncidentSeverity.P0: 1,
+    IncidentSeverity.P1: 2,
+    IncidentSeverity.P2: 3,
+    IncidentSeverity.P3: 4,
+    IncidentSeverity.P4: 0,
+}
 ACTIVE_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
 # Statuses that mean the incident has been responded to/mitigated, at which
 # point any PagerDuty pages Firetower triggered should be auto-resolved.
@@ -1016,20 +1027,24 @@ def decorate_incident_channel(
     feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
     if feed_channel_id and not ctx.is_private:
         try:
+            feed_message = f"A {ctx.severity} incident has been created"
+            if ctx.reporter_slack_id:
+                feed_message = f"{feed_message} by <@{ctx.reporter_slack_id}>"
+
             if ctx.incident_url and ctx.incident_number:
-                feed_message = (
-                    f"A {ctx.severity} incident has been created.\n"
+                title = (
                     f"<{ctx.incident_url}|{ctx.incident_number} "
                     f"{escape_slack_text(ctx.title)}>"
-                    f"\n\nFor those involved, please join <#{ctx.channel_id}>"
                 )
             else:
-                feed_message = (
-                    f"A {ctx.severity} incident has been created "
-                    "(degraded mode).\n"
-                    f"{escape_slack_text(ctx.title)}"
-                    f"\n\nFor those involved, please join <#{ctx.channel_id}>"
-                )
+                feed_message = f"{feed_message} (degraded mode)"
+                title = escape_slack_text(ctx.title)
+
+            feed_message = (
+                f"{feed_message}.\n"
+                f"{title}"
+                f"\n\nFor those involved, please join <#{ctx.channel_id}>"
+            )
             slack_service.post_message(feed_channel_id, feed_message)
         except Exception:
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
@@ -1099,14 +1114,26 @@ def _sync_linear_assignee(incident: Incident) -> None:
         )
 
 
+def _sync_linear_priority(incident: Incident) -> None:
+    if not settings.LINEAR or not incident.linear_parent_issue_id:
+        return
+    try:
+        _get_linear_service().update_issue(
+            incident.linear_parent_issue_id,
+            priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
+        )
+    except Exception:
+        logger.exception(
+            f"Failed to update Linear issue priority for incident {incident.id}"
+        )
+
+
 LINEAR_PARENT_DESCRIPTION = (
     "Add action items as sub-issues (child issues) of this ticket to have "
     "them tracked by Firetower. "
-    "Do not update title, status or captain here, use Firetower for that.\n\n"
-    "Firetower will mark this ticket as completed once the incident is "
-    "resolved and all action items are done. "
-    "Firetower will reopen this ticket if the incident is reopened, or if "
-    "there are still unfinished action items. "
+    "Do not update title, status or captain here; use Firetower for those.\n\n"
+    "This ticket's status mirrors the associated Firetower incident and is "
+    "independent of its action items. "
     "If you have questions, please reach out to #team-sre."
 )
 
@@ -1159,19 +1186,18 @@ def populate_linear_parent(
     if not linear_config or not uuid:
         return
 
-    team_id = str(linear_config.get("TEAM_ID", ""))
     linear_service = _get_linear_service()
 
     try:
-        states = linear_service.get_workflow_states(team_id) if team_id else None
-        started_state_id = states.get("started") if states else None
+        state_id = get_linear_parent_issue_state_id(incident, linear_service)
         captain_linear_id = _resolve_linear_user_id(incident.captain, linear_service)
         linear_service.update_issue(
             uuid,
             title=_linear_issue_title(incident, sync_identifiers=True),
             description=LINEAR_PARENT_DESCRIPTION,
-            state_id=started_state_id,
+            state_id=state_id,
             assignee_id=captain_linear_id,
+            priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
         )
     except Exception:
         logger.exception(
@@ -1262,14 +1288,14 @@ def create_linear_parent_issue(
                 )
                 return
 
-            states = linear_service.get_workflow_states(team_id)
-            started_state_id = states.get("started") if states else None
+            state_id = get_linear_parent_issue_state_id(incident, linear_service)
             if not linear_service.update_issue(
                 issue["id"],
                 title=title,
                 description=LINEAR_PARENT_DESCRIPTION,
-                state_id=started_state_id,
+                state_id=state_id,
                 assignee_id=captain_linear_id,
+                priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
             ):
                 linear_link.delete()
                 logger.warning(
@@ -1277,12 +1303,15 @@ def create_linear_parent_issue(
                 )
                 return
         else:
+            state_id = get_linear_parent_issue_state_id(incident, linear_service)
             issue = linear_service.create_issue(
                 title,
                 LINEAR_PARENT_DESCRIPTION,
                 team_id,
                 project_id,
+                state_id=state_id,
                 assignee_id=captain_linear_id,
+                priority=LINEAR_PRIORITY_BY_SEVERITY[incident.severity],
             )
             if not issue:
                 linear_link.delete()
@@ -1565,6 +1594,8 @@ def on_severity_changed(incident: Incident, old_severity: str) -> None:
     except Exception:
         logger.exception(f"Error in on_severity_changed for incident {incident.id}")
 
+    _sync_linear_priority(incident)
+
     if (
         old_severity not in HIGH_SEVERITIES
         and incident.severity in HIGH_SEVERITIES
@@ -1628,17 +1659,40 @@ def on_title_changed(incident: Incident) -> None:
     _sync_linear_title(incident)
 
 
+def _is_incidents_own_channel(incident: Incident, channel_id: str) -> bool:
+    """Verify channel_id actually names this incident's own channel before
+    allowing an admin-privileged action on it. Incident external links are
+    caller-editable, so this guards against a spoofed link pointing an admin
+    API call at an arbitrary workspace channel."""
+    channel_info = _slack_service.get_channel_info(channel_id)
+    if not channel_info:
+        return False
+    return channel_info.get("name") == build_channel_name(incident)
+
+
 def on_visibility_changed(incident: Incident) -> None:
     try:
         channel_id = _get_channel_id(incident)
         if channel_id:
             visibility = "private" if incident.is_private else "public"
             incident_url = _build_incident_url(incident)
-            message = (
-                f"This incident has been marked as *{visibility}* in Firetower. "
-                f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
-                f"<{incident_url}|View in Firetower>"
+            converted = _is_incidents_own_channel(
+                incident, channel_id
+            ) and _slack_service.convert_channel_privacy(
+                channel_id, incident.is_private
             )
+            if converted:
+                message = (
+                    f"This incident has been marked as *{visibility}* in Firetower, "
+                    f"and this channel has been converted to {visibility}.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
+            else:
+                message = (
+                    f"This incident has been marked as *{visibility}* in Firetower. "
+                    f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
             _slack_service.post_message(channel_id, message)
     except Exception:
         logger.exception(f"Error in on_visibility_changed for incident {incident.id}")
@@ -1759,11 +1813,23 @@ def on_incident_updated(
         try:
             visibility = "private" if incident.is_private else "public"
             incident_url = _build_incident_url(incident)
-            vis_message = (
-                f"This incident has been marked as *{visibility}* in Firetower. "
-                f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
-                f"<{incident_url}|View in Firetower>"
+            converted = _is_incidents_own_channel(
+                incident, channel_id
+            ) and _slack_service.convert_channel_privacy(
+                channel_id, incident.is_private
             )
+            if converted:
+                vis_message = (
+                    f"This incident has been marked as *{visibility}* in Firetower, "
+                    f"and this channel has been converted to {visibility}.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
+            else:
+                vis_message = (
+                    f"This incident has been marked as *{visibility}* in Firetower. "
+                    f"If you want to make this channel {visibility}, you will need a Slack admin to make the change.\n"
+                    f"<{incident_url}|View in Firetower>"
+                )
             _slack_service.post_message(channel_id, vis_message)
         except Exception:
             logger.exception(
@@ -1771,6 +1837,15 @@ def on_incident_updated(
             )
 
     # --- Side effects ---
+
+    # Status change: mirror the lifecycle state to the Linear parent ticket.
+    if old_status is not None:
+        try:
+            sync_linear_parent_issue_status(incident)
+        except Exception:
+            logger.exception(
+                f"Failed to sync Linear parent status for incident {incident.id}"
+            )
 
     # Status change: trigger slack dump for resolve-like statuses
     if (
@@ -1807,6 +1882,9 @@ def on_incident_updated(
             logger.exception(
                 f"Failed to resolve pages in on_incident_updated for incident {incident.id}"
             )
+
+    if old_severity is not None:
+        _sync_linear_priority(incident)
 
     # Severity escalation: page, invite oncall, create status channel, schedule reminders
     if (

@@ -9,6 +9,7 @@ import sentry_sdk
 from datadog import statsd
 from django.conf import settings
 from django.db import transaction
+from slack_sdk.errors import SlackApiError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
@@ -29,17 +30,27 @@ _PRIVATE_INCIDENT_PM_MESSAGE = (
 )
 
 
+def _is_archived_channel_error(exc: Exception) -> bool:
+    return isinstance(exc, SlackApiError) and exc.response.get("error") == "is_archived"
+
+
 def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
     if incident.is_private:
         try:
             client.chat_postMessage(
                 channel=channel_id, text=_PRIVATE_INCIDENT_PM_MESSAGE
             )
-        except Exception:
-            logger.exception(
-                "Failed to post private incident PM message to channel %s",
-                channel_id,
-            )
+        except Exception as exc:
+            if _is_archived_channel_error(exc):
+                logger.info(
+                    "Channel %s is archived, skipping private incident message",
+                    channel_id,
+                )
+            else:
+                logger.exception(
+                    "Failed to post private incident PM message to channel %s",
+                    channel_id,
+                )
         return
 
     notion = NotionService.from_settings()
@@ -72,11 +83,17 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                         channel=channel_id,
                         text="Could not parse existing Notion page ID from stored URL.",
                     )
-                except Exception:
-                    logger.exception(
-                        "Failed to post Notion page ID error to channel %s",
-                        channel_id,
-                    )
+                except Exception as exc:
+                    if _is_archived_channel_error(exc):
+                        logger.info(
+                            "Channel %s is archived, skipping Notion page ID error message",
+                            channel_id,
+                        )
+                    else:
+                        logger.exception(
+                            "Failed to post Notion page ID error to channel %s",
+                            channel_id,
+                        )
                 return
             page_url = existing_url
             update_slack = True
@@ -121,10 +138,16 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                 channel=channel_id,
                 text="Failed to create Notion postmortem page. Please try again.",
             )
-        except Exception:
-            logger.exception(
-                "Failed to post Notion creation error to channel %s", channel_id
-            )
+        except Exception as exc:
+            if _is_archived_channel_error(exc):
+                logger.info(
+                    "Channel %s is archived, skipping Notion creation error message",
+                    channel_id,
+                )
+            else:
+                logger.exception(
+                    "Failed to post Notion creation error to channel %s", channel_id
+                )
         return
 
     action = "Created" if notion_page_created else "Updated"
@@ -143,10 +166,16 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
                 channel=channel_id,
                 text=f"Postmortem doc {action.lower()} but content dump failed. Check: {page_url}",
             )
-        except Exception:
-            logger.exception(
-                "Failed to post template failure message to channel %s", channel_id
-            )
+        except Exception as exc:
+            if _is_archived_channel_error(exc):
+                logger.info(
+                    "Channel %s is archived, skipping template failure message",
+                    channel_id,
+                )
+            else:
+                logger.exception(
+                    "Failed to post template failure message to channel %s", channel_id
+                )
         return
 
     try:
@@ -171,12 +200,19 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         client.chat_postMessage(
             channel=channel_id, text=f"{action} postmortem doc: {page_url}"
         )
-    except Exception:
-        logger.exception(
-            "Failed to post completion message to channel %s for page %s",
-            channel_id,
-            page_url,
-        )
+    except Exception as exc:
+        if _is_archived_channel_error(exc):
+            logger.info(
+                "Channel %s is archived, skipping completion message for page %s",
+                channel_id,
+                page_url,
+            )
+        else:
+            logger.exception(
+                "Failed to post completion message to channel %s for page %s",
+                channel_id,
+                page_url,
+            )
 
 
 def _backfill_milestones(incident: Any, timeline_md: str) -> None:

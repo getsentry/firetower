@@ -1,7 +1,8 @@
-import {useEffect, useRef, useState} from 'react';
+import {createContext, useContext, useEffect, useRef, useState} from 'react';
 import {useSuspenseInfiniteQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
+import {Button} from 'components/Button';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {Spinner} from 'components/Spinner';
@@ -9,12 +10,18 @@ import {arraysEqual} from 'utils/arrays';
 import {z} from 'zod';
 
 import {FilterPanel, FilterTrigger} from './components/AdvancedFilters';
+import {CreateIncidentDialog} from './components/CreateIncidentDialog';
 import {IncidentCard} from './components/IncidentCard';
 import {IncidentListSkeleton} from './components/IncidentListSkeleton';
 import {StatusFilter} from './components/StatusFilter';
 import {useActiveFilters} from './components/useActiveFilters';
 import {incidentsQueryOptions} from './queries/incidentsQueryOptions';
 import {STATUS_FILTER_GROUPS} from './types';
+
+const CreateDialogContext = createContext<{
+  showCreateDialog: boolean;
+  setShowCreateDialog: (open: boolean) => void;
+}>({showCreateDialog: false, setShowCreateDialog: () => {}});
 
 const stringArrayPreprocess = z
   .preprocess(val => {
@@ -40,19 +47,47 @@ const incidentListSearchSchema = z.object({
   created_before: z.string().optional(),
 });
 
-function IncidentsLayout({children}: {children: React.ReactNode}) {
+function IncidentsLayout({
+  children,
+  showCreateButton = true,
+}: {
+  children: React.ReactNode;
+  showCreateButton?: boolean;
+}) {
   const {activeCount} = useActiveFilters();
   const [open, setOpen] = useState(activeCount > 0);
+  const {setShowCreateDialog} = useContext(CreateDialogContext);
 
   return (
     <div className="gap-space-lg flex flex-col">
       <div className="flex items-center justify-between">
         <StatusFilter />
-        <FilterTrigger open={open} onToggle={() => setOpen(prev => !prev)} />
+        <div className="gap-space-sm flex items-center">
+          {showCreateButton ? (
+            <Button variant="primary" size="sm" onClick={() => setShowCreateDialog(true)}>
+              Create Incident
+            </Button>
+          ) : null}
+          <FilterTrigger open={open} onToggle={() => setOpen(prev => !prev)} />
+        </div>
       </div>
       {open ? <FilterPanel /> : null}
       {children}
     </div>
+  );
+}
+
+function IncidentsPageWrapper({children}: {children: React.ReactNode}) {
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  return (
+    <CreateDialogContext.Provider value={{showCreateDialog, setShowCreateDialog}}>
+      {children}
+      <CreateIncidentDialog
+        isOpen={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+      />
+    </CreateDialogContext.Provider>
   );
 }
 
@@ -69,12 +104,12 @@ export const Route = createFileRoute('/')({
     await context.queryClient.prefetchInfiniteQuery(options);
   },
   pendingComponent: () => (
-    <IncidentsLayout>
+    <IncidentsLayout showCreateButton={false}>
       <IncidentListSkeleton />
     </IncidentsLayout>
   ),
   errorComponent: () => (
-    <IncidentsLayout>
+    <IncidentsLayout showCreateButton={false}>
       <ErrorState
         title="Something went wrong fetching incidents"
         description={
@@ -150,25 +185,27 @@ function Index() {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return (
-    <IncidentsLayout>
-      {incidents.length === 0 ? (
-        <IncidentsEmptyState status={params.status} />
-      ) : (
-        <>
-          <ul className="gap-space-lg flex list-none flex-col">
-            {incidents.map(incident => (
-              <li key={incident.id}>
-                <IncidentCard incident={incident} />
-              </li>
-            ))}
-          </ul>
+    <IncidentsPageWrapper>
+      <IncidentsLayout>
+        {incidents.length === 0 ? (
+          <IncidentsEmptyState status={params.status} />
+        ) : (
+          <>
+            <ul className="gap-space-lg flex list-none flex-col">
+              {incidents.map(incident => (
+                <li key={incident.id}>
+                  <IncidentCard incident={incident} />
+                </li>
+              ))}
+            </ul>
 
-          {/* Intersection observer target */}
-          <div ref={observerTarget} className="py-space-xl flex justify-center">
-            {isFetchingNextPage ? <Spinner size="md" /> : null}
-          </div>
-        </>
-      )}
-    </IncidentsLayout>
+            {/* Intersection observer target */}
+            <div ref={observerTarget} className="py-space-xl flex justify-center">
+              {isFetchingNextPage ? <Spinner size="md" /> : null}
+            </div>
+          </>
+        )}
+      </IncidentsLayout>
+    </IncidentsPageWrapper>
   );
 }

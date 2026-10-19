@@ -884,7 +884,7 @@ class TestGetUserByEmail:
 
 
 class TestGetIssue:
-    def test_returns_issue_with_state_type(self, linear_service):
+    def test_returns_issue_with_state_id_and_type(self, linear_service):
         mock_response = {
             "issue": {
                 "id": "issue-123",
@@ -892,7 +892,7 @@ class TestGetIssue:
                 "title": "Fix the thing",
                 "url": "https://linear.app/team/issue/LIN-42",
                 "priority": 1,
-                "state": {"type": "started"},
+                "state": {"id": "state-123", "type": "started"},
                 "assignee": {"id": "user-1", "email": "alice@example.com"},
             }
         }
@@ -905,6 +905,7 @@ class TestGetIssue:
             "identifier": "LIN-42",
             "title": "Fix the thing",
             "url": "https://linear.app/team/issue/LIN-42",
+            "state_id": "state-123",
             "state_type": "started",
         }
 
@@ -925,6 +926,7 @@ class TestGetIssue:
             result = linear_service.get_issue("issue-123")
 
         assert result is not None
+        assert result["state_id"] == ""
         assert result["state_type"] == ""
 
     def test_returns_none_on_api_failure(self, linear_service):

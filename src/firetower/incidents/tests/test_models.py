@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.utils import timezone
 
 from firetower.incidents.models import (
     ExternalLink,
@@ -13,6 +16,9 @@ from firetower.incidents.models import (
     IncidentStatus,
     Tag,
     TagType,
+    TimelineEvent,
+    TimelineEventSource,
+    TimelineEventType,
     filter_visible_to_user,
 )
 
@@ -327,6 +333,56 @@ class TestIncident:
 
 
 @pytest.mark.django_db
+class TestTimelineEvent:
+    def test_enums_and_string(self):
+        incident = Incident.objects.create(title="Test", severity=IncidentSeverity.P1)
+        event = TimelineEvent.objects.create(
+            incident=incident,
+            source=TimelineEventSource.INTERNAL,
+            event_type=TimelineEventType.INCIDENT_CREATED,
+            occurred_at=timezone.now(),
+            payload={"severity": "P1"},
+        )
+
+        assert TimelineEventSource.values == [
+            "USER",
+            "INTERNAL",
+            "STATUSPAGE",
+            "PAGERDUTY",
+        ]
+        assert len(TimelineEventType.values) == 10
+        assert str(event) == f"{incident.incident_number}: Incident created"
+
+    def test_ordering_cascade_and_actor_set_null(self):
+        actor = User.objects.create_user(username="actor@example.com")
+        incident = Incident.objects.create(title="Test", severity=IncidentSeverity.P1)
+        later = timezone.now()
+        earlier = later - timedelta(minutes=1)
+        second = TimelineEvent.objects.create(
+            incident=incident,
+            source=TimelineEventSource.INTERNAL,
+            event_type=TimelineEventType.STATUS_CHANGED,
+            occurred_at=later,
+            actor=actor,
+        )
+        first = TimelineEvent.objects.create(
+            incident=incident,
+            source=TimelineEventSource.INTERNAL,
+            event_type=TimelineEventType.INCIDENT_CREATED,
+            occurred_at=earlier,
+            actor=actor,
+        )
+
+        assert list(TimelineEvent.objects.all()) == [first, second]
+        actor.delete()
+        first.refresh_from_db()
+        assert first.actor is None
+
+        incident.delete()
+        assert TimelineEvent.objects.count() == 0
+
+
+@pytest.mark.django_db
 class TestTag:
     def test_tag_creation(self):
         """Test creating a tag"""
@@ -518,6 +574,33 @@ class TestFilterVisibleToUser:
         assert public in filtered
         assert user_private in filtered
         assert other_private not in filtered
+
+    def test_google_service_account_never_sees_private_incidents(self):
+        service_account = User.objects.create_user(
+            username="123456789@cloudbuild.gserviceaccount.com",
+            email="123456789@cloudbuild.gserviceaccount.com",
+        )
+        public = Incident.objects.create(
+            title="Public",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+        private = Incident.objects.create(
+            title="Private",
+            status=IncidentStatus.ACTIVE,
+            severity=IncidentSeverity.P1,
+            is_private=True,
+            captain=service_account,
+            reporter=service_account,
+        )
+        private.participants.add(service_account)
+
+        filtered = filter_visible_to_user(Incident.objects.all(), service_account)
+
+        assert public.is_visible_to_user(service_account)
+        assert not private.is_visible_to_user(service_account)
+        assert list(filtered) == [public]
 
     def test_participant_sees_private_incident(self):
         """Test participants can see private incidents they're involved in"""

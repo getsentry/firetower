@@ -1,9 +1,9 @@
 import logging
-from typing import Any
+from typing import Any, cast
 
 import requests
 
-from firetower_sdk.auth import JWTInterface, JwtAuth
+from firetower_sdk.auth import JwtAuth, JWTInterface
 from firetower_sdk.enums import IncidentSeverity, IncidentStatus, ServiceTier
 from firetower_sdk.exceptions import FiretowerError
 from firetower_sdk.utils import get_base_url
@@ -47,11 +47,16 @@ class FiretowerClient:
             response.raise_for_status()
             return response.json() if response.content else {}
         except requests.exceptions.HTTPError as e:
-            error_msg = f"Firetower API error ({e.response.status_code}): {e.response.text}"
+            status_code = e.response.status_code if e.response is not None else None
+            error_msg = (
+                f"Firetower API error ({status_code})"
+                if status_code is not None
+                else "Firetower API error"
+            )
             logger.error(error_msg)
-            raise FiretowerError(error_msg, status_code=e.response.status_code) from e
+            raise FiretowerError(error_msg, status_code=status_code) from e
         except requests.exceptions.RequestException as e:
-            error_msg = f"Firetower API request failed: {e}"
+            error_msg = f"Firetower API request failed ({type(e).__name__})"
             logger.error(error_msg)
             raise FiretowerError(error_msg) from e
 
@@ -94,6 +99,20 @@ class FiretowerClient:
         """Get an incident by ID."""
         return self._request("GET", f"/api/incidents/{incident_id}/")
 
+    def get_incident_action_items(self, incident_id: str) -> list[dict[str, Any]]:
+        """Get all action items for an incident."""
+        return cast(
+            list[dict[str, Any]],
+            self._request("GET", f"/api/incidents/{incident_id}/action-items/"),
+        )
+
+    def get_incident_timeline(self, incident_id: str) -> list[dict[str, Any]]:
+        """Get all timeline events for an incident in chronological order."""
+        return cast(
+            list[dict[str, Any]],
+            self._request("GET", f"/api/incidents/{incident_id}/timeline-events/"),
+        )
+
     def get_incident_status(self, incident_id: str) -> dict[str, Any]:
         """Get the status of an incident by ID.
 
@@ -115,6 +134,7 @@ class FiretowerClient:
         affected_region: list[str] | None = None,
         captain: list[str] | None = None,
         reporter: list[str] | None = None,
+        participant: list[str] | None = None,
         page: int = 1,
     ) -> dict[str, Any]:
         """List incidents with optional filtering.
@@ -135,6 +155,7 @@ class FiretowerClient:
                 Each tag name must be a separate list element, not comma-separated.
             captain: Filter by captain email addresses.
             reporter: Filter by reporter email addresses.
+            participant: Filter by participant email addresses.
             page: Page number for pagination
         """
         params: dict[str, Any] = {"page": page}
@@ -160,6 +181,8 @@ class FiretowerClient:
             params["captain"] = captain
         if reporter:
             params["reporter"] = reporter
+        if participant:
+            params["participant"] = participant
         return self._request("GET", "/api/incidents/", params=params)
 
     def update_incident(self, incident_id: str, **fields: Any) -> dict[str, Any]:

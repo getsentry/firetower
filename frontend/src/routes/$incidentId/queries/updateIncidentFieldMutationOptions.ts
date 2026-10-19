@@ -110,6 +110,11 @@ export function updateIncidentFieldMutationOptions(queryClient: QueryClient) {
         );
       }
     },
+    onSuccess: data => {
+      queryClient.invalidateQueries({
+        queryKey: ['IncidentTimeline', data.id],
+      });
+    },
     onSettled: (_data, _error, variables) => {
       queryClient.invalidateQueries({queryKey: ['IncidentDetail', variables.incidentId]});
     },

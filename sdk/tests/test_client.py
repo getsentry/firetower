@@ -73,6 +73,61 @@ class TestGetIncident:
                 client.get_incident("INC-9999")
 
             assert exc_info.value.status_code == 404
+            assert str(exc_info.value) == "Firetower API error (404)"
+            assert "Not found" not in str(exc_info.value)
+
+
+class TestGetIncidentActionItems:
+    def test_success(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            action_items = [
+                {
+                    "linear_identifier": "RELENG-123",
+                    "title": "Prevent recurrence",
+                    "status": "Todo",
+                }
+            ]
+            mock_response = MagicMock()
+            mock_response.json.return_value = action_items
+            mock_response.content = b'[{"linear_identifier": "RELENG-123"}]'
+            mock_request.return_value = mock_response
+
+            result = client.get_incident_action_items("INC-2000")
+
+            assert result == action_items
+            mock_request.assert_called_once_with(
+                method="GET",
+                url=("https://firetower.getsentry.net/api/incidents/INC-2000/action-items/"),
+                json=None,
+                params=None,
+                timeout=30,
+            )
+
+
+class TestGetIncidentTimeline:
+    def test_success(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            events = [
+                {
+                    "event_type": "incident_created",
+                    "summary": "Incident created with severity P1",
+                }
+            ]
+            mock_response = MagicMock()
+            mock_response.json.return_value = events
+            mock_response.content = b'[{"event_type": "incident_created"}]'
+            mock_request.return_value = mock_response
+
+            result = client.get_incident_timeline("INC-2000")
+
+            assert result == events
+            mock_request.assert_called_once_with(
+                method="GET",
+                url=("https://firetower.getsentry.net/api/incidents/INC-2000/timeline-events/"),
+                json=None,
+                params=None,
+                timeout=30,
+            )
 
 
 class TestCreateIncident:
@@ -242,6 +297,21 @@ class TestListIncidents:
             assert call_kwargs["params"] == {
                 "page": 1,
                 "reporter": ["reporter@example.com", "other@example.com"],
+            }
+
+    def test_with_participant_filter(self, client):
+        with patch.object(client.session, "request") as mock_request:
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"results": [], "count": 0}
+            mock_response.content = b'{"results": []}'
+            mock_request.return_value = mock_response
+
+            client.list_incidents(participant=["participant@example.com"])
+
+            call_kwargs = mock_request.call_args[1]
+            assert call_kwargs["params"] == {
+                "page": 1,
+                "participant": ["participant@example.com"],
             }
 
 
