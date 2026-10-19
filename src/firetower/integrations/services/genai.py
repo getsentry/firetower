@@ -122,17 +122,11 @@ class GenAIService:
         from openrouter.components.chatusermessage import (  # noqa: PLC0415
             ChatUserMessage,
         )
-        from openrouter.components.providerpreferences import (  # noqa: PLC0415
-            ProviderPreferences,
-        )
 
         response = self._client.chat.send(
             model=self._model,
             messages=[ChatUserMessage(role="user", content=prompt)],
             stream=False,
-            # Incident Slack content goes to a third party, so require
-            # zero-data-retention routing.
-            provider=ProviderPreferences(zdr=True),
         )
         content = (
             response.choices[0].message.content
