@@ -105,6 +105,12 @@ def _process_stale_incident(
     threshold_minutes = _get_stale_threshold_minutes(incident)
     threshold_seconds = threshold_minutes * 60
 
+    last_sent: float | None = None
+    if incident.last_stale_reminder_sent_at is not None:
+        last_sent = incident.last_stale_reminder_sent_at.timestamp()
+        if (now - last_sent) < threshold_seconds:
+            return
+
     latest_ts = slack.get_latest_channel_activity_ts(channel_id)
     if latest_ts is None:
         return
@@ -112,10 +118,8 @@ def _process_stale_incident(
     if (now - latest_ts) < threshold_seconds:
         return
 
-    if incident.last_stale_reminder_sent_at is not None:
-        last_sent = incident.last_stale_reminder_sent_at.timestamp()
-        if last_sent > latest_ts:
-            return
+    if last_sent is not None and last_sent > latest_ts:
+        return
 
     if incident.status == IncidentStatus.MITIGATED:
         template = STALE_MITIGATED_INCIDENT_REMINDER_MESSAGE

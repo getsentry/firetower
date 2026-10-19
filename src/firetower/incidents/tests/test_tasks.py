@@ -1741,6 +1741,24 @@ class TestSendStaleIncidentReminder:
 
         mock_slack.post_message.assert_called_once()
 
+    def test_skips_slack_lookup_when_reminded_within_threshold(self):
+        incident = self._make_incident(severity=IncidentSeverity.P1)
+        self._make_link(incident, ExternalLinkType.SLACK)
+        incident.last_stale_reminder_sent_at = timezone.now() - timedelta(minutes=30)
+        incident.save(update_fields=["last_stale_reminder_sent_at"])
+
+        mock_slack = MagicMock()
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        with patch(
+            "firetower.incidents.tasks.slack_activity.SlackService",
+            return_value=mock_slack,
+        ):
+            send_stale_incident_reminder()
+
+        mock_slack.get_latest_channel_activity_ts.assert_not_called()
+        mock_slack.post_message.assert_not_called()
+
     def test_does_not_record_reminder_on_post_failure(self):
         incident = self._make_incident(severity=IncidentSeverity.P1)
         self._make_link(incident, ExternalLinkType.SLACK)

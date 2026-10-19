@@ -19,7 +19,7 @@ def delete_schedule(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0023_add_meeting_recording_link_type"),
+        ("incidents", "0024_timeline_event"),
         ("django_q", "0018_task_success_index"),
     ]
 
