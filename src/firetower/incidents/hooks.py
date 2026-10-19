@@ -864,6 +864,38 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
         ).delete()
 
 
+def ping_triage_bot(ctx: ChannelSetupContext, slack_service: SlackService) -> None:
+    """Invite and mention the triage bot with the alert URL.
+
+    Callers should run this after all other channel posts so the triage bot
+    message is the last thing in the channel and easy to discover.
+    """
+    triage_bot_user_id = settings.SLACK.get("TRIAGE_BOT_USER_ID", "")
+    triage_bot_prompt = settings.SLACK.get("TRIAGE_BOT_PROMPT", "")
+    if not (
+        not ctx.is_private
+        and ctx.alert_url
+        and triage_bot_user_id
+        and triage_bot_prompt
+    ):
+        return
+
+    # Always invite the triage bot, if it's already a member this is a no op
+    try:
+        slack_service.invite_to_channel(ctx.channel_id, [triage_bot_user_id])
+    except Exception:
+        logger.exception(f"Failed to invite triage bot to {ctx.channel_name}")
+
+    try:
+        prompt = triage_bot_prompt.format_map(defaultdict(str, alert_url=ctx.alert_url))
+        slack_service.post_message(
+            ctx.channel_id,
+            f"<@{triage_bot_user_id}> {prompt}",
+        )
+    except Exception:
+        logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
+
+
 def decorate_incident_channel(
     ctx: ChannelSetupContext,
     slack_service: SlackService,
@@ -963,15 +995,6 @@ def decorate_incident_channel(
         except Exception:
             logger.exception(f"Failed to post description in {ctx.channel_name}")
 
-    triage_bot_user_id = settings.SLACK.get("TRIAGE_BOT_USER_ID", "")
-    triage_bot_prompt = settings.SLACK.get("TRIAGE_BOT_PROMPT", "")
-    should_ping_triage_bot = bool(
-        not ctx.is_private
-        and ctx.alert_url
-        and triage_bot_user_id
-        and triage_bot_prompt
-    )
-
     ids_to_invite: list[str] = []
     if ctx.captain_slack_id:
         ids_to_invite.append(ctx.captain_slack_id)
@@ -987,24 +1010,6 @@ def decorate_incident_channel(
             slack_service.invite_to_channel(ctx.channel_id, ids_to_invite)
         except Exception:
             logger.exception(f"Failed to invite users to {ctx.channel_name}")
-
-    if should_ping_triage_bot:
-        # Always invite the triage bot, if it's in ids_to_invite this is a no op
-        try:
-            slack_service.invite_to_channel(ctx.channel_id, [triage_bot_user_id])
-        except Exception:
-            logger.exception(f"Failed to invite triage bot to {ctx.channel_name}")
-
-        try:
-            prompt = triage_bot_prompt.format_map(
-                defaultdict(str, alert_url=ctx.alert_url)
-            )
-            slack_service.post_message(
-                ctx.channel_id,
-                f"<@{triage_bot_user_id}> {prompt}",
-            )
-        except Exception:
-            logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
 
     try:
         _invite_oncall_to_channel(
@@ -1528,6 +1533,8 @@ def on_incident_created(
         # appears first in the channel.
         _create_datadog_notebook(incident, channel_id)
         _create_troubleshooting_doc(incident, channel_id)
+
+        ping_triage_bot(ctx, _slack_service)
 
     try:
         create_linear_parent_issue(incident, channel_id=channel_id)

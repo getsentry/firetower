@@ -144,6 +144,20 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
         },
         {
             "type": "input",
+            "block_id": "alert_url_block",
+            "optional": True,
+            "element": {
+                "type": "url_text_input",
+                "action_id": "alert_url",
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "https://sentry.io/issues/...",
+                },
+            },
+            "label": {"type": "plain_text", "text": "Alert URL"},
+        },
+        {
+            "type": "input",
             "block_id": "impact_summary_block",
             "optional": True,
             "element": {
@@ -171,20 +185,6 @@ def build_incident_form_blocks(user_id: str = "") -> list[dict[str, Any]]:
                 },
             },
             "label": {"type": "plain_text", "text": "Description"},
-        },
-        {
-            "type": "input",
-            "block_id": "alert_url_block",
-            "optional": True,
-            "element": {
-                "type": "url_text_input",
-                "action_id": "alert_url",
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "https://sentry.io/issues/...",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Alert URL"},
         },
     ]
 

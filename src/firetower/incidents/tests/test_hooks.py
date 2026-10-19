@@ -384,6 +384,30 @@ class TestOnIncidentCreated:
         assert "help triage this incident" in triage_calls[0][0][1]
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_triage_bot_message_is_last_channel_message(self, mock_slack, settings):
+        settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
+        settings.SLACK["TRIAGE_BOT_PROMPT"] = "Alert: {alert_url}"
+        settings.SLACK["INCIDENT_GUIDE_MESSAGE"] = "Guide"
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            description="Something is broken",
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/1")
+
+        channel_messages = [
+            c[0][1]
+            for c in mock_slack.post_message.call_args_list
+            if c[0][0] == "C99999"
+        ]
+        assert len(channel_messages) > 1
+        assert channel_messages[-1].startswith("<@U_TRIAGE_BOT>")
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_triage_bot_message_uses_custom_prompt(self, mock_slack, settings):
         settings.SLACK["TRIAGE_BOT_USER_ID"] = "U_TRIAGE_BOT"
         settings.SLACK["TRIAGE_BOT_PROMPT"] = (

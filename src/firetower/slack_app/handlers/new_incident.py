@@ -12,6 +12,7 @@ from firetower.incidents.hooks import (
     ChannelSetupContext,
     decorate_incident_channel,
     page_for_channel,
+    ping_triage_bot,
 )
 from firetower.incidents.models import Incident, Tag, TagType
 from firetower.incidents.serializers import IncidentWriteSerializer
@@ -131,6 +132,8 @@ def _create_fallback_channel(
         logger.exception(
             "Failed to page PagerDuty for fallback channel %s", channel_name
         )
+
+    ping_triage_bot(ctx, _slack_service)
 
     # DM the user
     dm_reason = degraded_reason or "database issue"
