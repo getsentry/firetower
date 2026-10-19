@@ -71,6 +71,10 @@ class SlackConfig:
     always_invited_ids: list[str] = field(default_factory=list)
     incident_guide_message: str = ""
     slash_command: str = "/inc"
+    triage_bot_user_id: str = ""
+    triage_bot_prompt: str = (
+        "We've been alerted by {alert_url}, run incident triage for this issue."
+    )
 
 
 @deserialize

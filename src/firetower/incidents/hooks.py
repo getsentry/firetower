@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -118,6 +119,7 @@ class ChannelSetupContext:
     incident_url: str | None = None
     incident_number: str | None = None
     topic: str | None = None
+    alert_url: str | None = None
 
 
 def page_for_channel(
@@ -862,6 +864,38 @@ def _create_troubleshooting_doc(incident: Incident, channel_id: str) -> None:
         ).delete()
 
 
+def ping_triage_bot(ctx: ChannelSetupContext, slack_service: SlackService) -> None:
+    """Invite and mention the triage bot with the alert URL.
+
+    Callers should run this after all other channel posts so the triage bot
+    message is the last thing in the channel and easy to discover.
+    """
+    triage_bot_user_id = settings.SLACK.get("TRIAGE_BOT_USER_ID", "")
+    triage_bot_prompt = settings.SLACK.get("TRIAGE_BOT_PROMPT", "")
+    if not (
+        not ctx.is_private
+        and ctx.alert_url
+        and triage_bot_user_id
+        and triage_bot_prompt
+    ):
+        return
+
+    # Always invite the triage bot, if it's already a member this is a no op
+    try:
+        slack_service.invite_to_channel(ctx.channel_id, [triage_bot_user_id])
+    except Exception:
+        logger.exception(f"Failed to invite triage bot to {ctx.channel_name}")
+
+    try:
+        prompt = triage_bot_prompt.format_map(defaultdict(str, alert_url=ctx.alert_url))
+        slack_service.post_message(
+            ctx.channel_id,
+            f"<@{triage_bot_user_id}> {prompt}",
+        )
+    except Exception:
+        logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
+
+
 def decorate_incident_channel(
     ctx: ChannelSetupContext,
     slack_service: SlackService,
@@ -1390,7 +1424,9 @@ def schedule_statuspage_followup_reminder(
     )
 
 
-def on_incident_created(incident: Incident, *, skip_paging: bool = False) -> None:
+def on_incident_created(
+    incident: Incident, *, skip_paging: bool = False, alert_url: str = ""
+) -> None:
     # Use get_or_create to atomically claim the ExternalLink row before calling
     # the Slack API.  If two concurrent requests both reach this point, only one
     # will get created=True; the other bails out without creating a second channel.
@@ -1481,6 +1517,7 @@ def on_incident_created(incident: Incident, *, skip_paging: bool = False) -> Non
             incident_url=incident_url,
             incident_number=incident.incident_number,
             topic=build_channel_topic(incident, captain_slack_id),
+            alert_url=alert_url,
         )
         status_channel_id = decorate_incident_channel(
             ctx,
@@ -1496,6 +1533,8 @@ def on_incident_created(incident: Incident, *, skip_paging: bool = False) -> Non
         # appears first in the channel.
         _create_datadog_notebook(incident, channel_id)
         _create_troubleshooting_doc(incident, channel_id)
+
+        ping_triage_bot(ctx, _slack_service)
 
     try:
         create_linear_parent_issue(incident, channel_id=channel_id)

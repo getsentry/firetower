@@ -79,6 +79,7 @@ class TestNewIncidentModal:
             "title_block",
             "description_block",
             "impact_summary_block",
+            "alert_url_block",
             "options_block",
         }
 
@@ -160,6 +161,15 @@ class TestBuildNewIncidentModal:
             b for b in modal["blocks"] if b.get("block_id") == "severity_block"
         )
         assert severity_block.get("dispatch_action") is True
+
+    def test_alert_url_block_present_and_optional(self):
+        modal = _build_new_incident_modal()
+        alert_url_block = next(
+            b for b in modal["blocks"] if b.get("block_id") == "alert_url_block"
+        )
+        assert alert_url_block["optional"] is True
+        assert alert_url_block["element"]["type"] == "url_text_input"
+        assert alert_url_block["element"]["action_id"] == "alert_url"
 
 
 class TestSeverityAction:
@@ -1032,6 +1042,56 @@ class TestFallbackChannel:
 
         mock_page.assert_called_once()
         assert mock_page.call_args[1]["skip_paging"] is True
+
+    @patch("firetower.slack_app.handlers.new_incident.ping_triage_bot")
+    @patch("firetower.slack_app.handlers.new_incident.page_for_channel")
+    @patch("firetower.slack_app.handlers.new_incident.decorate_incident_channel")
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_pings_triage_bot_after_channel_setup(
+        self, mock_slack_svc, mock_decorate, mock_page, mock_ping
+    ):
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        manager = MagicMock()
+        manager.attach_mock(mock_decorate, "decorate")
+        manager.attach_mock(mock_page, "page")
+        manager.attach_mock(mock_ping, "ping")
+        client = MagicMock()
+
+        form_data = self._base_form_data()
+        form_data["alert_url"] = "https://sentry.io/issues/12345"
+
+        _create_fallback_channel(client, "U_REPORTER", form_data)
+
+        call_order = [c[0] for c in manager.mock_calls]
+        assert call_order == ["decorate", "page", "ping"]
+        ctx = mock_ping.call_args[0][0]
+        assert ctx.alert_url == "https://sentry.io/issues/12345"
+
+    @patch("firetower.slack_app.handlers.new_incident.decorate_incident_channel")
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    def test_passes_alert_url_to_channel_setup_context(
+        self, mock_slack_svc, mock_decorate
+    ):
+        mock_slack_svc.create_channel.return_value = "C_FALLBACK"
+        mock_slack_svc.post_message.return_value = "1234.5678"
+        mock_slack_svc.pin_message.return_value = True
+        mock_slack_svc.build_channel_url.return_value = (
+            "https://sentry.slack.com/archives/C_FALLBACK"
+        )
+        client = MagicMock()
+
+        form_data = self._base_form_data()
+        form_data["alert_url"] = "https://sentry.io/issues/12345"
+
+        _create_fallback_channel(client, "U_REPORTER", form_data)
+
+        mock_decorate.assert_called_once()
+        ctx = mock_decorate.call_args[0][0]
+        assert ctx.alert_url == "https://sentry.io/issues/12345"
 
 
 @pytest.mark.django_db

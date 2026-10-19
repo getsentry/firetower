@@ -12,6 +12,7 @@ from firetower.incidents.hooks import (
     ChannelSetupContext,
     decorate_incident_channel,
     page_for_channel,
+    ping_triage_bot,
 )
 from firetower.incidents.models import Incident, Tag, TagType
 from firetower.incidents.serializers import IncidentWriteSerializer
@@ -43,6 +44,7 @@ def _create_fallback_channel(
     captain_slack_id = form_data.get("captain_slack_id")
     is_private = form_data.get("is_private", False)
     skip_paging = form_data.get("skip_paging", False)
+    alert_url = form_data.get("alert_url", "")
 
     channel_name = f"{settings.PROJECT_KEY.lower()}-{uuid.uuid4().hex[:8]}"
 
@@ -108,6 +110,7 @@ def _create_fallback_channel(
         captain_slack_id=captain_slack_id,
         reporter_slack_id=slack_user_id,
         description=description,
+        alert_url=alert_url,
     )
     decorate_incident_channel(ctx, _slack_service)
 
@@ -129,6 +132,8 @@ def _create_fallback_channel(
         logger.exception(
             "Failed to page PagerDuty for fallback channel %s", channel_name
         )
+
+    ping_triage_bot(ctx, _slack_service)
 
     # DM the user
     dm_reason = degraded_reason or "database issue"
@@ -362,7 +367,11 @@ def _create_incident_via_db(
 
     serializer = IncidentWriteSerializer(
         data=data,
-        context={"skip_paging": skip_paging, "acting_user": user},
+        context={
+            "skip_paging": skip_paging,
+            "alert_url": form.get("alert_url", ""),
+            "acting_user": user,
+        },
     )
     if not serializer.is_valid():
         logger.error(f"Incident validation failed: {serializer.errors}")
@@ -388,6 +397,7 @@ def _fallback_form_data(
         "captain_slack_id": form["captain_slack_id"],
         "is_private": is_private,
         "skip_paging": skip_paging,
+        "alert_url": form.get("alert_url", ""),
     }
 
 
