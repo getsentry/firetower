@@ -473,6 +473,48 @@ class TestStatuspageSubmission:
         assert "created" in msg
         assert "<@U_SUBMITTER>" in msg
 
+    @pytest.mark.parametrize(
+        "timeline_metadata",
+        [{}, {"created_at": "not-a-timestamp"}],
+        ids=["missing", "invalid"],
+    )
+    def test_invalid_create_timeline_metadata_still_reports_success(
+        self, incident, timeline_metadata
+    ):
+        ack = MagicMock()
+        body = {"user": {"id": "U_SUBMITTER"}}
+        view = self._make_view()
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.return_value = {
+                "id": "new_sp_without_metadata",
+                **timeline_metadata,
+            }
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/new_sp_without_metadata"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.STATUSPAGE
+        )
+        assert link.url == (
+            "https://test.statuspage.io/incidents/new_sp_without_metadata"
+        )
+        assert incident.timeline_events.count() == 0
+        assert client.chat_postEphemeral.call_count == 0
+        assert client.chat_postMessage.call_count == 2
+        assert all(
+            "created a statuspage post" in call.kwargs["text"]
+            for call in client.chat_postMessage.call_args_list
+        )
+
     def test_posts_to_both_incident_and_status_channels(self, incident):
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
@@ -576,10 +618,15 @@ class TestStatuspageSubmission:
                 "id": "existing_sp",
                 "incident_updates": [
                     {
+                        "id": "sp_update_old",
+                        "status": "investigating",
+                        "created_at": "2026-08-20T15:00:00Z",
+                    },
+                    {
                         "id": "sp_update_123",
                         "status": "identified",
                         "created_at": "2026-08-20T16:00:00Z",
-                    }
+                    },
                 ],
             }
             instance.get_incident_url.return_value = (
@@ -609,7 +656,23 @@ class TestStatuspageSubmission:
         assert "updated" in msg
         assert "<@U_SUBMITTER>" in msg
 
-    def test_incomplete_update_response_still_reports_success(self, incident):
+    @pytest.mark.parametrize(
+        "incident_updates",
+        [
+            [],
+            [
+                {
+                    "id": "sp_update_without_timestamp",
+                    "status": "monitoring",
+                    "created_at": "not-a-timestamp",
+                }
+            ],
+        ],
+        ids=["missing", "invalid"],
+    )
+    def test_incomplete_update_response_still_reports_success(
+        self, incident, incident_updates
+    ):
         ExternalLink.objects.create(
             incident=incident,
             type=ExternalLinkType.STATUSPAGE,
@@ -626,7 +689,9 @@ class TestStatuspageSubmission:
             instance = MockService.return_value
             instance.configured = True
             instance.extract_incident_id_from_url.return_value = "existing_sp"
-            instance.update_incident.return_value = {"incident_updates": []}
+            instance.update_incident.return_value = {
+                "incident_updates": incident_updates
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/existing_sp"
             )

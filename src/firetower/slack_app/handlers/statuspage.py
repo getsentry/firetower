@@ -28,11 +28,49 @@ logger = logging.getLogger(__name__)
 COMPONENT_BLOCK_PREFIX = "component_"
 
 
-def _parse_statuspage_timestamp(value: str) -> datetime:
-    timestamp = parse_datetime(value)
-    if timestamp is None:
-        raise ValueError(f"Invalid Statuspage timestamp: {value!r}")
+def _parse_statuspage_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        timestamp = parse_datetime(value)
+    except ValueError:
+        return None
+    if timestamp is None or timestamp.tzinfo is None:
+        return None
     return timestamp
+
+
+def _get_latest_statuspage_update_metadata(
+    result: dict[str, Any],
+) -> tuple[str, str, datetime] | None:
+    updates = result.get("incident_updates")
+    if not isinstance(updates, list):
+        return None
+
+    candidates: list[tuple[datetime, str, str]] = []
+    for update in updates:
+        if not isinstance(update, dict):
+            return None
+        update_id = update.get("id")
+        occurred_at = _parse_statuspage_timestamp(update.get("created_at"))
+        if not isinstance(update_id, str) or not update_id or occurred_at is None:
+            return None
+        update_status = update.get("status")
+        candidates.append(
+            (
+                occurred_at,
+                update_id,
+                update_status if isinstance(update_status, str) else "",
+            )
+        )
+
+    if not candidates:
+        return None
+    occurred_at, update_id, update_status = max(
+        candidates,
+        key=lambda candidate: candidate[0],
+    )
+    return update_id, update_status, occurred_at
 
 
 def _build_statuspage_modal(
@@ -550,32 +588,22 @@ def _process_statuspage_submission(
                     components=components or None,
                 )
                 statuspage_url = service.get_incident_url(sp_id)
-                statuspage_updates = result.get("incident_updates")
-                statuspage_update = (
-                    statuspage_updates[0]
-                    if isinstance(statuspage_updates, list) and statuspage_updates
-                    else None
-                )
-                if (
-                    isinstance(statuspage_update, dict)
-                    and isinstance(statuspage_update.get("id"), str)
-                    and isinstance(statuspage_update.get("created_at"), str)
-                ):
-                    record_statuspage_update_posted(
-                        incident,
-                        sp_update_id=statuspage_update["id"],
-                        sp_url=statuspage_url,
-                        message=message,
-                        status=statuspage_update.get("status") or status,
-                        occurred_at=_parse_statuspage_timestamp(
-                            statuspage_update["created_at"]
-                        ),
-                    )
-                else:
+                update_metadata = _get_latest_statuspage_update_metadata(result)
+                if update_metadata is None:
                     logger.error(
                         "Statuspage update response for incident %s did not include "
-                        "timeline metadata",
+                        "valid timeline metadata",
                         sp_id,
+                    )
+                else:
+                    update_id, update_status, occurred_at = update_metadata
+                    record_statuspage_update_posted(
+                        incident,
+                        sp_update_id=update_id,
+                        sp_url=statuspage_url,
+                        message=message,
+                        status=update_status or status,
+                        occurred_at=occurred_at,
                     )
                 attribution = f"<@{user_id}> " if user_id else ""
                 success_message = (
@@ -592,13 +620,23 @@ def _process_statuspage_submission(
                 statuspage_url = service.get_incident_url(result["id"])
                 statuspage_link.url = statuspage_url
                 statuspage_link.save(update_fields=["url"])
-                record_statuspage_incident_created(
-                    incident,
-                    sp_incident_id=result["id"],
-                    sp_url=statuspage_url,
-                    message=message,
-                    occurred_at=_parse_statuspage_timestamp(result["created_at"]),
+                created_occurred_at = _parse_statuspage_timestamp(
+                    result.get("created_at")
                 )
+                if created_occurred_at is None:
+                    logger.error(
+                        "Statuspage create response for incident %s did not include "
+                        "valid timeline metadata",
+                        result["id"],
+                    )
+                else:
+                    record_statuspage_incident_created(
+                        incident,
+                        sp_incident_id=result["id"],
+                        sp_url=statuspage_url,
+                        message=message,
+                        occurred_at=created_occurred_at,
+                    )
                 attribution = f"<@{user_id}> " if user_id else ""
                 success_message = (
                     f"{attribution}created a statuspage post: {statuspage_url}"
