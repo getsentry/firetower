@@ -196,11 +196,10 @@ class TestGenAIService:
             for i in range(n)
         ]
 
-    def test_requests_zero_data_retention_provider(self, genai_service):
+    def test_does_not_request_zero_data_retention_provider(self, genai_service):
         genai_service._client.chat.send.return_value = _make_response("timeline")
         genai_service.generate_timeline(self._make_messages())
-        provider = genai_service._client.chat.send.call_args.kwargs["provider"]
-        assert provider.zdr is True
+        assert "provider" not in genai_service._client.chat.send.call_args.kwargs
 
     def test_returns_timeline_text(self, genai_service):
         genai_service._client.chat.send.return_value = _make_response(
