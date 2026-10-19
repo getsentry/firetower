@@ -71,6 +71,8 @@ class SlackConfig:
     always_invited_ids: list[str] = field(default_factory=list)
     incident_guide_message: str = ""
     slash_command: str = "/inc"
+    reminder_stale_state_threshold_high_severity_minutes: int = 120  # 2 hours for P0/P1
+    reminder_stale_state_threshold_low_severity_minutes: int = 1440  # 24 hours for P2+
 
 
 @deserialize
