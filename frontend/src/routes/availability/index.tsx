@@ -87,7 +87,7 @@ function AvailabilityPage() {
         <PeriodTabs activePeriod={activePeriod} />
       </div>
       <PeriodLabels periods={periods} />
-      <div className="bg-background-primary rounded-radius-lg p-space-2xl shadow-sm flex flex-col gap-space-md px-space-xl pt-space-2xl pb-space-2xl">
+      <div className="bg-background-primary rounded-radius-lg p-space-2xl gap-space-md px-space-xl pt-space-2xl pb-space-2xl flex flex-col shadow-sm">
         {regions.map((region, i) => {
           const showGroupSpacing =
             i > 0 && region.group_index !== regions[i - 1]!.group_index;

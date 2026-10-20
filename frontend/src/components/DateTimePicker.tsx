@@ -24,7 +24,7 @@ export function DateTimePicker({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex items-center gap-space-sm">
+    <div className="gap-space-sm flex items-center">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button variant="secondary" className="w-28 justify-between font-normal">
@@ -53,7 +53,7 @@ export function DateTimePicker({
         onChange={e => {
           onTimeChange(e.target.value || undefined);
         }}
-        className="bg-background text-size-md w-[85px] px-2 appearance-none disabled:opacity-30 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+        className="bg-background text-size-md w-[85px] appearance-none px-2 disabled:opacity-30 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
       />
       <Button
         variant="icon"
@@ -63,7 +63,7 @@ export function DateTimePicker({
         }}
         disabled={!date}
         aria-label="Clear date and time"
-        className="disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-content-secondary"
+        className="disabled:hover:text-content-secondary disabled:cursor-default disabled:hover:bg-transparent"
       >
         <X className="h-4 w-4" />
       </Button>

@@ -17,7 +17,7 @@ export function PeriodLabels({periods}: PeriodLabelsProps) {
   const labels = [...periods].reverse();
 
   return (
-    <div className="mb-space-sm gap-space-lg flex items-center px-space-xl">
+    <div className="mb-space-sm gap-space-lg px-space-xl flex items-center">
       <div className="w-32 shrink-0" aria-hidden />
       <div className="flex min-w-0 flex-1 gap-px">
         {labels.map((p, i) => {

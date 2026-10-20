@@ -12,13 +12,13 @@ export function DowntimeField({
   onChange,
 }: DowntimeFieldProps) {
   return (
-    <div className="flex items-center gap-space-md">
+    <div className="gap-space-md flex items-center">
       <div className="text-content-secondary w-20 flex-none text-sm font-medium">
         Downtime
       </div>
       <div className="flex flex-1 items-center justify-end">
         {isEditing ? (
-          <div className="flex items-center gap-space-xs">
+          <div className="gap-space-xs flex items-center">
             <input
               type="number"
               min="0"
@@ -28,13 +28,13 @@ export function DowntimeField({
                 onChange(e.target.value === '' ? null : Number.isNaN(num) ? null : num);
               }}
               placeholder="—"
-              className="w-20 rounded-radius-sm border border-secondary bg-background-primary px-space-sm py-space-xs text-right text-sm focus:outline-none focus:ring-1"
+              className="rounded-radius-sm border-secondary bg-background-primary px-space-sm py-space-xs w-20 border text-right text-sm focus:ring-1 focus:outline-none"
             />
             <span className="text-content-secondary text-sm">min</span>
           </div>
         ) : (
           <span
-            className={`text-sm ${value != null ? 'text-content-primary' : 'text-content-tertiary'}`}
+            className={`text-sm ${value != null ? 'text-content-primary' : 'text-content-secondary'}`}
           >
             {value != null ? `${value} min` : 'Not set'}
           </span>

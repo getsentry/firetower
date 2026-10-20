@@ -79,14 +79,14 @@ export function EditableDateTimeField({
   }, [draftDate, draftTime, value, onSave]);
 
   return (
-    <div className="flex items-center gap-space-md">
+    <div className="gap-space-md flex items-center">
       <div className="text-content-secondary w-20 flex-none text-sm font-medium">
         {label}
       </div>
 
       <div className="flex flex-1 items-center justify-end">
         {isEditing ? (
-          <div className="flex shrink-0 items-center gap-space-sm">
+          <div className="gap-space-sm flex shrink-0 items-center">
             <DateTimePicker
               date={draftDate}
               time={draftTime}
@@ -98,9 +98,9 @@ export function EditableDateTimeField({
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-space-xs">
+          <div className="gap-space-xs flex items-center">
             <span
-              className={`text-sm ${value ? 'text-content-primary' : 'text-content-tertiary italic'}`}
+              className={`text-sm ${value ? 'text-content-primary' : 'text-content-secondary italic'}`}
             >
               {formatDateTime(value) || placeholder}
             </span>
