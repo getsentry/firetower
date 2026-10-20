@@ -120,15 +120,15 @@ class LinearConfig:
         "{% if days_past_due > 0 %}This action item is **{{ days_past_due }} "
         "day{% if days_past_due != 1 %}s{% endif %} past due**. {% endif %}"
         "The SLO for completing P0/P1 incident action items is {{ slo_days }} "
-        "days from incident creation. Please prioritize this work or close "
-        "out the issue if it is no longer relevant."
+        "days from action item creation. Please prioritize this work, downgrade "
+        "the priority, or close out the issue if it is no longer relevant."
     )
     action_item_nag_comment_medium_priority: str = (
         "{% if days_past_due > 0 %}This action item is **{{ days_past_due }} "
         "day{% if days_past_due != 1 %}s{% endif %} past due**. {% endif %}"
         "The SLO for completing P2 incident action items is {{ slo_days }} "
-        "days from incident creation. Please prioritize this work or close "
-        "out the issue if it is no longer relevant."
+        "days from action item creation. Please prioritize this work, downgrade "
+        "the priority, or close out the issue if it is no longer relevant."
     )
 
 

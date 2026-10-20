@@ -897,6 +897,7 @@ class TestSendActionItemReminder:
             "status": ActionItemStatus.TODO,
             "priority": 1,
             "url": f"https://linear.app/team/issue/{title}",
+            "created_at": incident.created_at,
         }
         defaults.update(kwargs)
         return ActionItem.objects.create(incident=incident, **defaults)
@@ -907,10 +908,10 @@ class TestSendActionItemReminder:
         synced_ids = {c.args[0].id for c in mock_sync.call_args_list}
         assert synced_ids == {incident.id}
 
-    def test_skips_incident_younger_than_global_floor(self, mock_sync):
-        self._make_incident(days_old=5)
+    def test_syncs_recent_incident_for_early_sla(self, mock_sync):
+        incident = self._make_incident(days_old=5)
         send_action_item_reminder()
-        mock_sync.assert_not_called()
+        mock_sync.assert_called_once_with(incident)
 
     def test_skips_incident_older_than_max_age(self, mock_sync):
         self._make_incident(days_old=120)
@@ -987,6 +988,18 @@ class TestSendActionItemReminder:
             action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
 
+    def test_uses_action_item_age_instead_of_incident_age(self, mock_linear):
+        incident = self._make_incident(days_old=45)
+        self._make_action_item(
+            incident,
+            priority=1,
+            created_at=timezone.now() - timedelta(days=5),
+        )
+
+        send_action_item_reminder()
+
+        mock_linear.create_comment.assert_not_called()
+
     def test_skips_medium_priority_under_twenty_one_days(self, mock_linear):
         incident = self._make_incident(days_old=10)
         self._make_action_item(incident, priority=3)
@@ -1009,6 +1022,17 @@ class TestSendActionItemReminder:
 
         mock_linear.create_comment.assert_called_once_with(
             urgent.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
+        )
+
+    def test_reminder_does_not_reset_sla(self, mock_linear):
+        incident = self._make_incident()
+        action_item = self._make_action_item(incident)
+
+        send_action_item_reminder()
+
+        mock_linear.update_issue.assert_not_called()
+        mock_linear.create_comment.assert_called_once_with(
+            action_item.linear_issue_id, self.CONFIGURED_HIGH_PRIORITY_COMMENT
         )
 
     def test_does_not_stamp_when_comment_returns_failure(self, mock_linear):
@@ -1088,7 +1112,8 @@ class TestSendActionItemReminder:
 
     def test_renders_template_variables(self, mock_linear):
         template = (
-            "SLO={{ slo_days }} age={{ incident_age_days }} "
+            "SLO={{ slo_days }} action_age={{ action_item_age_days }} "
+            "incident_age={{ incident_age_days }} "
             "past={{ days_past_due }} left={{ days_left }} "
             "passed={{ slo_passed }} id={{ action_item.linear_identifier }} "
             "title={{ incident.title }}"
@@ -1102,7 +1127,7 @@ class TestSendActionItemReminder:
             send_action_item_reminder()
 
         expected = (
-            f"SLO=14 age=10 past=0 left=4 passed=False "
+            f"SLO=14 action_age=10 incident_age=10 past=0 left=4 passed=False "
             f"id={action_item.linear_identifier} title=Some outage"
         )
         mock_linear.create_comment.assert_called_once_with(

@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models, transaction
 from django.db.models import Q, QuerySet
+from django.utils import timezone
 
 from firetower.auth.service_accounts import is_google_service_account
 
@@ -438,7 +439,7 @@ class ActionItem(models.Model):
     )
     priority = models.IntegerField(default=0)
     url = models.URLField(max_length=500)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     last_nag = models.DateTimeField(null=True, blank=True)
 

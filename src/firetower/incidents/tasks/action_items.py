@@ -85,12 +85,7 @@ def send_action_item_reminder() -> None:
         return
 
     now = timezone.now()
-    earliest_notify_after_days = (
-        min(tier.slo_days for tier in nag_tiers.values())
-        - ACTION_ITEM_REMINDER_NAG_EVERY_DAYS
-    )
     min_age = now - timedelta(days=ACTION_ITEM_REMINDER_MAX_AGE_DAYS)
-    max_age = now - timedelta(days=earliest_notify_after_days)
 
     def _action_item_eligible(action_item: ActionItem, incident: Incident) -> bool:
         if action_item.status not in [
@@ -104,7 +99,7 @@ def send_action_item_reminder() -> None:
         if not comments_by_priority.get(action_item.priority):
             return False
         notify_after_days = tier.slo_days - ACTION_ITEM_REMINDER_NAG_EVERY_DAYS
-        if incident.created_at > now - timedelta(days=notify_after_days):
+        if action_item.created_at > now - timedelta(days=notify_after_days):
             return False
         if action_item.last_nag is None:
             return True
@@ -151,13 +146,15 @@ def send_action_item_reminder() -> None:
         template_source = comments_by_priority[action_item.priority]
         tier = nag_tiers[action_item.priority]
         incident_age_days = (timezone.now() - incident.created_at).days
-        slo_passed = incident_age_days >= tier.slo_days
+        action_item_age_days = (timezone.now() - action_item.created_at).days
+        slo_passed = action_item_age_days >= tier.slo_days
         try:
             comment = _NAG_TEMPLATE_ENV.from_string(template_source).render(
                 slo_days=tier.slo_days,
                 incident_age_days=incident_age_days,
-                days_past_due=max(0, incident_age_days - tier.slo_days),
-                days_left=max(0, tier.slo_days - incident_age_days),
+                action_item_age_days=action_item_age_days,
+                days_past_due=max(0, action_item_age_days - tier.slo_days),
+                days_left=max(0, tier.slo_days - action_item_age_days),
                 slo_passed=slo_passed,
                 action_item=action_item,
                 incident=incident,
@@ -167,8 +164,9 @@ def send_action_item_reminder() -> None:
                 f"Failed to render nag comment template for action item {action_item.linear_identifier}"
             )
             return
+        linear_service = LinearService()
         try:
-            success = LinearService().create_comment(
+            success = linear_service.create_comment(
                 action_item.linear_issue_id, comment
             )
         except Exception:
@@ -187,7 +185,6 @@ def send_action_item_reminder() -> None:
 
     incidents = Incident.objects.filter(
         created_at__gte=min_age,
-        created_at__lte=max_age,
         severity__in=HIGH_SEVERITIES,
     ).exclude(status=IncidentStatus.CANCELED)
 
