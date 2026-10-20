@@ -464,7 +464,10 @@ class TestStatuspageSubmission:
         event = incident.timeline_events.get()
         assert event.source == TimelineEventSource.STATUSPAGE
         assert event.event_type == TimelineEventType.STATUSPAGE_INCIDENT_CREATED
-        assert event.payload == {"message": "Looking into it"}
+        assert event.payload == {
+            "message": "Looking into it",
+            "affected_components": {},
+        }
         assert event.external_id == "new_sp_123"
         assert event.link_url == link.url
         assert event.occurred_at == datetime(2026, 8, 20, 15, tzinfo=UTC)
@@ -570,7 +573,9 @@ class TestStatuspageSubmission:
     def test_creates_with_components(self, incident):
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
-        view = self._make_view(components={"comp1": "major_outage"})
+        view = self._make_view(
+            components={"comp1": "major_outage", "comp2": "operational"}
+        )
         client = MagicMock()
 
         with patch(
@@ -593,8 +598,12 @@ class TestStatuspageSubmission:
             status="investigating",
             message="Looking into it",
             impact="major",
-            components={"comp1": "major_outage"},
+            components={"comp1": "major_outage", "comp2": "operational"},
         )
+        assert incident.timeline_events.get().payload == {
+            "message": "Looking into it",
+            "affected_components": {"comp1": "major_outage"},
+        }
 
     def test_updates_existing_statuspage_incident(self, incident):
         ExternalLink.objects.create(
@@ -605,7 +614,11 @@ class TestStatuspageSubmission:
 
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
-        view = self._make_view(status="identified", message="Found the cause")
+        view = self._make_view(
+            status="identified",
+            message="Found the cause",
+            components={"comp1": "degraded_performance", "comp2": "operational"},
+        )
         client = MagicMock()
 
         with patch(
@@ -639,7 +652,7 @@ class TestStatuspageSubmission:
             incident_id="existing_sp",
             status="identified",
             message="Found the cause",
-            components=None,
+            components={"comp1": "degraded_performance", "comp2": "operational"},
         )
         event = incident.timeline_events.get()
         assert event.source == TimelineEventSource.STATUSPAGE
@@ -647,6 +660,7 @@ class TestStatuspageSubmission:
         assert event.payload == {
             "message": "Found the cause",
             "status": "identified",
+            "affected_components": {"comp1": "degraded_performance"},
         }
         assert event.external_id == "sp_update_123"
         assert event.link_url == "https://test.statuspage.io/incidents/existing_sp"
@@ -753,6 +767,7 @@ class TestStatuspageSubmission:
         assert incident.timeline_events.get().payload == {
             "message": "Resolved",
             "status": "resolved",
+            "affected_components": {},
         }
 
     def test_empty_message_returns_error(self, incident):

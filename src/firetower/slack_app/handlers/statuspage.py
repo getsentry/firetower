@@ -537,6 +537,11 @@ def _process_statuspage_submission(
     message = data["message"]
     impact = data["impact"]
     components = data["components"]
+    affected_components: dict[str, str] = {
+        component_id: component_status
+        for component_id, component_status in components.items()
+        if component_status != "operational"
+    }
 
     service = StatuspageService()
     if not service.configured:
@@ -603,6 +608,7 @@ def _process_statuspage_submission(
                         sp_url=statuspage_url,
                         message=message,
                         status=update_status or status,
+                        affected_components=affected_components,
                         occurred_at=occurred_at,
                     )
                 attribution = f"<@{user_id}> " if user_id else ""
@@ -635,6 +641,7 @@ def _process_statuspage_submission(
                         sp_incident_id=result["id"],
                         sp_url=statuspage_url,
                         message=message,
+                        affected_components=affected_components,
                         occurred_at=created_occurred_at,
                     )
                 attribution = f"<@{user_id}> " if user_id else ""

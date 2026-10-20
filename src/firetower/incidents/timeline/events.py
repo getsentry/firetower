@@ -37,10 +37,10 @@ class NotePayload(TypedDict):
 
 class StatuspagePayload(TypedDict):
     message: str
+    affected_components: dict[str, str]
 
 
-class StatuspageUpdatePayload(TypedDict):
-    message: str
+class StatuspageUpdatePayload(StatuspagePayload):
     status: str
 
 
@@ -193,10 +193,14 @@ def record_statuspage_incident_created(
     sp_incident_id: str,
     sp_url: str,
     message: str,
+    affected_components: dict[str, str],
     occurred_at: datetime,
     actor: User | None = None,
 ) -> TimelineEvent:
-    payload: StatuspagePayload = {"message": message}
+    payload: StatuspagePayload = {
+        "message": message,
+        "affected_components": affected_components,
+    }
     return _record_event(
         incident,
         TimelineEventType.STATUSPAGE_INCIDENT_CREATED,
@@ -216,12 +220,14 @@ def record_statuspage_update_posted(
     sp_url: str,
     message: str,
     status: str,
+    affected_components: dict[str, str],
     occurred_at: datetime,
     actor: User | None = None,
 ) -> TimelineEvent:
     payload: StatuspageUpdatePayload = {
         "message": message,
         "status": status,
+        "affected_components": affected_components,
     }
     return _record_event(
         incident,

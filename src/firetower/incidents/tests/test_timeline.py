@@ -115,6 +115,7 @@ class TestTimelineEventHelpers:
             sp_incident_id="sp-incident",
             sp_url="https://status.example.com/incidents/sp-incident",
             message="Investigating",
+            affected_components={"api": "major_outage"},
             occurred_at=created_at,
             actor=first,
         )
@@ -124,13 +125,17 @@ class TestTimelineEventHelpers:
             sp_url="https://status.example.com/incidents/sp-incident",
             message="Monitoring",
             status="monitoring",
+            affected_components={"api": "degraded_performance"},
             occurred_at=updated_at,
         )
 
         created, updated = incident.timeline_events.all()
         assert created.source == TimelineEventSource.STATUSPAGE
         assert created.event_type == TimelineEventType.STATUSPAGE_INCIDENT_CREATED
-        assert created.payload == {"message": "Investigating"}
+        assert created.payload == {
+            "message": "Investigating",
+            "affected_components": {"api": "major_outage"},
+        }
         assert created.external_id == "sp-incident"
         assert created.link_url == "https://status.example.com/incidents/sp-incident"
         assert created.occurred_at == created_at
@@ -141,6 +146,7 @@ class TestTimelineEventHelpers:
         assert updated.payload == {
             "message": "Monitoring",
             "status": "monitoring",
+            "affected_components": {"api": "degraded_performance"},
         }
         assert updated.external_id == "sp-update"
         assert updated.link_url == "https://status.example.com/incidents/sp-incident"
@@ -365,7 +371,10 @@ class TestTimelineRenderer:
             ),
             (
                 TimelineEventType.STATUSPAGE_INCIDENT_CREATED,
-                {"message": "Investigating"},
+                {
+                    "message": "Investigating",
+                    "affected_components": {"api": "major_outage"},
+                },
                 'Statuspage incident posted: "Investigating"',
             ),
             (
@@ -373,6 +382,7 @@ class TestTimelineRenderer:
                 {
                     "message": "The problem has been resolved",
                     "status": "resolved",
+                    "affected_components": {},
                 },
                 'Statuspage marked Resolved: "The problem has been resolved"',
             ),
