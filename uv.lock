@@ -563,7 +563,7 @@ wheels = [
 
 [[package]]
 name = "datadog-api-client"
-version = "2.61.0"
+version = "2.62.0"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
     { name = "certifi" },
@@ -571,9 +571,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/7f/79/9f57ac587159c978a52383515454190d2d55dd7327e9b0ef9feb3f3ba21a/datadog_api_client-2.61.0.tar.gz", hash = "sha256:75a0cf5c5805a6ad76eaf6c0aaddebf43138cca7431ff41b8a17f842c70684e2", size = 8049873, upload-time = "2026-09-24T14:22:51.648Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/95/aa/3434aa78b0f0107445655a7831f0b5b5366218c25fad90df9c75fe317e38/datadog_api_client-2.62.0.tar.gz", hash = "sha256:fec6a649dac5dd7224f64662390005e6d6ce688029742278346f46190d0fc902", size = 8317484, upload-time = "2026-10-13T12:35:14.172Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/a3/5f/da93044cda6e238691885874deeed28349f137e4482dbe4e50d55183371f/datadog_api_client-2.61.0-py3-none-any.whl", hash = "sha256:a398383eef6165fdd7e4ef6f32436d9b4f456b352d64b151bc773a0d955e21e2", size = 9421258, upload-time = "2026-09-24T14:22:48.419Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/de/9d/211c2c466fb6efc3ff404c93a35322663bd3884ae8d96208db24de8661b4/datadog_api_client-2.62.0-py3-none-any.whl", hash = "sha256:b779cde91e0d8c24666e762154bb266506cecaf63bcc9339cd2e0a34f2e30183", size = 9844952, upload-time = "2026-10-13T12:35:11.407Z" },
 ]
 
 [[package]]
@@ -933,7 +933,7 @@ prod = [
 requires-dist = [
     { name = "cryptography", specifier = ">=50.0.2" },
     { name = "datadog", specifier = "==0.52.1" },
-    { name = "datadog-api-client", specifier = "==2.61.0" },
+    { name = "datadog-api-client", specifier = "==2.62.0" },
     { name = "django", specifier = ">=6.1.2,<7" },
     { name = "django-cors-headers", specifier = ">=4.9.0" },
     { name = "django-fernet-encrypted-fields", specifier = ">=0.4.0" },
