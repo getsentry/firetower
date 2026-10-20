@@ -1,7 +1,5 @@
 @layer reset, stylex;
 
-@import './scraps-theme.css';
-
 @font-face {
   font-family: 'Rubik';
   font-style: normal;
