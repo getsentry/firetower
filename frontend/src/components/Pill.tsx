@@ -1,6 +1,5 @@
 import React from 'react';
 import * as stylex from '@stylexjs/stylex';
-import {cn} from 'utils/cn';
 
 import {
   background,
@@ -22,10 +21,8 @@ const styles = stylex.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
     textTransform: 'uppercase',
-    userSelect: 'none',
-  },
-  singleLine: {
     lineHeight: 1,
+    userSelect: 'none',
   },
   danger: {
     backgroundColor: background.transparentDangerMuted,
@@ -85,15 +82,17 @@ interface PillProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const Pill = ({children, className, variant = 'default', ref, ...props}: PillProps) => {
-  const singleLine = cn('leading-none', className).split(' ').includes('leading-none');
   const {className: stylexClassName} = stylex.props(
     styles.base,
-    singleLine && styles.singleLine,
     variant === null ? null : variants[variant]
   );
 
   return (
-    <div ref={ref} className={cn(stylexClassName, className)} {...props}>
+    <div
+      ref={ref}
+      className={[stylexClassName, className].filter(Boolean).join(' ')}
+      {...props}
+    >
       {children}
     </div>
   );
