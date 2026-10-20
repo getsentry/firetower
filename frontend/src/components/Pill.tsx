@@ -1,68 +1,99 @@
 import React from 'react';
-import {cva, type VariantProps} from 'class-variance-authority';
+import * as stylex from '@stylexjs/stylex';
 import {cn} from 'utils/cn';
 
-const pill = cva(
-  [
-    'inline-flex',
-    'items-center',
-    'justify-center',
-    'px-space-lg',
-    'py-space-xs',
-    'rounded-radius-full',
-    'text-size-sm',
-    'font-medium',
-    'uppercase',
-    'leading-none',
-    'select-none',
-  ],
-  {
-    variants: {
-      variant: {
-        // Status variants
-        Active: ['bg-background-transparent-danger-muted', 'text-content-danger'],
-        Mitigated: ['bg-background-transparent-warning-muted', 'text-content-warning'],
-        Postmortem: ['bg-background-transparent-accent-muted', 'text-content-accent'],
-        Done: ['bg-background-transparent-success-muted', 'text-content-success'],
-        Canceled: ['bg-background-transparent-neutral-muted', 'text-content-secondary'],
-        // Action item status variants
-        Todo: ['bg-background-transparent-neutral-muted', 'text-content-secondary'],
-        'In Progress': [
-          'bg-background-transparent-warning-muted',
-          'text-content-warning',
-        ],
-        // Severity variants
-        P0: ['bg-background-danger-vibrant', 'text-content-on-vibrant-light'],
-        P1: ['bg-background-transparent-danger-muted', 'text-content-danger'],
-        P2: ['bg-background-transparent-warning-muted', 'text-content-warning'],
-        P3: ['bg-background-transparent-accent-muted', 'text-content-accent'],
-        P4: ['bg-background-transparent-neutral-muted', 'text-content-secondary'],
-        // Service tier variants
-        T0: ['bg-background-danger-vibrant', 'text-content-on-vibrant-light'],
-        T1: ['bg-background-transparent-danger-muted', 'text-content-danger'],
-        T2: ['bg-background-transparent-warning-muted', 'text-content-warning'],
-        T3: ['bg-background-transparent-accent-muted', 'text-content-accent'],
-        T4: ['bg-background-transparent-neutral-muted', 'text-content-secondary'],
-        // Other variants
-        private: ['bg-background-transparent-danger-muted', 'text-content-danger'],
-        default: ['bg-background-secondary', 'text-content-secondary'],
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-    },
-  }
-);
+import {
+  background,
+  content,
+  fontSize,
+  fontWeight,
+  radius,
+  space,
+} from '../styles/tokens.stylex';
 
-interface PillProps
-  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof pill> {
+const styles = stylex.create({
+  base: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingInline: space.lg,
+    paddingBlock: space.xs,
+    borderRadius: radius.full,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    textTransform: 'uppercase',
+    userSelect: 'none',
+  },
+  singleLine: {
+    lineHeight: 1,
+  },
+  danger: {
+    backgroundColor: background.transparentDangerMuted,
+    color: content.danger,
+  },
+  warning: {
+    backgroundColor: background.transparentWarningMuted,
+    color: content.warning,
+  },
+  accent: {
+    backgroundColor: background.transparentAccentMuted,
+    color: content.accent,
+  },
+  success: {
+    backgroundColor: background.transparentSuccessMuted,
+    color: content.success,
+  },
+  neutral: {
+    backgroundColor: background.transparentNeutralMuted,
+    color: content.secondary,
+  },
+  critical: {
+    backgroundColor: background.dangerVibrant,
+    color: content.onVibrantLight,
+  },
+  default: {
+    backgroundColor: background.secondary,
+    color: content.secondary,
+  },
+});
+
+const variants = {
+  Active: styles.danger,
+  Mitigated: styles.warning,
+  Postmortem: styles.accent,
+  Done: styles.success,
+  Canceled: styles.neutral,
+  Todo: styles.neutral,
+  'In Progress': styles.warning,
+  P0: styles.critical,
+  P1: styles.danger,
+  P2: styles.warning,
+  P3: styles.accent,
+  P4: styles.neutral,
+  T0: styles.critical,
+  T1: styles.danger,
+  T2: styles.warning,
+  T3: styles.accent,
+  T4: styles.neutral,
+  private: styles.danger,
+  default: styles.default,
+};
+
+interface PillProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: keyof typeof variants | null;
   ref?: React.Ref<HTMLDivElement>;
 }
 
-const Pill = ({className, variant, ref, ...props}: PillProps) => {
-  const {children, ...rest} = props;
+const Pill = ({children, className, variant = 'default', ref, ...props}: PillProps) => {
+  const singleLine = cn('leading-none', className).split(' ').includes('leading-none');
+  const {className: stylexClassName} = stylex.props(
+    styles.base,
+    singleLine && styles.singleLine,
+    variant === null ? null : variants[variant]
+  );
+
   return (
-    <div ref={ref} className={cn(pill({variant, className}))} {...rest}>
+    <div ref={ref} className={cn(stylexClassName, className)} {...props}>
       {children}
     </div>
   );

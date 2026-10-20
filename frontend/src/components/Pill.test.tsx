@@ -1,6 +1,7 @@
 import React from 'react';
 import {render, screen} from '@testing-library/react';
-import {describe, expect, it} from 'vitest';
+import userEvent from '@testing-library/user-event';
+import {describe, expect, it, vi} from 'vitest';
 
 import {Pill} from './Pill';
 
@@ -10,26 +11,18 @@ describe('Pill', () => {
     expect(screen.getByText('Test Pill')).toBeInTheDocument();
   });
 
-  it('applies default variant', () => {
-    render(<Pill data-testid="pill">Default</Pill>);
-    const pill = screen.getByTestId('pill');
-
-    expect(pill).toHaveClass('bg-background-secondary');
-    expect(pill).toHaveClass('text-content-secondary');
-    expect(pill).toHaveClass('px-space-lg');
-    expect(pill).toHaveClass('py-space-xs');
+  it('accepts inline styles', () => {
+    render(<Pill style={{paddingInline: 20}}>Styled</Pill>);
+    expect(screen.getByText('Styled').style.paddingInline).toBe('20px');
   });
 
-  it('applies variant classes', () => {
-    render(
-      <Pill variant="Active" data-testid="pill">
-        Active
-      </Pill>
-    );
-    const pill = screen.getByTestId('pill');
+  it('forwards click handlers', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(<Pill onClick={onClick}>Clickable</Pill>);
 
-    expect(pill).toHaveClass('bg-background-transparent-danger-muted');
-    expect(pill).toHaveClass('text-content-danger');
+    await user.click(screen.getByText('Clickable'));
+    expect(onClick).toHaveBeenCalledOnce();
   });
 
   it('accepts custom className', () => {
