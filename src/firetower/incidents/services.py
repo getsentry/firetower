@@ -172,6 +172,7 @@ def _set_action_item_sla(linear_service: LinearService, issue: dict) -> None:
     try:
         success = linear_service.update_issue(
             issue["id"],
+            sla_started_at=created_at.isoformat(),
             sla_breaches_at=(created_at + timedelta(days=slo_days)).isoformat(),
             sla_type="all",
         )

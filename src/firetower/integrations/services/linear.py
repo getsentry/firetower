@@ -571,6 +571,7 @@ class LinearService:
         state_id: str | None = None,
         assignee_id: str | None = None,
         priority: int | None = None,
+        sla_started_at: str | None = None,
         sla_breaches_at: str | None = None,
         sla_type: str | None = None,
     ) -> bool:
@@ -592,6 +593,8 @@ class LinearService:
             input_data["assigneeId"] = assignee_id
         if priority is not None:
             input_data["priority"] = priority
+        if sla_started_at is not None:
+            input_data["slaStartedAt"] = sla_started_at
         if sla_breaches_at is not None:
             input_data["slaBreachesAt"] = sla_breaches_at
         if sla_type is not None:
