@@ -1,4 +1,5 @@
 import {Suspense} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {CatchBoundary} from '@tanstack/react-router';
 import {Avatar} from 'components/Avatar';
@@ -6,38 +7,136 @@ import {Card} from 'components/Card';
 import {Skeleton} from 'components/Skeleton';
 import {Activity, Radio, Siren, UserRound, type LucideIcon} from 'lucide-react';
 
+import {background, content, fontWeight, space} from '../../../styles/tokens.stylex';
 import type {
   TimelineEvent,
   TimelineEventSource,
 } from '../queries/incidentTimelineQueryOptions';
 import {incidentTimelineQueryOptions} from '../queries/incidentTimelineQueryOptions';
 
+const styles = stylex.create({
+  row: {
+    paddingBottom: {default: space.xl, ':last-child': '0px'},
+    gap: space.md,
+    position: 'relative',
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr',
+  },
+  icon: {height: '16px', width: '16px'},
+  connector: {
+    backgroundColor: background.secondary,
+    position: 'absolute',
+    top: '28px',
+    bottom: '0px',
+    left: '14px',
+    width: '1px',
+  },
+  body: {minWidth: '0px'},
+  summary: {
+    color: content.headings,
+    fontSize: '14px',
+    lineHeight: '20px',
+    fontWeight: fontWeight.medium,
+  },
+  metadata: {
+    color: content.secondary,
+    marginTop: space.xs,
+    gap: space.sm,
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    fontSize: '12px',
+    lineHeight: '16px',
+  },
+  actor: {gap: space.xs, display: 'flex', alignItems: 'center'},
+  avatar: {height: '20px', width: '20px', fontSize: '10px'},
+  sourceLink: {
+    color: content.accent,
+    textDecoration: {default: null, ':hover': 'underline'},
+  },
+  empty: {
+    color: content.secondary,
+    textAlign: 'center',
+    fontSize: '14px',
+    lineHeight: '20px',
+  },
+  loading: {gap: space.xl, display: 'flex', flexDirection: 'column'},
+  screenReader: {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: 0,
+    margin: '-1px',
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    borderWidth: 0,
+  },
+  loadingRow: {gap: space.md, display: 'flex', alignItems: 'flex-start'},
+  loadingIcon: {height: '28px', width: '28px', flexShrink: 0, borderRadius: '9999px'},
+  loadingText: {gap: space.sm, display: 'flex', flex: '1 1 0%', flexDirection: 'column'},
+  loadingTitle: {height: '16px', width: '75%'},
+  loadingMetadata: {height: '12px', width: '50%'},
+  error: {
+    color: content.danger,
+    textAlign: 'center',
+    fontSize: '14px',
+    lineHeight: '20px',
+  },
+  heading: {
+    color: content.headings,
+    marginBottom: space.lg,
+    fontSize: '18px',
+    lineHeight: '28px',
+    fontWeight: 600,
+  },
+  sourceIcon: {
+    zIndex: 10,
+    display: 'flex',
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+  },
+  sourceNeutral: {backgroundColor: background.secondary, color: content.secondary},
+  sourceWarning: {
+    backgroundColor: background.transparentWarningMuted,
+    color: content.warning,
+  },
+  sourceDanger: {
+    backgroundColor: background.transparentDangerMuted,
+    color: content.danger,
+  },
+  lastConnector: {display: 'none'},
+});
+
 interface SourceStyle {
   label: string;
   Icon: LucideIcon;
-  iconClassName: string;
+  style: stylex.StyleXStyles;
 }
 
 const SOURCE_STYLES: Record<TimelineEventSource, SourceStyle> = {
   USER: {
     label: 'User',
     Icon: UserRound,
-    iconClassName: 'bg-background-secondary text-content-secondary',
+    style: styles.sourceNeutral,
   },
   INTERNAL: {
     label: 'Firetower',
     Icon: Activity,
-    iconClassName: 'bg-background-secondary text-content-secondary',
+    style: styles.sourceNeutral,
   },
   STATUSPAGE: {
     label: 'Statuspage',
     Icon: Radio,
-    iconClassName: 'bg-background-transparent-warning-muted text-content-warning',
+    style: styles.sourceWarning,
   },
   PAGERDUTY: {
     label: 'PagerDuty',
     Icon: Siren,
-    iconClassName: 'bg-background-transparent-danger-muted text-content-danger',
+    style: styles.sourceDanger,
   },
 };
 
@@ -53,32 +152,30 @@ function formatDateTime(dateString: string): string {
   });
 }
 
-function TimelineRow({event}: {event: TimelineEvent}) {
+function TimelineRow({event, isLast}: {event: TimelineEvent; isLast: boolean}) {
   const sourceStyle = SOURCE_STYLES[event.source];
   const SourceIcon = sourceStyle.Icon;
 
   return (
-    <li className="group pb-space-xl gap-space-md relative grid grid-cols-[auto_1fr] last:pb-0">
-      <div
-        className={`z-10 flex h-7 w-7 items-center justify-center rounded-full ${sourceStyle.iconClassName}`}
-      >
-        <SourceIcon className="h-4 w-4" aria-hidden="true" />
+    <li {...stylex.props(styles.row)}>
+      <div {...stylex.props(styles.sourceIcon, sourceStyle.style)}>
+        <SourceIcon {...stylex.props(styles.icon)} aria-hidden="true" />
       </div>
       <span
-        className="bg-background-secondary absolute top-7 bottom-0 left-3.5 w-px group-last:hidden"
+        {...stylex.props(styles.connector, isLast && styles.lastConnector)}
         aria-hidden="true"
       />
-      <div className="min-w-0">
-        <p className="text-content-headings text-sm font-medium">{event.summary}</p>
-        <div className="text-content-secondary mt-space-xs gap-space-sm flex flex-wrap items-center text-xs">
+      <div {...stylex.props(styles.body)}>
+        <p {...stylex.props(styles.summary)}>{event.summary}</p>
+        <div {...stylex.props(styles.metadata)}>
           {event.actor ? (
-            <span className="gap-space-xs flex items-center">
+            <span {...stylex.props(styles.actor)}>
               <span aria-hidden="true">
                 <Avatar
                   name={event.actor.name}
                   src={event.actor.avatar_url}
                   size="sm"
-                  className="!h-5 !w-5 !text-[10px]"
+                  style={styles.avatar}
                 />
               </span>
               {event.actor.name}
@@ -95,7 +192,7 @@ function TimelineRow({event}: {event: TimelineEvent}) {
                 href={event.link_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-content-accent hover:underline"
+                {...stylex.props(styles.sourceLink)}
               >
                 View source
               </a>
@@ -111,11 +208,11 @@ function TimelineBody({incidentId}: {incidentId: string}) {
   const {data: events} = useSuspenseQuery(incidentTimelineQueryOptions({incidentId}));
 
   return events.length === 0 ? (
-    <p className="text-content-secondary text-center text-sm">No timeline events yet.</p>
+    <p {...stylex.props(styles.empty)}>No timeline events yet.</p>
   ) : (
     <ol>
-      {events.map(event => (
-        <TimelineRow key={event.id} event={event} />
+      {events.map((event, index) => (
+        <TimelineRow key={event.id} event={event} isLast={index === events.length - 1} />
       ))}
     </ol>
   );
@@ -123,22 +220,18 @@ function TimelineBody({incidentId}: {incidentId: string}) {
 
 function TimelineLoading() {
   return (
-    <div
-      className="gap-space-xl flex flex-col"
-      role="status"
-      aria-label="Loading timeline"
-    >
-      <span className="sr-only">Loading timeline</span>
+    <div {...stylex.props(styles.loading)} role="status" aria-label="Loading timeline">
+      <span {...stylex.props(styles.screenReader)}>Loading timeline</span>
       {[0, 1, 2].map(index => (
         <div
           key={index}
-          className="gap-space-md flex items-start"
+          {...stylex.props(styles.loadingRow)}
           data-testid="timeline-skeleton-row"
         >
-          <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
-          <div className="gap-space-sm flex flex-1 flex-col">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-3 w-1/2" />
+          <Skeleton style={styles.loadingIcon} />
+          <div {...stylex.props(styles.loadingText)}>
+            <Skeleton style={styles.loadingTitle} />
+            <Skeleton style={styles.loadingMetadata} />
           </div>
         </div>
       ))}
@@ -148,7 +241,7 @@ function TimelineLoading() {
 
 function TimelineError() {
   return (
-    <p className="text-content-danger text-center text-sm" role="alert">
+    <p {...stylex.props(styles.error)} role="alert">
       Failed to load timeline events. Please try again.
     </p>
   );
@@ -160,10 +253,7 @@ export function IncidentTimeline({incidentId}: {incidentId: string}) {
   return (
     <Card>
       <section aria-labelledby={headingId}>
-        <h2
-          id={headingId}
-          className="text-content-headings mb-space-lg text-lg font-semibold"
-        >
+        <h2 id={headingId} {...stylex.props(styles.heading)}>
           Timeline
         </h2>
         <CatchBoundary getResetKey={() => incidentId} errorComponent={TimelineError}>

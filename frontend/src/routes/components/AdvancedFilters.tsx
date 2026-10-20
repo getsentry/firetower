@@ -1,5 +1,7 @@
+import * as stylex from '@stylexjs/stylex';
 import {Card} from 'components/Card';
 
+import {space} from '../../styles/tokens.stylex';
 import {ServiceTierSchema, SeveritySchema} from '../types';
 
 import {DateRangeFilter} from './filters/DateRangeFilter';
@@ -11,8 +13,8 @@ export {FilterTrigger} from './filters/FilterTrigger';
 
 export function FilterPanel() {
   return (
-    <Card className="gap-space-md flex flex-col" data-testid="advanced-filters">
-      <div className="gap-space-md grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+    <Card style={styles.panel} data-testid="advanced-filters">
+      <div {...stylex.props(styles.grid)}>
         <PillFilter
           label="Severity"
           filterKey="severity"
@@ -44,3 +46,16 @@ export function FilterPanel() {
     </Card>
   );
 }
+
+const styles = stylex.create({
+  panel: {gap: space.md, display: 'flex', flexDirection: 'column'},
+  grid: {
+    gap: space.md,
+    display: 'grid',
+    gridTemplateColumns: {
+      default: 'repeat(1, minmax(0, 1fr))',
+      '@media (min-width: 640px)': 'repeat(2, minmax(0, 1fr))',
+      '@media (min-width: 1280px)': 'repeat(3, minmax(0, 1fr))',
+    },
+  },
+});

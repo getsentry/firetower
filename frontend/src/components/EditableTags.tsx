@@ -1,19 +1,21 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {Loader2, Pencil, Plus, X} from 'lucide-react';
-import {cn} from 'utils/cn';
+
+import type {StyledProps} from '../styles/props';
+import {background, content, fontSize, radius, space} from '../styles/tokens.stylex';
 
 import {Button} from './Button';
 import {GetHelpLink} from './GetHelpLink';
 import {Tag} from './Tag';
 
-export interface EditableTagsProps {
+export interface EditableTagsProps extends StyledProps<object> {
   tags: string[];
   onSave: (tags: string[]) => Promise<void>;
   label?: string;
   suggestions?: string[];
   placeholder?: string;
   emptyText?: string;
-  className?: string;
   allowTagCreation?: boolean;
   onCreateTag?: (name: string) => Promise<void>;
 }
@@ -25,7 +27,7 @@ export function EditableTags({
   suggestions = [],
   placeholder = 'Add...',
   emptyText = 'None specified',
-  className,
+  style,
   allowTagCreation = false,
   onCreateTag,
 }: EditableTagsProps) {
@@ -69,7 +71,6 @@ export function EditableTags({
       });
   }, [draftTags, onSave]);
 
-  // Use optimistic tags until props catch up, then use props
   const sortedTags = [...tags].sort((a, b) => a.localeCompare(b));
   const tagsHaveCaughtUp =
     optimisticTags && JSON.stringify(sortedTags) === JSON.stringify(optimisticTags);
@@ -79,12 +80,6 @@ export function EditableTags({
     s => !draftTags.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
   );
 
-  // Show create option if:
-  // - allowTagCreation is true
-  // - onCreateTag is provided
-  // - input has content
-  // - input doesn't exactly match any suggestion (case-insensitive)
-  // - input isn't already in draftTags (case-insensitive)
   const trimmedInput = inputValue.trim();
   const exactMatchExists = suggestions.some(
     s => s.toLowerCase() === trimmedInput.toLowerCase()
@@ -99,7 +94,6 @@ export function EditableTags({
     !exactMatchExists &&
     !alreadyInDraft;
 
-  // Total options count (for keyboard navigation)
   const totalOptions = filteredSuggestions.length + (showCreateOption ? 1 : 0);
 
   const handleCreateTag = async () => {
@@ -108,7 +102,6 @@ export function EditableTags({
     setIsCreating(true);
     try {
       await onCreateTag(trimmedInput);
-      // Add to draft tags after successful creation
       setDraftTags(prev => [...prev, trimmedInput].sort((a, b) => a.localeCompare(b)));
       resetState();
       inputRef.current?.focus();
@@ -208,24 +201,24 @@ export function EditableTags({
   }, [isEditing, close]);
 
   return (
-    <div className={className}>
+    <div {...stylex.props(style)}>
       {label && (
-        <div className="mb-space-md gap-space-xs flex items-center">
-          <h3 className="text-size-md text-content-secondary font-semibold">{label}</h3>
+        <div {...stylex.props(styles.labelRow)}>
+          <h3 {...stylex.props(styles.label)}>{label}</h3>
           <Button
             variant="icon"
             onClick={open}
             aria-label={`Edit ${label}`}
-            className={cn(isEditing && 'invisible')}
+            style={isEditing && styles.invisible}
           >
-            <Pencil className="h-4 w-4" />
+            <Pencil {...stylex.props(styles.icon)} />
           </Button>
         </div>
       )}
 
-      <div className={cn('relative', isEditing && 'z-50')}>
+      <div {...stylex.props(styles.relative, isEditing && styles.raised)}>
         {isEditing ? (
-          <div className="gap-space-sm flex flex-wrap items-center">
+          <div {...stylex.props(styles.draftTags)}>
             {draftTags.map(tag => (
               <Tag
                 key={tag}
@@ -236,7 +229,7 @@ export function EditableTags({
                     onClick={() => removeTag(tag)}
                     aria-label={`Remove ${tag}`}
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X {...stylex.props(styles.closeIcon)} />
                   </Button>
                 }
               >
@@ -253,47 +246,45 @@ export function EditableTags({
               }}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
-              className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
+              {...stylex.props(styles.input)}
             />
           </div>
         ) : displayTags.length > 0 ? (
-          <div className="gap-space-sm flex flex-wrap">
+          <div {...stylex.props(styles.tags)}>
             {displayTags.map(tag => (
               <Tag key={tag}>{tag}</Tag>
             ))}
           </div>
         ) : (
-          <p className="text-size-sm text-content-disabled italic">{emptyText}</p>
+          <p {...stylex.props(styles.empty)}>{emptyText}</p>
         )}
 
-        {saveError && (
-          <p className="text-size-sm text-content-danger mt-space-sm">{saveError}</p>
-        )}
+        {saveError && <p {...stylex.props(styles.error)}>{saveError}</p>}
 
         {isEditing && (
-          <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
+          <div {...stylex.props(styles.dropdown)}>
             {totalOptions > 0 ? (
-              <div className="p-space-sm max-h-[200px] [scrollbar-width:none] overflow-y-auto [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div {...stylex.props(styles.options)}>
                 {showCreateOption && (
                   <button
                     ref={focusedIndex === 0 ? focusedOptionRef : undefined}
                     type="button"
                     onClick={handleCreateTag}
                     disabled={isCreating}
-                    className={cn(
-                      'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm flex items-center gap-space-sm',
-                      focusedIndex === 0
-                        ? 'bg-background-secondary'
-                        : 'hover:bg-background-transparent-neutral-muted',
-                      isCreating && 'cursor-wait opacity-70'
+                    {...stylex.props(
+                      styles.createOption,
+                      focusedIndex === 0 ? styles.highlighted : styles.hovered,
+                      isCreating && styles.creating
                     )}
                   >
                     {isCreating ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 {...stylex.props(styles.icon, styles.spinningIcon)} />
                     ) : (
-                      <Plus className="h-4 w-4" />
+                      <Plus {...stylex.props(styles.icon)} />
                     )}
-                    <span className="mt-[1px] mb-auto">Create tag "{trimmedInput}"</span>
+                    <span {...stylex.props(styles.createLabel)}>
+                      Create tag "{trimmedInput}"
+                    </span>
                   </button>
                 )}
                 {filteredSuggestions.map((suggestion, index) => {
@@ -304,11 +295,9 @@ export function EditableTags({
                       key={suggestion}
                       type="button"
                       onClick={() => addTag(suggestion)}
-                      className={cn(
-                        'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
-                        optionIndex === focusedIndex
-                          ? 'bg-background-secondary'
-                          : 'hover:bg-background-transparent-neutral-muted'
+                      {...stylex.props(
+                        styles.suggestion,
+                        optionIndex === focusedIndex ? styles.highlighted : styles.hovered
                       )}
                     >
                       {suggestion}
@@ -317,8 +306,8 @@ export function EditableTags({
                 })}
               </div>
             ) : inputValue.trim() ? (
-              <div className="text-size-sm text-content-secondary px-space-md py-space-lg text-center">
-                <p className={cn(!allowTagCreation && 'mb-space-sm')}>
+              <div {...stylex.props(styles.noMatches)}>
+                <p {...stylex.props(!allowTagCreation && styles.emptyMessage)}>
                   No tags match that query.
                 </p>
                 {!allowTagCreation && (
@@ -333,12 +322,99 @@ export function EditableTags({
       </div>
 
       {isEditing && (
-        <div
-          className="fixed inset-0 z-40 bg-transparent"
-          aria-hidden="true"
-          onClick={close}
-        />
+        <div {...stylex.props(styles.backdrop)} aria-hidden="true" onClick={close} />
       )}
     </div>
   );
 }
+
+const spin = stylex.keyframes({to: {transform: 'rotate(360deg)'}});
+const styles = stylex.create({
+  spinningIcon: {
+    animationName: spin,
+    animationDuration: '1s',
+    animationTimingFunction: 'linear',
+    animationIterationCount: 'infinite',
+  },
+  labelRow: {
+    marginBottom: space.md,
+    gap: space.xs,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  label: {fontSize: fontSize.md, color: content.secondary, fontWeight: 600},
+  icon: {height: 16, width: 16},
+  draftTags: {gap: space.sm, display: 'flex', flexWrap: 'wrap', alignItems: 'center'},
+  closeIcon: {height: 14, width: 14},
+  input: {
+    paddingInline: space.sm,
+    paddingBlock: space.xs,
+    fontSize: fontSize.sm,
+    color: {default: null, '::placeholder': content.disabled},
+    minWidth: '100px',
+    flex: '1',
+    backgroundColor: 'transparent',
+  },
+  tags: {gap: space.sm, display: 'flex', flexWrap: 'wrap'},
+  empty: {fontSize: fontSize.sm, color: content.disabled, fontStyle: 'italic'},
+  error: {fontSize: fontSize.sm, color: content.danger, marginTop: space.sm},
+  dropdown: {
+    marginTop: space.xs,
+    borderRadius: radius.md,
+    backgroundColor: background.primary,
+    position: 'absolute',
+    right: 0,
+    left: 0,
+    zIndex: 50,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#e5e7eb',
+    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+  },
+  options: {
+    padding: space.sm,
+    maxHeight: '200px',
+    scrollbarWidth: 'none',
+    overflowY: 'auto',
+    display: {default: null, '::-webkit-scrollbar': 'none'},
+  },
+  createLabel: {marginTop: '1px', marginBottom: 'auto'},
+  noMatches: {
+    fontSize: fontSize.sm,
+    color: content.secondary,
+    paddingInline: space.md,
+    paddingBlock: space.lg,
+    textAlign: 'center',
+  },
+  backdrop: {position: 'fixed', inset: 0, zIndex: 40, backgroundColor: 'transparent'},
+  invisible: {visibility: 'hidden'},
+  relative: {position: 'relative'},
+  raised: {zIndex: 50},
+  emptyMessage: {marginBottom: space.sm},
+  createOption: {
+    width: '100%',
+    textAlign: 'left',
+    paddingInline: space.md,
+    paddingBlock: space.sm,
+    cursor: 'pointer',
+    borderRadius: radius.sm,
+    fontSize: fontSize.sm,
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  highlighted: {backgroundColor: background.secondary},
+  hovered: {
+    backgroundColor: {default: null, ':hover': background.transparentNeutralMuted},
+  },
+  creating: {cursor: 'wait', opacity: 0.7},
+  suggestion: {
+    width: '100%',
+    textAlign: 'left',
+    paddingInline: space.md,
+    paddingBlock: space.sm,
+    cursor: 'pointer',
+    borderRadius: radius.sm,
+    fontSize: fontSize.sm,
+  },
+});

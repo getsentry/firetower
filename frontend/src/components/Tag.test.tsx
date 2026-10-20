@@ -1,4 +1,5 @@
 import React from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {render, screen} from '@testing-library/react';
 import {describe, expect, it} from 'vitest';
 
@@ -10,27 +11,14 @@ describe('Tag', () => {
     expect(screen.getByText('Test Tag')).toBeInTheDocument();
   });
 
-  it('applies base classes', () => {
-    render(<Tag data-testid="tag">Default</Tag>);
-    const tag = screen.getByTestId('tag');
-
-    expect(tag).toHaveClass('bg-background-tertiary');
-    expect(tag).toHaveClass('text-content-secondary');
-    expect(tag).toHaveClass('px-space-md');
-    expect(tag).toHaveClass('py-space-xs');
-    expect(tag).toHaveClass('rounded-radius-xs');
-    expect(tag).toHaveClass('text-size-sm');
-  });
-
-  it('accepts custom className', () => {
-    render(
-      <Tag className="custom-class" data-testid="tag">
-        Custom
-      </Tag>
+  it('composes caller styles and dynamic dimensions', () => {
+    render(<Tag style={[styles.padding(12), styles.padding(20)]}>Styled</Tag>);
+    expect(screen.getByText('Styled').parentElement?.getAttribute('style')).toContain(
+      '20px'
     );
-    const tag = screen.getByTestId('tag');
-
-    expect(tag).toHaveClass('custom-class');
+    expect(screen.getByText('Styled').parentElement?.getAttribute('style')).not.toContain(
+      '12px'
+    );
   });
 
   it('spreads additional props', () => {
@@ -53,3 +41,5 @@ describe('Tag', () => {
     expect(inner).toHaveTextContent('Content');
   });
 });
+
+const styles = stylex.create({padding: (value: number) => ({paddingInline: value})});

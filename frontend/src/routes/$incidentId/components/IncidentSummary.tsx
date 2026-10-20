@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {Card} from 'components/Card';
 import {EditablePill} from 'components/EditablePill';
@@ -5,6 +6,7 @@ import {EditableTags} from 'components/EditableTags';
 import {EditableTextField} from 'components/EditableTextField';
 import {Pill} from 'components/Pill';
 
+import {content, fontSize, space} from '../../../styles/tokens.stylex';
 import {ServiceTierSchema, SeveritySchema, StatusSchema} from '../../types';
 import {createTagMutationOptions} from '../queries/createTagMutationOptions';
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
@@ -74,16 +76,13 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
 
   return (
     <Card>
-      <div className="mb-space-lg flex items-center justify-between">
-        <span className="text-content-secondary gap-space-xs flex items-center text-sm leading-none">
+      <div {...stylex.props(styles.header)}>
+        <span {...stylex.props(styles.identifier)}>
           {incident.is_private && <span aria-label="Private incident">🔒</span>}
           {incident.id}
         </span>
-        <div className="gap-space-md flex items-center">
-          <time
-            className="text-content-secondary text-right text-sm"
-            dateTime={incident.created_at}
-          >
+        <div {...stylex.props(styles.metadata)}>
+          <time {...stylex.props(styles.createdAt)} dateTime={incident.created_at}>
             {formatDateTime(incident.created_at)}
           </time>
           <OverflowMenu
@@ -92,7 +91,7 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
           />
         </div>
       </div>
-      <div className="gap-space-lg mb-space-xl flex">
+      <div {...stylex.props(styles.pills)}>
         <EditablePill
           value={incident.severity}
           options={SeveritySchema.options}
@@ -111,12 +110,12 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         />
         {incident.is_private && <Pill variant="private">Private</Pill>}
       </div>
-      <div className="mb-space-xl">
+      <div {...stylex.props(styles.titleContainer)}>
         <EditableTextField
           value={incident.title}
           onSave={handleFieldChange('title')}
           as="h3"
-          className="text-content-headings text-2xl font-semibold"
+          style={styles.title}
         />
       </div>
       <EditableTextField
@@ -125,22 +124,22 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
         as="p"
         multiline
         placeholder="No description provided"
-        className="text-content-secondary"
+        style={styles.secondary}
         label="Description"
-        labelClassName="text-size-md font-semibold"
+        labelStyle={styles.label}
       />
 
-      <div className="mt-space-xl gap-space-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5">
+      <div {...stylex.props(styles.details)}>
         <div>
           <EditableTextField
             value={incident.impact_summary}
             onSave={handleFieldChange('impact_summary')}
             label="Impact summary"
-            labelClassName="text-size-md font-semibold"
+            labelStyle={styles.label}
             as="p"
             multiline
             placeholder="No impact specified"
-            className="text-size-sm text-content-secondary"
+            style={styles.impactSummary}
           />
         </div>
 
@@ -215,3 +214,43 @@ export function IncidentSummary({incident}: IncidentSummaryProps) {
     </Card>
   );
 }
+
+const styles = stylex.create({
+  header: {
+    marginBottom: space.lg,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  identifier: {
+    color: content.secondary,
+    gap: space.xs,
+    display: 'flex',
+    alignItems: 'center',
+    fontSize: '14px',
+    lineHeight: 1,
+  },
+  metadata: {gap: space.md, display: 'flex', alignItems: 'center'},
+  createdAt: {
+    color: content.secondary,
+    textAlign: 'right',
+    fontSize: '14px',
+    lineHeight: '20px',
+  },
+  pills: {gap: space.lg, marginBottom: space.xl, display: 'flex'},
+  titleContainer: {marginBottom: space.xl},
+  title: {color: content.headings, fontSize: '24px', lineHeight: '32px', fontWeight: 600},
+  secondary: {color: content.secondary},
+  label: {fontSize: fontSize.md, fontWeight: 600},
+  details: {
+    marginTop: space.xl,
+    gap: space.xl,
+    display: 'grid',
+    gridTemplateColumns: {
+      default: 'repeat(1, minmax(0, 1fr))',
+      '@media (min-width: 768px)': 'repeat(2, minmax(0, 1fr))',
+      '@media (min-width: 1024px)': 'repeat(5, minmax(0, 1fr))',
+    },
+  },
+  impactSummary: {fontSize: fontSize.sm, color: content.secondary},
+});

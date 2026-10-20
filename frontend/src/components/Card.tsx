@@ -1,49 +1,49 @@
 import React from 'react';
-import {cva, type VariantProps} from 'class-variance-authority';
-import {cn} from 'utils/cn';
+import * as stylex from '@stylexjs/stylex';
 
-const card = cva([
-  'bg-background-primary',
-  'rounded-radius-lg',
-  'p-space-2xl',
-  'shadow-sm',
-]);
+import type {StyledProps} from '../styles/props';
+import {background, content, radius, space} from '../styles/tokens.stylex';
 
-interface CardProps
-  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof card> {
-  ref?: React.Ref<HTMLDivElement>;
-}
-
-const CardRoot = ({className, ref, ...props}: CardProps) => (
-  <div ref={ref} className={cn(card({className}))} {...props} />
-);
-
-const title = cva(['text-lg', 'font-semibold', 'mb-space-xl', 'text-content-headings'], {
-  variants: {
-    size: {
-      sm: ['text-sm'],
-      base: ['text-base'],
-      lg: ['text-lg'],
-      xl: ['text-xl'],
-      '2xl': ['text-2xl'],
-    },
+const styles = stylex.create({
+  root: {
+    backgroundColor: background.primary,
+    borderRadius: radius.lg,
+    padding: space['2xl'],
+    boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
   },
-  defaultVariants: {
-    size: 'lg',
+  title: {
+    fontSize: 18,
+    lineHeight: '28px',
+    fontWeight: 600,
+    marginBottom: space.xl,
+    color: content.headings,
   },
+  sm: {fontSize: 14, lineHeight: '20px'},
+  base: {fontSize: 16, lineHeight: '24px'},
+  lg: {fontSize: 18, lineHeight: '28px'},
+  xl: {fontSize: 20, lineHeight: '28px'},
+  '2xl': {fontSize: 24, lineHeight: '32px'},
 });
-
-interface TitleProps
-  extends React.HTMLAttributes<HTMLHeadingElement>, VariantProps<typeof title> {
+const sizes = {
+  sm: styles.sm,
+  base: styles.base,
+  lg: styles.lg,
+  xl: styles.xl,
+  '2xl': styles['2xl'],
+};
+type CardProps = StyledProps<React.HTMLAttributes<HTMLDivElement>> & {
+  ref?: React.Ref<HTMLDivElement>;
+};
+type TitleProps = StyledProps<React.HTMLAttributes<HTMLHeadingElement>> & {
+  size?: keyof typeof sizes | null;
   ref?: React.Ref<HTMLHeadingElement>;
-}
-
-const Title = ({className, size, children, ref, ...props}: TitleProps) => (
-  <h3 ref={ref} className={cn(title({className, size}))} {...props}>
+};
+const CardRoot = ({style, ref, ...props}: CardProps) => (
+  <div ref={ref} {...stylex.props(styles.root, style)} {...props} />
+);
+const Title = ({style, size = 'lg', children, ref, ...props}: TitleProps) => (
+  <h3 ref={ref} {...stylex.props(styles.title, size && sizes[size], style)} {...props}>
     {children}
   </h3>
 );
-
-export const Card = Object.assign(CardRoot, {
-  Title,
-});
+export const Card = Object.assign(CardRoot, {Title});

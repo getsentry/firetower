@@ -1,6 +1,7 @@
 import React from 'react';
 import * as stylex from '@stylexjs/stylex';
 
+import type {StyledProps} from '../styles/props';
 import {
   background,
   content,
@@ -76,21 +77,16 @@ const variants = {
   default: styles.default,
 };
 
-interface PillProps extends React.HTMLAttributes<HTMLDivElement> {
+interface PillProps extends StyledProps<React.HTMLAttributes<HTMLDivElement>> {
   variant?: keyof typeof variants | null;
   ref?: React.Ref<HTMLDivElement>;
 }
 
-const Pill = ({children, className, variant = 'default', ref, ...props}: PillProps) => {
-  const {className: stylexClassName} = stylex.props(
-    styles.base,
-    variant === null ? null : variants[variant]
-  );
-
+const Pill = ({children, style, variant = 'default', ref, ...props}: PillProps) => {
   return (
     <div
       ref={ref}
-      className={[stylexClassName, className].filter(Boolean).join(' ')}
+      {...stylex.props(styles.base, variant === null ? null : variants[variant], style)}
       {...props}
     >
       {children}

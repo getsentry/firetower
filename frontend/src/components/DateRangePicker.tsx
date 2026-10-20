@@ -1,10 +1,13 @@
+import {useRef} from 'react';
 import type {DateRange} from 'react-day-picker';
+import * as stylex from '@stylexjs/stylex';
 import {XIcon} from 'lucide-react';
+
+import {background, content, fontSize, radius, space} from '../styles/tokens.stylex';
 
 import {Button} from './Button';
 import {Calendar} from './Calendar';
 import {Popover, PopoverContent, PopoverTrigger} from './Popover';
-import {Tag} from './Tag';
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
@@ -41,40 +44,34 @@ export function DateRangePicker({
   align = 'start',
   numberOfMonths = 2,
 }: DateRangePickerProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        {value?.from ? (
-          <Tag
-            className="hover:bg-background-transparent-neutral-muted cursor-pointer select-none"
-            action={
-              onClear ? (
-                <Button
-                  variant="close"
-                  size={null}
-                  onClick={e => {
-                    e.stopPropagation();
-                    onClear();
-                  }}
-                  aria-label="Clear date range"
-                >
-                  <XIcon className="h-3.5 w-3.5" />
-                </Button>
-              ) : null
-            }
-          >
-            {formatRange(value)}
-          </Tag>
-        ) : (
+      <span {...stylex.props(styles.control, value?.from && styles.selected)}>
+        <PopoverTrigger asChild>
           <button
+            ref={triggerRef}
             type="button"
-            className="text-size-sm text-content-disabled cursor-pointer italic select-none"
+            {...stylex.props(styles.trigger, !value?.from && styles.placeholder)}
           >
-            {placeholder}
+            {value?.from ? formatRange(value) : placeholder}
           </button>
+        </PopoverTrigger>
+        {value?.from && onClear && (
+          <Button
+            variant="close"
+            size={null}
+            onClick={() => {
+              onClear();
+              triggerRef.current?.focus();
+            }}
+            aria-label="Clear date range"
+          >
+            <XIcon {...stylex.props(styles.clearIcon)} />
+          </Button>
         )}
-      </PopoverTrigger>
-      <PopoverContent className="w-auto overflow-hidden p-0" align={align}>
+      </span>
+      <PopoverContent style={styles.popover} align={align}>
         <Calendar
           mode="range"
           selected={value}
@@ -88,3 +85,26 @@ export function DateRangePicker({
     </Popover>
   );
 }
+
+const styles = stylex.create({
+  control: {display: 'inline-flex', alignItems: 'center', gap: space.xs},
+  selected: {
+    paddingInline: space.md,
+    paddingBlock: space.xs,
+    backgroundColor: {
+      default: background.tertiary,
+      '@media (prefers-color-scheme: dark)': {
+        default: background.secondary,
+        ':hover': background.transparentNeutralMuted,
+      },
+      ':hover': background.transparentNeutralMuted,
+    },
+    borderRadius: radius.xs,
+    fontSize: fontSize.sm,
+    color: content.secondary,
+  },
+  trigger: {cursor: 'pointer', userSelect: 'none', backgroundColor: 'transparent'},
+  clearIcon: {height: 14, width: 14},
+  placeholder: {fontSize: fontSize.sm, color: content.disabled, fontStyle: 'italic'},
+  popover: {width: 'auto', overflow: 'hidden', padding: 0},
+});

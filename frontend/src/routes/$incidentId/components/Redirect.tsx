@@ -1,9 +1,12 @@
 import {useEffect, useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
+
+import {content, space} from '../../../styles/tokens.stylex';
 
 type RedirectProps = {
   redirect?: string;
   message?: string;
-  countdown?: number; // Countdown duration in seconds
+  countdown?: number;
 };
 
 export const Redirect = ({
@@ -16,7 +19,6 @@ export const Redirect = ({
   useEffect(() => {
     if (!redirect) return;
 
-    // Countdown timer
     if (timeRemaining > 0) {
       const timer = setTimeout(() => {
         setTimeRemaining(timeRemaining - 1);
@@ -24,25 +26,23 @@ export const Redirect = ({
       return () => clearTimeout(timer);
     }
 
-    // Redirect when countdown reaches 0
     if (timeRemaining === 0) {
       window.location.href = redirect;
     }
   }, [redirect, timeRemaining]);
 
-  // If redirect URL is set, show countdown message
   if (redirect) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-heading-sm mb-space-sm">{message}</h2>
-          <p className="text-content-secondary">
+      <div {...stylex.props(styles.container)}>
+        <div {...stylex.props(styles.content)}>
+          <h2 {...stylex.props(styles.heading)}>{message}</h2>
+          <p {...stylex.props(styles.secondary)}>
             You will be redirected in {timeRemaining} second
             {timeRemaining !== 1 ? 's' : ''}
           </p>
-          <p className="text-content-secondary">
+          <p {...stylex.props(styles.secondary)}>
             Or,{' '}
-            <a href={redirect} className="text-content-accent">
+            <a href={redirect} {...stylex.props(styles.link)}>
               click here
             </a>{' '}
             to be redirected now.
@@ -53,3 +53,16 @@ export const Redirect = ({
   }
   return null;
 };
+
+const styles = stylex.create({
+  container: {
+    display: 'flex',
+    minHeight: '50vh',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {textAlign: 'center'},
+  heading: {marginBottom: space.sm},
+  secondary: {color: content.secondary},
+  link: {color: content.accent},
+});

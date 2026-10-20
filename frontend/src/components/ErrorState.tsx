@@ -1,5 +1,8 @@
 import type {ReactNode} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {Link} from '@tanstack/react-router';
+
+import {background, content, fontWeight, space} from '../styles/tokens.stylex';
 
 interface ErrorStateProps {
   title?: string;
@@ -13,22 +16,13 @@ export const ErrorState = ({
   showBackButton = false,
 }: ErrorStateProps) => {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
-      <div className="text-center">
-        <h2 className="text-content-headings mb-space-lg text-2xl font-medium">
-          {title}
-        </h2>
-        {description && (
-          <div className="text-content-secondary mb-space-lg space-y-space-lg mx-auto max-w-md">
-            {description}
-          </div>
-        )}
+    <div {...stylex.props(styles.container)}>
+      <div {...stylex.props(styles.content)}>
+        <h2 {...stylex.props(styles.title)}>{title}</h2>
+        {description && <div {...stylex.props(styles.description)}>{description}</div>}
         {showBackButton && (
-          <div className="mt-space-xl">
-            <Link
-              to="/"
-              className="text-content-secondary hover:bg-background-secondary hover:text-content-accent px-space-md py-space-sm inline-flex items-center gap-2 rounded-sm transition-colors"
-            >
+          <div {...stylex.props(styles.backContainer)}>
+            <Link to="/" {...stylex.props(styles.backLink)}>
               <span>{String.fromCharCode(8592)}</span>
               <span>All Incidents</span>
             </Link>
@@ -38,3 +32,44 @@ export const ErrorState = ({
     </div>
   );
 };
+
+const styles = stylex.create({
+  container: {
+    display: 'flex',
+    minHeight: '40vh',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {textAlign: 'center'},
+  title: {
+    color: content.headings,
+    marginBottom: space.lg,
+    fontSize: 24,
+    lineHeight: '32px',
+    fontWeight: fontWeight.medium,
+  },
+  description: {
+    color: content.secondary,
+    marginBottom: space.lg,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.lg,
+    marginInline: 'auto',
+    maxWidth: 448,
+  },
+  backContainer: {marginTop: space.xl},
+  backLink: {
+    color: {default: content.secondary, ':hover': content.accent},
+    backgroundColor: {default: null, ':hover': background.secondary},
+    paddingInline: space.md,
+    paddingBlock: space.sm,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 2,
+    transitionProperty:
+      'color, background-color, border-color, text-decoration-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+});

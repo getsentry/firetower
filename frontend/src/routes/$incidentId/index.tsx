@@ -1,4 +1,5 @@
 import {useEffect} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {ErrorState} from 'components/ErrorState';
@@ -59,11 +60,11 @@ function Incident() {
 
   const incident = inc_or_redir.incident;
   return (
-    <div className="space-y-4 p-2">
+    <div {...stylex.props(styles.page)}>
       <IncidentSummary incident={incident} />
 
-      <div className="flex flex-col gap-4 md:flex-row">
-        <section className="order-2 flex flex-col gap-4 md:order-1 md:flex-[2]">
+      <div {...stylex.props(styles.columns)}>
+        <section {...stylex.props(styles.main)}>
           <ActionItemsList
             incidentId={params.incidentId}
             linearUrl={incident.external_links.linear}
@@ -71,7 +72,7 @@ function Incident() {
           <IncidentTimeline incidentId={incident.id} />
         </section>
 
-        <aside className="order-1 flex flex-col gap-4 md:order-2 md:flex-1">
+        <aside {...stylex.props(styles.sidebar)}>
           {incident.external_links.slack && (
             <SlackLink
               slackUrl={incident.external_links.slack}
@@ -89,3 +90,26 @@ function Incident() {
     </div>
   );
 }
+
+const styles = stylex.create({
+  page: {display: 'flex', flexDirection: 'column', rowGap: '16px', padding: '8px'},
+  columns: {
+    display: 'flex',
+    flexDirection: {default: 'column', '@media (min-width: 768px)': 'row'},
+    gap: '16px',
+  },
+  main: {
+    order: {default: 2, '@media (min-width: 768px)': 1},
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    flex: {default: null, '@media (min-width: 768px)': '2'},
+  },
+  sidebar: {
+    order: {default: 1, '@media (min-width: 768px)': 2},
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    flex: {default: null, '@media (min-width: 768px)': '1 1 0%'},
+  },
+});

@@ -1,16 +1,19 @@
-import {cn} from 'utils/cn';
+import * as stylex from '@stylexjs/stylex';
 
-interface SkeletonProps {
-  className?: string;
-  style?: React.CSSProperties;
-}
+import type {StyledProps} from '../styles/props';
+import {background, radius} from '../styles/tokens.stylex';
 
-export const Skeleton = ({className, style}: SkeletonProps) => {
-  return (
-    <div
-      className={cn('animate-pulse rounded-radius-sm bg-background-secondary', className)}
-      style={style}
-      aria-hidden="true"
-    />
-  );
-};
+const pulse = stylex.keyframes({'50%': {opacity: 0.5}});
+const styles = stylex.create({
+  root: {
+    animationName: pulse,
+    animationDuration: '2s',
+    animationTimingFunction: 'cubic-bezier(0.4, 0, 0.6, 1)',
+    animationIterationCount: 'infinite',
+    borderRadius: radius.sm,
+    backgroundColor: background.secondary,
+  },
+});
+export const Skeleton = ({style, ...props}: StyledProps<React.ComponentProps<'div'>>) => (
+  <div {...stylex.props(styles.root, style)} aria-hidden="true" {...props} />
+);

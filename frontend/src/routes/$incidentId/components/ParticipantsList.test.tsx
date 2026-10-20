@@ -87,10 +87,10 @@ describe('ParticipantsList', () => {
 
     await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
 
-    // Should show search input and cancel button
     expect(screen.getByRole('button', {name: 'Cancel'})).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', 'John Smith');
+    expect(screen.getByRole('textbox')).toHaveFocus();
   });
 
   it('shows dropdown immediately when entering edit mode', async () => {
@@ -144,7 +144,6 @@ describe('ParticipantsList', () => {
 
     await user.click(screen.getByRole('button', {name: 'Edit Captain'}));
 
-    // Should only show 2 options (deduplicated), not 3
     expect(screen.getAllByRole('option')).toHaveLength(2);
   });
 
@@ -281,7 +280,6 @@ describe('ParticipantsList', () => {
 
     await user.type(input, '{arrowdown}{arrowdown}{enter}');
 
-    // After selection, the async mutation resolves/rejects and edit mode closes
     await waitFor(() => {
       expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     });

@@ -1,10 +1,13 @@
 import {Fragment} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
 import {ErrorState} from 'components/ErrorState';
 import {GetHelpLink} from 'components/GetHelpLink';
 import {z} from 'zod';
+
+import {background, content, fontSize, radius, space} from '../../styles/tokens.stylex';
 
 import {AvailabilityTooltip} from './components/AvailabilityTooltip';
 import {PeriodLabels} from './components/PeriodLabels';
@@ -13,6 +16,7 @@ import {RegionRow} from './components/RegionRow';
 import {
   availabilityQueryOptions,
   PeriodSchema,
+  type AvailabilityData,
   type Period,
   type PeriodData,
 } from './queries/availabilityQueryOptions';
@@ -40,10 +44,7 @@ export const Route = createFileRoute('/availability/')({
   ),
 });
 
-function getPeriodsForGranularity(
-  data: {months: PeriodData[]; quarters: PeriodData[]; years: PeriodData[]},
-  period: Period
-): PeriodData[] {
+function getPeriodsForGranularity(data: AvailabilityData, period: Period): PeriodData[] {
   switch (period) {
     case 'month':
       return data.months;
@@ -71,29 +72,27 @@ function AvailabilityPage() {
   const regions = currentPeriod?.regions ?? [];
 
   return (
-    <div className="flex flex-col">
-      <div className="mb-space-xl flex flex-wrap items-end justify-between gap-4">
+    <div {...stylex.props(styles.page)}>
+      <div {...stylex.props(styles.header)}>
         <div>
-          <div className="gap-space-sm flex items-center">
-            <h1 className="text-content-headings text-size-2xl font-semibold">
-              Availability by Region
-            </h1>
+          <div {...stylex.props(styles.titleRow)}>
+            <h1 {...stylex.props(styles.title)}>Availability by Region</h1>
             <AvailabilityTooltip />
           </div>
-          <p className="text-content-secondary mt-space-xs text-size-sm">
-            {getDateRangeLabel(periods)}
-          </p>
+          <p {...stylex.props(styles.dateRange)}>{getDateRangeLabel(periods)}</p>
         </div>
         <PeriodTabs activePeriod={activePeriod} />
       </div>
       <PeriodLabels periods={periods} />
-      <div className="bg-background-primary rounded-radius-lg p-space-2xl gap-space-md px-space-xl pt-space-2xl pb-space-2xl flex flex-col shadow-sm">
+      <div {...stylex.props(styles.regions)}>
         {regions.map((region, i) => {
           const showGroupSpacing =
             i > 0 && region.group_index !== regions[i - 1]!.group_index;
           return (
             <Fragment key={region.name}>
-              {showGroupSpacing ? <div className="pt-space-md" aria-hidden /> : null}
+              {showGroupSpacing ? (
+                <div {...stylex.props(styles.groupSpacer)} aria-hidden />
+              ) : null}
               <RegionRow regionName={region.name} periods={periods} />
             </Fragment>
           );
@@ -102,3 +101,31 @@ function AvailabilityPage() {
     </div>
   );
 }
+
+const styles = stylex.create({
+  page: {display: 'flex', flexDirection: 'column'},
+  header: {
+    marginBottom: space.xl,
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  titleRow: {gap: space.sm, display: 'flex', alignItems: 'center'},
+  title: {color: content.headings, fontSize: fontSize['2xl'], fontWeight: 600},
+  dateRange: {color: content.secondary, marginTop: space.xs, fontSize: fontSize.sm},
+  regions: {
+    backgroundColor: background.primary,
+    borderRadius: radius.lg,
+    padding: space['2xl'],
+    gap: space.md,
+    paddingInline: space.xl,
+    paddingTop: space['2xl'],
+    paddingBottom: space['2xl'],
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+  },
+  groupSpacer: {paddingTop: space.md},
+});

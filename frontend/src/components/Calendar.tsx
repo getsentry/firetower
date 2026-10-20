@@ -1,186 +1,328 @@
 import {useEffect, useRef, type ComponentProps} from 'react';
-import {DayPicker, getDefaultClassNames, type DayButton} from 'react-day-picker';
+import {
+  DayPicker,
+  useDayPicker,
+  type Chevron,
+  type Day,
+  type DayButton,
+  type PreviousMonthButton,
+  type Root,
+  type WeekNumber,
+} from 'react-day-picker';
+import * as stylex from '@stylexjs/stylex';
 import {ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon} from 'lucide-react';
-import {cn} from 'utils/cn';
 
-import {Button, buttonVariants} from './Button';
+import type {StyledProps} from '../styles/props';
+import {background, content, fontWeight, radius} from '../styles/tokens.stylex';
+
+import {buttonStyles} from './buttonStyles';
+
+type CalendarOptions<Props> = Props extends unknown
+  ? Omit<
+      Props,
+      'classNames' | 'styles' | 'modifiersClassNames' | 'modifiersStyles' | 'components'
+    >
+  : never;
+type CalendarProps = StyledProps<CalendarOptions<ComponentProps<typeof DayPicker>>> & {
+  classNames?: never;
+  styles?: never;
+  modifiersClassNames?: never;
+  modifiersStyles?: never;
+  components?: never;
+};
+const styles = stylex.create({
+  root: {width: 'fit-content', padding: 12, backgroundColor: 'transparent'},
+  months: {
+    display: 'flex',
+    gap: 16,
+    flexDirection: {default: 'column', '@media (min-width: 768px)': 'row'},
+    position: 'relative',
+  },
+  month: {display: 'flex', flexDirection: 'column', width: '100%', gap: 16},
+  nav: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    width: '100%',
+    position: 'absolute',
+    top: 0,
+    insetInline: 0,
+    justifyContent: 'space-between',
+  },
+  navigationButton: {
+    height: 32,
+    width: 32,
+    padding: 0,
+    userSelect: 'none',
+    opacity: {default: 1, ':disabled': 0.5},
+  },
+  monthCaption: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 32,
+    width: '100%',
+    paddingInline: 32,
+  },
+  dropdowns: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    fontSize: 14,
+    lineHeight: '20px',
+    fontWeight: fontWeight.medium,
+    justifyContent: 'center',
+    height: 32,
+    gap: 6,
+    color: content.primary,
+  },
+  dropdownRoot: {
+    position: 'relative',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#e5e7eb',
+    borderRadius: radius.md,
+  },
+  dropdown: {
+    position: 'absolute',
+    inset: 0,
+    color: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  captionLabel: {
+    userSelect: 'none',
+    fontWeight: fontWeight.medium,
+    fontSize: 14,
+    lineHeight: '20px',
+  },
+  dropdownLabel: {
+    borderRadius: 6,
+    paddingLeft: 8,
+    paddingRight: 4,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    height: 32,
+  },
+  table: {width: '100%', borderCollapse: 'collapse'},
+  weekdays: {display: 'flex'},
+  weekday: {
+    color: content.secondary,
+    borderRadius: 6,
+    flex: '1',
+    fontWeight: 400,
+    fontSize: '0.8rem',
+    userSelect: 'none',
+  },
+  week: {display: 'flex', width: '100%', marginTop: 8},
+  weekNumberHeader: {userSelect: 'none', width: 32},
+  weekNumber: {fontSize: '0.8rem', userSelect: 'none', color: content.secondary},
+  weekNumberContent: {
+    display: 'flex',
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+  },
+  day: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+    padding: 0,
+    textAlign: 'center',
+    aspectRatio: '1',
+    userSelect: 'none',
+  },
+  rangeStart: {
+    borderStartStartRadius: 6,
+    borderEndStartRadius: 6,
+    backgroundColor: background.secondary,
+  },
+  rangeMiddle: {borderRadius: 0, backgroundColor: background.secondary},
+  rangeEnd: {
+    borderStartEndRadius: 6,
+    borderEndEndRadius: 6,
+    backgroundColor: background.secondary,
+  },
+  today: {backgroundColor: background.secondary, borderRadius: 6},
+  selectedToday: {borderRadius: 0},
+  outside: {color: content.disabled},
+  disabled: {color: content.disabled, opacity: 0.5},
+  hidden: {visibility: 'hidden'},
+  icon: {width: 16, height: 16},
+  dropdownIcon: {width: 14, height: 14},
+  rtlIcon: {transform: 'rotate(180deg)'},
+  unavailable: {opacity: 0.5},
+  dayButton: {
+    display: 'flex',
+    aspectRatio: '1',
+    width: '100%',
+    height: 'auto',
+    minWidth: 32,
+    flexDirection: 'column',
+    gap: 4,
+    lineHeight: 1,
+    fontWeight: 400,
+  },
+  selected: {
+    backgroundColor: background.accentVibrant,
+    color: content.onVibrantLight,
+    borderRadius: radius.md,
+  },
+  middleButton: {color: content.primary, backgroundColor: 'transparent', borderRadius: 0},
+  firstSelected: {borderStartStartRadius: 6, borderEndStartRadius: 6},
+  lastSelected: {borderStartEndRadius: 6, borderEndEndRadius: 6},
+});
 
 function Calendar({
-  className,
-  classNames,
+  style,
   showOutsideDays = true,
   captionLayout = 'label',
   formatters,
-  components,
   ...props
-}: ComponentProps<typeof DayPicker>) {
-  const defaultClassNames = getDefaultClassNames();
-
+}: CalendarProps) {
   return (
     <DayPicker
+      {...props}
+      {...stylex.props(styles.root, style)}
       showOutsideDays={showOutsideDays}
-      className={cn(
-        'bg-background group/calendar p-3 [--cell-size:--spacing(8)] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent',
-        String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
-        String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
-        className
-      )}
       captionLayout={captionLayout}
       formatters={{
         formatMonthDropdown: date => date.toLocaleString('default', {month: 'short'}),
         ...formatters,
       }}
       classNames={{
-        root: cn('w-fit', defaultClassNames.root),
-        months: cn('flex gap-4 flex-col md:flex-row relative', defaultClassNames.months),
-        month: cn('flex flex-col w-full gap-4', defaultClassNames.month),
-        nav: cn(
-          'flex items-center gap-1 w-full absolute top-0 inset-x-0 justify-between',
-          defaultClassNames.nav
-        ),
-        button_previous: cn(
-          buttonVariants({variant: 'icon', size: 'icon'}),
-          'size-(--cell-size) aria-disabled:opacity-50 p-0 select-none',
-          defaultClassNames.button_previous
-        ),
-        button_next: cn(
-          buttonVariants({variant: 'icon', size: 'icon'}),
-          'size-(--cell-size) aria-disabled:opacity-50 p-0 select-none',
-          defaultClassNames.button_next
-        ),
-        month_caption: cn(
-          'flex items-center justify-center h-(--cell-size) w-full px-(--cell-size)',
-          defaultClassNames.month_caption
-        ),
-        dropdowns: cn(
-          'w-full flex items-center text-sm font-medium justify-center h-(--cell-size) gap-1.5 text-content-primary',
-          defaultClassNames.dropdowns
-        ),
-        dropdown_root: cn(
-          'relative border border-gray-200 rounded-radius-md',
-          defaultClassNames.dropdown_root
-        ),
-        dropdown: cn(
-          'absolute inset-0 text-transparent bg-transparent focus:outline-auto',
-          defaultClassNames.dropdown
-        ),
-        caption_label: cn(
-          'select-none font-medium',
-          captionLayout === 'label'
-            ? 'text-sm'
-            : 'rounded-md pl-2 pr-1 flex items-center gap-1 text-sm h-8 [&>svg]:text-muted-foreground [&>svg]:size-3.5',
-          defaultClassNames.caption_label
-        ),
-        table: 'w-full border-collapse',
-        weekdays: cn('flex', defaultClassNames.weekdays),
-        weekday: cn(
-          'text-content-secondary rounded-md flex-1 font-normal text-[0.8rem] select-none',
-          defaultClassNames.weekday
-        ),
-        week: cn('flex w-full mt-2', defaultClassNames.week),
-        week_number_header: cn(
-          'select-none w-(--cell-size)',
-          defaultClassNames.week_number_header
-        ),
-        week_number: cn(
-          'text-[0.8rem] select-none text-content-secondary',
-          defaultClassNames.week_number
-        ),
-        day: cn(
-          'relative w-full h-full p-0 text-center [&:last-child[data-selected=true]_button]:rounded-r-md group/day aspect-square select-none',
-          props.showWeekNumber
-            ? '[&:nth-child(2)[data-selected=true]_button]:rounded-l-md'
-            : '[&:first-child[data-selected=true]_button]:rounded-l-md',
-          defaultClassNames.day
-        ),
-        range_start: cn(
-          'rounded-l-md bg-background-secondary',
-          defaultClassNames.range_start
-        ),
-        range_middle: cn(
-          'rounded-none bg-background-secondary [&_button]:text-content-primary [&_button]:bg-transparent',
-          defaultClassNames.range_middle
-        ),
-        range_end: cn(
-          'rounded-r-md bg-background-secondary',
-          defaultClassNames.range_end
-        ),
-        today: cn(
-          'bg-background-secondary rounded-md data-[selected=true]:rounded-none',
-          defaultClassNames.today
-        ),
-        outside: cn('text-content-disabled', defaultClassNames.outside),
-        disabled: cn('text-content-disabled opacity-50', defaultClassNames.disabled),
-        hidden: cn('invisible', defaultClassNames.hidden),
-        ...classNames,
+        months: stylex.props(styles.months).className,
+        month: stylex.props(styles.month).className,
+        nav: stylex.props(styles.nav).className,
+        month_caption: stylex.props(styles.monthCaption).className,
+        dropdowns: stylex.props(styles.dropdowns).className,
+        dropdown_root: stylex.props(styles.dropdownRoot).className,
+        dropdown: stylex.props(styles.dropdown).className,
+        caption_label: stylex.props(
+          styles.captionLabel,
+          captionLayout !== 'label' && styles.dropdownLabel
+        ).className,
+        month_grid: stylex.props(styles.table).className,
+        weekdays: stylex.props(styles.weekdays).className,
+        weekday: stylex.props(styles.weekday).className,
+        week: stylex.props(styles.week).className,
+        week_number_header: stylex.props(styles.weekNumberHeader).className,
+        week_number: stylex.props(styles.weekNumber).className,
       }}
       components={{
-        Root: ({className, rootRef, ...props}) => {
-          return (
-            <div
-              data-slot="calendar"
-              ref={rootRef}
-              className={cn(className)}
-              {...props}
-            />
-          );
-        },
-        Chevron: ({className, orientation, ...props}) => {
-          if (orientation === 'left') {
-            return <ChevronLeftIcon className={cn('size-4', className)} {...props} />;
-          }
-
-          if (orientation === 'right') {
-            return <ChevronRightIcon className={cn('size-4', className)} {...props} />;
-          }
-
-          return <ChevronDownIcon className={cn('size-4', className)} {...props} />;
-        },
+        Root: CalendarRoot,
+        PreviousMonthButton: CalendarNavigationButton,
+        NextMonthButton: CalendarNavigationButton,
+        Day: CalendarDay,
         DayButton: CalendarDayButton,
-        WeekNumber: ({children, ...props}) => {
-          return (
-            <td {...props}>
-              <div className="flex size-(--cell-size) items-center justify-center text-center">
-                {children}
-              </div>
-            </td>
-          );
-        },
-        ...components,
+        Chevron: CalendarChevron,
+        WeekNumber: CalendarWeekNumber,
       }}
-      {...props}
     />
   );
 }
 
-function CalendarDayButton({
-  className,
-  modifiers,
-  ...props
-}: ComponentProps<typeof DayButton>) {
-  const defaultClassNames = getDefaultClassNames();
+function CalendarRoot({rootRef, ...props}: ComponentProps<typeof Root>) {
+  return <div data-slot="calendar" ref={rootRef} {...props} />;
+}
 
+function CalendarNavigationButton(props: ComponentProps<typeof PreviousMonthButton>) {
+  return (
+    <button
+      {...props}
+      {...stylex.props(
+        buttonStyles({variant: 'icon', size: 'icon'}),
+        styles.navigationButton,
+        !!props['aria-disabled'] && styles.unavailable
+      )}
+    />
+  );
+}
+
+function CalendarChevron({orientation}: ComponentProps<typeof Chevron>) {
+  const {dayPickerProps} = useDayPicker();
+  const Icon =
+    orientation === 'left'
+      ? ChevronLeftIcon
+      : orientation === 'right'
+        ? ChevronRightIcon
+        : ChevronDownIcon;
+  return (
+    <Icon
+      {...stylex.props(
+        orientation === 'left' || orientation === 'right'
+          ? styles.icon
+          : styles.dropdownIcon,
+        dayPickerProps.dir === 'rtl' &&
+          (orientation === 'left' || orientation === 'right') &&
+          styles.rtlIcon
+      )}
+    />
+  );
+}
+
+function CalendarWeekNumber({
+  children,
+  week,
+  ...props
+}: ComponentProps<typeof WeekNumber>) {
+  return (
+    <th {...props} data-week-number={week.weekNumber}>
+      <div {...stylex.props(styles.weekNumberContent)}>{children}</div>
+    </th>
+  );
+}
+
+function CalendarDay({day, modifiers, ...props}: ComponentProps<typeof Day>) {
+  return (
+    <td
+      {...props}
+      data-day={day.isoDate}
+      {...stylex.props(
+        styles.day,
+        modifiers.range_start && styles.rangeStart,
+        modifiers.range_middle && styles.rangeMiddle,
+        modifiers.range_end && styles.rangeEnd,
+        modifiers.today && styles.today,
+        modifiers.today && modifiers.selected && styles.selectedToday,
+        modifiers.outside && styles.outside,
+        modifiers.disabled && styles.disabled,
+        modifiers.hidden && styles.hidden
+      )}
+    />
+  );
+}
+
+function CalendarDayButton({day, modifiers, ...props}: ComponentProps<typeof DayButton>) {
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (modifiers.focused) ref.current?.focus();
   }, [modifiers.focused]);
-
+  const {dayPickerProps} = useDayPicker();
+  const weekStartsOn =
+    dayPickerProps.ISOWeek || dayPickerProps.broadcastCalendar
+      ? 1
+      : (dayPickerProps.weekStartsOn ??
+        dayPickerProps.locale?.options?.weekStartsOn ??
+        0);
+  const firstInWeek = day.date.getDay() === weekStartsOn;
+  const lastInWeek = day.date.getDay() === (weekStartsOn + 6) % 7;
   return (
-    <Button
-      ref={ref}
-      variant="icon"
-      size="icon"
-      className={cn(
-        'flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 leading-none font-normal',
-        '[&>span]:text-xs [&>span]:opacity-70',
-        modifiers.selected &&
-          'bg-background-accent-vibrant text-content-on-vibrant-light rounded-radius-md',
-        defaultClassNames.day,
-        className
-      )}
+    <button
       {...props}
+      ref={ref}
+      {...stylex.props(
+        buttonStyles({variant: 'icon', size: 'icon'}),
+        styles.dayButton,
+        modifiers.selected && styles.selected,
+        modifiers.range_middle && styles.middleButton,
+        modifiers.selected && firstInWeek && styles.firstSelected,
+        modifiers.selected && lastInWeek && styles.lastSelected
+      )}
     />
   );
 }
 
-export {Calendar, CalendarDayButton};
+export {Calendar};

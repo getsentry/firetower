@@ -1,7 +1,11 @@
 import {useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {ChevronDownIcon, X} from 'lucide-react';
 
+import {background, content, fontSize, space} from '../styles/tokens.stylex';
+
 import {Button} from './Button';
+import {buttonStyles} from './buttonStyles';
 import {Calendar} from './Calendar';
 import {Input} from './Input';
 import {Popover, PopoverContent, PopoverTrigger} from './Popover';
@@ -24,15 +28,18 @@ export function DateTimePicker({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="gap-space-sm flex items-center">
+    <div {...stylex.props(styles.row)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="secondary" className="w-28 justify-between font-normal">
+          <button
+            type="button"
+            {...stylex.props(buttonStyles({variant: 'secondary'}), styles.dateTrigger)}
+          >
             {date ? date.toLocaleDateString() : 'Pick date'}
-            <ChevronDownIcon className="h-4 w-4 shrink-0" />
-          </Button>
+            <ChevronDownIcon {...stylex.props(styles.chevron)} />
+          </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+        <PopoverContent style={styles.popover} align="start">
           <Calendar
             mode="single"
             selected={date}
@@ -53,7 +60,7 @@ export function DateTimePicker({
         onChange={e => {
           onTimeChange(e.target.value || undefined);
         }}
-        className="bg-background text-size-md w-[85px] appearance-none px-2 disabled:opacity-30 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+        style={styles.timeInput}
       />
       <Button
         variant="icon"
@@ -63,10 +70,38 @@ export function DateTimePicker({
         }}
         disabled={!date}
         aria-label="Clear date and time"
-        className="disabled:hover:text-content-secondary disabled:cursor-default disabled:hover:bg-transparent"
+        style={styles.clearButton}
       >
-        <X className="h-4 w-4" />
+        <X {...stylex.props(styles.icon)} />
       </Button>
     </div>
   );
 }
+
+const styles = stylex.create({
+  row: {gap: space.sm, display: 'flex', alignItems: 'center'},
+  dateTrigger: {width: 112, justifyContent: 'space-between', fontWeight: 400},
+  chevron: {height: 16, width: 16, flexShrink: 0},
+  popover: {width: 'auto', overflow: 'hidden', padding: 0},
+  timeInput: {
+    backgroundColor: background.primary,
+    fontSize: fontSize.md,
+    width: '85px',
+    appearance: {default: 'none', '::-webkit-calendar-picker-indicator': 'none'},
+    paddingInline: 8,
+    opacity: {default: null, ':disabled': 0.3},
+    display: {default: null, '::-webkit-calendar-picker-indicator': 'none'},
+  },
+  clearButton: {
+    color: {
+      default: content.secondary,
+      ':disabled': {default: content.secondary, ':hover': content.secondary},
+    },
+    cursor: {default: 'pointer', ':disabled': 'default'},
+    backgroundColor: {
+      default: 'transparent',
+      ':disabled': {default: 'transparent', ':hover': 'transparent'},
+    },
+  },
+  icon: {height: 16, width: 16},
+});
