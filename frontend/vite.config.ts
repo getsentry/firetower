@@ -1,10 +1,13 @@
 import path from 'path';
 
 import {sentryVitePlugin} from '@sentry/vite-plugin';
+import stylex from '@stylexjs/unplugin';
 import tailwindcss from '@tailwindcss/vite';
 import {tanstackRouter} from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react-swc';
 import {defineConfig} from 'vite';
+
+const stylexPlugin = process.env.VITEST ? stylex.rollup : stylex.vite;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,6 +18,14 @@ export default defineConfig({
       routeFileIgnorePattern: 'queries|components|types|utils|.*.test.tsx?',
     }),
     tailwindcss(),
+    stylexPlugin({
+      runtimeInjection: false,
+      useCSSLayers: {
+        before: ['theme', 'base', 'components'],
+        after: ['utilities'],
+        prefix: 'stylex',
+      },
+    }),
     react(),
     sentryVitePlugin({
       org: 'sentry',

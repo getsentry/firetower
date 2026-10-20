@@ -1,3 +1,5 @@
+@layer theme, base, components, stylex, utilities;
+
 @import 'tailwindcss';
 @import './scraps-theme.css';
 
