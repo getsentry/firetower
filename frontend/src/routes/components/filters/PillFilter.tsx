@@ -4,7 +4,6 @@ import {Pill, type PillProps} from 'components/Pill';
 import {Tag} from 'components/Tag';
 import {Pencil, XIcon} from 'lucide-react';
 
-import {dropdownInputStyles} from '../../../styles/dropdownInputStyles';
 import {
   background,
   content,
@@ -109,7 +108,7 @@ export function PillFilter<T extends PillVariant>({
               }}
               onKeyDown={handleKeyDown(available as string[])}
               placeholder="Add..."
-              {...stylex.props(styles.input, dropdownInputStyles.focus)}
+              {...stylex.props(styles.input)}
             />
           </div>
         ) : selected.length > 0 ? (

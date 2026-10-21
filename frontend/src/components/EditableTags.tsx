@@ -2,7 +2,6 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import * as stylex from '@stylexjs/stylex';
 import {Loader2, Pencil, Plus, X} from 'lucide-react';
 
-import {dropdownInputStyles} from '../styles/dropdownInputStyles';
 import type {StyledProps} from '../styles/props';
 import {background, content, fontSize, radius, space} from '../styles/tokens.stylex';
 
@@ -247,7 +246,7 @@ export function EditableTags({
               }}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
-              {...stylex.props(styles.input, dropdownInputStyles.focus)}
+              {...stylex.props(styles.input)}
             />
           </div>
         ) : displayTags.length > 0 ? (
