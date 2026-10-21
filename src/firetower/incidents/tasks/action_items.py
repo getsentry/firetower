@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from django.conf import settings
 from django.utils import timezone
@@ -71,10 +72,67 @@ def _build_nag_tiers(linear: dict) -> dict[int, NagTier]:
 
 _NAG_TEMPLATE_ENV = Environment(autoescape=False)
 
+MISFILED_ACTION_ITEM_REMINDER_MARKER = "Firetower action-item team reminder"
+
+
+def _remind_misfiled_action_item_creators(linear: dict) -> None:
+    team_id = linear.get("TEAM_ID")
+    if not team_id:
+        return
+
+    service = LinearService()
+    try:
+        issues = service.get_misfiled_action_items(
+            team_id, MISFILED_ACTION_ITEM_REMINDER_MARKER
+        )
+    except Exception:
+        logger.exception("Failed to find misfiled action items")
+        return
+    if issues is None:
+        logger.error("Failed to find misfiled action items")
+        return
+
+    for issue in issues:
+        creator = issue.get("creator")
+        greeting = (
+            f"Hi @[{creator['displayName']}]({creator['id']}), " if creator else "Hi, "
+        )
+        comment = (
+            f"**{MISFILED_ACTION_ITEM_REMINDER_MARKER}**\n\n"
+            f"{greeting}this action item was created in the "
+            f"{settings.PROJECT_KEY} team. Please move it to the relevant "
+            "actioning team, keeping it as a child of the incident ticket. "
+            "The incident team is reserved for incident tickets, not action items."
+        )
+        # A stable UUID in Linear's required v4 format also prevents duplicate
+        # comments from overlapping runs or a successful but timed-out request.
+        comment_id = str(
+            UUID(
+                bytes=uuid5(
+                    NAMESPACE_URL, f"firetower:inc-team-reminder:{issue['id']}"
+                ).bytes,
+                version=4,
+            )
+        )
+        try:
+            success = service.create_comment(
+                issue["id"], comment, comment_id=comment_id
+            )
+        except Exception:
+            logger.exception(
+                "Failed to post team reminder for action item %s", issue["identifier"]
+            )
+            continue
+        if not success:
+            logger.error(
+                "Failed to post team reminder for action item %s", issue["identifier"]
+            )
+
 
 @datadog_log
 def send_action_item_reminder() -> None:
     linear = settings.LINEAR or {}
+    _remind_misfiled_action_item_creators(linear)
     nag_tiers = _build_nag_tiers(linear)
     comments_by_priority: dict[int, str] = {
         priority: linear.get(tier.comment_setting_key, "")

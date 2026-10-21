@@ -839,6 +839,13 @@ class TestSendActionItemReminder:
             yield
 
     @pytest.fixture(autouse=True)
+    def mock_team_reminders(self):
+        with patch(
+            "firetower.incidents.tasks.action_items._remind_misfiled_action_item_creators"
+        ) as mock:
+            yield mock
+
+    @pytest.fixture(autouse=True)
     def mock_sync(self):
         with patch(
             "firetower.incidents.tasks.action_items.sync_action_items_from_linear"
