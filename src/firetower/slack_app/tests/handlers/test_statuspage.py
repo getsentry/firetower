@@ -602,7 +602,10 @@ class TestStatuspageSubmission:
         )
         assert incident.timeline_events.get().payload == {
             "message": "Looking into it",
-            "affected_components": {"comp1": "major_outage"},
+            "affected_components": {
+                "comp1": "major_outage",
+                "comp2": "operational",
+            },
         }
 
     def test_updates_existing_statuspage_incident(self, incident):
@@ -660,7 +663,10 @@ class TestStatuspageSubmission:
         assert event.payload == {
             "message": "Found the cause",
             "status": "identified",
-            "affected_components": {"comp1": "degraded_performance"},
+            "affected_components": {
+                "comp1": "degraded_performance",
+                "comp2": "operational",
+            },
         }
         assert event.external_id == "sp_update_123"
         assert event.link_url == "https://test.statuspage.io/incidents/existing_sp"
@@ -729,7 +735,11 @@ class TestStatuspageSubmission:
         )
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
-        view = self._make_view(status="resolved", message="Resolved")
+        view = self._make_view(
+            status="resolved",
+            message="Resolved",
+            components={"comp1": "operational", "comp2": "operational"},
+        )
         client = MagicMock()
 
         with (
@@ -767,7 +777,10 @@ class TestStatuspageSubmission:
         assert incident.timeline_events.get().payload == {
             "message": "Resolved",
             "status": "resolved",
-            "affected_components": {},
+            "affected_components": {
+                "comp1": "operational",
+                "comp2": "operational",
+            },
         }
 
     def test_empty_message_returns_error(self, incident):

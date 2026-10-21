@@ -537,11 +537,7 @@ def _process_statuspage_submission(
     message = data["message"]
     impact = data["impact"]
     components = data["components"]
-    affected_components: dict[str, str] = {
-        component_id: component_status
-        for component_id, component_status in components.items()
-        if component_status != "operational"
-    }
+    affected_components: dict[str, str] = dict(components)
 
     service = StatuspageService()
     if not service.configured:
