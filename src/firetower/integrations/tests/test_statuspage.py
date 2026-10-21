@@ -311,10 +311,13 @@ class TestStatuspageServiceUpdateIncident:
         with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
             service = StatuspageService()
 
-        with patch(
-            "firetower.integrations.services.statuspage.requests.patch",
-            return_value=mock_response,
-        ) as mock_patch:
+        with (
+            patch.object(service, "get_incident", return_value={"components": []}),
+            patch(
+                "firetower.integrations.services.statuspage.requests.patch",
+                return_value=mock_response,
+            ) as mock_patch,
+        ):
             service.update_incident(
                 incident_id="inc123",
                 components={"comp1": "degraded_performance"},
@@ -334,10 +337,13 @@ class TestStatuspageServiceUpdateIncident:
         with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
             service = StatuspageService()
 
-        with patch(
-            "firetower.integrations.services.statuspage.requests.patch",
-            return_value=mock_response,
-        ) as mock_patch:
+        with (
+            patch.object(service, "get_incident", return_value={"components": []}),
+            patch(
+                "firetower.integrations.services.statuspage.requests.patch",
+                return_value=mock_response,
+            ) as mock_patch,
+        ):
             service.update_incident(
                 incident_id="inc123",
                 components={
@@ -357,6 +363,71 @@ class TestStatuspageServiceUpdateIncident:
                 "comp2": "operational",
                 "comp3": "partial_outage",
             }
+
+    def test_update_incident_keeps_existing_components_when_operational(self):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "inc123"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
+            service = StatuspageService()
+
+        existing = {"components": [{"id": "comp1"}, {"id": "comp2"}]}
+        with (
+            patch.object(
+                service, "get_incident", return_value=existing
+            ) as mock_get_incident,
+            patch(
+                "firetower.integrations.services.statuspage.requests.patch",
+                return_value=mock_response,
+            ) as mock_patch,
+        ):
+            service.update_incident(
+                incident_id="inc123",
+                status="resolved",
+                components={
+                    "comp1": "operational",
+                    "comp2": "operational",
+                    "comp3": "operational",
+                },
+            )
+
+            mock_get_incident.assert_called_once_with("inc123")
+            payload = mock_patch.call_args[1]["json"]
+            assert payload["incident"]["component_ids"] == ["comp1", "comp2"]
+            assert payload["incident"]["components"] == {
+                "comp1": "operational",
+                "comp2": "operational",
+                "comp3": "operational",
+            }
+
+    def test_update_incident_adds_new_components_to_existing(self):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"id": "inc123"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(settings, "STATUSPAGE", MOCK_STATUSPAGE_CONFIG):
+            service = StatuspageService()
+
+        existing = {"components": [{"id": "comp1"}]}
+        with (
+            patch.object(service, "get_incident", return_value=existing),
+            patch(
+                "firetower.integrations.services.statuspage.requests.patch",
+                return_value=mock_response,
+            ) as mock_patch,
+        ):
+            service.update_incident(
+                incident_id="inc123",
+                components={
+                    "comp1": "operational",
+                    "comp2": "major_outage",
+                    "comp3": "operational",
+                },
+            )
+
+            payload = mock_patch.call_args[1]["json"]
+            assert payload["incident"]["component_ids"] == ["comp1", "comp2"]
 
     def test_update_incident_minimal(self):
         mock_response = MagicMock()
