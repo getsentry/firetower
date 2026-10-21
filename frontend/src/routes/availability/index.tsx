@@ -35,10 +35,10 @@ export const Route = createFileRoute('/availability/')({
     <ErrorState
       title="Something went wrong fetching availability data"
       description={
-        <>
+        <p>
           Try refreshing the page, or if that doesn't work, come chat with us in{' '}
           <GetHelpLink />.
-        </>
+        </p>
       }
     />
   ),

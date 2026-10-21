@@ -112,10 +112,10 @@ export const Route = createFileRoute('/')({
       <ErrorState
         title="Something went wrong fetching incidents"
         description={
-          <>
+          <p>
             Try refreshing the page, or if that doesn't work, come chat with us in{' '}
             <GetHelpLink />.
-          </>
+          </p>
         }
       />
     </IncidentsLayout>
