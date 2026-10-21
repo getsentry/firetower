@@ -5,6 +5,7 @@ import {Button} from 'components/Button';
 import {Tag} from 'components/Tag';
 import {Pencil, XIcon} from 'lucide-react';
 
+import {dropdownInputStyles} from '../../../styles/dropdownInputStyles';
 import {
   background,
   content,
@@ -236,7 +237,7 @@ export function UserFilter({label, filterKey}: UserFilterProps) {
               }}
               onKeyDown={handleKeyDown(allOptions)}
               placeholder="Search users..."
-              {...stylex.props(styles.input)}
+              {...stylex.props(styles.input, dropdownInputStyles.focus)}
             />
           </div>
         ) : (
@@ -349,7 +350,6 @@ const styles = stylex.create({
     minWidth: '100px',
     flex: '1 1 0%',
     backgroundColor: 'transparent',
-    outlineStyle: {default: null, ':focus': 'none'},
   },
   dropdown: {
     marginTop: space.xs,
