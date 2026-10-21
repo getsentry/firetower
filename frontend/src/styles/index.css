@@ -1,4 +1,5 @@
 @layer reset, stylex;
+@import './preflight.css' layer(reset);
 
 @font-face {
   font-family: 'Rubik';
@@ -44,98 +45,4 @@
   font-weight: 500;
   font-display: swap;
   src: url('/fonts/roboto-mono-medium.woff2') format('woff2');
-}
-
-@layer reset {
-  *,
-  ::before,
-  ::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    border: 0 solid;
-  }
-
-  html {
-    line-height: 1.5;
-    -webkit-text-size-adjust: 100%;
-    tab-size: 4;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-size: inherit;
-    font-weight: inherit;
-  }
-
-  a {
-    color: inherit;
-    text-decoration: inherit;
-  }
-
-  button,
-  input,
-  select,
-  textarea {
-    font: inherit;
-    letter-spacing: inherit;
-    color: inherit;
-    background-color: transparent;
-    border-radius: 0;
-  }
-
-  button,
-  input[type='button'],
-  input[type='reset'],
-  input[type='submit'] {
-    appearance: button;
-  }
-
-  ol,
-  ul,
-  menu {
-    list-style: none;
-  }
-
-  img,
-  svg,
-  video,
-  canvas {
-    display: block;
-    vertical-align: middle;
-  }
-
-  img,
-  video {
-    max-width: 100%;
-    height: auto;
-  }
-
-  table {
-    text-indent: 0;
-    border-color: inherit;
-    border-collapse: collapse;
-  }
-
-  textarea {
-    resize: vertical;
-  }
-
-  [hidden]:not([hidden='until-found']) {
-    display: none !important;
-  }
-
-  input[type='number']::-webkit-inner-spin-button,
-  input[type='number']::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  input[type='number'] {
-    -moz-appearance: textfield;
-  }
 }
