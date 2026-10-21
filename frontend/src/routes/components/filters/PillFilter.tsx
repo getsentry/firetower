@@ -214,6 +214,7 @@ const styles = stylex.create({
     minWidth: '100px',
     flex: '1 1 0%',
     backgroundColor: 'transparent',
+    outlineStyle: {default: null, ':focus': 'none'},
   },
   tags: {gap: space.sm, display: 'flex', flexWrap: 'wrap', userSelect: 'none'},
   tag: {

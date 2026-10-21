@@ -354,6 +354,7 @@ const styles = stylex.create({
     minWidth: '100px',
     flex: '1',
     backgroundColor: 'transparent',
+    outlineStyle: {default: null, ':focus': 'none'},
   },
   tags: {gap: space.sm, display: 'flex', flexWrap: 'wrap'},
   empty: {fontSize: fontSize.sm, color: content.disabled, fontStyle: 'italic'},

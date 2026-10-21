@@ -349,6 +349,7 @@ const styles = stylex.create({
     minWidth: '100px',
     flex: '1 1 0%',
     backgroundColor: 'transparent',
+    outlineStyle: {default: null, ':focus': 'none'},
   },
   dropdown: {
     marginTop: space.xs,
