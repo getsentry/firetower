@@ -1,6 +1,13 @@
 import * as stylex from '@stylexjs/stylex';
 
-import {background, content, fontWeight, radius, space} from '../styles/tokens.stylex';
+import {
+  background,
+  border,
+  content,
+  fontWeight,
+  radius,
+  space,
+} from '../styles/tokens.stylex';
 
 const styles = stylex.create({
   base: {
@@ -43,7 +50,7 @@ const styles = stylex.create({
     },
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: {default: '#e5e7eb', '@media (prefers-color-scheme: dark)': '#404040'},
+    borderColor: border.secondary,
     color: content.primary,
   },
   icon: {

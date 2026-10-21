@@ -2,7 +2,7 @@ import * as PopoverPrimitive from '@radix-ui/react-popover';
 import * as stylex from '@stylexjs/stylex';
 
 import type {StyledProps} from '../styles/props';
-import {background, radius, space} from '../styles/tokens.stylex';
+import {background, border, radius, space} from '../styles/tokens.stylex';
 
 const Popover = PopoverPrimitive.Root;
 function PopoverTrigger({
@@ -24,7 +24,7 @@ const styles = stylex.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#e5e7eb',
+    borderColor: border.secondary,
     backgroundColor: background.primary,
     padding: space.md,
     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',

@@ -8,6 +8,7 @@ import {Pencil, X} from 'lucide-react';
 
 import {
   background,
+  border,
   content,
   fontWeight,
   radius,
@@ -379,7 +380,7 @@ const styles = stylex.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#e5e7eb',
+    borderColor: border.secondary,
     backgroundColor: background.primary,
     color: content.primary,
     fontSize: 14,
@@ -397,7 +398,7 @@ const styles = stylex.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#e5e7eb',
+    borderColor: border.secondary,
     backgroundColor: background.primary,
     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
     padding: space.sm,

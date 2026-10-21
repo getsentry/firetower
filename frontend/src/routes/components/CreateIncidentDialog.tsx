@@ -7,7 +7,14 @@ import {Input} from 'components/Input';
 import {Label} from 'components/Label';
 import {useBodyScrollLock} from 'utils/useBodyScrollLock';
 
-import {background, content, fontSize, radius, space} from '../../styles/tokens.stylex';
+import {
+  background,
+  border,
+  content,
+  fontSize,
+  radius,
+  space,
+} from '../../styles/tokens.stylex';
 import {createIncidentMutationOptions} from '../queries/createIncidentMutationOptions';
 import {currentUserQueryOptions} from '../queries/currentUserQueryOptions';
 import {SeveritySchema} from '../types';
@@ -183,7 +190,7 @@ const styles = stylex.create({
     boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
   },
   select: {
-    borderColor: '#e5e7eb',
+    borderColor: border.secondary,
     height: 32,
     width: '100%',
     borderRadius: radius.md,
@@ -195,7 +202,7 @@ const styles = stylex.create({
     fontSize: fontSize.sm,
   },
   description: {
-    borderColor: '#e5e7eb',
+    borderColor: border.secondary,
     width: '100%',
     borderRadius: radius.md,
     borderWidth: 1,

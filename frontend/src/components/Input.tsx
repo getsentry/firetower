@@ -1,11 +1,11 @@
 import * as stylex from '@stylexjs/stylex';
 
 import type {StyledProps} from '../styles/props';
-import {content, fontSize, radius} from '../styles/tokens.stylex';
+import {border, content, fontSize, radius} from '../styles/tokens.stylex';
 
 const styles = stylex.create({
   root: {
-    borderColor: '#e5e7eb',
+    borderColor: border.secondary,
     borderWidth: 1,
     borderStyle: 'solid',
     height: 32,

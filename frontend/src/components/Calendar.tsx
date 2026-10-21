@@ -13,7 +13,7 @@ import * as stylex from '@stylexjs/stylex';
 import {ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon} from 'lucide-react';
 
 import type {StyledProps} from '../styles/props';
-import {background, content, fontWeight, radius} from '../styles/tokens.stylex';
+import {background, border, content, fontWeight, radius} from '../styles/tokens.stylex';
 
 import {buttonStyles} from './buttonStyles';
 
@@ -80,7 +80,7 @@ const styles = stylex.create({
     position: 'relative',
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#e5e7eb',
+    borderColor: border.secondary,
     borderRadius: radius.md,
   },
   dropdown: {

@@ -6,6 +6,7 @@ import {Pencil, XIcon} from 'lucide-react';
 
 import {
   background,
+  border,
   content,
   fontSize,
   radius,
@@ -237,7 +238,7 @@ const styles = stylex.create({
     zIndex: 50,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#e5e7eb',
+    borderColor: border.secondary,
     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
   },
   options: {

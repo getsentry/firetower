@@ -3,7 +3,14 @@ import * as stylex from '@stylexjs/stylex';
 import {Loader2, Pencil, Plus, X} from 'lucide-react';
 
 import type {StyledProps} from '../styles/props';
-import {background, content, fontSize, radius, space} from '../styles/tokens.stylex';
+import {
+  background,
+  border,
+  content,
+  fontSize,
+  radius,
+  space,
+} from '../styles/tokens.stylex';
 
 import {Button} from './Button';
 import {GetHelpLink} from './GetHelpLink';
@@ -368,7 +375,7 @@ const styles = stylex.create({
     zIndex: 50,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#e5e7eb',
+    borderColor: border.secondary,
     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
   },
   options: {
