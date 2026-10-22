@@ -573,7 +573,10 @@ class LinearService:
             "team": {"id": {"eq": team_id}},
             "number": {"gte": 2000},
             "parent": {"team": {"id": {"eq": team_id}}},
-            "comments": {"every": {"body": {"notContains": reminder_marker}}},
+            "or": [
+                {"comments": {"length": {"eq": 0}}},
+                {"comments": {"every": {"body": {"notContains": reminder_marker}}}},
+            ],
         }
         issues: list[dict[str, Any]] = []
         cursor: str | None = None

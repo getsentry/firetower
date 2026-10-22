@@ -30,7 +30,10 @@ def test_filters_by_child_team_parent_team_number_and_existing_comments(service)
             "team": {"id": {"eq": "team-id"}},
             "number": {"gte": 2000},
             "parent": {"team": {"id": {"eq": "team-id"}}},
-            "comments": {"every": {"body": {"notContains": "reminder-marker"}}},
+            "or": [
+                {"comments": {"length": {"eq": 0}}},
+                {"comments": {"every": {"body": {"notContains": "reminder-marker"}}}},
+            ],
         },
         "after": None,
     }

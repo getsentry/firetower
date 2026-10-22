@@ -92,6 +92,11 @@ def _remind_misfiled_action_item_creators(linear: dict) -> None:
         logger.error("Failed to find misfiled action items")
         return
 
+    logger.info(
+        "Found %d misfiled action items without a team reminder in Linear team %s",
+        len(issues),
+        team_id,
+    )
     for issue in issues:
         issue_id = None
         try:
@@ -127,6 +132,8 @@ def _remind_misfiled_action_item_creators(linear: dict) -> None:
             continue
         if not success:
             logger.error("Failed to post team reminder for action item %s", issue_id)
+        else:
+            logger.info("Posted team reminder for action item %s", issue_id)
 
 
 @datadog_log

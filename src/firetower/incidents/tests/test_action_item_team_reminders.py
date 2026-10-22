@@ -46,6 +46,29 @@ def test_mentions_creator_and_explains_move(service):
     assert UUID(kwargs["comment_id"]).version == 4
 
 
+@pytest.mark.parametrize("issues", [[], [ISSUE]])
+def test_logs_candidate_count(service, caplog, issues):
+    service.get_misfiled_action_items.return_value = issues
+
+    with caplog.at_level("INFO", logger="firetower.incidents.tasks.action_items"):
+        _remind_misfiled_action_item_creators(LINEAR)
+
+    assert (
+        f"Found {len(issues)} misfiled action items without a team reminder "
+        "in Linear team incident-team"
+    ) in caplog.text
+
+
+@pytest.mark.parametrize("success", [True, False])
+def test_logs_posted_reminder_only_on_success(service, caplog, success):
+    service.create_comment.return_value = success
+
+    with caplog.at_level("INFO", logger="firetower.incidents.tasks.action_items"):
+        _remind_misfiled_action_item_creators(LINEAR)
+
+    assert ("Posted team reminder for action item issue-1" in caplog.text) is success
+
+
 def test_skips_issues_with_existing_reminder_on_later_runs(service):
     service.get_misfiled_action_items.side_effect = [[ISSUE], []]
 
