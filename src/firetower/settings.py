@@ -20,6 +20,7 @@ from datadog import initialize
 from datadog.dogstatsd.base import statsd
 
 from firetower.config import ConfigFile, DummyConfigFile
+from firetower.sentry import before_send
 
 
 def env_is_dev() -> bool:
@@ -59,6 +60,7 @@ if not env_is_dev():
         traces_sample_rate=1.0,
         profiles_sample_rate=0.25,
         enable_logs=True,
+        before_send=before_send,
         trace_propagation_targets=[],
         _experiments={
             "trace_lifecycle": "stream",
