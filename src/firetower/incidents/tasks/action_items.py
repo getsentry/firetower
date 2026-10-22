@@ -80,8 +80,8 @@ def _remind_misfiled_action_item_creators(linear: dict) -> None:
     if not team_id:
         return
 
-    service = LinearService()
     try:
+        service = LinearService()
         issues = service.get_misfiled_action_items(
             team_id, MISFILED_ACTION_ITEM_REMINDER_MARKER
         )
@@ -93,40 +93,40 @@ def _remind_misfiled_action_item_creators(linear: dict) -> None:
         return
 
     for issue in issues:
-        creator = issue.get("creator")
-        greeting = (
-            f"Hi @[{creator['displayName']}]({creator['id']}), " if creator else "Hi, "
-        )
-        comment = (
-            f"**{MISFILED_ACTION_ITEM_REMINDER_MARKER}**\n\n"
-            f"{greeting}this action item was created in the "
-            f"{settings.PROJECT_KEY} team. Please move it to the relevant "
-            "actioning team, keeping it as a child of the incident ticket. "
-            "The incident team is reserved for incident tickets, not action items."
-        )
-        # A stable UUID in Linear's required v4 format also prevents duplicate
-        # comments from overlapping runs or a successful but timed-out request.
-        comment_id = str(
-            UUID(
-                bytes=uuid5(
-                    NAMESPACE_URL, f"firetower:inc-team-reminder:{issue['id']}"
-                ).bytes,
-                version=4,
-            )
-        )
+        issue_id = None
         try:
-            success = service.create_comment(
-                issue["id"], comment, comment_id=comment_id
+            issue_id = issue["id"]
+            creator = issue.get("creator")
+            greeting = (
+                f"Hi @[{creator['displayName']}]({creator['id']}), "
+                if creator
+                else "Hi, "
             )
+            comment = (
+                f"**{MISFILED_ACTION_ITEM_REMINDER_MARKER}**\n\n"
+                f"{greeting}this action item was created in the "
+                f"{settings.PROJECT_KEY} team. Please move it to the relevant "
+                "actioning team, keeping it as a child of the incident ticket. "
+                "The incident team is reserved for incident tickets, not action items."
+            )
+            # A stable UUID in Linear's required v4 format also prevents duplicate
+            # comments from overlapping runs or a successful but timed-out request.
+            comment_id = str(
+                UUID(
+                    bytes=uuid5(
+                        NAMESPACE_URL, f"firetower:inc-team-reminder:{issue_id}"
+                    ).bytes,
+                    version=4,
+                )
+            )
+            success = service.create_comment(issue_id, comment, comment_id=comment_id)
         except Exception:
             logger.exception(
-                "Failed to post team reminder for action item %s", issue["identifier"]
+                "Failed to post team reminder for action item %s", issue_id
             )
             continue
         if not success:
-            logger.error(
-                "Failed to post team reminder for action item %s", issue["identifier"]
-            )
+            logger.error("Failed to post team reminder for action item %s", issue_id)
 
 
 @datadog_log

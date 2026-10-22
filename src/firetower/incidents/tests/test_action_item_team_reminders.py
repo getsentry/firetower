@@ -121,6 +121,55 @@ def test_continues_after_a_comment_failure(service, failure):
     assert service.create_comment.call_count == 2
 
 
+@pytest.mark.parametrize(
+    "malformed",
+    [
+        None,
+        {},
+        {**ISSUE, "creator": {"id": "creator-id"}},
+        {**ISSUE, "creator": {"displayName": "Leander Rodrigues"}},
+    ],
+)
+def test_continues_after_malformed_issue_data(service, malformed):
+    service.get_misfiled_action_items.return_value = [malformed, ISSUE]
+
+    _remind_misfiled_action_item_creators(LINEAR)
+
+    service.create_comment.assert_called_once()
+    assert service.create_comment.call_args.args[0] == ISSUE["id"]
+
+
+def test_initialization_failure_does_not_escape(service):
+    with patch(
+        "firetower.incidents.tasks.action_items.LinearService",
+        side_effect=RuntimeError("initialization failed"),
+    ):
+        _remind_misfiled_action_item_creators(LINEAR)
+
+    service.create_comment.assert_not_called()
+
+
+def test_malformed_issue_does_not_block_slo_sweep(service, settings):
+    settings.LINEAR = {**LINEAR, "ACTION_ITEM_NAG_COMMENT_HIGH_PRIORITY": "SLO nag"}
+    service.get_misfiled_action_items.return_value = [
+        {**ISSUE, "creator": {"id": "creator-id"}}
+    ]
+    incident = MagicMock()
+    incident.action_items.filter.return_value = []
+    with (
+        patch("firetower.incidents.tasks.action_items.Incident") as incident_model,
+        patch(
+            "firetower.incidents.tasks.action_items.sync_action_items_from_linear"
+        ) as sync,
+    ):
+        incident_model.objects.filter.return_value.exclude.return_value = [incident]
+
+        send_action_item_reminder()
+
+    sync.assert_called_once_with(incident)
+    service.create_comment.assert_not_called()
+
+
 def test_uses_configured_incident_team_key(service, settings):
     settings.PROJECT_KEY = "TESTINC"
 
