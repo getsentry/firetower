@@ -76,6 +76,9 @@ MISFILED_ACTION_ITEM_REMINDER_MARKER = "Firetower action-item team reminder"
 
 
 def _remind_misfiled_action_item_creators(linear: dict) -> None:
+    if not linear.get("SYNC_IDENTIFIERS", False):
+        return
+
     team_id = linear.get("TEAM_ID")
     if not team_id:
         return

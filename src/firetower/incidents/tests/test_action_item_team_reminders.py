@@ -9,7 +9,7 @@ from firetower.incidents.tasks.action_items import (
     send_action_item_reminder,
 )
 
-LINEAR = {"TEAM_ID": "incident-team"}
+LINEAR = {"TEAM_ID": "incident-team", "SYNC_IDENTIFIERS": True}
 ISSUE = {
     "id": "issue-1",
     "identifier": "INC-2508",
@@ -113,8 +113,18 @@ def test_handles_missing_creator(service):
 
 @pytest.mark.parametrize("config", [{}, {"TEAM_ID": ""}])
 def test_skips_when_team_is_not_configured(service, config):
-    _remind_misfiled_action_item_creators(config)
+    _remind_misfiled_action_item_creators({**config, "SYNC_IDENTIFIERS": True})
 
+    service.get_misfiled_action_items.assert_not_called()
+    service.create_comment.assert_not_called()
+
+
+@pytest.mark.parametrize("config", [{}, {"SYNC_IDENTIFIERS": False}])
+def test_skips_when_identifier_sync_is_disabled(service, config):
+    with patch("firetower.incidents.tasks.action_items.LinearService") as client:
+        _remind_misfiled_action_item_creators({"TEAM_ID": "incident-team", **config})
+
+    client.assert_not_called()
     service.get_misfiled_action_items.assert_not_called()
     service.create_comment.assert_not_called()
 
