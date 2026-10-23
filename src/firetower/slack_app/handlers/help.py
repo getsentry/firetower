@@ -22,5 +22,7 @@ def handle_help_command(ack: Any, command: dict, respond: Any) -> None:
         f"  `{cmd} severity <P0-P4>` - Change incident severity (alias: `{cmd} sev`)\n"
         f"  `{cmd} statuspage` - Create or update a statuspage post\n"
         f"  `{cmd} subject <title>` - Change incident title (alias: `{cmd} title`)\n"
-        f"  `{cmd} update` - Interactively update incident metadata (alias: `{cmd} edit`)\n"
+        f"  `{cmd} update` - Interactively update incident metadata (alias: `{cmd} edit`)\n\n"
+        "Slash commands don't work in threads. To declare an incident from a thread, "
+        "use *Declare incident* in the message's More actions menu.\n"
     )
