@@ -12,6 +12,8 @@ from firetower.slack_app.bolt import handle_command
 from firetower.slack_app.handlers.new_incident import (
     _build_new_incident_modal,
     _create_fallback_channel,
+    _parse_invoking_context,
+    handle_declare_incident_shortcut,
     handle_new_command,
     handle_new_incident_submission,
     handle_severity_action,
@@ -389,6 +391,43 @@ class TestNewIncidentSubmission:
         assert client.chat_postMessage.call_count == 2
         channels = [c[1]["channel"] for c in client.chat_postMessage.call_args_list]
         assert "C_INVOKE" in channels
+        mock_slack_svc.join_channel.assert_called_once_with("C_INVOKE")
+
+    @patch("firetower.slack_app.handlers.new_incident._slack_service")
+    @patch("firetower.incidents.serializers.on_incident_created")
+    @patch("firetower.slack_app.handlers.new_incident.get_or_create_user_from_slack_id")
+    def test_posts_in_thread_when_declared_from_shortcut(
+        self, mock_get_user, mock_hook, mock_slack_svc
+    ):
+        mock_get_user.return_value = self.user
+
+        client = MagicMock()
+        body = {"user": {"id": "U_TEST"}}
+        modal = _build_new_incident_modal(channel_id="C_INVOKE", thread_ts="100.0")
+        view = {
+            "private_metadata": modal["private_metadata"],
+            "state": {
+                "values": {
+                    "title_block": {"title": {"value": "Test Incident"}},
+                    "severity_block": {
+                        "severity": {
+                            "selected_option": {"value": "P1"},
+                        }
+                    },
+                    "options_block": {"incident_options": {"selected_options": []}},
+                }
+            },
+        }
+
+        handle_new_incident_submission(MagicMock(), body, view, client)
+
+        channel_calls = [
+            c[1]
+            for c in client.chat_postMessage.call_args_list
+            if c[1]["channel"] == "C_INVOKE"
+        ]
+        assert len(channel_calls) == 1
+        assert channel_calls[0]["thread_ts"] == "100.0"
         mock_slack_svc.join_channel.assert_called_once_with("C_INVOKE")
 
     @patch("firetower.slack_app.handlers.new_incident._slack_service")
@@ -1156,3 +1195,91 @@ class TestResolveTagValues:
 
         assert resolved == ["Payments"]
         assert Tag.objects.filter(type=TagType.AFFECTED_SERVICE).count() == 1
+
+
+class TestDeclareIncidentShortcut:
+    def _shortcut(self, message: dict) -> dict:
+        return {
+            "trigger_id": "T12345",
+            "channel": {"id": "C_THREAD"},
+            "user": {"id": "U_TEST"},
+            "message": message,
+        }
+
+    def test_opens_modal_threaded_under_reply(self):
+        ack = MagicMock()
+        client = MagicMock()
+        shortcut = self._shortcut({"ts": "200.0", "thread_ts": "100.0"})
+
+        handle_declare_incident_shortcut(ack, shortcut, client)
+
+        ack.assert_called_once_with()
+        kwargs = client.views_open.call_args[1]
+        assert kwargs["trigger_id"] == "T12345"
+        view = kwargs["view"]
+        assert view["callback_id"] == "new_incident_modal"
+        assert _parse_invoking_context(view["private_metadata"]) == (
+            "C_THREAD",
+            "100.0",
+        )
+
+    def test_top_level_message_threads_under_itself(self):
+        client = MagicMock()
+
+        handle_declare_incident_shortcut(
+            MagicMock(), self._shortcut({"ts": "300.0"}), client
+        )
+
+        view = client.views_open.call_args[1]["view"]
+        assert _parse_invoking_context(view["private_metadata"]) == (
+            "C_THREAD",
+            "300.0",
+        )
+
+    def test_global_shortcut_opens_modal_without_context(self):
+        ack = MagicMock()
+        client = MagicMock()
+        shortcut = {"trigger_id": "T12345", "user": {"id": "U_TEST"}}
+
+        handle_declare_incident_shortcut(ack, shortcut, client)
+
+        ack.assert_called_once_with()
+        view = client.views_open.call_args[1]["view"]
+        assert view["callback_id"] == "new_incident_modal"
+        assert "private_metadata" not in view
+
+    def test_severity_change_preserves_thread(self):
+        client = MagicMock()
+        modal = _build_new_incident_modal(channel_id="C_THREAD", thread_ts="100.0")
+        body = {
+            "user": {"id": "U_TEST"},
+            "view": {
+                "id": "V1",
+                "callback_id": "new_incident_modal",
+                "private_metadata": modal["private_metadata"],
+                "state": {
+                    "values": {
+                        "severity_block": {
+                            "severity": {"selected_option": {"value": "P0"}}
+                        }
+                    }
+                },
+            },
+        }
+
+        handle_severity_action(MagicMock(), body, client)
+
+        new_view = client.views_update.call_args[1]["view"]
+        assert new_view["private_metadata"] == modal["private_metadata"]
+
+
+class TestParseInvokingContext:
+    def test_bare_channel_id(self):
+        assert _parse_invoking_context("C123") == ("C123", "")
+
+    def test_empty(self):
+        assert _parse_invoking_context("") == ("", "")
+
+    def test_slash_command_metadata_stays_bare(self):
+        modal = _build_new_incident_modal(channel_id="C123")
+        assert modal["private_metadata"] == "C123"

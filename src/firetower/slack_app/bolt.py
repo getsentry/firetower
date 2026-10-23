@@ -28,6 +28,7 @@ from firetower.slack_app.handlers.mitigated import (
     handle_mitigated_submission,
 )
 from firetower.slack_app.handlers.new_incident import (
+    handle_declare_incident_shortcut,
     handle_new_command,
     handle_new_incident_submission,
     handle_severity_action,
@@ -247,6 +248,12 @@ def _with_event_metrics(event_type: str) -> Callable[..., Callable[..., Any]]:
 
 def _register_views(app: App) -> None:
     """Register view handlers (modals, etc.) on the Bolt app."""
+    app.shortcut("declare_incident")(
+        _with_metrics("declare_incident")(handle_declare_incident_shortcut)
+    )
+    app.shortcut("declare_incident_global")(
+        _with_metrics("declare_incident_global")(handle_declare_incident_shortcut)
+    )
     app.view("backfill_incident_modal")(
         _with_metrics("backfill_incident_modal")(handle_backfill_submission)
     )

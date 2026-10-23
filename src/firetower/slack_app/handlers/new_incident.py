@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from typing import Any
@@ -197,11 +198,33 @@ def _build_options_block(
     }
 
 
+def _encode_invoking_context(channel_id: str, thread_ts: str = "") -> str:
+    if not thread_ts:
+        return channel_id
+    return json.dumps({"channel_id": channel_id, "thread_ts": thread_ts})
+
+
+def _parse_invoking_context(private_metadata: str) -> tuple[str, str]:
+    """Return ``(channel_id, thread_ts)`` from new-incident modal metadata.
+
+    Slash commands store a bare channel id; the message shortcut stores JSON so
+    the creation notice can be threaded under the source message.
+    """
+    if not private_metadata.startswith("{"):
+        return private_metadata, ""
+    try:
+        data = json.loads(private_metadata)
+    except ValueError:
+        return "", ""
+    return data.get("channel_id", ""), data.get("thread_ts", "")
+
+
 def _build_new_incident_modal(
     channel_id: str = "",
     user_id: str = "",
     severity: str = "",
     selected_options: set[str] | None = None,
+    thread_ts: str = "",
 ) -> dict:
     blocks = build_incident_form_blocks(user_id=user_id)
 
@@ -220,7 +243,7 @@ def _build_new_incident_modal(
         "blocks": blocks,
     }
     if channel_id:
-        modal["private_metadata"] = channel_id
+        modal["private_metadata"] = _encode_invoking_context(channel_id, thread_ts)
     return modal
 
 
@@ -294,6 +317,26 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
     )
 
 
+def handle_declare_incident_shortcut(ack: Any, shortcut: dict, client: Any) -> None:
+    """Open the new incident modal from the message or global shortcut.
+
+    Slack does not deliver custom slash commands from threads, so shortcuts are
+    the way to declare an incident there. Typing ``/inc`` in a thread surfaces
+    the global shortcut, which carries no channel or message context.
+    """
+    ack()
+    message = shortcut.get("message", {})
+    thread_ts = message.get("thread_ts") or message.get("ts", "")
+    client.views_open(
+        trigger_id=shortcut["trigger_id"],
+        view=_build_new_incident_modal(
+            channel_id=shortcut.get("channel", {}).get("id", ""),
+            user_id=shortcut.get("user", {}).get("id", ""),
+            thread_ts=thread_ts,
+        ),
+    )
+
+
 def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
     ack()
     view = body.get("view", {})
@@ -305,7 +348,7 @@ def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
         values.get("severity_block", {}).get("severity", {}).get("selected_option")
     )
     severity = selected_option.get("value") if selected_option else ""
-    channel_id = view.get("private_metadata", "")
+    channel_id, thread_ts = _parse_invoking_context(view.get("private_metadata", ""))
     user_id = body.get("user", {}).get("id", "")
 
     prior_selections = (
@@ -321,6 +364,7 @@ def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
         user_id=user_id,
         severity=severity,
         selected_options=selected_values,
+        thread_ts=thread_ts,
     )
 
     client.views_update(view_id=view["id"], view=new_view)
@@ -482,7 +526,9 @@ def handle_new_incident_submission(
 
         client.chat_postMessage(channel=slack_user_id, text=dm_message)
 
-        invoking_channel = view.get("private_metadata", "")
+        invoking_channel, invoking_thread_ts = _parse_invoking_context(
+            view.get("private_metadata", "")
+        )
         feed_channel_id = settings.SLACK.get("INCIDENT_FEED_CHANNEL_ID", "")
         if (
             invoking_channel
@@ -500,6 +546,10 @@ def handle_new_incident_submission(
                     f"\n\nFor those involved, please join <#{channel_id}>"
                 )
             _slack_service.join_channel(invoking_channel)
-            client.chat_postMessage(channel=invoking_channel, text=channel_message)
+            client.chat_postMessage(
+                channel=invoking_channel,
+                text=channel_message,
+                thread_ts=invoking_thread_ts or None,
+            )
     except Exception:
         logger.exception("Failed to send incident creation notifications")
