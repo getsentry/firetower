@@ -89,10 +89,15 @@ def _remind_misfiled_action_item_creators(linear: dict) -> None:
             team_id, MISFILED_ACTION_ITEM_REMINDER_MARKER
         )
     except Exception:
-        logger.exception("Failed to find misfiled action items")
+        logger.info(
+            "Failed to fetch misfiled action items from Linear; skipping team reminders",
+            exc_info=True,
+        )
         return
     if issues is None:
-        logger.error("Failed to find misfiled action items")
+        logger.info(
+            "Failed to fetch misfiled action items from Linear; skipping team reminders"
+        )
         return
 
     logger.info(
@@ -129,12 +134,14 @@ def _remind_misfiled_action_item_creators(linear: dict) -> None:
             )
             success = service.create_comment(issue_id, comment, comment_id=comment_id)
         except Exception:
-            logger.exception(
-                "Failed to post team reminder for action item %s", issue_id
+            logger.info(
+                "Failed to post team reminder for action item %s",
+                issue_id,
+                exc_info=True,
             )
             continue
         if not success:
-            logger.error("Failed to post team reminder for action item %s", issue_id)
+            logger.info("Failed to post team reminder for action item %s", issue_id)
         else:
             logger.info("Posted team reminder for action item %s", issue_id)
 

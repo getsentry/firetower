@@ -590,7 +590,7 @@ class LinearService:
                 return issues
             next_cursor = page["pageInfo"]["endCursor"]
             if not next_cursor or next_cursor == cursor:
-                logger.error("Incomplete Linear misfiled action item pagination")
+                logger.info("Incomplete Linear misfiled action item pagination")
                 return None
             cursor = next_cursor
 

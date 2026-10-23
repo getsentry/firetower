@@ -71,13 +71,19 @@ def test_does_not_return_partial_results_on_failure(service):
 
 
 @pytest.mark.parametrize("cursor", [None, "cursor-1"])
-def test_fails_closed_when_pagination_cannot_advance(service, cursor):
-    with patch.object(
-        service,
-        "_graphql",
-        side_effect=[page([], True, "cursor-1"), page([], True, cursor)],
+def test_fails_closed_when_pagination_cannot_advance(service, cursor, caplog):
+    with (
+        patch.object(
+            service,
+            "_graphql",
+            side_effect=[page([], True, "cursor-1"), page([], True, cursor)],
+        ),
+        caplog.at_level("INFO", logger="firetower.integrations.services.linear"),
     ):
         assert service.get_misfiled_action_items("team-id", "marker") is None
+
+    assert "Incomplete Linear misfiled action item pagination" in caplog.text
+    assert all(record.levelname == "INFO" for record in caplog.records)
 
 
 def test_returns_fetched_batch_at_page_limit(service):

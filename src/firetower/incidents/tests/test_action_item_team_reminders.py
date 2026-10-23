@@ -130,28 +130,34 @@ def test_skips_when_identifier_sync_is_disabled(service, config):
 
 
 @pytest.mark.parametrize("failure", [None, RuntimeError("Linear unavailable")])
-def test_does_not_post_when_lookup_fails(service, failure):
+def test_does_not_post_when_lookup_fails(service, failure, caplog):
     if isinstance(failure, Exception):
         service.get_misfiled_action_items.side_effect = failure
     else:
         service.get_misfiled_action_items.return_value = failure
 
-    _remind_misfiled_action_item_creators(LINEAR)
+    with caplog.at_level("INFO", logger="firetower.incidents.tasks.action_items"):
+        _remind_misfiled_action_item_creators(LINEAR)
 
     service.create_comment.assert_not_called()
+    assert "Failed to fetch misfiled action items from Linear" in caplog.text
+    assert all(record.levelname == "INFO" for record in caplog.records)
 
 
 @pytest.mark.parametrize("failure", [False, RuntimeError("Linear unavailable")])
-def test_continues_after_a_comment_failure(service, failure):
+def test_continues_after_a_comment_failure(service, failure, caplog):
     service.get_misfiled_action_items.return_value = [
         ISSUE,
         {**ISSUE, "id": "issue-2", "identifier": "INC-2509"},
     ]
     service.create_comment.side_effect = [failure, True]
 
-    _remind_misfiled_action_item_creators(LINEAR)
+    with caplog.at_level("INFO", logger="firetower.incidents.tasks.action_items"):
+        _remind_misfiled_action_item_creators(LINEAR)
 
     assert service.create_comment.call_count == 2
+    assert "Failed to post team reminder for action item issue-1" in caplog.text
+    assert all(record.levelname == "INFO" for record in caplog.records)
 
 
 @pytest.mark.parametrize(
