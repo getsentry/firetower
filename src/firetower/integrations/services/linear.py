@@ -545,7 +545,65 @@ class LinearService:
 
         return data.get("attachmentCreate", {}).get("success", False)
 
-    def create_comment(self, issue_id: str, body: str) -> bool:
+    def get_misfiled_action_items(
+        self, team_id: str, reminder_marker: str
+    ) -> list[dict[str, Any]] | None:
+        """Find unnotified child issues in the incident team, in any status."""
+        query = """
+        query($filter: IssueFilter!, $after: String) {
+            issues(
+                filter: $filter, includeArchived: true, first: 50, after: $after
+            ) {
+                nodes {
+                    id
+                    identifier
+                    creator {
+                        id
+                        displayName
+                    }
+                }
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+            }
+        }
+        """
+        issue_filter = {
+            "team": {"id": {"eq": team_id}},
+            "number": {"gte": 2000},
+            "parent": {"team": {"id": {"eq": team_id}}},
+            "or": [
+                {"comments": {"length": {"eq": 0}}},
+                {"comments": {"every": {"body": {"notContains": reminder_marker}}}},
+            ],
+        }
+        issues: list[dict[str, Any]] = []
+        cursor: str | None = None
+        for _ in range(25):
+            data = self._graphql(query, {"filter": issue_filter, "after": cursor})
+            if not data or not data.get("issues"):
+                return None
+            page = data["issues"]
+            issues.extend(page["nodes"])
+            if not page["pageInfo"]["hasNextPage"]:
+                return issues
+            next_cursor = page["pageInfo"]["endCursor"]
+            if not next_cursor or next_cursor == cursor:
+                logger.info("Incomplete Linear misfiled action item pagination")
+                return None
+            cursor = next_cursor
+
+        logger.info(
+            "Reached Linear misfiled action item page limit; returning %d issues "
+            "and leaving the rest for the next run",
+            len(issues),
+        )
+        return issues
+
+    def create_comment(
+        self, issue_id: str, body: str, *, comment_id: str | None = None
+    ) -> bool:
         mutation = """
         mutation($input: CommentCreateInput!) {
             commentCreate(input: $input) {
@@ -553,11 +611,10 @@ class LinearService:
             }
         }
         """
-        data = self._graphql(
-            mutation,
-            {"input": {"issueId": issue_id, "body": body}},
-            retryable=False,
-        )
+        input_data = {"issueId": issue_id, "body": body}
+        if comment_id is not None:
+            input_data["id"] = comment_id
+        data = self._graphql(mutation, {"input": input_data}, retryable=False)
         if not data:
             return False
 

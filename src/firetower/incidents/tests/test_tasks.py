@@ -839,6 +839,13 @@ class TestSendActionItemReminder:
             yield
 
     @pytest.fixture(autouse=True)
+    def mock_team_reminders(self):
+        with patch(
+            "firetower.incidents.tasks.action_items._remind_misfiled_action_item_creators"
+        ) as mock:
+            yield mock
+
+    @pytest.fixture(autouse=True)
     def mock_sync(self):
         with patch(
             "firetower.incidents.tasks.action_items.sync_action_items_from_linear"
@@ -901,6 +908,19 @@ class TestSendActionItemReminder:
         }
         defaults.update(kwargs)
         return ActionItem.objects.create(incident=incident, **defaults)
+
+    def test_sends_slo_nags_before_team_reminders(
+        self, mock_linear, mock_team_reminders
+    ):
+        incident = self._make_incident()
+        self._make_action_item(incident)
+        calls = MagicMock()
+        calls.attach_mock(mock_linear.create_comment, "slo_comment")
+        calls.attach_mock(mock_team_reminders, "team_reminders")
+
+        send_action_item_reminder()
+
+        assert [c[0] for c in calls.mock_calls] == ["slo_comment", "team_reminders"]
 
     def test_processes_incident_in_age_window(self, mock_sync):
         incident = self._make_incident(days_old=45)
