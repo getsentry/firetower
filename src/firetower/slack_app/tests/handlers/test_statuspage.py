@@ -1,10 +1,16 @@
 import json
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
 
-from firetower.incidents.models import ExternalLink, ExternalLinkType
+from firetower.incidents.models import (
+    ExternalLink,
+    ExternalLinkType,
+    TimelineEventSource,
+    TimelineEventType,
+)
 from firetower.slack_app.handlers.statuspage import (
     _build_statuspage_modal,
     _extract_submission_data,
@@ -431,7 +437,10 @@ class TestStatuspageSubmission:
         ) as MockService:
             instance = MockService.return_value
             instance.configured = True
-            instance.create_incident.return_value = {"id": "new_sp_123"}
+            instance.create_incident.return_value = {
+                "id": "new_sp_123",
+                "created_at": "2026-08-20T15:00:00Z",
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/new_sp_123"
             )
@@ -452,9 +461,62 @@ class TestStatuspageSubmission:
         )
         assert link.url == "https://test.statuspage.io/incidents/new_sp_123"
 
+        event = incident.timeline_events.get()
+        assert event.source == TimelineEventSource.STATUSPAGE
+        assert event.event_type == TimelineEventType.STATUSPAGE_INCIDENT_CREATED
+        assert event.payload == {
+            "message": "Looking into it",
+            "affected_components": {},
+        }
+        assert event.external_id == "new_sp_123"
+        assert event.link_url == link.url
+        assert event.occurred_at == datetime(2026, 8, 20, 15, tzinfo=UTC)
+
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "created" in msg
         assert "<@U_SUBMITTER>" in msg
+
+    @pytest.mark.parametrize(
+        "timeline_metadata",
+        [{}, {"created_at": "not-a-timestamp"}],
+        ids=["missing", "invalid"],
+    )
+    def test_invalid_create_timeline_metadata_still_reports_success(
+        self, incident, timeline_metadata
+    ):
+        ack = MagicMock()
+        body = {"user": {"id": "U_SUBMITTER"}}
+        view = self._make_view()
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.create_incident.return_value = {
+                "id": "new_sp_without_metadata",
+                **timeline_metadata,
+            }
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/new_sp_without_metadata"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.STATUSPAGE
+        )
+        assert link.url == (
+            "https://test.statuspage.io/incidents/new_sp_without_metadata"
+        )
+        assert incident.timeline_events.count() == 0
+        assert client.chat_postEphemeral.call_count == 0
+        assert client.chat_postMessage.call_count == 2
+        assert all(
+            "created a statuspage post" in call.kwargs["text"]
+            for call in client.chat_postMessage.call_args_list
+        )
 
     def test_posts_to_both_incident_and_status_channels(self, incident):
         ack = MagicMock()
@@ -467,7 +529,10 @@ class TestStatuspageSubmission:
         ) as MockService:
             instance = MockService.return_value
             instance.configured = True
-            instance.create_incident.return_value = {"id": "sp_dual"}
+            instance.create_incident.return_value = {
+                "id": "sp_dual",
+                "created_at": "2026-08-20T15:00:00Z",
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/sp_dual"
             )
@@ -490,7 +555,10 @@ class TestStatuspageSubmission:
         ) as MockService:
             instance = MockService.return_value
             instance.configured = True
-            instance.create_incident.return_value = {"id": "sp_from_status"}
+            instance.create_incident.return_value = {
+                "id": "sp_from_status",
+                "created_at": "2026-08-20T15:00:00Z",
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/sp_from_status"
             )
@@ -505,7 +573,9 @@ class TestStatuspageSubmission:
     def test_creates_with_components(self, incident):
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
-        view = self._make_view(components={"comp1": "major_outage"})
+        view = self._make_view(
+            components={"comp1": "major_outage", "comp2": "operational"}
+        )
         client = MagicMock()
 
         with patch(
@@ -513,7 +583,10 @@ class TestStatuspageSubmission:
         ) as MockService:
             instance = MockService.return_value
             instance.configured = True
-            instance.create_incident.return_value = {"id": "new_sp_456"}
+            instance.create_incident.return_value = {
+                "id": "new_sp_456",
+                "created_at": "2026-08-20T15:00:00Z",
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/new_sp_456"
             )
@@ -525,8 +598,15 @@ class TestStatuspageSubmission:
             status="investigating",
             message="Looking into it",
             impact="major",
-            components={"comp1": "major_outage"},
+            components={"comp1": "major_outage", "comp2": "operational"},
         )
+        assert incident.timeline_events.get().payload == {
+            "message": "Looking into it",
+            "affected_components": {
+                "comp1": "major_outage",
+                "comp2": "operational",
+            },
+        }
 
     def test_updates_existing_statuspage_incident(self, incident):
         ExternalLink.objects.create(
@@ -537,7 +617,11 @@ class TestStatuspageSubmission:
 
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
-        view = self._make_view(status="identified", message="Found the cause")
+        view = self._make_view(
+            status="identified",
+            message="Found the cause",
+            components={"comp1": "degraded_performance", "comp2": "operational"},
+        )
         client = MagicMock()
 
         with patch(
@@ -546,7 +630,21 @@ class TestStatuspageSubmission:
             instance = MockService.return_value
             instance.configured = True
             instance.extract_incident_id_from_url.return_value = "existing_sp"
-            instance.update_incident.return_value = {"id": "existing_sp"}
+            instance.update_incident.return_value = {
+                "id": "existing_sp",
+                "incident_updates": [
+                    {
+                        "id": "sp_update_old",
+                        "status": "investigating",
+                        "created_at": "2026-08-20T15:00:00Z",
+                    },
+                    {
+                        "id": "sp_update_123",
+                        "status": "identified",
+                        "created_at": "2026-08-20T16:00:00Z",
+                    },
+                ],
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/existing_sp"
             )
@@ -557,11 +655,77 @@ class TestStatuspageSubmission:
             incident_id="existing_sp",
             status="identified",
             message="Found the cause",
-            components=None,
+            components={"comp1": "degraded_performance", "comp2": "operational"},
         )
+        event = incident.timeline_events.get()
+        assert event.source == TimelineEventSource.STATUSPAGE
+        assert event.event_type == TimelineEventType.STATUSPAGE_UPDATE_POSTED
+        assert event.payload == {
+            "message": "Found the cause",
+            "status": "identified",
+            "affected_components": {
+                "comp1": "degraded_performance",
+                "comp2": "operational",
+            },
+        }
+        assert event.external_id == "sp_update_123"
+        assert event.link_url == "https://test.statuspage.io/incidents/existing_sp"
+        assert event.occurred_at == datetime(2026, 8, 20, 16, tzinfo=UTC)
+
         msg = client.chat_postMessage.call_args[1]["text"]
         assert "updated" in msg
         assert "<@U_SUBMITTER>" in msg
+
+    @pytest.mark.parametrize(
+        "incident_updates",
+        [
+            [],
+            [
+                {
+                    "id": "sp_update_without_timestamp",
+                    "status": "monitoring",
+                    "created_at": "not-a-timestamp",
+                }
+            ],
+        ],
+        ids=["missing", "invalid"],
+    )
+    def test_incomplete_update_response_still_reports_success(
+        self, incident, incident_updates
+    ):
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.STATUSPAGE,
+            url="https://test.statuspage.io/incidents/existing_sp",
+        )
+        ack = MagicMock()
+        body = {"user": {"id": "U_SUBMITTER"}}
+        view = self._make_view(status="monitoring", message="Monitoring")
+        client = MagicMock()
+
+        with patch(
+            "firetower.slack_app.handlers.statuspage.StatuspageService"
+        ) as MockService:
+            instance = MockService.return_value
+            instance.configured = True
+            instance.extract_incident_id_from_url.return_value = "existing_sp"
+            instance.update_incident.return_value = {
+                "incident_updates": incident_updates
+            }
+            instance.get_incident_url.return_value = (
+                "https://test.statuspage.io/incidents/existing_sp"
+            )
+
+            handle_statuspage_submission(ack, body, view, client)
+
+        instance.get_incident_url.assert_called_once_with("existing_sp")
+        assert incident.timeline_events.count() == 0
+        assert client.chat_postEphemeral.call_count == 0
+        assert client.chat_postMessage.call_count == 2
+        assert all(
+            "updated the statuspage" in call.kwargs["text"]
+            for call in client.chat_postMessage.call_args_list
+        )
 
     def test_resolving_existing_statuspage_cancels_followup_reminder(self, incident):
         ExternalLink.objects.create(
@@ -571,7 +735,11 @@ class TestStatuspageSubmission:
         )
         ack = MagicMock()
         body = {"user": {"id": "U_SUBMITTER"}}
-        view = self._make_view(status="resolved", message="Resolved")
+        view = self._make_view(
+            status="resolved",
+            message="Resolved",
+            components={"comp1": "operational", "comp2": "operational"},
+        )
         client = MagicMock()
 
         with (
@@ -588,7 +756,16 @@ class TestStatuspageSubmission:
             instance = MockService.return_value
             instance.configured = True
             instance.extract_incident_id_from_url.return_value = "existing_sp"
-            instance.update_incident.return_value = {"id": "existing_sp"}
+            instance.update_incident.return_value = {
+                "id": "existing_sp",
+                "incident_updates": [
+                    {
+                        "id": "sp_update_resolved",
+                        "status": "resolved",
+                        "created_at": "2026-08-20T17:00:00Z",
+                    }
+                ],
+            }
             instance.get_incident_url.return_value = (
                 "https://test.statuspage.io/incidents/existing_sp"
             )
@@ -597,6 +774,14 @@ class TestStatuspageSubmission:
 
         mock_cancel.assert_called_once_with(incident)
         mock_schedule.assert_not_called()
+        assert incident.timeline_events.get().payload == {
+            "message": "Resolved",
+            "status": "resolved",
+            "affected_components": {
+                "comp1": "operational",
+                "comp2": "operational",
+            },
+        }
 
     def test_empty_message_returns_error(self, incident):
         ack = MagicMock()
@@ -653,6 +838,7 @@ class TestStatuspageSubmission:
         assert not ExternalLink.objects.filter(
             incident=incident, type=ExternalLinkType.STATUSPAGE
         ).exists()
+        assert incident.timeline_events.count() == 0
 
     def test_no_incident_for_channel(self, db):
         ack = MagicMock()

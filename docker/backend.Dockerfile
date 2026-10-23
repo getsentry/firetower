@@ -1,5 +1,5 @@
 FROM python:3.12.11-alpine3.22 AS build_backend
-COPY --from=ghcr.io/astral-sh/uv:0.8.18 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.4 /uv /uvx /bin/
 
 WORKDIR /app
 

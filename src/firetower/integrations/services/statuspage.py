@@ -173,12 +173,16 @@ class StatuspageService:
         if components:
             # component_ids and components must be in the same payload or Statuspage
             # treats them as separate actions and suppresses one webhook.
-            # Only list non-operational components in component_ids so the
-            # incident page shows affected components, but send all statuses
-            # in components so resets to operational are still applied.
+            # Keep components already attached to the incident in component_ids
+            # even once they recover: detaching them stops component subscribers
+            # from receiving this and any later updates, including the resolve.
+            existing = self.get_incident(incident_id) or {}
             affected_ids = [
-                cid for cid, status in components.items() if status != "operational"
+                c["id"] for c in existing.get("components") or [] if c.get("id")
             ]
+            for cid, status in components.items():
+                if status != "operational" and cid not in affected_ids:
+                    affected_ids.append(cid)
             incident_data["component_ids"] = affected_ids
             incident_data["components"] = components
 

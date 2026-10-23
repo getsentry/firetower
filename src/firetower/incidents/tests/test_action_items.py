@@ -127,13 +127,15 @@ class TestSyncActionItemsFromLinear:
         ("priority", "slo_days"),
         [(1, 14), (2, 14), (3, 28)],
     )
-    def test_sets_sla_during_first_sync(self, settings, priority, slo_days):
+    def test_sets_sla_start_and_breach_during_first_sync(
+        self, settings, priority, slo_days
+    ):
         settings.LINEAR = {
             "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": 14,
             "ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY": 28,
         }
         incident = self._make_incident()
-        created_at = timezone.now() - timedelta(days=2)
+        created_at = timezone.now() - timedelta(days=slo_days + 1)
         children = [
             _make_linear_issue(
                 id="id-1",
@@ -154,6 +156,7 @@ class TestSyncActionItemsFromLinear:
 
         mock_service.update_issue.assert_called_once_with(
             "id-1",
+            sla_started_at=created_at.isoformat(),
             sla_breaches_at=(created_at + timedelta(days=slo_days)).isoformat(),
             sla_type="all",
         )
@@ -697,12 +700,14 @@ class TestLinearService:
         ) as mock_gql:
             result = service.update_issue(
                 "issue-id",
+                sla_started_at="2026-10-18T12:00:00+00:00",
                 sla_breaches_at="2026-11-01T12:00:00+00:00",
                 sla_type="all",
             )
 
         assert result is True
         assert mock_gql.call_args[0][1]["input"] == {
+            "slaStartedAt": "2026-10-18T12:00:00+00:00",
             "slaBreachesAt": "2026-11-01T12:00:00+00:00",
             "slaType": "all",
         }

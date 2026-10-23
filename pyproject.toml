@@ -6,13 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "cryptography>=50.0.2",
-    "datadog==0.52.1",
-    "datadog-api-client==2.61.0",
+    "datadog==0.55.0",
+    "datadog-api-client==2.62.0",
     "django>=6.1.2,<7",
     "django-cors-headers>=4.9.0",
     "django-fernet-encrypted-fields>=0.4.0",
     "django-kubernetes>=1.1.0",
-    "djangorestframework>=3.18.1",
+    "djangorestframework>=3.18.3",
     "google-auth>=2.59.1",
     "psycopg[binary]>=3.3.6",
     "pyserde[toml]>=0.33.1",
@@ -37,14 +37,14 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-django>=4.14.0",
-    "ruff>=0.17.0",
+    "ruff>=0.17.1",
     "ty>=0.0.86",
     "django-stubs>=6.1.2",
     "django-stubs-ext>=5.2.7",
     "blessed>=1.50.0",
 ]
 prod = [
-    "ddtrace==4.15.6",
+    "ddtrace==4.16.0",
     "granian>=2.8.3",
     "sentry-sdk[django]>=2.71.0",
 ]

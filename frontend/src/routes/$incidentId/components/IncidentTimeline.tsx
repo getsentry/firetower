@@ -1,11 +1,11 @@
-import {Suspense} from 'react';
+import {Suspense, type ReactNode} from 'react';
 import * as stylex from '@stylexjs/stylex';
 import {useSuspenseQuery} from '@tanstack/react-query';
 import {CatchBoundary} from '@tanstack/react-router';
 import {Avatar} from 'components/Avatar';
 import {Card} from 'components/Card';
 import {Skeleton} from 'components/Skeleton';
-import {Activity, Radio, Siren, UserRound, type LucideIcon} from 'lucide-react';
+import {Activity, Siren, UserRound} from 'lucide-react';
 
 import {background, content, fontWeight, space} from '../../../styles/tokens.stylex';
 import type {
@@ -23,6 +23,9 @@ const styles = stylex.create({
     gridTemplateColumns: 'auto 1fr',
   },
   icon: {height: '16px', width: '16px'},
+  statuspageIcon: {
+    filter: {default: null, '@media (prefers-color-scheme: dark)': 'invert(100%)'},
+  },
   connector: {
     backgroundColor: background.secondary,
     position: 'absolute',
@@ -113,29 +116,36 @@ const styles = stylex.create({
 
 interface SourceStyle {
   label: string;
-  Icon: LucideIcon;
+  icon: ReactNode;
   style: stylex.StyleXStyles;
 }
 
 const SOURCE_STYLES: Record<TimelineEventSource, SourceStyle> = {
   USER: {
     label: 'User',
-    Icon: UserRound,
+    icon: <UserRound {...stylex.props(styles.icon)} aria-hidden="true" />,
     style: styles.sourceNeutral,
   },
   INTERNAL: {
     label: 'Firetower',
-    Icon: Activity,
+    icon: <Activity {...stylex.props(styles.icon)} aria-hidden="true" />,
     style: styles.sourceNeutral,
   },
   STATUSPAGE: {
     label: 'Statuspage',
-    Icon: Radio,
+    icon: (
+      <img
+        src="/statuspage.svg"
+        alt=""
+        {...stylex.props(styles.icon, styles.statuspageIcon)}
+        aria-hidden="true"
+      />
+    ),
     style: styles.sourceWarning,
   },
   PAGERDUTY: {
     label: 'PagerDuty',
-    Icon: Siren,
+    icon: <Siren {...stylex.props(styles.icon)} aria-hidden="true" />,
     style: styles.sourceDanger,
   },
 };
@@ -154,12 +164,11 @@ function formatDateTime(dateString: string): string {
 
 function TimelineRow({event, isLast}: {event: TimelineEvent; isLast: boolean}) {
   const sourceStyle = SOURCE_STYLES[event.source];
-  const SourceIcon = sourceStyle.Icon;
 
   return (
     <li {...stylex.props(styles.row)}>
       <div {...stylex.props(styles.sourceIcon, sourceStyle.style)}>
-        <SourceIcon {...stylex.props(styles.icon)} aria-hidden="true" />
+        {sourceStyle.icon}
       </div>
       <span
         {...stylex.props(styles.connector, isLast && styles.lastConnector)}

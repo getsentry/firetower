@@ -23,6 +23,8 @@ from firetower.incidents.timeline.events import (
     record_incident_created,
     record_severity_changed,
     record_status_changed,
+    record_statuspage_incident_created,
+    record_statuspage_update_posted,
     record_title_changed,
     record_visibility_changed,
 )
@@ -102,6 +104,54 @@ class TestTimelineEventHelpers:
         first, _ = users
         event = record_captain_changed(incident, first, None)
         assert event.payload == {"old": "First User", "new": None}
+
+    def test_statuspage_helpers(self, incident, users):
+        first, _ = users
+        created_at = datetime(2026, 8, 20, 15, tzinfo=UTC)
+        updated_at = datetime(2026, 8, 20, 16, tzinfo=UTC)
+
+        record_statuspage_incident_created(
+            incident,
+            sp_incident_id="sp-incident",
+            sp_url="https://status.example.com/incidents/sp-incident",
+            message="Investigating",
+            affected_components={"api": "major_outage"},
+            occurred_at=created_at,
+            actor=first,
+        )
+        record_statuspage_update_posted(
+            incident,
+            sp_update_id="sp-update",
+            sp_url="https://status.example.com/incidents/sp-incident",
+            message="Monitoring",
+            status="monitoring",
+            affected_components={"api": "degraded_performance"},
+            occurred_at=updated_at,
+        )
+
+        created, updated = incident.timeline_events.all()
+        assert created.source == TimelineEventSource.STATUSPAGE
+        assert created.event_type == TimelineEventType.STATUSPAGE_INCIDENT_CREATED
+        assert created.payload == {
+            "message": "Investigating",
+            "affected_components": {"api": "major_outage"},
+        }
+        assert created.external_id == "sp-incident"
+        assert created.link_url == "https://status.example.com/incidents/sp-incident"
+        assert created.occurred_at == created_at
+        assert created.actor == first
+
+        assert updated.source == TimelineEventSource.STATUSPAGE
+        assert updated.event_type == TimelineEventType.STATUSPAGE_UPDATE_POSTED
+        assert updated.payload == {
+            "message": "Monitoring",
+            "status": "monitoring",
+            "affected_components": {"api": "degraded_performance"},
+        }
+        assert updated.external_id == "sp-update"
+        assert updated.link_url == "https://status.example.com/incidents/sp-incident"
+        assert updated.occurred_at == updated_at
+        assert updated.actor is None
 
 
 @pytest.mark.django_db
@@ -321,13 +371,20 @@ class TestTimelineRenderer:
             ),
             (
                 TimelineEventType.STATUSPAGE_INCIDENT_CREATED,
-                {"message": "Investigating"},
+                {
+                    "message": "Investigating",
+                    "affected_components": {"api": "major_outage"},
+                },
                 'Statuspage incident posted: "Investigating"',
             ),
             (
                 TimelineEventType.STATUSPAGE_UPDATE_POSTED,
-                {"message": "Monitoring"},
-                'Statuspage update: "Monitoring"',
+                {
+                    "message": "The problem has been resolved",
+                    "status": "resolved",
+                    "affected_components": {},
+                },
+                'Statuspage marked Resolved: "The problem has been resolved"',
             ),
             (
                 TimelineEventType.PAGERDUTY_INCIDENT_TRIGGERED,
@@ -339,6 +396,14 @@ class TestTimelineRenderer:
     def test_renders_every_declared_event_type(self, event_type, payload, expected):
         event = TimelineEvent(event_type=event_type, payload=payload)
         assert render_timeline_event(event) == expected
+
+    def test_statuspage_update_without_statuses_keeps_legacy_summary(self):
+        event = TimelineEvent(
+            event_type=TimelineEventType.STATUSPAGE_UPDATE_POSTED,
+            payload={"message": "Monitoring"},
+        )
+
+        assert render_timeline_event(event) == 'Statuspage update: "Monitoring"'
 
     def test_malformed_payload_has_fallback_summary(self):
         event = TimelineEvent(
