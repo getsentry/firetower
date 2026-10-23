@@ -80,15 +80,38 @@ def test_fails_closed_when_pagination_cannot_advance(service, cursor):
         assert service.get_misfiled_action_items("team-id", "marker") is None
 
 
-def test_fails_closed_at_page_limit(service):
+def test_returns_fetched_batch_at_page_limit(service):
+    issues = [{"id": f"issue-{i}"} for i in range(1250)]
     with patch.object(
         service,
         "_graphql",
-        side_effect=[page([], True, f"cursor-{i}") for i in range(25)],
+        side_effect=[
+            page(issues[i * 50 : (i + 1) * 50], True, f"cursor-{i}") for i in range(25)
+        ],
     ) as graphql:
-        assert service.get_misfiled_action_items("team-id", "marker") is None
+        assert service.get_misfiled_action_items("team-id", "marker") == issues
 
     assert graphql.call_count == 25
+
+
+def test_starts_a_fresh_sweep_on_next_call(service):
+    first_batch = [{"id": f"issue-{i}"} for i in range(25)]
+    remaining = [{"id": "remaining-issue"}]
+    with patch.object(
+        service,
+        "_graphql",
+        side_effect=[
+            *[
+                page([issue], True, f"cursor-{i}")
+                for i, issue in enumerate(first_batch)
+            ],
+            page(remaining),
+        ],
+    ) as graphql:
+        assert service.get_misfiled_action_items("team-id", "marker") == first_batch
+        assert service.get_misfiled_action_items("team-id", "marker") == remaining
+
+    assert graphql.call_args_list[25].args[1]["after"] is None
 
 
 @pytest.mark.parametrize("comment_id", [None, "stable-comment-id"])

@@ -590,11 +590,16 @@ class LinearService:
                 return issues
             next_cursor = page["pageInfo"]["endCursor"]
             if not next_cursor or next_cursor == cursor:
-                break
+                logger.error("Incomplete Linear misfiled action item pagination")
+                return None
             cursor = next_cursor
 
-        logger.error("Incomplete Linear misfiled action item pagination")
-        return None
+        logger.info(
+            "Reached Linear misfiled action item page limit; returning %d issues "
+            "and leaving the rest for the next run",
+            len(issues),
+        )
+        return issues
 
     def create_comment(
         self, issue_id: str, body: str, *, comment_id: str | None = None
