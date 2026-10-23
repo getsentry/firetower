@@ -1,25 +1,11 @@
 import {useCallback, useState} from 'react';
-import {cva} from 'class-variance-authority';
-import {Button} from 'components/Button';
+import * as stylex from '@stylexjs/stylex';
+import {buttonStyles} from 'components/buttonStyles';
 import {ConfirmationDialog} from 'components/ConfirmationDialog';
 import {Popover, PopoverContent, PopoverTrigger} from 'components/Popover';
 import {EllipsisVertical} from 'lucide-react';
-import {cn} from 'utils/cn';
 
-const menuItemStyles = cva([
-  'w-full',
-  'cursor-pointer',
-  'rounded-radius-md',
-  'px-space-md',
-  'py-space-sm',
-  'text-left',
-  'text-sm',
-  'transition-colors',
-  'text-content-primary',
-  'bg-background-primary',
-  'hover:bg-background-tertiary',
-  'select-none',
-]);
+import {background, content, radius, space} from '../../../styles/tokens.stylex';
 
 interface OverflowMenuProps {
   isPrivate: boolean;
@@ -64,16 +50,21 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
     <>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
-          <Button variant="icon" disabled={isLoading} aria-label="More actions">
-            <EllipsisVertical className="h-5 w-5" />
-          </Button>
+          <button
+            type="button"
+            {...stylex.props(buttonStyles({variant: 'icon'}))}
+            disabled={isLoading}
+            aria-label="More actions"
+          >
+            <EllipsisVertical {...stylex.props(styles.icon)} />
+          </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="p-space-sm">
+        <PopoverContent align="end" style={styles.content}>
           <button
             role="menuitem"
             type="button"
             onClick={handleMenuItemClick}
-            className={cn(menuItemStyles())}
+            {...stylex.props(styles.menuItem)}
           >
             {isPrivate ? 'Make incident public' : 'Convert to private incident'}
           </button>
@@ -91,3 +82,27 @@ export function OverflowMenu({isPrivate, onToggleVisibility}: OverflowMenuProps)
     </>
   );
 }
+
+const styles = stylex.create({
+  icon: {height: '20px', width: '20px'},
+  content: {padding: space.sm},
+  menuItem: {
+    width: '100%',
+    cursor: 'pointer',
+    borderRadius: radius.md,
+    paddingLeft: space.md,
+    paddingRight: space.md,
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
+    textAlign: 'left',
+    fontSize: 14,
+    lineHeight: '20px',
+    transitionProperty:
+      'color, background-color, border-color, text-decoration-color, fill, stroke',
+    transitionDuration: '150ms',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    color: content.primary,
+    backgroundColor: {default: background.primary, ':hover': background.tertiary},
+    userSelect: 'none',
+  },
+});

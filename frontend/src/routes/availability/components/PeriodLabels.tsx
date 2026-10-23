@@ -1,5 +1,6 @@
-import {cn} from 'utils/cn';
+import * as stylex from '@stylexjs/stylex';
 
+import {content, fontSize, space} from '../../../styles/tokens.stylex';
 import {type PeriodData} from '../queries/availabilityQueryOptions';
 
 interface PeriodLabelsProps {
@@ -17,19 +18,17 @@ export function PeriodLabels({periods}: PeriodLabelsProps) {
   const labels = [...periods].reverse();
 
   return (
-    <div className="mb-space-sm gap-space-lg px-space-xl flex items-center">
-      <div className="w-32 shrink-0" aria-hidden />
-      <div className="flex min-w-0 flex-1 gap-px">
+    <div {...stylex.props(styles.container)}>
+      <div {...stylex.props(styles.regionSpacer)} aria-hidden />
+      <div {...stylex.props(styles.periods)}>
         {labels.map((p, i) => {
           const isCurrent = i === labels.length - 1;
           return (
-            <div key={p.start} className="min-w-0 flex-1 text-center">
+            <div key={p.start} {...stylex.props(styles.period)}>
               <span
-                className={cn(
-                  'text-size-xs',
-                  isCurrent
-                    ? 'text-content-headings font-semibold'
-                    : 'text-content-secondary font-normal'
+                {...stylex.props(
+                  styles.label,
+                  isCurrent ? styles.current : styles.previous
                 )}
               >
                 {abbreviateLabel(p.label)}
@@ -41,3 +40,19 @@ export function PeriodLabels({periods}: PeriodLabelsProps) {
     </div>
   );
 }
+
+const styles = stylex.create({
+  container: {
+    marginBottom: space.sm,
+    gap: space.lg,
+    paddingInline: space.xl,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  regionSpacer: {width: 128, flexShrink: 0},
+  periods: {display: 'flex', minWidth: 0, flex: '1 1 0%', gap: 1},
+  period: {minWidth: 0, flex: '1 1 0%', textAlign: 'center'},
+  label: {fontSize: fontSize.xs},
+  current: {color: content.headings, fontWeight: 600},
+  previous: {color: content.secondary, fontWeight: 400},
+});

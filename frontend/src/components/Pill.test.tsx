@@ -1,6 +1,8 @@
 import React from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {render, screen} from '@testing-library/react';
-import {describe, expect, it} from 'vitest';
+import userEvent from '@testing-library/user-event';
+import {describe, expect, it, vi} from 'vitest';
 
 import {Pill} from './Pill';
 
@@ -10,37 +12,19 @@ describe('Pill', () => {
     expect(screen.getByText('Test Pill')).toBeInTheDocument();
   });
 
-  it('applies default variant', () => {
-    render(<Pill data-testid="pill">Default</Pill>);
-    const pill = screen.getByTestId('pill');
-
-    expect(pill).toHaveClass('bg-background-secondary');
-    expect(pill).toHaveClass('text-content-secondary');
-    expect(pill).toHaveClass('px-space-lg');
-    expect(pill).toHaveClass('py-space-xs');
+  it('composes caller styles and dynamic dimensions', () => {
+    render(<Pill style={[styles.padding(12), styles.padding(20)]}>Styled</Pill>);
+    expect(screen.getByText('Styled').getAttribute('style')).toContain('20px');
+    expect(screen.getByText('Styled').getAttribute('style')).not.toContain('12px');
   });
 
-  it('applies variant classes', () => {
-    render(
-      <Pill variant="Active" data-testid="pill">
-        Active
-      </Pill>
-    );
-    const pill = screen.getByTestId('pill');
+  it('forwards click handlers', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(<Pill onClick={onClick}>Clickable</Pill>);
 
-    expect(pill).toHaveClass('bg-background-transparent-danger-muted');
-    expect(pill).toHaveClass('text-content-danger');
-  });
-
-  it('accepts custom className', () => {
-    render(
-      <Pill className="custom-class" data-testid="pill">
-        Custom
-      </Pill>
-    );
-    const pill = screen.getByTestId('pill');
-
-    expect(pill).toHaveClass('custom-class');
+    await user.click(screen.getByText('Clickable'));
+    expect(onClick).toHaveBeenCalledOnce();
   });
 
   it('forwards ref', () => {
@@ -61,3 +45,5 @@ describe('Pill', () => {
     expect(pill).toHaveAttribute('data-custom', 'test');
   });
 });
+
+const styles = stylex.create({padding: (value: number) => ({paddingInline: value})});

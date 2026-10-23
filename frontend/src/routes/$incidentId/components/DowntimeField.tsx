@@ -1,3 +1,14 @@
+import * as stylex from '@stylexjs/stylex';
+
+import {
+  background,
+  border,
+  content,
+  fontWeight,
+  radius,
+  space,
+} from '../../../styles/tokens.stylex';
+
 interface DowntimeFieldProps {
   isEditing: boolean;
   value: number | null;
@@ -12,13 +23,11 @@ export function DowntimeField({
   onChange,
 }: DowntimeFieldProps) {
   return (
-    <div className="gap-space-md flex items-center">
-      <div className="text-content-secondary w-20 flex-none text-sm font-medium">
-        Downtime
-      </div>
-      <div className="flex flex-1 items-center justify-end">
+    <div {...stylex.props(styles.row)}>
+      <div {...stylex.props(styles.label)}>Downtime</div>
+      <div {...stylex.props(styles.value)}>
         {isEditing ? (
-          <div className="gap-space-xs flex items-center">
+          <div {...stylex.props(styles.editor)}>
             <input
               type="number"
               min="0"
@@ -28,13 +37,16 @@ export function DowntimeField({
                 onChange(e.target.value === '' ? null : Number.isNaN(num) ? null : num);
               }}
               placeholder="—"
-              className="rounded-radius-sm border-secondary bg-background-primary px-space-sm py-space-xs w-20 border text-right text-sm focus:ring-1 focus:outline-none"
+              {...stylex.props(styles.input)}
             />
-            <span className="text-content-secondary text-sm">min</span>
+            <span {...stylex.props(styles.unit)}>min</span>
           </div>
         ) : (
           <span
-            className={`text-sm ${value != null ? 'text-content-primary' : 'text-content-secondary'}`}
+            {...stylex.props(
+              styles.displayValue,
+              value != null ? styles.presentValue : styles.emptyValue
+            )}
           >
             {value != null ? `${value} min` : 'Not set'}
           </span>
@@ -43,3 +55,46 @@ export function DowntimeField({
     </div>
   );
 }
+
+const styles = stylex.create({
+  row: {gap: space.md, display: 'flex', alignItems: 'center'},
+  label: {
+    color: content.secondary,
+    width: '80px',
+    flex: 'none',
+    fontSize: '14px',
+    lineHeight: '20px',
+    fontWeight: fontWeight.medium,
+  },
+  value: {
+    display: 'flex',
+    flex: '1 1 0%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  editor: {gap: space.xs, display: 'flex', alignItems: 'center'},
+  input: {
+    appearance: {
+      default: 'textfield',
+      '::-webkit-inner-spin-button': 'none',
+      '::-webkit-outer-spin-button': 'none',
+    },
+    borderRadius: radius.sm,
+    borderColor: border.secondary,
+    backgroundColor: background.primary,
+    paddingLeft: space.sm,
+    paddingRight: space.sm,
+    paddingTop: space.xs,
+    paddingBottom: space.xs,
+    width: '80px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    textAlign: 'right',
+    fontSize: '14px',
+    lineHeight: '20px',
+  },
+  unit: {color: content.secondary, fontSize: '14px', lineHeight: '20px'},
+  displayValue: {fontSize: 14, lineHeight: '20px'},
+  presentValue: {color: content.primary},
+  emptyValue: {color: content.secondary},
+});

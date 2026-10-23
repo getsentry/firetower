@@ -1,5 +1,7 @@
+import * as stylex from '@stylexjs/stylex';
 import {Card} from 'components/Card';
 
+import {content, space} from '../../../styles/tokens.stylex';
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 
 const linkConfigs = {
@@ -52,13 +54,9 @@ function Link({type, url}: LinkProps) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-content-accent py-space-lg hover:text-content-accent/80 flex items-center gap-3 no-underline transition-colors"
+      {...stylex.props(styles.link)}
     >
-      <img
-        src={config.icon}
-        alt={config.label}
-        className="h-[18px] w-[18px] dark:invert"
-      />
+      <img src={config.icon} alt={config.label} {...stylex.props(styles.icon)} />
       <span>{config.label}</span>
     </a>
   );
@@ -78,7 +76,7 @@ export function LinksList({externalLinks}: LinksListProps) {
 
   return (
     <Card>
-      <div className="flex flex-col">
+      <div {...stylex.props(styles.list)}>
         {linkTypes.map(type => {
           const url = externalLinks[type];
           if (!url) return null;
@@ -89,3 +87,28 @@ export function LinksList({externalLinks}: LinksListProps) {
     </Card>
   );
 }
+
+const styles = stylex.create({
+  link: {
+    color: {
+      default: content.accent,
+      ':hover': `color-mix(in srgb, ${content.accent} 80%, transparent)`,
+    },
+    paddingTop: space.lg,
+    paddingBottom: space.lg,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    textDecoration: 'none',
+    transitionProperty:
+      'color, background-color, border-color, text-decoration-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  icon: {
+    height: '18px',
+    width: '18px',
+    filter: {default: null, '@media (prefers-color-scheme: dark)': 'invert(100%)'},
+  },
+  list: {display: 'flex', flexDirection: 'column'},
+});

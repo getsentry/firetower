@@ -1,12 +1,19 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
-import {cva} from 'class-variance-authority';
 import {Avatar} from 'components/Avatar';
 import {Button} from 'components/Button';
 import {Card} from 'components/Card';
 import {Pencil, X} from 'lucide-react';
-import {cn} from 'utils/cn';
 
+import {
+  background,
+  border,
+  content,
+  fontWeight,
+  radius,
+  space,
+} from '../../../styles/tokens.stylex';
 import {currentUserQueryOptions} from '../../queries/currentUserQueryOptions';
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
@@ -15,68 +22,6 @@ const MAX_VISIBLE_PARTICIPANTS = 5;
 
 type Participant = IncidentDetail['participants'][number];
 type EditableRole = 'Captain' | 'Reporter';
-
-const dropdownTriggerStyles = cva([
-  'gap-space-sm',
-  'px-space-md',
-  'py-space-xs',
-  'rounded-radius-md',
-  'border',
-  'border-gray-200',
-  'bg-background-primary',
-  'text-content-primary',
-  'text-sm',
-  'cursor-pointer',
-  'inline-flex',
-  'items-center',
-  'focus:outline-auto',
-  'focus:border-content-accent',
-  'select-none',
-]);
-
-const dropdownMenuStyles = cva([
-  'absolute',
-  'z-50',
-  'mt-space-xs',
-  'rounded-radius-md',
-  'border',
-  'border-gray-200',
-  'bg-background-primary',
-  'shadow-lg',
-  'p-space-sm',
-  'max-h-[200px]',
-  'overflow-y-auto',
-  '[&::-webkit-scrollbar]:hidden',
-  '[-ms-overflow-style:none]',
-  '[scrollbar-width:none]',
-]);
-
-const dropdownItemStyles = cva(
-  [
-    'w-full',
-    'gap-space-sm',
-    'px-space-md',
-    'py-space-sm',
-    'cursor-pointer',
-    'flex',
-    'items-center',
-    'rounded-radius-sm',
-    'text-sm',
-    'select-none',
-  ],
-  {
-    variants: {
-      focused: {
-        true: ['bg-background-secondary'],
-        false: ['hover:bg-background-tertiary'],
-      },
-      selected: {
-        true: ['font-medium'],
-        false: [],
-      },
-    },
-  }
-);
 
 interface ParticipantDropdownProps {
   participants: Participant[];
@@ -95,7 +40,10 @@ function ParticipantDropdown({
 }: ParticipantDropdownProps) {
   const [searchValue, setSearchValue] = useState('');
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const [menuMeasurements, setMenuMeasurements] = useState<{
+    left: number;
+    width: number;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -155,7 +103,6 @@ function ParticipantDropdown({
     [focusedIndex, filteredParticipants, handleSelect]
   );
 
-  // Focus input on mount
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
@@ -172,7 +119,7 @@ function ParticipantDropdown({
     if (containerRef?.current && inputRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
       const inputRect = inputRef.current.getBoundingClientRect();
-      setMenuStyle({
+      setMenuMeasurements({
         left: containerRect.left - inputRect.left,
         width: containerRect.width,
       });
@@ -180,7 +127,7 @@ function ParticipantDropdown({
   }, [containerRef]);
 
   return (
-    <div className="relative w-full">
+    <div {...stylex.props(styles.container)}>
       <input
         ref={inputRef}
         type="text"
@@ -193,30 +140,30 @@ function ParticipantDropdown({
         placeholder={selectedParticipant?.name ?? value}
         aria-haspopup="listbox"
         aria-expanded={true}
-        className={cn(dropdownTriggerStyles(), 'w-full cursor-text')}
+        {...stylex.props(styles.dropdownTrigger)}
       />
 
       <div
         ref={menuRef}
         role="listbox"
-        className={cn(dropdownMenuStyles())}
-        style={menuStyle}
+        {...stylex.props(
+          styles.dropdownMenu,
+          menuMeasurements &&
+            styles.menuPosition(menuMeasurements.left, menuMeasurements.width)
+        )}
       >
         {filteredParticipants.length === 0 ? (
-          <div className="px-space-md py-space-sm text-content-secondary text-sm">
-            No participants match
-          </div>
+          <div {...stylex.props(styles.empty)}>No participants match</div>
         ) : (
           filteredParticipants.map((participant, index) => (
             <div
               key={participant.email}
               role="option"
               aria-selected={participant.email === value}
-              className={cn(
-                dropdownItemStyles({
-                  focused: index === focusedIndex,
-                  selected: participant.email === value,
-                })
+              {...stylex.props(
+                styles.dropdownItem,
+                index === focusedIndex ? styles.focusedItem : styles.unfocusedItem,
+                participant.email === value && styles.selectedItem
               )}
               onClick={() => handleSelect(participant)}
               onMouseEnter={() => setFocusedIndex(index)}
@@ -248,7 +195,6 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
   const [editingRole, setEditingRole] = useState<EditableRole | null>(null);
   const [selectedParticipantEmail, setSelectedParticipantEmail] = useState<string>('');
 
-  // Memoize sorted participants list for display (may have duplicates if captain === reporter)
   const displayParticipants = useMemo(() => {
     const sorted = [...participants].sort((a, b) => a.name.localeCompare(b.name));
     const captain = sorted.find(p => p.role === 'Captain');
@@ -257,7 +203,6 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
     return [captain, reporter, ...others].filter(Boolean) as Participant[];
   }, [participants]);
 
-  // Deduplicated list for dropdown selection
   const dropdownParticipants = useMemo(() => {
     const seen = new Set<string>();
     return displayParticipants.filter(p => {
@@ -314,8 +259,8 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
 
     if (isEditingThis) {
       return (
-        <div className="gap-space-sm flex flex-1 items-center">
-          <div className="flex-1">
+        <div {...stylex.props(styles.editing)}>
+          <div {...stylex.props(styles.grow)}>
             <ParticipantDropdown
               participants={dropdownParticipants}
               value={selectedParticipantEmail}
@@ -324,10 +269,10 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
               currentUserEmail={currentUser?.email}
             />
           </div>
-          <div className="gap-space-xs flex items-center">
-            <div className="text-content-secondary text-sm uppercase">{role}</div>
+          <div {...stylex.props(styles.roleContainer)}>
+            <div {...stylex.props(styles.role)}>{role}</div>
             <Button variant="icon" onClick={cancelEditing} aria-label="Cancel">
-              <X className="h-4 w-4" />
+              <X {...stylex.props(styles.icon)} />
             </Button>
           </div>
         </div>
@@ -335,15 +280,15 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
     }
 
     return (
-      <div className="gap-space-xs flex items-center">
-        <div className="text-content-secondary text-sm uppercase">{role}</div>
+      <div {...stylex.props(styles.roleContainer)}>
+        <div {...stylex.props(styles.role)}>{role}</div>
         {isEditable && (
           <Button
             variant="icon"
             onClick={() => startEditing(role as EditableRole, participant.email)}
             aria-label={`Edit ${role}`}
           >
-            <Pencil className="h-4 w-4" />
+            <Pencil {...stylex.props(styles.icon)} />
           </Button>
         )}
       </div>
@@ -353,18 +298,16 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
   return (
     <Card>
       <Card.Title>Participants</Card.Title>
-      <div ref={containerRef} className="gap-space-xl grid grid-cols-1">
+      <div ref={containerRef} {...stylex.props(styles.list)}>
         {visibleParticipants.map((participant, index) => {
           const role = getParticipantRole(participant);
           const isEditingThisRow = editingRole !== null && role === editingRole;
           return (
-            <div key={index} className="gap-space-lg flex min-h-10 items-center">
+            <div key={index} {...stylex.props(styles.row)}>
               {!isEditingThisRow && (
                 <>
                   <Avatar name={participant.name} src={participant.avatar_url} />
-                  <div className="text-content-headings flex-1 font-medium">
-                    {participant.name}
-                  </div>
+                  <div {...stylex.props(styles.name)}>{participant.name}</div>
                 </>
               )}
               {role && renderRoleDisplay(participant, role)}
@@ -372,11 +315,11 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
           );
         })}
         {hasMore && (
-          <div className="text-center">
+          <div {...stylex.props(styles.moreContainer)}>
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
-              className="text-content-secondary hover:text-content-accent px-space-md py-space-xs cursor-pointer text-xs"
+              {...stylex.props(styles.more)}
             >
               {expanded
                 ? 'Show fewer participants'
@@ -388,3 +331,99 @@ export function ParticipantsList({incidentId, participants}: ParticipantsListPro
     </Card>
   );
 }
+
+const styles = stylex.create({
+  container: {position: 'relative', width: '100%'},
+  empty: {
+    paddingLeft: space.md,
+    paddingRight: space.md,
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
+    color: content.secondary,
+    fontSize: '14px',
+    lineHeight: '20px',
+  },
+  editing: {gap: space.sm, display: 'flex', flex: '1 1 0%', alignItems: 'center'},
+  grow: {flex: '1 1 0%'},
+  roleContainer: {gap: space.xs, display: 'flex', alignItems: 'center'},
+  role: {
+    color: content.secondary,
+    fontSize: '14px',
+    lineHeight: '20px',
+    textTransform: 'uppercase',
+  },
+  icon: {height: '16px', width: '16px'},
+  list: {
+    gap: space.xl,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(1, minmax(0, 1fr))',
+  },
+  row: {gap: space.lg, display: 'flex', minHeight: '40px', alignItems: 'center'},
+  name: {color: content.headings, flex: '1 1 0%', fontWeight: fontWeight.medium},
+  moreContainer: {textAlign: 'center'},
+  more: {
+    color: {default: content.secondary, ':hover': content.accent},
+    paddingLeft: space.md,
+    paddingRight: space.md,
+    paddingTop: space.xs,
+    paddingBottom: space.xs,
+    cursor: 'pointer',
+    fontSize: '12px',
+    lineHeight: '16px',
+  },
+  dropdownTrigger: {
+    gap: space.sm,
+    paddingLeft: space.md,
+    paddingRight: space.md,
+    paddingTop: space.xs,
+    paddingBottom: space.xs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: border.secondary,
+    backgroundColor: background.primary,
+    color: content.primary,
+    fontSize: 14,
+    lineHeight: '20px',
+    cursor: 'text',
+    display: 'inline-flex',
+    alignItems: 'center',
+    userSelect: 'none',
+    width: '100%',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    zIndex: 50,
+    marginTop: space.xs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: border.secondary,
+    backgroundColor: background.primary,
+    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+    padding: space.sm,
+    maxHeight: 200,
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
+    display: {default: null, '::-webkit-scrollbar': 'none'},
+  },
+  menuPosition: (left: number, width: number) => ({left, width}),
+  dropdownItem: {
+    width: '100%',
+    gap: space.sm,
+    paddingLeft: space.md,
+    paddingRight: space.md,
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    borderRadius: radius.sm,
+    fontSize: 14,
+    lineHeight: '20px',
+    userSelect: 'none',
+  },
+  focusedItem: {backgroundColor: background.secondary},
+  unfocusedItem: {backgroundColor: {default: null, ':hover': background.tertiary}},
+  selectedItem: {fontWeight: fontWeight.medium},
+});

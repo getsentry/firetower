@@ -1,3 +1,6 @@
+import * as stylex from '@stylexjs/stylex';
+
+import {content, fontSize, fontWeight, space} from '../../../styles/tokens.stylex';
 import {type PeriodData} from '../queries/availabilityQueryOptions';
 
 import {HeatmapBar} from './HeatmapBar';
@@ -19,11 +22,23 @@ export function RegionRow({regionName, periods}: RegionRowProps) {
   });
 
   return (
-    <div className="gap-space-lg flex items-center">
-      <span className="text-content-headings text-size-md w-32 shrink-0 truncate font-medium">
-        {regionName}
-      </span>
+    <div {...stylex.props(styles.row)}>
+      <span {...stylex.props(styles.label)}>{regionName}</span>
       <HeatmapBar blocks={heatmapBlocks} />
     </div>
   );
 }
+
+const styles = stylex.create({
+  row: {gap: space.lg, display: 'flex', alignItems: 'center'},
+  label: {
+    color: content.headings,
+    fontSize: fontSize.md,
+    width: 128,
+    flexShrink: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    fontWeight: fontWeight.medium,
+  },
+});

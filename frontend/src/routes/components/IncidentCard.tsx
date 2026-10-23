@@ -1,6 +1,16 @@
+import * as stylex from '@stylexjs/stylex';
 import {Link} from '@tanstack/react-router';
 import {Pill} from 'components/Pill';
 
+import {
+  background,
+  content,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  radius,
+  space,
+} from '../../styles/tokens.stylex';
 import type {IncidentListItem} from '../queries/incidentsQueryOptions';
 
 interface IncidentCardProps {
@@ -14,34 +24,27 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
     <Link
       to="/$incidentId"
       params={{incidentId: incident.id}}
-      className="block no-underline"
+      {...stylex.props(styles.link)}
       preload={'intent'}
     >
-      <div
-        className="bg-background-primary hover:bg-background-transparent-neutral-muted rounded-radius-lg p-space-xl cursor-pointer shadow-sm transition-colors duration-200"
-        data-testid={`incident-card-${incident.id}`}
-      >
-        <div className="gap-space-xl flex justify-between">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-size-xl text-content-headings font-semibold select-text">
-              {incident.title}
-            </h3>
-            <span className="text-size-lg text-content-secondary mt-space-sm gap-space-xs font-regular flex items-center leading-none select-text">
+      <div {...stylex.props(styles.card)} data-testid={`incident-card-${incident.id}`}>
+        <div {...stylex.props(styles.layout)}>
+          <div {...stylex.props(styles.summary)}>
+            <h3 {...stylex.props(styles.title)}>{incident.title}</h3>
+            <span {...stylex.props(styles.identifier)}>
               {incident.is_private && <span aria-label="Private incident">🔒</span>}
               {incident.id}
             </span>
-            <div className="gap-space-md mt-space-md flex">
+            <div {...stylex.props(styles.pills)}>
               <Pill variant={incident.severity}>{incident.severity}</Pill>
               <Pill variant={incident.status}>{incident.status}</Pill>
               {incident.is_private && <Pill variant="private">Private</Pill>}
             </div>
             {incident.description ? (
-              <p className="text-content-secondary text-size-sm leading-comfortable mt-space-md line-clamp-1 select-none">
-                {incident.description}
-              </p>
+              <p {...stylex.props(styles.description)}>{incident.description}</p>
             ) : null}
           </div>
-          <div className="text-size-sm text-content-secondary shrink-0 text-right select-none">
+          <div {...stylex.props(styles.metadata)}>
             <time dateTime={incident.created_at}>
               {createdAt.toLocaleDateString('en-US', {
                 month: 'short',
@@ -59,7 +62,7 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
               })}
             </p>
             {incident.captain && (
-              <p className="mt-space-xs">Captain: {incident.captain}</p>
+              <p {...stylex.props(styles.captain)}>Captain: {incident.captain}</p>
             )}
           </div>
         </div>
@@ -67,3 +70,60 @@ export const IncidentCard = ({incident}: IncidentCardProps) => {
     </Link>
   );
 };
+
+const styles = stylex.create({
+  link: {display: 'block', textDecoration: 'none'},
+  card: {
+    backgroundColor: {
+      default: background.primary,
+      ':hover': background.transparentNeutralMuted,
+    },
+    borderRadius: radius.lg,
+    padding: space.xl,
+    cursor: 'pointer',
+    boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+    transitionProperty:
+      'color, background-color, border-color, text-decoration-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '200ms',
+  },
+  layout: {gap: space.xl, display: 'flex', justifyContent: 'space-between'},
+  summary: {minWidth: 0, flex: '1 1 0%'},
+  title: {
+    fontSize: fontSize.xl,
+    color: content.headings,
+    fontWeight: 600,
+    userSelect: 'text',
+  },
+  identifier: {
+    fontSize: fontSize.lg,
+    color: content.secondary,
+    marginTop: space.sm,
+    gap: space.xs,
+    fontWeight: fontWeight.regular,
+    display: 'flex',
+    alignItems: 'center',
+    lineHeight: 1,
+    userSelect: 'text',
+  },
+  pills: {gap: space.md, marginTop: space.md, display: 'flex'},
+  description: {
+    color: content.secondary,
+    fontSize: fontSize.sm,
+    lineHeight: lineHeight.comfortable,
+    marginTop: space.md,
+    display: '-webkit-box',
+    WebkitBoxOrient: 'vertical',
+    WebkitLineClamp: 1,
+    overflow: 'hidden',
+    userSelect: 'none',
+  },
+  metadata: {
+    fontSize: fontSize.sm,
+    color: content.secondary,
+    flexShrink: 0,
+    textAlign: 'right',
+    userSelect: 'none',
+  },
+  captain: {marginTop: space.xs},
+});

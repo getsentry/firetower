@@ -1,10 +1,12 @@
 import {useState} from 'react';
 import type {DateRange} from 'react-day-picker';
+import * as stylex from '@stylexjs/stylex';
 import {useNavigate} from '@tanstack/react-router';
 import {Button} from 'components/Button';
 import {DateRangePicker} from 'components/DateRangePicker';
 import {Pencil} from 'lucide-react';
 
+import {content, fontSize, space} from '../../../styles/tokens.stylex';
 import {useActiveFilters} from '../useActiveFilters';
 
 function toDateString(date: Date): string {
@@ -57,20 +59,18 @@ export function DateRangeFilter() {
 
   return (
     <div>
-      <div className="mb-space-md gap-space-xs flex min-h-[32px] items-center">
-        <h3 className="text-size-md text-content-secondary font-semibold">
-          Created Date
-        </h3>
+      <div {...stylex.props(styles.heading)}>
+        <h3 {...stylex.props(styles.label)}>Created Date</h3>
         <Button
           variant="icon"
           onClick={() => setOpen(true)}
           aria-label="Edit date range"
-          className={open ? 'invisible' : 'transition-none'}
+          style={[open ? styles.hidden : styles.noTransition]}
         >
-          <Pencil className="h-4 w-4" />
+          <Pencil {...stylex.props(styles.icon)} />
         </Button>
       </div>
-      <div className="flex min-h-[28px] items-center">
+      <div {...stylex.props(styles.picker)}>
         <DateRangePicker
           value={value}
           onChange={handleChange}
@@ -83,3 +83,18 @@ export function DateRangeFilter() {
     </div>
   );
 }
+
+const styles = stylex.create({
+  heading: {
+    marginBottom: space.md,
+    gap: space.xs,
+    display: 'flex',
+    minHeight: '32px',
+    alignItems: 'center',
+  },
+  label: {fontSize: fontSize.md, color: content.secondary, fontWeight: 600},
+  icon: {height: 16, width: 16},
+  picker: {display: 'flex', minHeight: '28px', alignItems: 'center'},
+  hidden: {visibility: 'hidden'},
+  noTransition: {transitionProperty: 'none'},
+});

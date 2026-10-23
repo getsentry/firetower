@@ -1,20 +1,35 @@
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import {cn} from 'utils/cn';
+import * as stylex from '@stylexjs/stylex';
+
+import type {StyledProps} from '../styles/props';
+import {background, border, radius, space} from '../styles/tokens.stylex';
 
 const TooltipProvider = TooltipPrimitive.Provider;
-
 const Tooltip = TooltipPrimitive.Root;
-
-const TooltipTrigger = TooltipPrimitive.Trigger;
-
-interface TooltipContentProps extends React.ComponentPropsWithoutRef<
-  typeof TooltipPrimitive.Content
-> {
-  ref?: React.Ref<HTMLDivElement>;
+function TooltipTrigger({
+  style,
+  ...props
+}: StyledProps<React.ComponentProps<typeof TooltipPrimitive.Trigger>>) {
+  return <TooltipPrimitive.Trigger {...stylex.props(style)} {...props} />;
 }
 
+const styles = stylex.create({
+  content: {
+    zIndex: 50,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: border.secondary,
+    backgroundColor: background.primary,
+    padding: space.md,
+    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+  },
+});
+type TooltipContentProps = StyledProps<
+  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
+> & {ref?: React.Ref<HTMLDivElement>};
 function TooltipContent({
-  className,
+  style,
   align = 'center',
   sideOffset = 4,
   ref,
@@ -26,21 +41,10 @@ function TooltipContent({
         ref={ref}
         align={align}
         sideOffset={sideOffset}
-        className={cn(
-          'z-50',
-          'rounded-radius-md',
-          'border',
-          'border-gray-200',
-          'bg-background-primary',
-          'p-space-md',
-          'shadow-lg',
-          'outline-none',
-          className
-        )}
+        {...stylex.props(styles.content, style)}
         {...props}
       />
     </TooltipPrimitive.Portal>
   );
 }
-
-export {TooltipProvider, Tooltip, TooltipTrigger, TooltipContent};
+export {Tooltip, TooltipTrigger, TooltipContent, TooltipProvider};
