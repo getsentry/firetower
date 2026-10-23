@@ -1,16 +1,27 @@
 """Integration tests for the Firetower MCP HTTP and OAuth routes."""
 
+import dataclasses
+import http.server
+import json
+import logging
 import re
+import threading
+import time
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock
 from urllib.parse import parse_qs, urlparse
 
+import httpx
+import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastmcp import settings as fastmcp_settings
+from jwt.algorithms import RSAAlgorithm
 from starlette.testclient import TestClient
 
-from firetower.mcp_server import server
+from firetower.mcp_server import firetower, server
 from firetower.mcp_server.auth import GOOGLE_GROUPS_READ_SCOPE
 from firetower.mcp_server.branding import FIRETOWER_ICON
 from firetower.mcp_server.config import MCPConfig
@@ -25,12 +36,16 @@ PI_DCR_METADATA: dict[str, object] = {
     "client_name": "pi mcp-client",
 }
 UNALLOWED_CALLBACK = "https://untrusted.example/oauth/callback"
+BASE_URL = "https://mcp-test.firetower.getsentry.net"
+BOT_ISSUER = "https://junior.example"
+BOT_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+MCP_ACCEPT = {"Accept": "application/json, text/event-stream"}
 
 
 @pytest.fixture
-def mcp_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+def mcp_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> MCPConfig:
     monkeypatch.setattr(fastmcp_settings, "home", tmp_path)
-    config = MCPConfig(
+    return MCPConfig(
         google_client_id="test-client-id.apps.googleusercontent.com",
         google_client_secret="test-client-secret",
         base_url="https://mcp-test.firetower.getsentry.net",
@@ -46,8 +61,105 @@ def mcp_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Test
         host="127.0.0.1",
         port=8080,
     )
-    with TestClient(create_mcp(config).http_app(), follow_redirects=False) as client:
+
+
+@pytest.fixture
+def mcp_client(mcp_config: MCPConfig) -> Iterator[TestClient]:
+    with TestClient(
+        create_mcp(mcp_config).http_app(), follow_redirects=False
+    ) as client:
         yield client
+
+
+class _JWKSServer(http.server.HTTPServer):
+    requests = 0
+
+
+@pytest.fixture
+def bot_jwks_server() -> Iterator[_JWKSServer]:
+    jwk = json.loads(RSAAlgorithm.to_jwk(BOT_KEY.public_key())) | {
+        "kid": "junior-test",
+        "alg": "RS256",
+        "use": "sig",
+    }
+    body = json.dumps({"keys": [jwk]}).encode()
+
+    class JWKSHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            server.requests += 1
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args: object) -> None:
+            pass
+
+    server = _JWKSServer(("127.0.0.1", 0), JWKSHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield server
+    server.shutdown()
+
+
+@pytest.fixture
+def bot_mcp_config(mcp_config: MCPConfig, bot_jwks_server: _JWKSServer) -> MCPConfig:
+    return dataclasses.replace(
+        mcp_config,
+        bot_issuer=BOT_ISSUER,
+        bot_jwks_url=f"http://127.0.0.1:{bot_jwks_server.server_port}/jwks.json",
+    )
+
+
+def _bot_token(
+    client: TestClient,
+    signing_key: rsa.RSAPrivateKey = BOT_KEY,
+    kid: str = "junior-test",
+) -> httpx.Response:
+    registration = client.post(
+        "/register",
+        json={
+            "client_name": "firetower",
+            "redirect_uris": ["http://localhost"],
+            "token_endpoint_auth_method": "none",
+        },
+    )
+    client_id = registration.json()["client_id"]
+    now = int(time.time())
+    assertion = jwt.encode(
+        {
+            "iss": BOT_ISSUER,
+            "sub": "firetower",
+            "aud": f"{BASE_URL}/",
+            "iat": now,
+            "exp": now + 300,
+            "jti": str(uuid.uuid4()),
+            "client_id": client_id,
+            "resource": f"{BASE_URL}/mcp",
+        },
+        signing_key,
+        algorithm="RS256",
+        headers={"typ": "oauth-id-jag+jwt", "kid": kid},
+    )
+    return client.post(
+        "/token",
+        data={
+            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            "assertion": assertion,
+            "client_id": client_id,
+        },
+    )
+
+
+def _mcp_result(response: httpx.Response) -> dict:
+    assert response.status_code == 200, response.text
+    if response.headers["content-type"].startswith("text/event-stream"):
+        data = [
+            line.removeprefix("data:").strip()
+            for line in response.text.splitlines()
+            if line.startswith("data:")
+        ]
+        return json.loads(data[-1])
+    return response.json()
 
 
 def _authorization_params(client_id: str, redirect_uri: str) -> dict[str, str]:
@@ -181,3 +293,93 @@ def test_main_configures_audit_logging_and_disables_access_logs(monkeypatch):
     assert run_kwargs["uvicorn_config"] == {"access_log": False}
     assert len(run_kwargs["middleware"]) == 1
     assert run_kwargs["middleware"][0].cls is server.SafeOAuthAccessLogMiddleware
+
+
+def test_bot_assertion_mints_token_that_can_call_read_tools(
+    bot_mcp_config: MCPConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    sdk = MagicMock()
+    sdk.list_incidents.return_value = {"count": 0, "results": []}
+    monkeypatch.setattr(firetower, "get_client", lambda: sdk)
+
+    with TestClient(
+        create_mcp(bot_mcp_config).http_app(), follow_redirects=False
+    ) as client:
+        assert (
+            _bot_token(client, rsa.generate_private_key(65537, 2048)).status_code == 401
+        )
+        token_response = _bot_token(client)
+        assert token_response.status_code == 200, token_response.text
+        headers = {
+            **MCP_ACCEPT,
+            "Authorization": f"Bearer {token_response.json()['access_token']}",
+        }
+        init = client.post(
+            "/mcp",
+            headers=headers,
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "junior", "version": "0"},
+                },
+            },
+        )
+        _mcp_result(init)
+        if session_id := init.headers.get("mcp-session-id"):
+            headers["mcp-session-id"] = session_id
+        client.post(
+            "/mcp",
+            headers=headers,
+            json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+        )
+        with caplog.at_level(logging.INFO, logger="firetower.mcp_server.tools"):
+            call = client.post(
+                "/mcp",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {"name": "list_incidents", "arguments": {}},
+                },
+            )
+
+    result = _mcp_result(call)["result"]
+    assert result.get("isError") is not True, result
+    sdk.list_incidents.assert_called_once()
+    [audit] = [
+        r for r in caplog.records if getattr(r, "event", None) == "mcp_tool_call"
+    ]
+    assert audit.actor_sub == "bot:firetower"
+    assert audit.actor_email is None
+
+
+def test_unknown_bot_key_ids_do_not_refetch_jwks_during_cooldown(
+    bot_mcp_config: MCPConfig, bot_jwks_server: _JWKSServer
+):
+    with TestClient(
+        create_mcp(bot_mcp_config).http_app(), follow_redirects=False
+    ) as client:
+        responses = [
+            _bot_token(client, kid=f"attacker-{uuid.uuid4()}") for _ in range(3)
+        ]
+        valid = _bot_token(client)
+
+    assert [r.status_code for r in responses] == [401, 401, 401]
+    assert valid.status_code == 200, valid.text
+    assert bot_jwks_server.requests == 1
+
+
+def test_bot_assertions_are_rejected_when_not_configured(
+    mcp_client: TestClient,
+):
+    response = _bot_token(mcp_client)
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "unsupported_grant_type"
