@@ -52,7 +52,12 @@ export function DateRangePicker({
           <button
             ref={triggerRef}
             type="button"
-            {...stylex.props(styles.trigger, !value?.from && styles.placeholder)}
+            {...stylex.props(
+              styles.trigger,
+              value?.from
+                ? [styles.selectedTrigger, onClear && styles.clearableTrigger]
+                : styles.placeholder
+            )}
           >
             {value?.from ? formatRange(value) : placeholder}
           </button>
@@ -61,6 +66,7 @@ export function DateRangePicker({
           <Button
             variant="close"
             size={null}
+            style={styles.clearButton}
             onClick={() => {
               onClear();
               triggerRef.current?.focus();
@@ -87,10 +93,8 @@ export function DateRangePicker({
 }
 
 const styles = stylex.create({
-  control: {display: 'inline-flex', alignItems: 'center', gap: space.xs},
+  control: {display: 'inline-flex', alignItems: 'stretch'},
   selected: {
-    paddingInline: space.md,
-    paddingBlock: space.xs,
     backgroundColor: {
       default: background.tertiary,
       '@media (prefers-color-scheme: dark)': {
@@ -104,6 +108,13 @@ const styles = stylex.create({
     color: content.secondary,
   },
   trigger: {cursor: 'pointer', userSelect: 'none', backgroundColor: 'transparent'},
+  selectedTrigger: {paddingInline: space.md, paddingBlock: space.xs},
+  clearableTrigger: {paddingInlineEnd: space.xs},
+  clearButton: {
+    paddingBlock: space.sm,
+    paddingInlineStart: space['2xs'],
+    paddingInlineEnd: `calc(${space.md} + ${space['2xs']})`,
+  },
   clearIcon: {height: 14, width: 14},
   placeholder: {fontSize: fontSize.sm, color: content.disabled, fontStyle: 'italic'},
   popover: {width: 'auto', overflow: 'hidden', padding: 0},
