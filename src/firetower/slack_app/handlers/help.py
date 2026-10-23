@@ -24,5 +24,6 @@ def handle_help_command(ack: Any, command: dict, respond: Any) -> None:
         f"  `{cmd} subject <title>` - Change incident title (alias: `{cmd} title`)\n"
         f"  `{cmd} update` - Interactively update incident metadata (alias: `{cmd} edit`)\n\n"
         "Slash commands don't work in threads. To declare an incident from a thread, "
-        "use *Declare incident* in the message's More actions menu.\n"
+        "use *Declare incident* in the message's More actions menu, or pick "
+        "Firetower's *Declare incident* shortcut from the `/` menu.\n"
     )

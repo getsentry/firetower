@@ -11,6 +11,10 @@ features:
       type: message
       callback_id: declare_incident
       description: Open a new Firetower incident from this message
+    - name: Declare incident
+      type: global
+      callback_id: declare_incident_global
+      description: Open a new Firetower incident
   slash_commands:
     - command: /ft # test: /ft-test
       description: Manage incidents - use /ft help for full usage # test: /ft-test

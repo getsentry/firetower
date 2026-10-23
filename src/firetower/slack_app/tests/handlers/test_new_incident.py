@@ -1236,6 +1236,18 @@ class TestDeclareIncidentShortcut:
             "300.0",
         )
 
+    def test_global_shortcut_opens_modal_without_context(self):
+        ack = MagicMock()
+        client = MagicMock()
+        shortcut = {"trigger_id": "T12345", "user": {"id": "U_TEST"}}
+
+        handle_declare_incident_shortcut(ack, shortcut, client)
+
+        ack.assert_called_once_with()
+        view = client.views_open.call_args[1]["view"]
+        assert view["callback_id"] == "new_incident_modal"
+        assert "private_metadata" not in view
+
     def test_severity_change_preserves_thread(self):
         client = MagicMock()
         modal = _build_new_incident_modal(channel_id="C_THREAD", thread_ts="100.0")

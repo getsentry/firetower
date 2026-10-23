@@ -318,10 +318,11 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
 
 
 def handle_declare_incident_shortcut(ack: Any, shortcut: dict, client: Any) -> None:
-    """Open the new incident modal from a message shortcut.
+    """Open the new incident modal from the message or global shortcut.
 
-    Slack does not deliver custom slash commands from threads, so this is the
-    way to declare an incident from a thread reply.
+    Slack does not deliver custom slash commands from threads, so shortcuts are
+    the way to declare an incident there. Typing ``/inc`` in a thread surfaces
+    the global shortcut, which carries no channel or message context.
     """
     ack()
     message = shortcut.get("message", {})
