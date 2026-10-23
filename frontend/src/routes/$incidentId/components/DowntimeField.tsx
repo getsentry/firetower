@@ -74,6 +74,11 @@ const styles = stylex.create({
   },
   editor: {gap: space.xs, display: 'flex', alignItems: 'center'},
   input: {
+    appearance: {
+      default: 'textfield',
+      '::-webkit-inner-spin-button': 'none',
+      '::-webkit-outer-spin-button': 'none',
+    },
     borderRadius: radius.sm,
     borderColor: border.secondary,
     backgroundColor: background.primary,

@@ -46,9 +46,3 @@
   font-display: swap;
   src: url('/fonts/roboto-mono-medium.woff2') format('woff2');
 }
-
-@layer reset {
-  input:focus {
-    outline-style: none;
-  }
-}
