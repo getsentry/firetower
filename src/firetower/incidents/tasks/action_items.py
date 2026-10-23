@@ -149,14 +149,14 @@ def _remind_misfiled_action_item_creators(linear: dict) -> None:
 @datadog_log
 def send_action_item_reminder() -> None:
     linear = settings.LINEAR or {}
-    _remind_misfiled_action_item_creators(linear)
     nag_tiers = _build_nag_tiers(linear)
     comments_by_priority: dict[int, str] = {
         priority: linear.get(tier.comment_setting_key, "")
         for priority, tier in nag_tiers.items()
     }
     if not any(comments_by_priority.values()):
-        logger.warning("No Linear nag comments configured, skipping job")
+        logger.warning("No Linear nag comments configured, skipping SLO reminders")
+        _remind_misfiled_action_item_creators(linear)
         return
 
     now = timezone.now()
@@ -284,3 +284,5 @@ def send_action_item_reminder() -> None:
 
         for action_item in eligible:
             _nag(action_item, incident)
+
+    _remind_misfiled_action_item_creators(linear)
