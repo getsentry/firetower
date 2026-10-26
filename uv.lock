@@ -1838,7 +1838,7 @@ wheels = [
 
 [[package]]
 name = "openrouter"
-version = "1.3.63"
+version = "1.3.79"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
     { name = "httpcore" },
@@ -1846,9 +1846,9 @@ dependencies = [
     { name = "jsonpath-python" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/da/96/b0ad38f1e53a406fbf76c523e8375da472e11363c468a4c774383cff4a1e/openrouter-1.3.63.tar.gz", hash = "sha256:ac0a658ff52c61293a2589f01d3a68a7e164b5de6249e084450c18f401451eb5", size = 608059, upload-time = "2026-10-16T23:39:34.02Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/48/8a/7bc547972bdd903b2d203ab6261be41d0ae775482b5eb57ecd5cdd6dde5b/openrouter-1.3.79.tar.gz", hash = "sha256:a6b413adf320e202ec0a98e5d3da40e56a7ff3d0c2b7da5db020c9eefd3f8f34", size = 614986, upload-time = "2026-10-23T02:32:18.493Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/91/86/2d386d7fb8004d058c650f13fb435d92024626536c61f7a0b56aba2b51ff/openrouter-1.3.63-py3-none-any.whl", hash = "sha256:9427b50925f667187fc2c8f141b62c4b01a5413ae6e314f8ec86813f59fd7ef5", size = 1319145, upload-time = "2026-10-16T23:39:32.358Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/48/9b/6c42cac534d18a95d04d4e3746972d6532072c2bc3db8d7e176f3081e9ea/openrouter-1.3.79-py3-none-any.whl", hash = "sha256:cbb3d4a52bcb2c50fd54e5e574c8de951982fa84f39800af541b74ca5981df4d", size = 1331041, upload-time = "2026-10-23T02:32:17.01Z" },
 ]
 
 [[package]]
