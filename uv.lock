@@ -176,15 +176,15 @@ wheels = [
 
 [[package]]
 name = "blessed"
-version = "1.51.0"
+version = "1.52.0"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
     { name = "jinxed" },
     { name = "wcwidth" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/29/85/995a5fd19eea218f8b9450b5112521bf578dc4ca6109217342537cacca57/blessed-1.51.0.tar.gz", hash = "sha256:e8aa1b235cc92aca32818ba4c3541ebe98340c3934e77dc77b1fc7c5469a95fc", size = 14069432, upload-time = "2026-10-16T05:59:46.032Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/8f/e3/53462b28d7a06f2fcf820863f951255f4e022e4988981b0a5ca339f7773b/blessed-1.52.0.tar.gz", hash = "sha256:a6f42b2875c7afee78420ac9919699d5c3dce35bfa9ad45bc158b1713fc33d0d", size = 14069744, upload-time = "2026-10-20T14:14:31.747Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/eb/a8/9be4834180908c89052a00ca7289f60fce0cc0ffe0b1758f1c3007259429/blessed-1.51.0-py3-none-any.whl", hash = "sha256:1904583e1d36f426bf652571caa5fc9e08719b57cbe2b0d3fa98640fe8496a44", size = 142906, upload-time = "2026-10-15T18:42:09.047Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/29/1f/88e64e3b4a8299fcc47dd0db35276ca21c18fadad4e8eb25afad546404c6/blessed-1.52.0-py3-none-any.whl", hash = "sha256:1936f421f3feb130035a4629e6477d1432e33b2674ab2b9841292c74d479eac2", size = 142946, upload-time = "2026-10-20T14:14:29.241Z" },
 ]
 
 [[package]]
