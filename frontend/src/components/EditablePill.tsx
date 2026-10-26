@@ -1,45 +1,17 @@
 import {useCallback, useState} from 'react';
-import {cva} from 'class-variance-authority';
-import {cn} from 'utils/cn';
+import * as stylex from '@stylexjs/stylex';
+
+import type {StyledProps} from '../styles/props';
+import {background, radius, space} from '../styles/tokens.stylex';
 
 import {Pill, type PillProps} from './Pill';
 import {Popover, PopoverContent, PopoverTrigger} from './Popover';
 import {Spinner} from './Spinner';
 
-const optionRowStyles = cva([
-  'w-full',
-  'cursor-pointer',
-  'flex',
-  'items-center',
-  'justify-center',
-  'rounded-radius-md',
-  'px-space-xs',
-  'py-space-2xs',
-  'transition-colors',
-  'hover:bg-background-tertiary',
-]);
-
-const optionStyles = cva(['pointer-events-none']);
-
-const triggerStyles = cva([
-  'relative',
-  'inline-flex',
-  'cursor-pointer',
-  'items-center',
-  'rounded-radius-full',
-  'leading-none',
-  'select-none',
-  'transition-all',
-  'hover:scale-105',
-  'hover:shadow-md',
-  'active:scale-95',
-]);
-
-export interface EditablePillProps<T extends string> {
+export interface EditablePillProps<T extends string> extends StyledProps<object> {
   value: T | null;
   options: readonly T[];
   onSave: (newValue: T) => Promise<void>;
-  className?: string;
   getVariant?: (value: T) => PillProps['variant'];
   placeholder?: string;
 }
@@ -48,7 +20,7 @@ export function EditablePill<T extends string>({
   value,
   options,
   onSave,
-  className,
+  style,
   getVariant,
   placeholder = 'Not set',
 }: EditablePillProps<T>) {
@@ -124,17 +96,19 @@ export function EditablePill<T extends string>({
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <button className={cn(triggerStyles(), className)}>
+        <button {...stylex.props(styles.trigger, style)}>
           <Pill variant={variant}>
-            <span className="relative inline-flex items-center justify-center">
-              <span className={cn(isSaving && 'invisible')}>{value ?? placeholder}</span>
-              {isSaving && <Spinner size="sm" className="absolute h-3 w-3" />}
+            <span {...stylex.props(styles.content)}>
+              <span {...stylex.props(isSaving && styles.invisible)}>
+                {value ?? placeholder}
+              </span>
+              {isSaving && <Spinner size="sm" style={styles.spinner} />}
             </span>
           </Pill>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="p-space-0 overflow-hidden" onKeyDown={handleKeyDown}>
-        <div role="listbox" className="p-space-xs flex flex-col">
+      <PopoverContent style={styles.popover} onKeyDown={handleKeyDown}>
+        <div role="listbox" {...stylex.props(styles.options)}>
           {options.map((option, index) => {
             const optionVariant = getVariant
               ? getVariant(option)
@@ -144,12 +118,12 @@ export function EditablePill<T extends string>({
               <div
                 key={option}
                 tabIndex={-1}
-                className={cn(optionRowStyles(), isFocused && 'bg-background-tertiary')}
+                {...stylex.props(styles.optionRow, isFocused && styles.focused)}
                 onClick={() => handleSelect(option)}
                 role="option"
                 aria-selected={option === value}
               >
-                <Pill variant={optionVariant} className={cn(optionStyles())}>
+                <Pill variant={optionVariant} style={styles.option}>
                   {option}
                 </Pill>
               </div>
@@ -160,3 +134,49 @@ export function EditablePill<T extends string>({
     </Popover>
   );
 }
+
+const styles = stylex.create({
+  optionRow: {
+    width: '100%',
+    justifyContent: 'center',
+    display: 'flex',
+    alignItems: 'center',
+    cursor: 'pointer',
+    borderRadius: radius.md,
+    paddingInline: space.xs,
+    paddingBlock: space['2xs'],
+    transitionProperty:
+      'color, background-color, border-color, text-decoration-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+    backgroundColor: {default: null, ':hover': background.tertiary},
+  },
+  option: {pointerEvents: 'none'},
+  trigger: {
+    position: 'relative',
+    display: 'inline-flex',
+    cursor: 'pointer',
+    alignItems: 'center',
+    borderRadius: radius.full,
+    lineHeight: 1,
+    userSelect: 'none',
+    transitionProperty: 'all',
+    transitionDuration: '150ms',
+    transform: {default: null, ':hover': 'scale(1.05)', ':active': 'scale(0.95)'},
+    boxShadow: {
+      default: null,
+      ':hover': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+    },
+  },
+  content: {
+    position: 'relative',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spinner: {position: 'absolute', height: 12, width: 12},
+  popover: {padding: space['0'], overflow: 'hidden'},
+  options: {padding: space.xs, display: 'flex', flexDirection: 'column'},
+  invisible: {visibility: 'hidden'},
+  focused: {backgroundColor: background.tertiary},
+});

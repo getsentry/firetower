@@ -1,29 +1,30 @@
-import {cn} from 'utils/cn';
+import * as stylex from '@stylexjs/stylex';
 
-const baseAvatarClasses = [
-  'bg-background-tertiary',
-  'text-content-secondary',
-  'flex',
-  'items-center',
-  'justify-center',
-  'rounded-full',
-  'font-semibold',
-  'shrink-0',
-].join(' ');
+import type {StyledProps} from '../styles/props';
+import {background, content, radius} from '../styles/tokens.stylex';
 
-const sizeClasses = {
-  sm: 'h-7 w-7 text-sm',
-  md: 'h-10 w-10 text-base',
-};
-
-export interface AvatarProps {
+const styles = stylex.create({
+  root: {
+    backgroundColor: background.tertiary,
+    color: content.secondary,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.full,
+    fontWeight: 600,
+    flexShrink: 0,
+  },
+  sm: {height: 28, width: 28, fontSize: 14, lineHeight: '20px'},
+  md: {height: 40, width: 40, fontSize: 16, lineHeight: '24px'},
+  initials: {lineHeight: 1},
+});
+const sizes = {sm: styles.sm, md: styles.md};
+export type AvatarProps = StyledProps<{
   name: string;
   src?: string | null;
   alt?: string;
-  className?: string;
-  size?: 'sm' | 'md';
-}
-
+  size?: keyof typeof sizes;
+}>;
 function getInitials(name: string): string {
   return name
     .split(' ')
@@ -32,18 +33,18 @@ function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2);
 }
-
-export function Avatar({name, src, alt, className, size = 'md'}: AvatarProps) {
+export function Avatar({name, src, alt, style, size = 'md'}: AvatarProps) {
   if (!name) return null;
-
-  const avatarClasses = cn(baseAvatarClasses, sizeClasses[size], className);
-
-  if (src) {
-    return <img src={src} alt={alt || name} className={avatarClasses} />;
-  }
-
+  if (src)
+    return (
+      <img
+        src={src}
+        alt={alt || name}
+        {...stylex.props(styles.root, sizes[size], style)}
+      />
+    );
   return (
-    <div className={avatarClasses} style={{lineHeight: 1}}>
+    <div {...stylex.props(styles.root, sizes[size], styles.initials, style)}>
       {getInitials(name)}
     </div>
   );

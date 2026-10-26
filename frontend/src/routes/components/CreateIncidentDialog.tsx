@@ -1,32 +1,23 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {useNavigate} from '@tanstack/react-router';
-import {cva} from 'class-variance-authority';
 import {Button} from 'components/Button';
 import {Input} from 'components/Input';
 import {Label} from 'components/Label';
-import {cn} from 'utils/cn';
+import {useBodyScrollLock} from 'utils/useBodyScrollLock';
 
+import {
+  background,
+  border,
+  content,
+  fontSize,
+  radius,
+  space,
+} from '../../styles/tokens.stylex';
 import {createIncidentMutationOptions} from '../queries/createIncidentMutationOptions';
 import {currentUserQueryOptions} from '../queries/currentUserQueryOptions';
 import {SeveritySchema} from '../types';
-
-const overlay = cva(['fixed', 'inset-0', 'z-50', 'bg-black/50']);
-
-const dialog = cva([
-  'fixed',
-  'top-1/2',
-  'left-1/2',
-  '-translate-x-1/2',
-  '-translate-y-1/2',
-  'z-50',
-  'w-full',
-  'max-w-md',
-  'rounded-radius-lg',
-  'bg-background-primary',
-  'p-space-2xl',
-  'shadow-xl',
-]);
 
 interface CreateIncidentDialogProps {
   isOpen: boolean;
@@ -42,15 +33,16 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
   const [title, setTitle] = useState('');
   const [severity, setSeverity] = useState('P3');
   const [description, setDescription] = useState('');
+  const {isPending, reset} = createIncident;
 
-  const handleClose = () => {
-    if (createIncident.isPending) return;
+  const handleClose = useCallback(() => {
+    if (isPending) return;
     setTitle('');
     setSeverity('P3');
     setDescription('');
-    createIncident.reset();
+    reset();
     onClose();
-  };
+  }, [isPending, reset, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -63,18 +55,9 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, createIncident.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen, handleClose]);
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
+  useBodyScrollLock(isOpen);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +75,7 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
       handleClose();
       navigate({to: '/$incidentId', params: {incidentId: result.id}});
     } catch {
-      // Error state is handled by createIncident.isError
+      return;
     }
   };
 
@@ -100,21 +83,18 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
 
   return (
     <>
-      <div className={cn(overlay())} onClick={handleClose} aria-hidden="true" />
+      <div {...stylex.props(styles.overlay)} onClick={handleClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-incident-title"
-        className={cn(dialog())}
+        {...stylex.props(styles.dialog)}
       >
-        <h2
-          id="create-incident-title"
-          className="mb-space-xl text-content-headings text-lg font-semibold"
-        >
+        <h2 id="create-incident-title" {...stylex.props(styles.title)}>
           Create Incident
         </h2>
-        <form onSubmit={handleSubmit} className="gap-space-lg flex flex-col">
-          <div className="gap-space-xs flex flex-col">
+        <form onSubmit={handleSubmit} {...stylex.props(styles.form)}>
+          <div {...stylex.props(styles.field)}>
             <Label htmlFor="incident-title">Title</Label>
             <Input
               id="incident-title"
@@ -125,16 +105,13 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
               autoFocus
             />
           </div>
-          <div className="gap-space-xs flex flex-col">
+          <div {...stylex.props(styles.field)}>
             <Label htmlFor="incident-severity">Severity</Label>
             <select
               id="incident-severity"
               value={severity}
               onChange={e => setSeverity(e.target.value)}
-              className={cn(
-                'border-gray-200 h-8 w-full rounded-radius-md border bg-transparent px-3 py-1 text-size-sm',
-                'focus:outline-auto'
-              )}
+              {...stylex.props(styles.select)}
             >
               {SeveritySchema.options.map(option => (
                 <option key={option} value={option}>
@@ -143,10 +120,9 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
               ))}
             </select>
           </div>
-          <div className="gap-space-xs flex flex-col">
+          <div {...stylex.props(styles.field)}>
             <Label htmlFor="incident-description">
-              Description{' '}
-              <span className="text-content-disabled font-normal">(optional)</span>
+              Description <span {...stylex.props(styles.optional)}>(optional)</span>
             </Label>
             <textarea
               id="incident-description"
@@ -154,20 +130,15 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
               onChange={e => setDescription(e.target.value)}
               placeholder="What is happening? What is the impact?"
               rows={3}
-              className={cn(
-                'border-gray-200 w-full rounded-radius-md border bg-transparent px-3 py-2 text-size-sm',
-                'placeholder:text-content-disabled',
-                'focus:outline-auto',
-                'resize-y'
-              )}
+              {...stylex.props(styles.description)}
             />
           </div>
           {createIncident.isError && (
-            <p className="text-size-sm text-red-600">
+            <p {...stylex.props(styles.error)}>
               Failed to create incident. Please try again.
             </p>
           )}
-          <div className="gap-space-md flex justify-end">
+          <div {...stylex.props(styles.actions)}>
             <Button variant="secondary" onClick={handleClose} type="button">
               Cancel
             </Button>
@@ -185,3 +156,62 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
     </>
   );
 }
+
+const styles = stylex.create({
+  title: {
+    marginBottom: space.xl,
+    color: content.headings,
+    fontSize: 18,
+    lineHeight: '28px',
+    fontWeight: 600,
+  },
+  form: {gap: space.lg, display: 'flex', flexDirection: 'column'},
+  field: {gap: space.xs, display: 'flex', flexDirection: 'column'},
+  optional: {color: content.disabled, fontWeight: 400},
+  error: {fontSize: fontSize.sm, color: '#dc2626'},
+  actions: {gap: space.md, display: 'flex', justifyContent: 'flex-end'},
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 50,
+    backgroundColor: 'rgb(0 0 0 / 0.5)',
+  },
+  dialog: {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    zIndex: 50,
+    width: '100%',
+    maxWidth: 448,
+    borderRadius: radius.lg,
+    backgroundColor: background.primary,
+    padding: space['2xl'],
+    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+  },
+  select: {
+    borderColor: border.secondary,
+    height: 32,
+    width: '100%',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    backgroundColor: 'transparent',
+    paddingInline: 12,
+    paddingBlock: 4,
+    fontSize: fontSize.sm,
+  },
+  description: {
+    borderColor: border.secondary,
+    width: '100%',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    backgroundColor: 'transparent',
+    paddingInline: 12,
+    paddingBlock: 8,
+    fontSize: fontSize.sm,
+    color: {default: null, '::placeholder': content.disabled},
+    resize: 'vertical',
+  },
+});

@@ -21,6 +21,25 @@ describe('OverflowMenu', () => {
     expect(screen.getByRole('menuitem')).toBeInTheDocument();
   });
 
+  it('opens from the keyboard and returns focus when Escape closes it', async () => {
+    const user = userEvent.setup();
+
+    render(<OverflowMenu isPrivate={false} onToggleVisibility={async () => {}} />);
+
+    const trigger = screen.getByRole('button', {name: 'More actions'});
+    await user.tab();
+    expect(trigger).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('menuitem')).toHaveTextContent('Convert to private incident');
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => {
+      expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+    });
+  });
+
   it('shows "Convert to private incident" when incident is public', async () => {
     const user = userEvent.setup();
 

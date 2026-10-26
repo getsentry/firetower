@@ -1,10 +1,12 @@
 import js from '@eslint/js';
+import {rules as stylexRules} from '@stylexjs/eslint-plugin';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
-import eslintPluginTailwindCSS from 'eslint-plugin-tailwindcss';
 import {globalIgnores} from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+
+import stylexOnly from './eslint-rules/stylex-only.mjs';
 
 export default tseslint.config([
   globalIgnores(['dist']),
@@ -15,26 +17,33 @@ export default tseslint.config([
       tseslint.configs.recommended,
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
-      eslintPluginTailwindCSS.configs['flat/recommended'],
     ],
-    settings: {
-      tailwindcss: {
-        // For Tailwind v4 - disable config path since it uses CSS-based config
-        config: false,
-        // Specify CSS files where Tailwind is defined
-        cssFiles: ['src/styles/index.css', 'src/styles/scraps-theme.css'],
-      },
-    },
-    rules: {
-      // Disable until plugin properly supports Tailwind v4 CSS-based config
-      'tailwindcss/no-custom-classname': 'off',
+    plugins: {
+      '@stylexjs': {rules: stylexRules},
+      local: {rules: {'stylex-only': stylexOnly}},
     },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
     },
     rules: {
-      'tailwindcss/no-custom-classname': 'off',
+      '@stylexjs/valid-styles': 'error',
+      '@stylexjs/enforce-extension': 'error',
+      'local/stylex-only': 'error',
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            'classnames',
+            'class-variance-authority',
+            'tailwind-merge',
+            'tailwindcss',
+            '@tailwindcss/vite',
+            'utils/cn',
+          ],
+          patterns: ['**/utils/cn', '**/cn', '@tailwindcss/*', '**/*.css', '**/*.scss'],
+        },
+      ],
     },
   },
 ]);

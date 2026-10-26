@@ -1,8 +1,17 @@
+import * as stylex from '@stylexjs/stylex';
 import {useQuery} from '@tanstack/react-query';
 import {Link, useRouterState} from '@tanstack/react-router';
 import {Avatar} from 'components/Avatar';
-import {cn} from 'utils/cn';
 
+import {
+  background,
+  border,
+  content,
+  fontSize,
+  fontWeight,
+  radius,
+  space,
+} from '../../styles/tokens.stylex';
 import {currentUserQueryOptions} from '../queries/currentUserQueryOptions';
 import type {StatusFilterValue} from '../types';
 
@@ -38,65 +47,49 @@ export const Header = () => {
   const preservedSearch = getPreservedSearch();
 
   return (
-    <header className="bg-background-primary border-secondary border-b">
-      <div className="px-space-md py-space-md md:px-space-lg mx-auto max-w-6xl">
+    <header {...stylex.props(styles.header)}>
+      <div {...stylex.props(styles.container)}>
         {isTopLevelRoute ? (
-          <div className="relative flex items-center justify-between">
-            <nav className="gap-space-2xs flex">
+          <div {...stylex.props(styles.row)}>
+            <nav {...stylex.props(styles.navigation)}>
               {NAV_PAGES.map(page => (
                 <Link
                   key={page.to}
                   to={page.to}
                   preload="intent"
-                  className={cn(
-                    'rounded-radius-sm px-space-lg py-space-sm text-size-sm font-medium transition-colors',
-                    isActivePage(page.to)
-                      ? 'bg-background-secondary hover:bg-background-transparent-neutral-muted text-content-headings'
-                      : 'text-content-secondary hover:bg-background-transparent-neutral-muted hover:text-content-headings'
+                  {...stylex.props(
+                    styles.navLink,
+                    isActivePage(page.to) ? styles.activeLink : styles.inactiveLink
                   )}
                 >
                   {page.label}
                 </Link>
               ))}
             </nav>
-            <Link
-              to="/"
-              className="gap-space-sm absolute left-1/2 flex -translate-x-1/2 items-center no-underline"
-            >
-              <img src="/firetower.svg" alt="Firetower" className="h-6 w-6" />
-              <span className="text-content-headings text-xl font-semibold">
-                Firetower
-              </span>
+            <Link to="/" {...stylex.props(styles.brand)}>
+              <img src="/firetower.svg" alt="Firetower" {...stylex.props(styles.logo)} />
+              <span {...stylex.props(styles.name)}>Firetower</span>
             </Link>
             {currentUser ? (
               <Avatar name={currentUser.name} src={currentUser.avatar_url} size="sm" />
             ) : (
-              <div className="h-7 w-7" />
+              <div {...stylex.props(styles.avatarPlaceholder)} />
             )}
           </div>
         ) : (
-          <div className="relative flex items-center justify-between">
-            <Link
-              to="/"
-              search={preservedSearch}
-              className="text-content-secondary hover:bg-background-secondary hover:text-content-accent px-space-md py-space-sm inline-flex items-center gap-2 rounded-sm text-xs transition-colors"
-            >
+          <div {...stylex.props(styles.row)}>
+            <Link to="/" search={preservedSearch} {...stylex.props(styles.backLink)}>
               <span>←</span>
               <span>All Incidents</span>
             </Link>
-            <Link
-              to="/"
-              className="gap-space-sm absolute left-1/2 flex -translate-x-1/2 items-center no-underline"
-            >
-              <img src="/firetower.svg" alt="Firetower" className="h-6 w-6" />
-              <span className="text-content-headings text-xl font-semibold">
-                Firetower
-              </span>
+            <Link to="/" {...stylex.props(styles.brand)}>
+              <img src="/firetower.svg" alt="Firetower" {...stylex.props(styles.logo)} />
+              <span {...stylex.props(styles.name)}>Firetower</span>
             </Link>
             {currentUser ? (
               <Avatar name={currentUser.name} src={currentUser.avatar_url} size="sm" />
             ) : (
-              <div className="h-7 w-7" />
+              <div {...stylex.props(styles.avatarPlaceholder)} />
             )}
           </div>
         )}
@@ -104,3 +97,75 @@ export const Header = () => {
     </header>
   );
 };
+
+const styles = stylex.create({
+  header: {
+    backgroundColor: background.primary,
+    borderColor: border.secondary,
+    borderBottomWidth: 1,
+    borderBottomStyle: 'solid',
+  },
+  container: {
+    paddingInline: {default: space.md, '@media (min-width: 768px)': space.lg},
+    paddingBlock: space.md,
+    marginInline: 'auto',
+    maxWidth: 1152,
+  },
+  row: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  navigation: {gap: space['2xs'], display: 'flex'},
+  brand: {
+    gap: space.sm,
+    position: 'absolute',
+    left: '50%',
+    display: 'flex',
+    transform: 'translateX(-50%)',
+    alignItems: 'center',
+    textDecoration: 'none',
+  },
+  logo: {height: 24, width: 24},
+  name: {color: content.headings, fontSize: 20, lineHeight: '28px', fontWeight: 600},
+  avatarPlaceholder: {height: 28, width: 28},
+  backLink: {
+    color: {default: content.secondary, ':hover': content.accent},
+    backgroundColor: {default: null, ':hover': background.secondary},
+    paddingInline: space.md,
+    paddingBlock: space.sm,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 2,
+    fontSize: 12,
+    lineHeight: '16px',
+    transitionProperty:
+      'color, background-color, border-color, text-decoration-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  navLink: {
+    borderRadius: radius.sm,
+    paddingInline: space.lg,
+    paddingBlock: space.sm,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    transitionProperty:
+      'color, background-color, border-color, text-decoration-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  activeLink: {
+    backgroundColor: {
+      default: background.secondary,
+      ':hover': background.transparentNeutralMuted,
+    },
+    color: content.headings,
+  },
+  inactiveLink: {
+    color: {default: content.secondary, ':hover': content.headings},
+    backgroundColor: {default: null, ':hover': background.transparentNeutralMuted},
+  },
+});

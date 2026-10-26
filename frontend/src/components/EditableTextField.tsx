@@ -1,91 +1,86 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {cva} from 'class-variance-authority';
+import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {Pencil} from 'lucide-react';
-import {cn} from 'utils/cn';
 import {z} from 'zod';
+
+import type {StyledProps} from '../styles/props';
+import {
+  background,
+  border,
+  content,
+  fontWeight,
+  radius,
+  space,
+} from '../styles/tokens.stylex';
 
 import {Button} from './Button';
 
-const displayContainerStyles = cva(['flex', 'items-center', 'gap-space-xs']);
-
-const displayStyles = cva(['transition-opacity'], {
-  variants: {
-    editing: {
-      true: ['hidden'],
-      false: [],
-    },
+const styles = stylex.create({
+  root: {position: 'relative'},
+  displayContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.xs,
+    transitionProperty: 'opacity',
+    transitionDuration: '150ms',
   },
+  hidden: {display: 'none'},
+  invisible: {visibility: 'hidden'},
+  labelContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.xs,
+    marginBottom: space.md,
+  },
+  label: {
+    fontWeight: fontWeight.medium,
+    color: content.secondary,
+    fontSize: 14,
+    lineHeight: '20px',
+  },
+  display: {overflowWrap: 'break-word'},
+  fullWidth: {flex: '1', minWidth: 0},
+  inline: {display: 'inline'},
+  multiline: {whiteSpace: 'pre-wrap'},
+  placeholder: {color: content.disabled, fontStyle: 'italic'},
+  input: {
+    width: '100%',
+    paddingInline: space.md,
+    paddingBlock: space.sm,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderStyle: 'solid',
+    borderColor: {default: border.primary, ':focus': content.accent},
+    color: content.primary,
+    backgroundColor: background.primary,
+    transitionProperty: 'color, background-color, border-color',
+    transitionDuration: '150ms',
+    margin: 0,
+  },
+  invalid: {borderColor: {default: content.danger, ':focus': content.danger}},
+  textarea: {minHeight: 80, resize: 'none', overflow: 'hidden'},
+  textareaHeight: (height: number | undefined) => ({
+    height: height === undefined ? 'auto' : height,
+  }),
+  actions: {display: 'flex', alignItems: 'center', gap: space.sm},
+  stackedActions: {marginTop: space.sm},
+  message: {fontSize: 14, lineHeight: '20px', marginTop: space.xs, color: content.danger},
+  icon: {width: 16, height: 16},
 });
 
-// Label layout styles
-const labelContainerStyles = cva(['flex', 'items-center', 'gap-space-xs', 'mb-space-md']);
-
-const labelStyles = cva(['font-medium', 'text-content-secondary', 'text-sm']);
-
-const inputStyles = cva(
-  [
-    'w-full',
-    'px-space-md',
-    'py-space-sm',
-    'rounded-radius-md',
-    'border-2',
-    'border-border-primary',
-    'focus:border-content-accent',
-    'focus:outline-none',
-    'text-content-primary',
-    'bg-background-primary',
-    'transition-colors',
-    'm-0',
-  ],
-  {
-    variants: {
-      error: {
-        true: ['border-content-danger', 'focus:border-content-danger'],
-        false: [],
-      },
-      hidden: {
-        true: ['hidden'],
-        false: [],
-      },
-    },
-  }
-);
-
-const actionsStyles = cva(['flex', 'items-center', 'gap-space-sm'], {
-  variants: {
-    hidden: {
-      true: ['hidden'],
-      false: [],
-    },
-  },
-});
-
-const messageStyles = cva(['text-sm', 'mt-space-xs'], {
-  variants: {
-    type: {
-      error: ['text-content-danger'],
-      success: ['text-content-success'],
-    },
-  },
-});
-
-export interface EditableTextFieldProps {
-  // Required
+export interface EditableTextFieldProps extends StyledProps<object> {
   value: string;
   onSave: (newValue: string) => Promise<void>;
 
-  // Optional
   as?: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'div';
   validationSchema?: z.ZodSchema<string>;
   multiline?: boolean;
-  fullWidth?: boolean; // Whether display text should expand to full width (default: false)
-  className?: string;
-  placeholder?: string; // Shown when value is empty
+  fullWidth?: boolean;
+  placeholder?: string;
 
-  // Label layout (if present, pencil appears next to label instead of value)
   label?: string;
   labelAs?: 'h3' | 'h4' | 'h5' | 'h6' | 'span' | 'div';
-  labelClassName?: string;
+  labelStyle?: stylex.StyleXStyles;
 }
 
 export function EditableTextField({
@@ -95,21 +90,23 @@ export function EditableTextField({
   validationSchema,
   multiline = false,
   fullWidth = false,
-  className,
+  style,
   placeholder,
   label,
   labelAs: LabelComponent = 'div',
-  labelClassName,
+  labelStyle,
 }: EditableTextFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftValue, setDraftValue] = useState(value);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [textareaHeight, setTextareaHeight] = useState<number | undefined>();
 
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
   const startEditing = useCallback(() => {
+    setTextareaHeight(undefined);
     setIsEditing(true);
     setError(null);
     setValidationError(null);
@@ -124,11 +121,9 @@ export function EditableTextField({
   }, [value]);
 
   const save = useCallback(async () => {
-    // Clear previous errors
     setError(null);
     setValidationError(null);
 
-    // Client-side validation with Zod
     if (validationSchema) {
       const result = validationSchema.safeParse(draftValue);
       if (!result.success) {
@@ -137,7 +132,6 @@ export function EditableTextField({
       }
     }
 
-    // Don't save if value hasn't changed
     if (draftValue === value) {
       setIsEditing(false);
       return;
@@ -148,10 +142,8 @@ export function EditableTextField({
     try {
       await onSave(draftValue);
 
-      // Exit edit mode immediately on success
       setIsEditing(false);
     } catch (err) {
-      // Show error and stay in edit mode
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsSaving(false);
@@ -163,29 +155,19 @@ export function EditableTextField({
     setValidationError(null);
   }, []);
 
-  // Update draft when value changes (e.g., after successful save)
-  useEffect(() => {
-    if (!isEditing) {
-      setDraftValue(value); // eslint-disable-line react-hooks/set-state-in-effect
-    }
-  }, [value, isEditing]);
-
-  // Focus input when entering edit mode
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
-      // Place cursor at end of text
+
       const length = inputRef.current.value.length;
       inputRef.current.setSelectionRange(length, length);
     }
   }, [isEditing]);
 
-  // Handle keyboard shortcuts
   useEffect(() => {
     if (!isEditing) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Enter to save (only for single-line, or Ctrl/Cmd+Enter for multiline)
       if (event.key === 'Enter') {
         if (!multiline || event.ctrlKey || event.metaKey) {
           event.preventDefault();
@@ -198,14 +180,9 @@ export function EditableTextField({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isEditing, multiline, save]);
 
-  // Auto-resize textarea to fit content
-  useEffect(() => {
-    if (multiline && inputRef.current && isEditing) {
-      const textarea = inputRef.current as HTMLTextAreaElement;
-      // Reset height to auto to get the correct scrollHeight
-      textarea.style.height = 'auto';
-      // Set height to scrollHeight to fit content
-      textarea.style.height = `${textarea.scrollHeight}px`;
+  useLayoutEffect(() => {
+    if (multiline && isEditing && inputRef.current) {
+      setTextareaHeight(inputRef.current.scrollHeight);
     }
   }, [draftValue, multiline, isEditing]);
 
@@ -216,42 +193,33 @@ export function EditableTextField({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     updateDraft(e.target.value);
-    // Auto-resize on change
-    if (multiline) {
-      const textarea = e.target as HTMLTextAreaElement;
-      textarea.style.height = 'auto';
-      textarea.style.height = `${textarea.scrollHeight}px`;
-    }
+    setTextareaHeight(undefined);
   };
 
   return (
-    <div className="relative">
+    <div {...stylex.props(styles.root)}>
       {label ? (
-        // Label layout: Pencil next to label, value separate
         <>
-          {/* Label + Trigger (always visible) */}
-          <div className={cn(labelContainerStyles())}>
-            <LabelComponent className={cn(labelStyles(), labelClassName)}>
+          <div {...stylex.props(styles.labelContainer)}>
+            <LabelComponent {...stylex.props(styles.label, labelStyle)}>
               {label}
             </LabelComponent>
             <Button
               variant="icon"
               onClick={startEditing}
               aria-label="Edit"
-              className={cn(isEditing && 'invisible')}
+              style={isEditing && styles.invisible}
             >
-              <Pencil className="h-4 w-4" />
+              <Pencil {...stylex.props(styles.icon)} />
             </Button>
           </div>
-
-          {/* Display Value (no pencil) */}
           {!isEditing && (
             <Component
-              className={cn(
-                'break-words',
-                multiline && 'whitespace-pre-wrap',
-                className,
-                !value && placeholder && 'text-content-disabled italic'
+              {...stylex.props(
+                styles.display,
+                multiline && styles.multiline,
+                !value && !!placeholder && styles.placeholder,
+                style
               )}
             >
               {value || placeholder}
@@ -259,51 +227,43 @@ export function EditableTextField({
           )}
         </>
       ) : (
-        // Default layout: Pencil next to value
-        <div
-          className={cn(displayContainerStyles(), displayStyles({editing: isEditing}))}
-        >
+        <div {...stylex.props(styles.displayContainer, isEditing && styles.hidden)}>
           <Component
-            className={cn(
-              fullWidth ? 'flex-1 min-w-0' : 'inline',
-              'break-words',
-              multiline && 'whitespace-pre-wrap',
-              className,
-              !value && placeholder && 'text-content-disabled italic'
+            {...stylex.props(
+              fullWidth ? styles.fullWidth : styles.inline,
+              styles.display,
+              multiline && styles.multiline,
+              !value && !!placeholder && styles.placeholder,
+              style
             )}
           >
             {value || placeholder}
           </Component>
           {!isEditing && (
             <Button variant="icon" onClick={startEditing} aria-label="Edit">
-              <Pencil className="h-4 w-4" />
+              <Pencil {...stylex.props(styles.icon)} />
             </Button>
           )}
         </div>
       )}
-
-      {/* Input + Actions */}
       {isEditing && (
         <>
           {multiline || label ? (
-            // Multiline or labeled: Stack vertically with actions below
             <>
               {multiline ? (
                 <textarea
                   ref={inputRef as React.RefObject<HTMLTextAreaElement>}
                   value={draftValue}
                   onChange={handleInputChange}
-                  className={cn(
-                    inputStyles({error: hasError, hidden: !isEditing}),
-                    className
+                  {...stylex.props(
+                    styles.input,
+                    hasError && styles.invalid,
+                    styles.textarea,
+                    styles.textareaHeight(textareaHeight),
+                    style
                   )}
                   autoFocus
                   aria-invalid={hasError}
-                  style={{
-                    minHeight: '80px',
-                    resize: 'none',
-                    overflow: 'hidden',
-                  }}
                 />
               ) : (
                 <input
@@ -311,15 +271,12 @@ export function EditableTextField({
                   type="text"
                   value={draftValue}
                   onChange={handleInputChange}
-                  className={cn(
-                    inputStyles({error: hasError, hidden: !isEditing}),
-                    className
-                  )}
+                  {...stylex.props(styles.input, hasError && styles.invalid, style)}
                   autoFocus
                   aria-invalid={hasError}
                 />
               )}
-              <div className={cn(actionsStyles({hidden: !isEditing}), 'mt-space-sm')}>
+              <div {...stylex.props(styles.actions, styles.stackedActions)}>
                 <Button variant="primary" onClick={save} loading={isSaving}>
                   Save
                 </Button>
@@ -329,21 +286,17 @@ export function EditableTextField({
               </div>
             </>
           ) : (
-            // Single-line without label: Inline with buttons
-            <div className="gap-space-sm flex items-center">
+            <div {...stylex.props(styles.actions)}>
               <input
                 ref={inputRef as React.RefObject<HTMLInputElement>}
                 type="text"
                 value={draftValue}
                 onChange={handleInputChange}
-                className={cn(
-                  inputStyles({error: hasError, hidden: !isEditing}),
-                  className
-                )}
+                {...stylex.props(styles.input, hasError && styles.invalid, style)}
                 autoFocus
                 aria-invalid={hasError}
               />
-              <div className={cn(actionsStyles({hidden: !isEditing}))}>
+              <div {...stylex.props(styles.actions)}>
                 <Button variant="primary" onClick={save} loading={isSaving}>
                   Save
                 </Button>
@@ -353,14 +306,8 @@ export function EditableTextField({
               </div>
             </div>
           )}
-
-          {/* Error Message */}
           {errorMessage && (
-            <div
-              role="alert"
-              aria-live="polite"
-              className={cn(messageStyles({type: 'error'}), 'mt-space-xs')}
-            >
+            <div role="alert" aria-live="polite" {...stylex.props(styles.message)}>
               {errorMessage}
             </div>
           )}

@@ -1,25 +1,10 @@
 import React, {useEffect, useRef} from 'react';
-import {cva} from 'class-variance-authority';
-import {cn} from 'utils/cn';
+import * as stylex from '@stylexjs/stylex';
+import {useBodyScrollLock} from 'utils/useBodyScrollLock';
+
+import {background, content, radius, space} from '../styles/tokens.stylex';
 
 import {Button} from './Button';
-
-const overlay = cva(['fixed', 'inset-0', 'z-50', 'bg-black/50']);
-
-const dialog = cva([
-  'fixed',
-  'top-1/2',
-  'left-1/2',
-  '-translate-x-1/2',
-  '-translate-y-1/2',
-  'z-50',
-  'w-full',
-  'max-w-md',
-  'rounded-radius-lg',
-  'bg-background-primary',
-  'p-space-2xl',
-  'shadow-xl',
-]);
 
 interface ConfirmationDialogProps {
   isOpen: boolean;
@@ -55,41 +40,29 @@ function ConfirmationDialog({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onCancel]);
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
+  useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 
   return (
     <>
-      <div className={cn(overlay())} onClick={onCancel} aria-hidden="true" />
+      <div {...stylex.props(styles.overlay)} onClick={onCancel} aria-hidden="true" />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className={cn(dialog())}
+        {...stylex.props(styles.dialog)}
       >
-        <h2
-          id="dialog-title"
-          className="mb-space-md text-content-headings text-lg font-semibold"
-        >
+        <h2 id="dialog-title" {...stylex.props(styles.title)}>
           {title}
         </h2>
-        <div className="mb-space-xl text-content-secondary">{message}</div>
-        <div className="gap-space-md flex justify-end">
-          <Button variant="secondary" onClick={onCancel} className="w-auto">
+        <div {...stylex.props(styles.message)}>{message}</div>
+        <div {...stylex.props(styles.actions)}>
+          <Button variant="secondary" onClick={onCancel} style={styles.autoWidth}>
             {cancelLabel}
           </Button>
-          <Button variant="primary" onClick={onConfirm} className="w-auto">
+          <Button variant="primary" onClick={onConfirm} style={styles.autoWidth}>
             {confirmLabel}
           </Button>
         </div>
@@ -99,3 +72,30 @@ function ConfirmationDialog({
 }
 
 export {ConfirmationDialog, type ConfirmationDialogProps};
+
+const styles = stylex.create({
+  overlay: {position: 'fixed', inset: 0, zIndex: 50, backgroundColor: 'rgb(0 0 0 / 0.5)'},
+  dialog: {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    zIndex: 50,
+    width: '100%',
+    maxWidth: 448,
+    borderRadius: radius.lg,
+    backgroundColor: background.primary,
+    padding: space['2xl'],
+    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+  },
+  title: {
+    marginBottom: space.md,
+    color: content.headings,
+    fontSize: 18,
+    lineHeight: '28px',
+    fontWeight: 600,
+  },
+  message: {marginBottom: space.xl, color: content.secondary},
+  actions: {gap: space.md, display: 'flex', justifyContent: 'flex-end'},
+  autoWidth: {width: 'auto'},
+});

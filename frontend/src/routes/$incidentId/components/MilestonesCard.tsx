@@ -1,10 +1,12 @@
 import {useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {Button} from 'components/Button';
 import {Card} from 'components/Card';
 import {DateTimePicker} from 'components/DateTimePicker';
 import {Pencil} from 'lucide-react';
 
+import {content, fontWeight, space} from '../../../styles/tokens.stylex';
 import type {IncidentDetail} from '../queries/incidentDetailQueryOptions';
 import {updateIncidentFieldMutationOptions} from '../queries/updateIncidentFieldMutationOptions';
 
@@ -50,7 +52,7 @@ function formatDateTime(date: Date | undefined): string {
 
 interface DraftValue {
   date: Date | undefined;
-  time: string | undefined; // "HH:MM" format
+  time: string | undefined;
 }
 
 type DraftValues = Record<MilestoneField, DraftValue>;
@@ -90,9 +92,7 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
     updateIncidentFieldMutationOptions(queryClient)
   );
 
-  // For the calendar's default month: use the nearest previous milestone's date,
-  // or fall back to incident created_at. This will probably be the correct date and if so, saves the user from inputting date, if not, it's same effort to select date as if it were unset.
-  const getDefaultDate = (fieldIndex: number): Date => {
+  const getPreviousMilestoneDateOrCreatedAt = (fieldIndex: number): Date => {
     for (let i = fieldIndex - 1; i >= 0; i--) {
       const prevField = MILESTONES[i].field;
       if (draftValues[prevField].date) {
@@ -112,7 +112,6 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
       time_recovered: parseIncidentDateTime(incident.time_recovered),
     };
 
-    // Pre-fill dates for unset fields
     for (let i = 0; i < MILESTONES.length; i++) {
       const {field} = MILESTONES[i];
       if (!drafts[field].date) {
@@ -142,7 +141,6 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
         const {date, time} = draftValues[field];
         const oldValue = incident[field] ? new Date(incident[field]) : undefined;
 
-        // Only save if both date and time are set
         const effectiveValue = date && time ? combineDateAndTime(date, time) : undefined;
 
         if (effectiveValue?.getTime() !== oldValue?.getTime()) {
@@ -177,32 +175,33 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
 
   return (
     <Card>
-      <div className="mb-space-lg flex items-center justify-between">
-        <h2 className="text-content-headings text-lg font-semibold">Milestones</h2>
+      <div {...stylex.props(styles.header)}>
+        <h2 {...stylex.props(styles.heading)}>Milestones</h2>
         {!isEditing && (
           <Button variant="icon" onClick={startEditing} aria-label="Edit milestones">
-            <Pencil className="h-4 w-4" />
+            <Pencil {...stylex.props(styles.icon)} />
           </Button>
         )}
       </div>
-      <div className="gap-space-md flex flex-col">
+      <div {...stylex.props(styles.milestones)}>
         {MILESTONES.map(({field, label}, index) => (
-          <div key={field} className="gap-space-md flex items-center">
-            <div className="text-content-secondary w-20 flex-none text-sm font-medium">
-              {label}
-            </div>
-            <div className="flex flex-1 items-center justify-end">
+          <div key={field} {...stylex.props(styles.row)}>
+            <div {...stylex.props(styles.label)}>{label}</div>
+            <div {...stylex.props(styles.value)}>
               {isEditing ? (
                 <DateTimePicker
                   date={draftValues[field].date}
                   time={draftValues[field].time}
                   onDateChange={updateDraftDate(field)}
                   onTimeChange={updateDraftTime(field)}
-                  defaultDate={getDefaultDate(index)}
+                  defaultDate={getPreviousMilestoneDateOrCreatedAt(index)}
                 />
               ) : (
                 <span
-                  className={`text-sm ${incident[field] ? 'text-content-primary' : 'text-content-secondary'}`}
+                  {...stylex.props(
+                    styles.displayValue,
+                    incident[field] ? styles.presentValue : styles.emptyValue
+                  )}
                 >
                   {formatDateTime(
                     incident[field] ? new Date(incident[field]) : undefined
@@ -220,7 +219,7 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
         />
       </div>
       {isEditing && (
-        <div className="mt-space-lg gap-space-xs flex items-center justify-end">
+        <div {...stylex.props(styles.actions)}>
           <Button variant="primary" onClick={handleSave} loading={isSaving}>
             Save
           </Button>
@@ -232,3 +231,45 @@ export function MilestonesCard({incident}: MilestonesCardProps) {
     </Card>
   );
 }
+
+const styles = stylex.create({
+  header: {
+    marginBottom: space.lg,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heading: {
+    color: content.headings,
+    fontSize: '18px',
+    lineHeight: '28px',
+    fontWeight: 600,
+  },
+  icon: {height: '16px', width: '16px'},
+  milestones: {gap: space.md, display: 'flex', flexDirection: 'column'},
+  row: {gap: space.md, display: 'flex', alignItems: 'center'},
+  label: {
+    color: content.secondary,
+    width: '80px',
+    flex: 'none',
+    fontSize: '14px',
+    lineHeight: '20px',
+    fontWeight: fontWeight.medium,
+  },
+  value: {
+    display: 'flex',
+    flex: '1 1 0%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  actions: {
+    marginTop: space.lg,
+    gap: space.xs,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  displayValue: {fontSize: 14, lineHeight: '20px'},
+  presentValue: {color: content.primary},
+  emptyValue: {color: content.secondary},
+});

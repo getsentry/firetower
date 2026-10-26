@@ -1,7 +1,6 @@
-@import 'tailwindcss';
-@import './scraps-theme.css';
+@layer reset, stylex;
+@import './preflight.css' layer(reset);
 
-/* Rubik font with modified vertical metrics (copied from Sentry) */
 @font-face {
   font-family: 'Rubik';
   font-style: normal;
@@ -46,23 +45,4 @@
   font-weight: 500;
   font-display: swap;
   src: url('/fonts/roboto-mono-medium.woff2') format('woff2');
-}
-
-/* Global styles */
-body {
-  font-family: var(--scraps-font-family-sans);
-}
-
-html {
-  scrollbar-gutter: stable;
-}
-
-input[type='number']::-webkit-inner-spin-button,
-input[type='number']::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-input[type='number'] {
-  -moz-appearance: textfield;
 }

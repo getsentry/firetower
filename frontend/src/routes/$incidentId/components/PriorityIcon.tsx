@@ -1,4 +1,7 @@
+import * as stylex from '@stylexjs/stylex';
 import {Tooltip, TooltipContent, TooltipTrigger} from 'components/Tooltip';
+
+import {content} from '../../../styles/tokens.stylex';
 
 const PRIORITY_CONFIG: Record<number, {bars?: number; urgent?: boolean; label: string}> =
   {
@@ -35,7 +38,7 @@ export function PriorityIcon({priority}: {priority: number}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="text-content-secondary">
+        <span {...stylex.props(styles.trigger)}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             {config.urgent ? (
               <>
@@ -73,8 +76,13 @@ export function PriorityIcon({priority}: {priority: number}) {
         </span>
       </TooltipTrigger>
       <TooltipContent>
-        <span className="text-content-primary text-xs">{config.label}</span>
+        <span {...stylex.props(styles.label)}>{config.label}</span>
       </TooltipContent>
     </Tooltip>
   );
 }
+
+const styles = stylex.create({
+  trigger: {color: content.secondary},
+  label: {color: content.primary, fontSize: '12px', lineHeight: '16px'},
+});

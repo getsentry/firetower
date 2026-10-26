@@ -1,10 +1,20 @@
 import {StrictMode} from 'react';
 import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
+import * as stylex from '@stylexjs/stylex';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {createRouter, RouterProvider} from '@tanstack/react-router';
 
+import {background, fontFamily} from './styles/tokens.stylex';
 import {routeTree} from './routeTree.gen';
+
+const styles = stylex.create({
+  body: {fontFamily: fontFamily.sans, backgroundColor: background.tertiary},
+  html: {scrollbarGutter: 'stable'},
+});
+
+document.body.className = stylex.props(styles.body).className ?? '';
+document.documentElement.className = stylex.props(styles.html).className ?? '';
 
 const queryClient = new QueryClient();
 const router = createRouter({
@@ -62,9 +72,7 @@ if (!rootElement.innerHTML) {
     onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
       console.warn('Uncaught error', error, errorInfo.componentStack);
     }),
-    // Callback called when React catches an error in an ErrorBoundary.
     onCaughtError: Sentry.reactErrorHandler(),
-    // Callback called when React automatically recovers from errors.
     onRecoverableError: Sentry.reactErrorHandler(),
   });
   root.render(

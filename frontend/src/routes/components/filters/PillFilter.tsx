@@ -1,9 +1,17 @@
+import * as stylex from '@stylexjs/stylex';
 import {Button} from 'components/Button';
 import {Pill, type PillProps} from 'components/Pill';
 import {Tag} from 'components/Tag';
 import {Pencil, XIcon} from 'lucide-react';
-import {cn} from 'utils/cn';
 
+import {
+  background,
+  border,
+  content,
+  fontSize,
+  radius,
+  space,
+} from '../../../styles/tokens.stylex';
 import {EMPTY_FILTER_SENTINEL} from '../../types';
 import {type ArrayFilterKey} from '../useActiveFilters';
 
@@ -55,21 +63,21 @@ export function PillFilter<T extends PillVariant>({
 
   return (
     <div>
-      <div className="mb-space-md gap-space-xs flex items-center">
-        <h3 className="text-size-md text-content-secondary font-semibold">{label}</h3>
+      <div {...stylex.props(styles.heading)}>
+        <h3 {...stylex.props(styles.label)}>{label}</h3>
         <Button
           variant="icon"
           onClick={open}
           aria-label={`Edit ${label}`}
-          className={cn('transition-none', isEditing && 'invisible')}
+          style={[styles.editButton, isEditing && styles.hidden]}
         >
-          <Pencil className="h-4 w-4" />
+          <Pencil {...stylex.props(styles.editIcon)} />
         </Button>
       </div>
 
-      <div className={cn('relative', isEditing && 'z-50')}>
+      <div {...stylex.props(styles.editor, isEditing && styles.editing)}>
         {isEditing ? (
-          <div className="gap-space-sm flex flex-wrap items-center select-none">
+          <div {...stylex.props(styles.editingTags)}>
             {selected.map(v => (
               <Tag
                 key={v}
@@ -80,12 +88,12 @@ export function PillFilter<T extends PillVariant>({
                     onClick={() => toggle(v)}
                     aria-label={`Remove ${v === EMPTY_FILTER_SENTINEL ? 'Empty' : v}`}
                   >
-                    <XIcon className="h-3.5 w-3.5" />
+                    <XIcon {...stylex.props(styles.removeIcon)} />
                   </Button>
                 }
               >
                 {v === EMPTY_FILTER_SENTINEL ? (
-                  <span className="text-content-disabled italic">Empty</span>
+                  <span {...stylex.props(styles.emptyValue)}>Empty</span>
                 ) : (
                   <Pill variant={v as T}>{v}</Pill>
                 )}
@@ -101,15 +109,15 @@ export function PillFilter<T extends PillVariant>({
               }}
               onKeyDown={handleKeyDown(available as string[])}
               placeholder="Add..."
-              className="px-space-sm py-space-xs text-size-sm placeholder:text-content-disabled min-w-[100px] flex-1 bg-transparent focus:outline-none"
+              {...stylex.props(styles.input)}
             />
           </div>
         ) : selected.length > 0 ? (
-          <div className="gap-space-sm flex flex-wrap select-none">
+          <div {...stylex.props(styles.tags)}>
             {selected.map(v => (
               <Tag
                 key={v}
-                className="hover:bg-background-transparent-neutral-muted cursor-pointer"
+                style={styles.tag}
                 onClick={open}
                 action={
                   <Button
@@ -121,12 +129,12 @@ export function PillFilter<T extends PillVariant>({
                     }}
                     aria-label={`Remove ${v === EMPTY_FILTER_SENTINEL ? 'Empty' : v}`}
                   >
-                    <XIcon className="h-3.5 w-3.5" />
+                    <XIcon {...stylex.props(styles.removeIcon)} />
                   </Button>
                 }
               >
                 {v === EMPTY_FILTER_SENTINEL ? (
-                  <span className="text-content-disabled italic">Empty</span>
+                  <span {...stylex.props(styles.emptyValue)}>Empty</span>
                 ) : (
                   <Pill variant={v as T}>{v}</Pill>
                 )}
@@ -137,7 +145,7 @@ export function PillFilter<T extends PillVariant>({
           <button
             type="button"
             tabIndex={-1}
-            className="text-size-sm text-content-disabled cursor-pointer italic select-none"
+            {...stylex.props(styles.placeholder)}
             onClick={open}
           >
             Any
@@ -145,8 +153,8 @@ export function PillFilter<T extends PillVariant>({
         )}
 
         {isEditing && available.length > 0 ? (
-          <div className="mt-space-xs rounded-radius-md bg-background-primary absolute right-0 left-0 z-50 border border-gray-200 shadow-lg">
-            <div className="p-space-sm max-h-[200px] [scrollbar-width:none] overflow-y-auto [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div {...stylex.props(styles.dropdown)}>
+            <div {...stylex.props(styles.options)}>
               {available.map((option, index) => (
                 <button
                   key={option}
@@ -157,15 +165,13 @@ export function PillFilter<T extends PillVariant>({
                     setFocusedIndex(0);
                     inputRef.current?.focus();
                   }}
-                  className={cn(
-                    'w-full text-left px-space-md py-space-sm cursor-pointer rounded-radius-sm text-size-sm',
-                    index === focusedIndex
-                      ? 'bg-background-secondary'
-                      : 'hover:bg-background-transparent-neutral-muted'
+                  {...stylex.props(
+                    styles.option,
+                    index === focusedIndex ? styles.focusedOption : styles.idleOption
                   )}
                 >
                   {option === EMPTY_FILTER_SENTINEL ? (
-                    <span className="text-content-disabled italic">Empty</span>
+                    <span {...stylex.props(styles.emptyValue)}>Empty</span>
                   ) : (
                     <Pill variant={option as T}>{option}</Pill>
                   )}
@@ -177,12 +183,93 @@ export function PillFilter<T extends PillVariant>({
       </div>
 
       {isEditing ? (
-        <div
-          className="fixed inset-0 z-40 bg-transparent"
-          aria-hidden="true"
-          onClick={close}
-        />
+        <div {...stylex.props(styles.backdrop)} aria-hidden="true" onClick={close} />
       ) : null}
     </div>
   );
 }
+
+const styles = stylex.create({
+  heading: {
+    marginBottom: space.md,
+    gap: space.xs,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  label: {fontSize: fontSize.md, color: content.secondary, fontWeight: 600},
+  editIcon: {height: 16, width: 16},
+  editingTags: {
+    gap: space.sm,
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    userSelect: 'none',
+  },
+  removeIcon: {height: 14, width: 14},
+  emptyValue: {color: content.disabled, fontStyle: 'italic'},
+  input: {
+    paddingInline: space.sm,
+    paddingBlock: space.xs,
+    fontSize: fontSize.sm,
+    color: {default: null, '::placeholder': content.disabled},
+    minWidth: '100px',
+    flex: '1 1 0%',
+    backgroundColor: 'transparent',
+  },
+  tags: {gap: space.sm, display: 'flex', flexWrap: 'wrap', userSelect: 'none'},
+  tag: {
+    backgroundColor: {
+      default: background.tertiary,
+      ':hover': background.transparentNeutralMuted,
+      '@media (prefers-color-scheme: dark)': {
+        default: background.secondary,
+        ':hover': background.transparentNeutralMuted,
+      },
+    },
+    cursor: 'pointer',
+  },
+  placeholder: {
+    fontSize: fontSize.sm,
+    color: content.disabled,
+    cursor: 'pointer',
+    fontStyle: 'italic',
+    userSelect: 'none',
+  },
+  dropdown: {
+    marginTop: space.xs,
+    borderRadius: radius.md,
+    backgroundColor: background.primary,
+    position: 'absolute',
+    right: 0,
+    left: 0,
+    zIndex: 50,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: border.secondary,
+    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+  },
+  options: {
+    padding: space.sm,
+    maxHeight: '200px',
+    scrollbarWidth: 'none',
+    overflowY: 'auto',
+  },
+  backdrop: {position: 'fixed', inset: 0, zIndex: 40, backgroundColor: 'transparent'},
+  editButton: {transitionProperty: 'none'},
+  hidden: {visibility: 'hidden'},
+  editor: {position: 'relative'},
+  editing: {zIndex: 50},
+  option: {
+    width: '100%',
+    textAlign: 'left',
+    paddingInline: space.md,
+    paddingBlock: space.sm,
+    cursor: 'pointer',
+    borderRadius: radius.sm,
+    fontSize: fontSize.sm,
+  },
+  focusedOption: {backgroundColor: background.secondary},
+  idleOption: {
+    backgroundColor: {default: null, ':hover': background.transparentNeutralMuted},
+  },
+});

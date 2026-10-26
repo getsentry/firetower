@@ -1,4 +1,5 @@
 import {createContext, useContext, useEffect, useRef, useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {useSuspenseInfiniteQuery} from '@tanstack/react-query';
 import {createFileRoute} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
@@ -8,6 +9,8 @@ import {GetHelpLink} from 'components/GetHelpLink';
 import {Spinner} from 'components/Spinner';
 import {arraysEqual} from 'utils/arrays';
 import {z} from 'zod';
+
+import {content, space} from '../styles/tokens.stylex';
 
 import {FilterPanel, FilterTrigger} from './components/AdvancedFilters';
 import {CreateIncidentDialog} from './components/CreateIncidentDialog';
@@ -59,10 +62,10 @@ function IncidentsLayout({
   const {setShowCreateDialog} = useContext(CreateDialogContext);
 
   return (
-    <div className="gap-space-lg flex flex-col">
-      <div className="flex items-center justify-between">
+    <div {...stylex.props(styles.layout)}>
+      <div {...stylex.props(styles.toolbar)}>
         <StatusFilter />
-        <div className="gap-space-sm flex items-center">
+        <div {...stylex.props(styles.actions)}>
           {showCreateButton ? (
             <Button variant="primary" size="sm" onClick={() => setShowCreateDialog(true)}>
               Create Incident
@@ -92,13 +95,9 @@ function IncidentsPageWrapper({children}: {children: React.ReactNode}) {
 }
 
 export const Route = createFileRoute('/')({
-  // Component to render
   component: Index,
-  // Validate search params with zod schema
   validateSearch: zodValidator(incidentListSearchSchema),
-  // Extract search params needed for loader
   loaderDeps: ({search}) => search,
-  // Define loader with loaderDeps and context (context has queryClient)
   loader: async ({deps, context}) => {
     const options = incidentsQueryOptions(deps);
     await context.queryClient.prefetchInfiniteQuery(options);
@@ -113,10 +112,10 @@ export const Route = createFileRoute('/')({
       <ErrorState
         title="Something went wrong fetching incidents"
         description={
-          <>
+          <p>
             Try refreshing the page, or if that doesn't work, come chat with us in{' '}
             <GetHelpLink />.
-          </>
+          </p>
         }
       />
     </IncidentsLayout>
@@ -128,21 +127,23 @@ const STORAGE_KEY = 'firetower_list_search';
 function IncidentsEmptyState({status}: {status?: string[]}) {
   if (!status || arraysEqual(status, STATUS_FILTER_GROUPS.active)) {
     return (
-      <div className="text-content-secondary py-space-4xl text-center">
+      <div {...stylex.props(styles.emptyState)}>
         <p>There are no active incidents! {String.fromCodePoint(0x1f389)}</p>
       </div>
     );
   }
   if (arraysEqual(status, STATUS_FILTER_GROUPS.review)) {
     return (
-      <div className="text-content-secondary py-space-4xl text-center">
+      <div {...stylex.props(styles.emptyState)}>
         <p>There are no incidents in review.</p>
       </div>
     );
   }
   return (
-    <div className="text-content-secondary py-space-4xl text-center">
-      <p className="mb-space-lg">There are no incidents matching those filters.</p>
+    <div {...stylex.props(styles.emptyState)}>
+      <p {...stylex.props(styles.emptyMessage)}>
+        There are no incidents matching those filters.
+      </p>
       <p>
         If you think this is a bug, let us know in <GetHelpLink />.
       </p>
@@ -161,12 +162,10 @@ function Index() {
 
   const observerTarget = useRef<HTMLDivElement>(null);
 
-  // Store current search params in sessionStorage whenever they change
   useEffect(() => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(params));
   }, [params]);
 
-  // Infinite scroll observer
   useEffect(() => {
     const target = observerTarget.current;
     if (!target) return;
@@ -191,7 +190,7 @@ function Index() {
           <IncidentsEmptyState status={params.status} />
         ) : (
           <>
-            <ul className="gap-space-lg flex list-none flex-col">
+            <ul {...stylex.props(styles.incidents)}>
               {incidents.map(incident => (
                 <li key={incident.id}>
                   <IncidentCard incident={incident} />
@@ -199,8 +198,7 @@ function Index() {
               ))}
             </ul>
 
-            {/* Intersection observer target */}
-            <div ref={observerTarget} className="py-space-xl flex justify-center">
+            <div ref={observerTarget} {...stylex.props(styles.loading)}>
               {isFetchingNextPage ? <Spinner size="md" /> : null}
             </div>
           </>
@@ -209,3 +207,18 @@ function Index() {
     </IncidentsPageWrapper>
   );
 }
+
+const styles = stylex.create({
+  layout: {gap: space.lg, display: 'flex', flexDirection: 'column'},
+  toolbar: {display: 'flex', alignItems: 'center', justifyContent: 'space-between'},
+  actions: {gap: space.sm, display: 'flex', alignItems: 'center'},
+  emptyState: {color: content.secondary, paddingBlock: 48, textAlign: 'center'},
+  emptyMessage: {marginBottom: space.lg},
+  incidents: {
+    gap: space.lg,
+    display: 'flex',
+    listStyleType: 'none',
+    flexDirection: 'column',
+  },
+  loading: {paddingBlock: space.xl, display: 'flex', justifyContent: 'center'},
+});

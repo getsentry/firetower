@@ -1,5 +1,8 @@
 import {useCallback, useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {Check, Pencil} from 'lucide-react';
+
+import {content, fontWeight, space} from '../styles/tokens.stylex';
 
 import {Button} from './Button';
 import {DateTimePicker} from './DateTimePicker';
@@ -79,14 +82,12 @@ export function EditableDateTimeField({
   }, [draftDate, draftTime, value, onSave]);
 
   return (
-    <div className="gap-space-md flex items-center">
-      <div className="text-content-secondary w-20 flex-none text-sm font-medium">
-        {label}
-      </div>
+    <div {...stylex.props(styles.row)}>
+      <div {...stylex.props(styles.label)}>{label}</div>
 
-      <div className="flex flex-1 items-center justify-end">
+      <div {...stylex.props(styles.valueContainer)}>
         {isEditing ? (
-          <div className="gap-space-sm flex shrink-0 items-center">
+          <div {...stylex.props(styles.editor)}>
             <DateTimePicker
               date={draftDate}
               time={draftTime}
@@ -94,18 +95,18 @@ export function EditableDateTimeField({
               onTimeChange={setDraftTime}
             />
             <Button variant="icon" onClick={save} disabled={isSaving} aria-label="Save">
-              <Check className="h-4 w-4" />
+              <Check {...stylex.props(styles.icon)} />
             </Button>
           </div>
         ) : (
-          <div className="gap-space-xs flex items-center">
+          <div {...stylex.props(styles.displayRow)}>
             <span
-              className={`text-sm ${value ? 'text-content-primary' : 'text-content-secondary italic'}`}
+              {...stylex.props(styles.value, value ? styles.present : styles.placeholder)}
             >
               {formatDateTime(value) || placeholder}
             </span>
             <Button variant="icon" onClick={startEditing} aria-label={`Edit ${label}`}>
-              <Pencil className="h-4 w-4" />
+              <Pencil {...stylex.props(styles.icon)} />
             </Button>
           </div>
         )}
@@ -113,3 +114,27 @@ export function EditableDateTimeField({
     </div>
   );
 }
+
+const styles = stylex.create({
+  row: {gap: space.md, display: 'flex', alignItems: 'center'},
+  label: {
+    color: content.secondary,
+    width: 80,
+    flex: 'none',
+    fontSize: 14,
+    lineHeight: '20px',
+    fontWeight: fontWeight.medium,
+  },
+  valueContainer: {
+    display: 'flex',
+    flex: '1',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  editor: {gap: space.sm, display: 'flex', flexShrink: 0, alignItems: 'center'},
+  icon: {height: 16, width: 16},
+  displayRow: {gap: space.xs, display: 'flex', alignItems: 'center'},
+  value: {fontSize: 14, lineHeight: '20px'},
+  present: {color: content.primary},
+  placeholder: {color: content.secondary, fontStyle: 'italic'},
+});
