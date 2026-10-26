@@ -13,6 +13,9 @@ wheels/
 *.sqlite3
 config.toml
 
+# Frontend-generated files
+coverage/
+
 # Vite local .env files
 .env
 .env.local

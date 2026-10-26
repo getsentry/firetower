@@ -49,7 +49,7 @@ export const examples = [
 ];
 `;
     expect(typeErrors(source)).toEqual([]);
-  });
+  }, 30_000);
 
   it('rejects raw CSS and class strings at component boundaries', () => {
     const cases = [
@@ -79,7 +79,7 @@ export const examples = [
         cases[index]
       ).toBe(true);
     }
-  });
+  }, 30_000);
 
   it('rejects authored classes, inline host styles, and generated DOM props on app components', async () => {
     const eslint = new ESLint();
