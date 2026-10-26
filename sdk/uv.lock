@@ -385,7 +385,7 @@ wheels = [
 
 [[package]]
 name = "google-cloud-iam"
-version = "2.21.0"
+version = "2.26.0"
 source = { registry = "https://sfw.security.sentry.io/pypi/simple" }
 dependencies = [
     { name = "google-api-core", extra = ["grpc"] },
@@ -395,9 +395,9 @@ dependencies = [
     { name = "proto-plus" },
     { name = "protobuf" },
 ]
-sdist = { url = "https://sfw.security.sentry.io/pypi/packages/aa/0b/037b1e1eb601646d6f49bc06d62094c1d0996b373dcbf70c426c6c51572e/google_cloud_iam-2.21.0.tar.gz", hash = "sha256:fc560527e22b97c6cbfba0797d867cf956c727ba687b586b9aa44d78e92281a3", size = 499038, upload-time = "2026-01-15T13:15:08.243Z" }
+sdist = { url = "https://sfw.security.sentry.io/pypi/packages/42/08/4f88586e9e1cc65754200fc60adf25c2ca7b7da0407a6dcf13362e69e63a/google_cloud_iam-2.26.0.tar.gz", hash = "sha256:d44a86e5cb0bbc904c459b1367bd0124eef802fe0af72ac378f87f7f8e5b2d42", size = 613465, upload-time = "2026-10-01T18:16:49.524Z" }
 wheels = [
-    { url = "https://sfw.security.sentry.io/pypi/packages/c8/44/02ac4e147ea034a3d641c11b54c9d8d0b80fc1ea6a8b7d6c1588d208d42a/google_cloud_iam-2.21.0-py3-none-any.whl", hash = "sha256:1b4a21302b186a31f3a516ccff303779638308b7c801fb61a2406b6a0c6293c4", size = 458958, upload-time = "2026-01-15T13:13:40.671Z" },
+    { url = "https://sfw.security.sentry.io/pypi/packages/e8/62/bee32ed798f52c1188c57c5ef9ec584db3829ee02b8a3b2469c6d0dcf314/google_cloud_iam-2.26.0-py3-none-any.whl", hash = "sha256:77bb8d9d8a9c94b1632196fd4d88c52c0f2ceb35075514eb91af25ed6857b300", size = 564869, upload-time = "2026-10-01T18:10:35.8Z" },
 ]
 
 [[package]]
