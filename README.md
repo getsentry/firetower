@@ -131,18 +131,6 @@ sdk/                 # Python SDK
 
 Action item sync adds the existing workspace-wide `incident-action` label to incident sub-issues, including pre-existing issues adopted as follow-ups. Other labels are preserved.
 
-To backfill historical action items in production, open **Django admin → Incidents**:
-
-1. Select a batch of incidents.
-2. Run **Preview incident-action label backfill** to see how many labels are missing without updating Linear issues.
-3. Select the same incidents and run **Backfill incident-action labels in Linear** to apply the additions.
-
-Both actions require permission to change incidents and report counts and failures in admin. They read current sub-issues for the selected incident parents, including archived children, without changing parent relationships, SLAs, or cached action items. Use manageable batches to keep admin requests short; rerunning safely skips existing labels. The workspace label must already exist.
-
-If Linear rate-limits a request, the action stops immediately and reports partial progress and any `Retry-After` guidance. It does not wait for quota to reset inside the admin request or resume automatically. Wait for the limit to reset, then rerun the same selection; issues already labeled are skipped.
-
-The optional local script, `scripts/backfill_incident_action_labels.py`, uses the same backfill logic and still defaults to a dry run.
-
 ## Scheduled Tasks
 
 Scheduled tasks are stored as database objects and are managed via migrations.

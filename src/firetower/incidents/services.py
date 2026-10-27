@@ -5,7 +5,6 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import QuerySet
 from django.utils import timezone
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
@@ -22,10 +21,7 @@ from firetower.incidents.models import (
     IncidentStatus,
 )
 from firetower.integrations.services import LinearService, SlackService
-from firetower.integrations.services.linear import (
-    INCIDENT_ACTION_LABEL_NAME,
-    LinearRateLimitError,
-)
+from firetower.integrations.services.linear import INCIDENT_ACTION_LABEL_NAME
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
@@ -152,115 +148,6 @@ class ActionItemsSyncStats:
     deleted: int = 0
     errors: list[str] = field(default_factory=list)
     skipped: bool = False
-
-
-@dataclass
-class ActionItemLabelBackfillStats:
-    checked: int = 0
-    missing: int = 0
-    added: int = 0
-    errors: list[str] = field(default_factory=list)
-
-
-def backfill_action_item_labels(
-    incidents: QuerySet[Incident], *, dry_run: bool = True
-) -> ActionItemLabelBackfillStats:
-    """Label live incident sub-issues without running other sync side effects."""
-    stats = ActionItemLabelBackfillStats()
-    if not settings.LINEAR:
-        stats.errors.append("Linear integration is not configured")
-        return stats
-
-    try:
-        service = _get_linear_service()
-        label_id = service.get_issue_label_id(
-            INCIDENT_ACTION_LABEL_NAME, raise_on_error=True
-        )
-    except LinearRateLimitError as error:
-        stats.errors.insert(0, f"{error} Backfill stopped; rerun this selection later.")
-        return stats
-    except Exception:
-        logger.exception("Failed to fetch Linear incident action label")
-        stats.errors.append("Failed to fetch Linear incident action label")
-        return stats
-    if not label_id:
-        stats.errors.append(
-            f"Linear workspace label {INCIDENT_ACTION_LABEL_NAME} is unavailable"
-        )
-        return stats
-
-    incidents = incidents.exclude(linear_parent_issue_id__isnull=True).exclude(
-        linear_parent_issue_id=""
-    )
-    seen: set[str] = set()
-    for incident in incidents.iterator():
-        assert incident.linear_parent_issue_id is not None
-        try:
-            children = service.get_child_issues(
-                incident.linear_parent_issue_id,
-                include_archived=True,
-                raise_on_error=True,
-            )
-        except LinearRateLimitError as error:
-            stats.errors.insert(
-                0, f"{error} Backfill stopped; rerun this selection later."
-            )
-            return stats
-        except Exception:
-            logger.exception(
-                "Failed to fetch children for incident %s", incident.incident_number
-            )
-            children = None
-        if children is None:
-            stats.errors.append(
-                f"Failed to fetch children for incident {incident.incident_number}"
-            )
-            continue
-
-        for issue in children:
-            if issue["id"] in seen:
-                continue
-            seen.add(issue["id"])
-            stats.checked += 1
-            if label_id in issue.get("label_ids", []):
-                continue
-            stats.missing += 1
-            logger.info(
-                "%s %s to %s",
-                "Would add" if dry_run else "Adding",
-                INCIDENT_ACTION_LABEL_NAME,
-                issue["identifier"],
-            )
-            if dry_run:
-                continue
-            try:
-                success = service.add_issue_label(
-                    issue["id"], label_id, raise_on_error=True
-                )
-            except LinearRateLimitError as error:
-                stats.errors.insert(
-                    0, f"{error} Backfill stopped; rerun this selection later."
-                )
-                return stats
-            except Exception:
-                logger.exception("Failed to label action item %s", issue["identifier"])
-                success = False
-            if success:
-                stats.added += 1
-            else:
-                stats.errors.append(
-                    f"Failed to label action item {issue['identifier']}"
-                )
-
-    logger.info(
-        "%s: %d checked, %d missing labels, %d added, %d failures",
-        "Dry run" if dry_run else "Backfill",
-        stats.checked,
-        stats.missing,
-        stats.added,
-        len(stats.errors),
-    )
-    return stats
 
 
 def _get_action_item_slo_days(priority: int) -> int | None:

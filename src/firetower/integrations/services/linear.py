@@ -74,16 +74,6 @@ class LinearError(Exception):
     """
 
 
-class LinearRateLimitError(LinearError):
-    """Raised for rate-limited requests when the caller opts into errors."""
-
-    def __init__(self, retry_after: str | None = None) -> None:
-        message = "Linear API rate limit reached."
-        if retry_after:
-            message += f" Retry after {retry_after} seconds."
-        super().__init__(message)
-
-
 # Exact message Linear returns when an ``issue(id:)`` lookup references an
 # issue that does not exist. Matched case-insensitively. Deliberately specific
 # to a missing *issue* (not a generic "not found") so unrelated errors
@@ -93,18 +83,6 @@ _ISSUE_NOT_FOUND_MESSAGE = "could not find referenced issue"
 
 
 _MAX_LOGGED_ERRORS_LEN = 2000
-
-
-def _errors_are_rate_limited(errors: Any) -> bool:
-    if not isinstance(errors, list):
-        return False
-    for error in errors:
-        if not isinstance(error, dict):
-            continue
-        extensions = error.get("extensions")
-        if isinstance(extensions, dict) and extensions.get("code") == "RATELIMITED":
-            return True
-    return False
 
 
 def _summarize_graphql_errors(errors: Any) -> str:
@@ -282,14 +260,6 @@ class LinearService:
         if raise_on_error:
             raise LinearError(message)
 
-    def _handle_rate_limit(
-        self, response: requests.Response, *, raise_on_error: bool
-    ) -> None:
-        error = LinearRateLimitError(response.headers.get("Retry-After"))
-        logger.info("%s", error)
-        if raise_on_error:
-            raise error
-
     def _graphql(
         self,
         query: str,
@@ -348,20 +318,7 @@ class LinearService:
                     self._sleep_before_retry(attempt)
                     continue
 
-                if response.status_code == 429:
-                    self._handle_rate_limit(response, raise_on_error=raise_on_error)
-                    return None
-
                 if not response.ok:
-                    try:
-                        error_data = response.json()
-                    except ValueError:
-                        error_data = None
-                    if isinstance(error_data, dict) and _errors_are_rate_limited(
-                        error_data.get("errors")
-                    ):
-                        self._handle_rate_limit(response, raise_on_error=raise_on_error)
-                        return None
                     logger.error(
                         "Linear API returned %d: %s",
                         response.status_code,
@@ -390,9 +347,6 @@ class LinearService:
                     return None
 
                 if "errors" in data:
-                    if _errors_are_rate_limited(data["errors"]):
-                        self._handle_rate_limit(response, raise_on_error=raise_on_error)
-                        return None
                     # Looking up an issue by an identifier that does not exist
                     # (e.g. the placeholder slot the allocator wants to mint)
                     # comes back as a GraphQL "entity not found" error rather
@@ -583,9 +537,7 @@ class LinearService:
             "url": issue["url"],
         }
 
-    def get_issue_label_id(
-        self, name: str, *, raise_on_error: bool = False
-    ) -> str | None:
+    def get_issue_label_id(self, name: str) -> str | None:
         """Find an existing workspace-wide label that can be used across teams."""
         if name in self._issue_label_ids_cache:
             return self._issue_label_ids_cache[name]
@@ -606,7 +558,7 @@ class LinearService:
             }
         }
         """
-        data = self._graphql(query, {"name": name}, raise_on_error=raise_on_error)
+        data = self._graphql(query, {"name": name})
         if not data:
             return None
         labels = data.get("issueLabels", {}).get("nodes", [])
@@ -618,9 +570,7 @@ class LinearService:
         self._issue_label_ids_cache[name] = label_id
         return label_id
 
-    def add_issue_label(
-        self, issue_id: str, label_id: str, *, raise_on_error: bool = False
-    ) -> bool:
+    def add_issue_label(self, issue_id: str, label_id: str) -> bool:
         """Add a label atomically without replacing any existing issue labels."""
         mutation = """
         mutation($id: String!, $labelId: String!) {
@@ -629,11 +579,7 @@ class LinearService:
             }
         }
         """
-        data = self._graphql(
-            mutation,
-            {"id": issue_id, "labelId": label_id},
-            raise_on_error=raise_on_error,
-        )
+        data = self._graphql(mutation, {"id": issue_id, "labelId": label_id})
         if not data:
             return False
         return data.get("issueAddLabel", {}).get("success", False)
@@ -817,17 +763,11 @@ class LinearService:
         self._workflow_states_cache = states
         return states
 
-    def get_child_issues(
-        self,
-        issue_id: str,
-        *,
-        include_archived: bool = False,
-        raise_on_error: bool = False,
-    ) -> list[dict[str, Any]] | None:
+    def get_child_issues(self, issue_id: str) -> list[dict[str, Any]] | None:
         query = f"""
-        query($issueId: String!, $after: String, $includeArchived: Boolean!) {{
+        query($issueId: String!, $after: String) {{
             issue(id: $issueId) {{
-                children(first: 50, after: $after, includeArchived: $includeArchived) {{
+                children(first: 50, after: $after) {{
                     nodes {{
                         {ISSUE_FIELDS}
                     }}
@@ -845,14 +785,11 @@ class LinearService:
         max_pages = 25
 
         for _ in range(max_pages):
-            variables: dict[str, Any] = {
-                "issueId": issue_id,
-                "includeArchived": include_archived,
-            }
+            variables: dict[str, Any] = {"issueId": issue_id}
             if cursor is not None:
                 variables["after"] = cursor
 
-            data = self._graphql(query, variables, raise_on_error=raise_on_error)
+            data = self._graphql(query, variables)
             if data is None:
                 return None
 
@@ -867,14 +804,9 @@ class LinearService:
 
             page_info = children.get("pageInfo", {})
             if not page_info.get("hasNextPage"):
-                return issues
-            next_cursor = page_info.get("endCursor")
-            if not next_cursor or next_cursor == cursor:
-                logger.warning(
-                    "Incomplete Linear child issue pagination for %s", issue_id
-                )
-                return None
-            cursor = next_cursor
+                break
+            cursor = page_info.get("endCursor")
+            if cursor is None:
+                break
 
-        logger.warning("Reached Linear child issue page limit for %s", issue_id)
-        return None
+        return issues

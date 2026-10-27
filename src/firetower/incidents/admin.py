@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
 from .models import ExternalLink, Incident, Tag
 from .services import (
-    backfill_action_item_labels,
     sync_action_items_from_linear,
     sync_incident_participants_from_slack,
 )
@@ -43,8 +42,6 @@ class IncidentAdmin(admin.ModelAdmin):
     actions = [
         "sync_participants_from_slack",
         "sync_action_items",
-        "preview_action_item_labels",
-        "backfill_action_item_labels",
         "clear_milestones",
     ]
 
@@ -151,38 +148,6 @@ class IncidentAdmin(admin.ModelAdmin):
             message_parts.append(f"{error_count} failed")
 
         self.message_user(request, f"Action item sync: {', '.join(message_parts)}")
-
-    @admin.action(
-        description="Preview incident-action label backfill", permissions=["change"]
-    )
-    def preview_action_item_labels(
-        self, request: HttpRequest, queryset: QuerySet[Incident]
-    ) -> None:
-        self._backfill_action_item_labels(request, queryset, dry_run=True)
-
-    @admin.action(
-        description="Backfill incident-action labels in Linear", permissions=["change"]
-    )
-    def backfill_action_item_labels(
-        self, request: HttpRequest, queryset: QuerySet[Incident]
-    ) -> None:
-        self._backfill_action_item_labels(request, queryset, dry_run=False)
-
-    def _backfill_action_item_labels(
-        self, request: HttpRequest, queryset: QuerySet[Incident], *, dry_run: bool
-    ) -> None:
-        stats = backfill_action_item_labels(queryset, dry_run=dry_run)
-        operation = "preview" if dry_run else "backfill"
-        message = (
-            f"Action label {operation}: {stats.checked} checked, "
-            f"{stats.missing} missing labels, {stats.added} added, "
-            f"{len(stats.errors)} failures."
-        )
-        if stats.errors:
-            message += f" {stats.errors[0]}"
-        self.message_user(
-            request, message, level=messages.ERROR if stats.errors else messages.SUCCESS
-        )
 
     @admin.action(description="Clear all milestones")
     def clear_milestones(
