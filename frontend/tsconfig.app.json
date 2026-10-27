@@ -16,11 +16,10 @@
     "jsx": "react-jsx",
 
     /* Path aliases */
-    "baseUrl": "./src",
     "paths": {
-      "components/*": ["components/*"],
-      "utils/*": ["utils/*"],
-      "api": ["api.ts"]
+      "components/*": ["./src/components/*"],
+      "utils/*": ["./src/utils/*"],
+      "api": ["./src/api.ts"]
     },
 
     /* Linting */
