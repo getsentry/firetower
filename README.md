@@ -131,17 +131,15 @@ sdk/                 # Python SDK
 
 Action item sync adds the existing workspace-wide `incident-action` label to incident sub-issues, including pre-existing issues adopted as follow-ups. Other labels are preserved.
 
-To backfill historical action items, use the script with the intended environment's Firetower configuration. It reads current sub-issues for every stored incident parent, including archived children, without changing parent relationships, SLAs, or cached action items.
+To backfill historical action items in production, open **Django admin → Incidents**:
 
-```sh
-# Preview label additions without updating issues
-uv run python scripts/backfill_incident_action_labels.py
+1. Select a batch of incidents.
+2. Run **Preview incident-action label backfill** to see how many labels are missing without updating Linear issues.
+3. Select the same incidents and run **Backfill incident-action labels in Linear** to apply the additions.
 
-# Apply label additions after reviewing the preview
-uv run python scripts/backfill_incident_action_labels.py --apply
-```
+Both actions require permission to change incidents and report counts and failures in admin. They read current sub-issues for the selected incident parents, including archived children, without changing parent relationships, SLAs, or cached action items. Use manageable batches to keep admin requests short; rerunning safely skips existing labels. The workspace label must already exist.
 
-The backfill is safe to rerun and exits nonzero on failed lookups or label updates. It does not create the workspace label if it is missing.
+The optional local script, `scripts/backfill_incident_action_labels.py`, uses the same backfill logic and still defaults to a dry run.
 
 ## Scheduled Tasks
 

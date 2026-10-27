@@ -12,7 +12,10 @@ from firetower.incidents.models import (
     IncidentSeverity,
     IncidentStatus,
 )
-from firetower.incidents.services import sync_action_items_from_linear
+from firetower.incidents.services import (
+    backfill_action_item_labels,
+    sync_action_items_from_linear,
+)
 from firetower.integrations.services.linear import LinearService
 
 pytestmark = pytest.mark.django_db
@@ -40,11 +43,8 @@ def service(settings, issue):
     service.get_child_issues.return_value = [issue]
     service.get_issue_label_id.return_value = "action-label"
     service.add_issue_label.return_value = True
-    with (
-        patch("firetower.incidents.services._get_linear_service", return_value=service),
-        patch(
-            "firetower.integrations.services.linear.LinearService", return_value=service
-        ),
+    with patch(
+        "firetower.incidents.services._get_linear_service", return_value=service
     ):
         yield service
 
@@ -153,6 +153,74 @@ class TestActionItemLabels:
 
 
 class TestBackfillActionItemLabels:
+    def test_respects_selected_incidents(self, incident, service):
+        Incident.objects.create(
+            title="Not selected",
+            severity=IncidentSeverity.P2,
+            linear_parent_issue_id="parent-2",
+        )
+        stats = backfill_action_item_labels(
+            Incident.objects.filter(pk=incident.pk), dry_run=False
+        )
+        assert stats.checked == stats.missing == stats.added == 1
+        assert stats.errors == []
+        service.get_child_issues.assert_called_once_with(
+            "parent-1", include_archived=True
+        )
+
+    def test_preview_reports_counts_without_adding_labels(
+        self, incident, issue, service
+    ):
+        service.get_child_issues.return_value = [
+            issue,
+            {**issue, "id": "issue-2", "label_ids": ["action-label"]},
+        ]
+        stats = backfill_action_item_labels(Incident.objects.all())
+        assert stats.checked == 2
+        assert stats.missing == 1
+        assert stats.added == 0
+        assert stats.errors == []
+        service.add_issue_label.assert_not_called()
+
+    def test_continues_after_unexpected_child_fetch_error(self, incident, service):
+        Incident.objects.create(
+            title="Another incident",
+            severity=IncidentSeverity.P2,
+            linear_parent_issue_id="parent-2",
+        )
+        service.get_child_issues.side_effect = [
+            RuntimeError("Fetch failed"),
+            service.get_child_issues.return_value,
+        ]
+        stats = backfill_action_item_labels(Incident.objects.all(), dry_run=False)
+        assert stats.checked == stats.added == 1
+        assert len(stats.errors) == 1
+        assert service.get_child_issues.call_count == 2
+
+    def test_continues_after_unexpected_label_error(self, incident, issue, service):
+        service.get_child_issues.return_value = [
+            issue,
+            {**issue, "id": "issue-2", "identifier": "ENG-2"},
+        ]
+        service.add_issue_label.side_effect = [RuntimeError("Update failed"), True]
+        stats = backfill_action_item_labels(Incident.objects.all(), dry_run=False)
+        assert stats.checked == stats.missing == 2
+        assert stats.added == 1
+        assert stats.errors == ["Failed to label action item ENG-1"]
+
+    def test_reports_label_lookup_exception(self, service):
+        service.get_issue_label_id.side_effect = RuntimeError("Lookup failed")
+        stats = backfill_action_item_labels(Incident.objects.all(), dry_run=False)
+        assert stats.errors == ["Failed to fetch Linear incident action label"]
+        service.get_child_issues.assert_not_called()
+        service.add_issue_label.assert_not_called()
+
+    def test_reports_missing_configuration(self, settings, service):
+        settings.LINEAR = None
+        stats = backfill_action_item_labels(Incident.objects.all(), dry_run=False)
+        assert stats.errors == ["Linear integration is not configured"]
+        service.get_issue_label_id.assert_not_called()
+
     def test_dry_run_does_not_mutate_issues_or_cached_items(
         self, incident, service, backfill_main
     ):
