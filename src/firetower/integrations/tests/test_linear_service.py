@@ -779,12 +779,26 @@ class TestParseIssue:
             "url": "https://linear.app/team/issue/ENG-123",
             "status": "In Progress",
             "priority": 2,
+            "label_ids": [],
             "created_at": datetime(2026, 10, 16, 12, 30, tzinfo=UTC),
             "sla_breaches_at": datetime(2026, 10, 30, 12, 30, tzinfo=UTC),
             "assignee_email": "alice@sentry.io",
             "assignee_linear_id": "user-1",
             "relation_type": "child",
         }
+
+    def test_parses_existing_label_ids(self, linear_service):
+        issue = {
+            "id": "issue-1",
+            "identifier": "ENG-1",
+            "title": "An existing issue",
+            "url": "https://linear.app/issue/ENG-1",
+            "labels": {"nodes": [{"id": "existing-label"}, {"id": "action-label"}]},
+        }
+        assert linear_service._parse_issue(issue)["label_ids"] == [
+            "existing-label",
+            "action-label",
+        ]
 
     def test_maps_all_state_types(self, linear_service):
         for state_type, expected_status in [
@@ -806,7 +820,102 @@ class TestParseIssue:
             assert linear_service._parse_issue(issue)["status"] == expected_status
 
 
+class TestIssueLabels:
+    def test_finds_and_caches_workspace_label(self, linear_service):
+        response = {"issueLabels": {"nodes": [{"id": "action-label"}]}}
+        with patch.object(linear_service, "_graphql", return_value=response) as graphql:
+            assert (
+                linear_service.get_issue_label_id("incident-action") == "action-label"
+            )
+            assert (
+                linear_service.get_issue_label_id("incident-action") == "action-label"
+            )
+
+        graphql.assert_called_once()
+        query, variables = graphql.call_args.args
+        assert variables == {"name": "incident-action"}
+        assert "team: { null: true }" in query
+        assert "isGroup: { eq: false }" in query
+
+    @pytest.mark.parametrize(
+        "response",
+        [
+            None,
+            {"issueLabels": {"nodes": []}},
+            {"issueLabels": {"nodes": [{"id": "a"}, {"id": "b"}]}},
+        ],
+    )
+    def test_does_not_cache_missing_or_ambiguous_label(self, linear_service, response):
+        with patch.object(linear_service, "_graphql", return_value=response) as graphql:
+            assert linear_service.get_issue_label_id("incident-action") is None
+            assert linear_service.get_issue_label_id("incident-action") is None
+        assert graphql.call_count == 2
+
+    def test_adds_label_without_replacing_existing_labels(self, linear_service):
+        with patch.object(
+            linear_service,
+            "_graphql",
+            return_value={"issueAddLabel": {"success": True}},
+        ) as graphql:
+            assert linear_service.add_issue_label("issue-1", "action-label") is True
+
+        query, variables = graphql.call_args.args
+        assert "issueAddLabel" in query
+        assert variables == {"id": "issue-1", "labelId": "action-label"}
+
+    @pytest.mark.parametrize("response", [None, {"issueAddLabel": {"success": False}}])
+    def test_reports_addition_failure(self, linear_service, response):
+        with patch.object(linear_service, "_graphql", return_value=response):
+            assert linear_service.add_issue_label("issue-1", "action-label") is False
+
+
 class TestGetChildIssues:
+    def test_includes_archived_children_when_requested(self, linear_service):
+        response = {
+            "issue": {"children": {"nodes": [], "pageInfo": {"hasNextPage": False}}}
+        }
+        with patch.object(linear_service, "_graphql", return_value=response) as graphql:
+            assert (
+                linear_service.get_child_issues("parent-id", include_archived=True)
+                == []
+            )
+        assert graphql.call_args.args[1]["includeArchived"] is True
+        assert "includeArchived: $includeArchived" in graphql.call_args.args[0]
+
+    @pytest.mark.parametrize("end_cursor", [None, "cursor1"])
+    def test_rejects_incomplete_pagination(self, linear_service, end_cursor):
+        def page(cursor):
+            return {
+                "issue": {
+                    "children": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": True, "endCursor": cursor},
+                    }
+                }
+            }
+
+        with patch.object(
+            linear_service, "_graphql", side_effect=[page("cursor1"), page(end_cursor)]
+        ):
+            assert linear_service.get_child_issues("parent-id") is None
+
+    def test_rejects_page_limit_instead_of_returning_partial_children(
+        self, linear_service
+    ):
+        pages = [
+            {
+                "issue": {
+                    "children": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": True, "endCursor": str(index)},
+                    }
+                }
+            }
+            for index in range(25)
+        ]
+        with patch.object(linear_service, "_graphql", side_effect=pages):
+            assert linear_service.get_child_issues("parent-id") is None
+
     def test_paginates_through_multiple_pages(self, linear_service):
         with patch.object(
             linear_service,

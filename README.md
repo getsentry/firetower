@@ -127,6 +127,22 @@ frontend/            # React frontend
 sdk/                 # Python SDK
 ```
 
+## Incident Action Labels
+
+Action item sync adds the existing workspace-wide `incident-action` label to incident sub-issues, including pre-existing issues adopted as follow-ups. Other labels are preserved.
+
+To backfill historical action items, use the script with the intended environment's Firetower configuration. It reads current sub-issues for every stored incident parent, including archived children, without changing parent relationships, SLAs, or cached action items.
+
+```sh
+# Preview label additions without updating issues
+uv run python scripts/backfill_incident_action_labels.py
+
+# Apply label additions after reviewing the preview
+uv run python scripts/backfill_incident_action_labels.py --apply
+```
+
+The backfill is safe to rerun and exits nonzero on failed lookups or label updates. It does not create the workspace label if it is missing.
+
 ## Scheduled Tasks
 
 Scheduled tasks are stored as database objects and are managed via migrations.

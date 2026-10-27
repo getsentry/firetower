@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 LINEAR_API_URL = "https://api.linear.app/graphql"
 LINEAR_TOKEN_URL = "https://api.linear.app/oauth/token"
+INCIDENT_ACTION_LABEL_NAME = "incident-action"
 
 LINEAR_STATE_TYPE_MAP = {
     "triage": "Todo",
@@ -46,6 +47,11 @@ ISSUE_FIELDS = """
     priority
     createdAt
     slaBreachesAt
+    labels {
+        nodes {
+            id
+        }
+    }
     state {
         id
         type
@@ -163,6 +169,7 @@ class LinearService:
             timeout if timeout is not None else LINEAR_DEFAULT_TIMEOUT_SECONDS
         )
         self._workflow_states_cache: dict[str, str] | None = None
+        self._issue_label_ids_cache: dict[str, str] = {}
 
     @classmethod
     def for_allocation(cls) -> "LinearService":
@@ -406,6 +413,9 @@ class LinearService:
             "url": issue["url"],
             "status": status,
             "priority": issue.get("priority", 0),
+            "label_ids": [
+                label["id"] for label in (issue.get("labels") or {}).get("nodes", [])
+            ],
             "created_at": parse_datetime(created_at) if created_at else None,
             "sla_breaches_at": (
                 parse_datetime(sla_breaches_at) if sla_breaches_at else None
@@ -526,6 +536,53 @@ class LinearService:
             "identifier": issue["identifier"],
             "url": issue["url"],
         }
+
+    def get_issue_label_id(self, name: str) -> str | None:
+        """Find an existing workspace-wide label that can be used across teams."""
+        if name in self._issue_label_ids_cache:
+            return self._issue_label_ids_cache[name]
+
+        query = """
+        query($name: String!) {
+            issueLabels(
+                filter: {
+                    name: { eq: $name },
+                    team: { null: true },
+                    isGroup: { eq: false }
+                },
+                first: 2
+            ) {
+                nodes {
+                    id
+                }
+            }
+        }
+        """
+        data = self._graphql(query, {"name": name})
+        if not data:
+            return None
+        labels = data.get("issueLabels", {}).get("nodes", [])
+        if len(labels) != 1:
+            logger.warning("Expected one Linear workspace label named %s", name)
+            return None
+
+        label_id = labels[0]["id"]
+        self._issue_label_ids_cache[name] = label_id
+        return label_id
+
+    def add_issue_label(self, issue_id: str, label_id: str) -> bool:
+        """Add a label atomically without replacing any existing issue labels."""
+        mutation = """
+        mutation($id: String!, $labelId: String!) {
+            issueAddLabel(id: $id, labelId: $labelId) {
+                success
+            }
+        }
+        """
+        data = self._graphql(mutation, {"id": issue_id, "labelId": label_id})
+        if not data:
+            return False
+        return data.get("issueAddLabel", {}).get("success", False)
 
     def create_attachment(self, issue_id: str, url: str, title: str) -> bool:
         mutation = """
@@ -706,11 +763,13 @@ class LinearService:
         self._workflow_states_cache = states
         return states
 
-    def get_child_issues(self, issue_id: str) -> list[dict[str, Any]] | None:
+    def get_child_issues(
+        self, issue_id: str, *, include_archived: bool = False
+    ) -> list[dict[str, Any]] | None:
         query = f"""
-        query($issueId: String!, $after: String) {{
+        query($issueId: String!, $after: String, $includeArchived: Boolean!) {{
             issue(id: $issueId) {{
-                children(first: 50, after: $after) {{
+                children(first: 50, after: $after, includeArchived: $includeArchived) {{
                     nodes {{
                         {ISSUE_FIELDS}
                     }}
@@ -728,7 +787,10 @@ class LinearService:
         max_pages = 25
 
         for _ in range(max_pages):
-            variables: dict[str, Any] = {"issueId": issue_id}
+            variables: dict[str, Any] = {
+                "issueId": issue_id,
+                "includeArchived": include_archived,
+            }
             if cursor is not None:
                 variables["after"] = cursor
 
@@ -747,9 +809,14 @@ class LinearService:
 
             page_info = children.get("pageInfo", {})
             if not page_info.get("hasNextPage"):
-                break
-            cursor = page_info.get("endCursor")
-            if cursor is None:
-                break
+                return issues
+            next_cursor = page_info.get("endCursor")
+            if not next_cursor or next_cursor == cursor:
+                logger.warning(
+                    "Incomplete Linear child issue pagination for %s", issue_id
+                )
+                return None
+            cursor = next_cursor
 
-        return issues
+        logger.warning("Reached Linear child issue page limit for %s", issue_id)
+        return None
