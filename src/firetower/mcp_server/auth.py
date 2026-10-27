@@ -9,7 +9,8 @@ issues its own token. A per-tool fallback re-checks the embedded
 Bots (Junior) authenticate without a Google account via the RFC 7523 jwt-bearer
 grant (SEP-990 ID-JAG): when configured, the token endpoint accepts short-lived
 assertions signed by a trusted issuer whose JWKS we pin, and mints a FastMCP
-token marked ``fastmcp_grant == "id_jag"``. Those tokens skip the Google gates
+token marked ``fastmcp_grant == "id_jag"``. Subjects must identify a Junior
+actor as ``user:<id>`` or ``system:<name>``. Those tokens skip the Google gates
 and are audited as ``bot:<subject>``.
 
 Token refresh note: ``OAuthProxy`` re-calls ``_extract_upstream_claims`` on
@@ -22,6 +23,7 @@ token is active and belongs to the same verified identity and OAuth client.
 
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Callable
 from typing import Any, TypeGuard
@@ -30,7 +32,10 @@ import httpx
 import jwt
 from fastmcp.exceptions import FastMCPError
 from fastmcp.server.auth import AccessToken, IdentityAssertion
-from fastmcp.server.auth.identity_assertion import IdentityAssertionValidator
+from fastmcp.server.auth.identity_assertion import (
+    IdentityAssertionError,
+    IdentityAssertionValidator,
+)
 from fastmcp.server.auth.providers.google import GoogleProvider
 from fastmcp.server.auth.providers.jwt import JWTVerifier
 from fastmcp.server.dependencies import get_access_token
@@ -49,6 +54,7 @@ GOOGLE_GROUPS_READ_SCOPE = (
 ACCESS_GROUP = "team@sentry.io"
 BOT_GRANT = "id_jag"
 BOT_JWKS_REFRESH_COOLDOWN_SECONDS = 30.0
+BOT_SUBJECT_PATTERN = re.compile(r"(?:user|system):[!-~]{1,200}")
 
 
 class GoogleGroupMembershipChecker:
@@ -139,11 +145,24 @@ class CooldownJWTVerifier(JWTVerifier):
 
 
 class CooldownIdentityAssertionValidator(IdentityAssertionValidator):
-    """IdentityAssertionValidator whose per-issuer verifiers rate-limit JWKS refreshes.
+    """Validate Junior subjects and rate-limit per-issuer JWKS refreshes.
 
     Mirrors FastMCP 4.0.10's private ``_get_verifier`` (lazy, cached per issuer
     in ``_verifiers``), swapping in ``CooldownJWTVerifier``.
     """
+
+    async def validate(
+        self, assertion: str, *, client_id: str, resource_url: str | None
+    ) -> dict[str, Any]:
+        claims = await super().validate(
+            assertion, client_id=client_id, resource_url=resource_url
+        )
+        subject = claims.get("sub")
+        if not isinstance(subject, str) or not BOT_SUBJECT_PATTERN.fullmatch(subject):
+            raise IdentityAssertionError(
+                "Assertion subject must identify a Junior user or system actor"
+            )
+        return claims
 
     async def _get_verifier(self, issuer: str) -> JWTVerifier:
         verifier = self._verifiers.get(issuer)
