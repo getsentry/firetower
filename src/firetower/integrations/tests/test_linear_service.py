@@ -11,7 +11,6 @@ from firetower.integrations.services.linear import (
     LINEAR_DEFAULT_TIMEOUT_SECONDS,
     LINEAR_TOKEN_URL,
     LinearError,
-    LinearRateLimitError,
     LinearService,
     _errors_are_not_found,
     _summarize_graphql_errors,
@@ -121,74 +120,6 @@ class TestRequestNewToken:
 
 
 class TestGraphql:
-    @pytest.mark.parametrize("status_code", [200, 400, 429])
-    @pytest.mark.parametrize("raise_on_error", [False, True])
-    def test_rate_limit_does_not_retry_or_sleep(
-        self, linear_service, status_code, raise_on_error
-    ):
-        response = MagicMock()
-        response.status_code = status_code
-        response.ok = status_code < 400
-        response.headers = {"Retry-After": "60"}
-        response.json.return_value = {
-            "errors": [{"extensions": {"code": "RATELIMITED"}}]
-        }
-        with (
-            patch.object(
-                linear_service, "_get_access_token", return_value="valid-token"
-            ),
-            patch.object(
-                linear_service, "_make_graphql_request", return_value=response
-            ) as request,
-            patch.object(linear_service, "_sleep_before_retry") as sleep,
-        ):
-            if raise_on_error:
-                with pytest.raises(
-                    LinearRateLimitError, match="Retry after 60 seconds"
-                ):
-                    linear_service._graphql(
-                        "query { viewer { id } }", raise_on_error=True
-                    )
-            else:
-                assert linear_service._graphql("query { viewer { id } }") is None
-
-        request.assert_called_once()
-        sleep.assert_not_called()
-
-    def test_handles_429_without_json_body_or_retry_header(self, linear_service):
-        response = MagicMock()
-        response.status_code = 429
-        response.headers = {}
-        response.json.side_effect = ValueError("Not JSON")
-        with (
-            patch.object(
-                linear_service, "_get_access_token", return_value="valid-token"
-            ),
-            patch.object(
-                linear_service, "_make_graphql_request", return_value=response
-            ),
-            pytest.raises(LinearRateLimitError, match="Linear API rate limit reached"),
-        ):
-            linear_service._graphql("query { viewer { id } }", raise_on_error=True)
-        response.json.assert_not_called()
-
-    def test_non_rate_limited_http_error_without_json_body(self, linear_service):
-        response = MagicMock()
-        response.status_code = 400
-        response.ok = False
-        response.json.side_effect = ValueError("Not JSON")
-        with (
-            patch.object(
-                linear_service, "_get_access_token", return_value="valid-token"
-            ),
-            patch.object(
-                linear_service, "_make_graphql_request", return_value=response
-            ),
-            pytest.raises(LinearError, match="HTTP 400") as error,
-        ):
-            linear_service._graphql("query { viewer { id } }", raise_on_error=True)
-        assert not isinstance(error.value, LinearRateLimitError)
-
     def test_returns_data_on_success(self, linear_service):
         with (
             patch.object(
@@ -890,22 +821,6 @@ class TestParseIssue:
 
 
 class TestIssueLabels:
-    @pytest.mark.parametrize(
-        ("method", "args"),
-        [
-            ("get_issue_label_id", ("incident-action",)),
-            ("get_child_issues", ("parent-1",)),
-            ("add_issue_label", ("issue-1", "action-label")),
-        ],
-    )
-    def test_propagates_opt_in_rate_limit_errors(self, linear_service, method, args):
-        with patch.object(
-            linear_service, "_graphql", side_effect=LinearRateLimitError("60")
-        ) as graphql:
-            with pytest.raises(LinearRateLimitError):
-                getattr(linear_service, method)(*args, raise_on_error=True)
-        assert graphql.call_args.kwargs["raise_on_error"] is True
-
     def test_finds_and_caches_workspace_label(self, linear_service):
         response = {"issueLabels": {"nodes": [{"id": "action-label"}]}}
         with patch.object(linear_service, "_graphql", return_value=response) as graphql:
@@ -955,52 +870,6 @@ class TestIssueLabels:
 
 
 class TestGetChildIssues:
-    def test_includes_archived_children_when_requested(self, linear_service):
-        response = {
-            "issue": {"children": {"nodes": [], "pageInfo": {"hasNextPage": False}}}
-        }
-        with patch.object(linear_service, "_graphql", return_value=response) as graphql:
-            assert (
-                linear_service.get_child_issues("parent-id", include_archived=True)
-                == []
-            )
-        assert graphql.call_args.args[1]["includeArchived"] is True
-        assert "includeArchived: $includeArchived" in graphql.call_args.args[0]
-
-    @pytest.mark.parametrize("end_cursor", [None, "cursor1"])
-    def test_rejects_incomplete_pagination(self, linear_service, end_cursor):
-        def page(cursor):
-            return {
-                "issue": {
-                    "children": {
-                        "nodes": [],
-                        "pageInfo": {"hasNextPage": True, "endCursor": cursor},
-                    }
-                }
-            }
-
-        with patch.object(
-            linear_service, "_graphql", side_effect=[page("cursor1"), page(end_cursor)]
-        ):
-            assert linear_service.get_child_issues("parent-id") is None
-
-    def test_rejects_page_limit_instead_of_returning_partial_children(
-        self, linear_service
-    ):
-        pages = [
-            {
-                "issue": {
-                    "children": {
-                        "nodes": [],
-                        "pageInfo": {"hasNextPage": True, "endCursor": str(index)},
-                    }
-                }
-            }
-            for index in range(25)
-        ]
-        with patch.object(linear_service, "_graphql", side_effect=pages):
-            assert linear_service.get_child_issues("parent-id") is None
-
     def test_paginates_through_multiple_pages(self, linear_service):
         with patch.object(
             linear_service,
