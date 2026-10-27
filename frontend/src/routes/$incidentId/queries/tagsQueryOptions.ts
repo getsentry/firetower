@@ -5,10 +5,7 @@ import {z} from 'zod';
 const TagsSchema = z.array(z.string());
 
 export type TagType =
-  | 'AFFECTED_SERVICE'
-  | 'AFFECTED_REGION'
-  | 'ROOT_CAUSE'
-  | 'IMPACT_TYPE';
+  'AFFECTED_SERVICE' | 'AFFECTED_REGION' | 'ROOT_CAUSE' | 'IMPACT_TYPE';
 
 export function tagsQueryOptions(type: TagType) {
   return queryOptions({
