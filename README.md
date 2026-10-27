@@ -139,6 +139,8 @@ To backfill historical action items in production, open **Django admin → Incid
 
 Both actions require permission to change incidents and report counts and failures in admin. They read current sub-issues for the selected incident parents, including archived children, without changing parent relationships, SLAs, or cached action items. Use manageable batches to keep admin requests short; rerunning safely skips existing labels. The workspace label must already exist.
 
+If Linear rate-limits a request, the action stops immediately and reports partial progress and any `Retry-After` guidance. It does not wait for quota to reset inside the admin request or resume automatically. Wait for the limit to reset, then rerun the same selection; issues already labeled are skipped.
+
 The optional local script, `scripts/backfill_incident_action_labels.py`, uses the same backfill logic and still defaults to a dry run.
 
 ## Scheduled Tasks

@@ -16,7 +16,7 @@ from firetower.incidents.services import (
     backfill_action_item_labels,
     sync_action_items_from_linear,
 )
-from firetower.integrations.services.linear import LinearService
+from firetower.integrations.services.linear import LinearRateLimitError, LinearService
 
 pytestmark = pytest.mark.django_db
 
@@ -153,6 +153,91 @@ class TestActionItemLabels:
 
 
 class TestBackfillActionItemLabels:
+    def test_stops_on_rate_limited_label_lookup(self, service):
+        service.get_issue_label_id.side_effect = LinearRateLimitError("60")
+        stats = backfill_action_item_labels(Incident.objects.all(), dry_run=False)
+        assert stats.added == 0
+        assert "Retry after 60 seconds" in stats.errors[0]
+        assert "Backfill stopped" in stats.errors[0]
+        service.get_issue_label_id.assert_called_once_with(
+            "incident-action", raise_on_error=True
+        )
+        service.get_child_issues.assert_not_called()
+        service.add_issue_label.assert_not_called()
+
+    @pytest.mark.parametrize("dry_run", [False, True])
+    def test_stops_on_rate_limited_child_fetch(self, incident, issue, service, dry_run):
+        for parent_id in ("parent-2", "parent-3"):
+            Incident.objects.create(
+                title=parent_id,
+                severity=IncidentSeverity.P2,
+                linear_parent_issue_id=parent_id,
+            )
+        service.get_child_issues.side_effect = [[issue], LinearRateLimitError("60"), []]
+        stats = backfill_action_item_labels(
+            Incident.objects.order_by("id"), dry_run=dry_run
+        )
+        assert stats.checked == stats.missing == 1
+        assert stats.added == (0 if dry_run else 1)
+        assert "Backfill stopped" in stats.errors[0]
+        assert service.get_child_issues.call_count == 2
+        assert service.add_issue_label.call_count == (0 if dry_run else 1)
+
+    def test_stops_labeling_on_rate_limit_and_rerun_skips_completed_items(
+        self, incident, issue, service
+    ):
+        Incident.objects.create(
+            title="Another incident",
+            severity=IncidentSeverity.P2,
+            linear_parent_issue_id="parent-2",
+        )
+        children = [
+            issue,
+            {**issue, "id": "issue-2", "identifier": "ENG-2", "label_ids": []},
+            {**issue, "id": "issue-3", "identifier": "ENG-3", "label_ids": []},
+        ]
+        service.get_child_issues.return_value = children
+        service.add_issue_label.side_effect = [True, LinearRateLimitError("90"), True]
+        stats = backfill_action_item_labels(
+            Incident.objects.order_by("id"), dry_run=False
+        )
+        assert stats.checked == stats.missing == 2
+        assert stats.added == 1
+        assert "Retry after 90 seconds" in stats.errors[0]
+        assert "Backfill stopped" in stats.errors[0]
+        assert service.add_issue_label.call_count == 2
+        service.get_child_issues.assert_called_once_with(
+            "parent-1", include_archived=True, raise_on_error=True
+        )
+
+        issue["label_ids"].append("action-label")
+        service.add_issue_label.side_effect = None
+        service.add_issue_label.reset_mock()
+        stats = backfill_action_item_labels(Incident.objects.all(), dry_run=False)
+        assert stats.checked == 3
+        assert stats.missing == stats.added == 2
+        assert stats.errors == []
+        service.add_issue_label.assert_has_calls(
+            [
+                call("issue-2", "action-label", raise_on_error=True),
+                call("issue-3", "action-label", raise_on_error=True),
+            ]
+        )
+        assert service.add_issue_label.call_count == 2
+
+    def test_rate_limit_message_takes_precedence_over_earlier_failures(
+        self, incident, issue, service
+    ):
+        service.get_child_issues.return_value = [
+            issue,
+            {**issue, "id": "issue-2", "identifier": "ENG-2"},
+        ]
+        service.add_issue_label.side_effect = [False, LinearRateLimitError("60")]
+        stats = backfill_action_item_labels(Incident.objects.all(), dry_run=False)
+        assert len(stats.errors) == 2
+        assert "Backfill stopped" in stats.errors[0]
+        assert stats.errors[1] == "Failed to label action item ENG-1"
+
     def test_respects_selected_incidents(self, incident, service):
         Incident.objects.create(
             title="Not selected",
@@ -165,7 +250,7 @@ class TestBackfillActionItemLabels:
         assert stats.checked == stats.missing == stats.added == 1
         assert stats.errors == []
         service.get_child_issues.assert_called_once_with(
-            "parent-1", include_archived=True
+            "parent-1", include_archived=True, raise_on_error=True
         )
 
     def test_preview_reports_counts_without_adding_labels(
@@ -226,7 +311,7 @@ class TestBackfillActionItemLabels:
     ):
         assert backfill_main([]) == 0
         service.get_child_issues.assert_called_once_with(
-            "parent-1", include_archived=True
+            "parent-1", include_archived=True, raise_on_error=True
         )
         service.add_issue_label.assert_not_called()
         service.update_issue.assert_not_called()
@@ -244,13 +329,17 @@ class TestBackfillActionItemLabels:
             },
         ]
         assert backfill_main(["--apply"]) == 0
-        service.add_issue_label.assert_called_once_with("issue-1", "action-label")
+        service.add_issue_label.assert_called_once_with(
+            "issue-1", "action-label", raise_on_error=True
+        )
         service.update_issue.assert_not_called()
         assert incident.action_items.count() == 0
 
         issue["label_ids"].append("action-label")
         assert backfill_main(["--apply"]) == 0
-        service.add_issue_label.assert_called_once_with("issue-1", "action-label")
+        service.add_issue_label.assert_called_once_with(
+            "issue-1", "action-label", raise_on_error=True
+        )
 
     def test_includes_historical_private_incidents_and_deduplicates(
         self, incident, issue, service, backfill_main
@@ -276,13 +365,15 @@ class TestBackfillActionItemLabels:
 
         service.get_child_issues.assert_has_calls(
             [
-                call("parent-1", include_archived=True),
-                call("parent-2", include_archived=True),
+                call("parent-1", include_archived=True, raise_on_error=True),
+                call("parent-2", include_archived=True, raise_on_error=True),
             ],
             any_order=True,
         )
         assert service.get_child_issues.call_count == 2
-        service.add_issue_label.assert_called_once_with("issue-1", "action-label")
+        service.add_issue_label.assert_called_once_with(
+            "issue-1", "action-label", raise_on_error=True
+        )
 
     def test_reports_failed_additions(self, incident, service, backfill_main):
         service.add_issue_label.return_value = False
@@ -302,7 +393,9 @@ class TestBackfillActionItemLabels:
         ]
         assert backfill_main(["--apply"]) == 1
         assert service.get_child_issues.call_count == 2
-        service.add_issue_label.assert_called_once_with("issue-1", "action-label")
+        service.add_issue_label.assert_called_once_with(
+            "issue-1", "action-label", raise_on_error=True
+        )
 
     def test_stops_when_label_is_missing(self, service, backfill_main):
         service.get_issue_label_id.return_value = None
