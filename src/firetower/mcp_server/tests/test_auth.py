@@ -11,11 +11,14 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastmcp.exceptions import FastMCPError
+from fastmcp.server.auth import IdentityAssertion
+from fastmcp.server.auth.identity_assertion import IdentityAssertionError
 from jwt.algorithms import RSAAlgorithm
 
 from firetower.mcp_server import auth
 from firetower.mcp_server.auth import (
     ACCESS_GROUP,
+    CooldownIdentityAssertionValidator,
     CooldownJWTVerifier,
     SentryGoogleProvider,
     requester_email,
@@ -418,19 +421,30 @@ def test_fallback_rejects_when_no_token(monkeypatch):
         require_sentry_account()
 
 
-def test_fallback_admits_bot_grant_and_audits_as_bot(monkeypatch):
+@pytest.mark.parametrize(
+    ("subject", "audit_subject"),
+    [
+        ("user:user-123", "bot:user:user-123"),
+        ("system:scheduled-automation", "bot:system:scheduled-automation"),
+    ],
+)
+def test_fallback_admits_bot_grant_and_audits_attributed_subject(
+    monkeypatch, subject, audit_subject
+):
     monkeypatch.setattr(
         auth,
         "get_access_token",
-        lambda: _FakeToken({"fastmcp_grant": "id_jag"}, subject="firetower"),
+        lambda: _FakeToken({"fastmcp_grant": "id_jag"}, subject=subject),
     )
     require_sentry_account()  # no raise
-    assert requester_subject() == "bot:firetower"
+    assert requester_subject() == audit_subject
     assert requester_email() is None
 
 
 BOT_ISSUER = "https://junior.example"
 BOT_AUDIENCE = "https://mcp.example/"
+BOT_CLIENT_ID = "bot-client"
+BOT_RESOURCE = "https://mcp.example/mcp"
 
 
 def _jwk(key: rsa.RSAPrivateKey, kid: str) -> dict:
@@ -441,20 +455,24 @@ def _jwk(key: rsa.RSAPrivateKey, kid: str) -> dict:
     }
 
 
-def _bot_assertion(key: rsa.RSAPrivateKey, kid: str) -> str:
+def _bot_assertion(
+    key: rsa.RSAPrivateKey, kid: str, subject: str = "user:user-123"
+) -> str:
     now = int(time.time())
     return jwt.encode(
         {
             "iss": BOT_ISSUER,
-            "sub": "firetower",
+            "sub": subject,
             "aud": BOT_AUDIENCE,
             "iat": now,
             "exp": now + 300,
             "jti": str(uuid.uuid4()),
+            "client_id": BOT_CLIENT_ID,
+            "resource": BOT_RESOURCE,
         },
         key,
         algorithm="RS256",
-        headers={"kid": kid},
+        headers={"kid": kid, "typ": "oauth-id-jag+jwt"},
     )
 
 
@@ -494,6 +512,56 @@ def _cooldown_verifier(jwks: _JWKS, clock: _Clock) -> CooldownJWTVerifier:
     return verifier
 
 
+def _identity_assertion_validator(jwks: _JWKS) -> CooldownIdentityAssertionValidator:
+    validator = CooldownIdentityAssertionValidator(
+        config=IdentityAssertion(
+            trusted_issuers=[BOT_ISSUER],
+            jwks_uris={BOT_ISSUER: f"{BOT_ISSUER}/jwks.json"},
+        ),
+        audience=BOT_AUDIENCE,
+    )
+    validator._verifiers[BOT_ISSUER] = _cooldown_verifier(jwks, _Clock())
+    return validator
+
+
+@pytest.mark.parametrize("subject", ["user:user-123", "system:scheduled-automation"])
+def test_identity_assertion_validator_admits_attributed_subjects(subject):
+    validator = _identity_assertion_validator(_JWKS(_jwk(_KEY, "current")))
+
+    claims = asyncio.run(
+        validator.validate(
+            _bot_assertion(_KEY, "current", subject),
+            client_id=BOT_CLIENT_ID,
+            resource_url=BOT_RESOURCE,
+        )
+    )
+
+    assert claims["sub"] == subject
+
+
+@pytest.mark.parametrize(
+    "subject",
+    [
+        "firetower",
+        "user:",
+        "bot:user-123",
+        "user:user-123\nforged-log-line",
+        f"user:{'a' * 201}",
+    ],
+)
+def test_identity_assertion_validator_rejects_unattributed_subjects(subject):
+    validator = _identity_assertion_validator(_JWKS(_jwk(_KEY, "current")))
+
+    with pytest.raises(IdentityAssertionError, match="Junior user or system actor"):
+        asyncio.run(
+            validator.validate(
+                _bot_assertion(_KEY, "current", subject),
+                client_id=BOT_CLIENT_ID,
+                resource_url=BOT_RESOURCE,
+            )
+        )
+
+
 def test_cooldown_verifier_limits_unknown_kid_refreshes_and_keeps_known_keys_fast():
     jwks = _JWKS(_jwk(_KEY, "current"))
     verifier = _cooldown_verifier(jwks, _Clock())
@@ -509,7 +577,7 @@ def test_cooldown_verifier_limits_unknown_kid_refreshes_and_keeps_known_keys_fas
 
     known, *unknown, known_again = asyncio.run(run())
 
-    assert known is not None and known.claims["sub"] == "firetower"
+    assert known is not None and known.claims["sub"] == "user:user-123"
     assert unknown == [None] * 5
     assert known_again is not None
     assert jwks.fetches == 1
