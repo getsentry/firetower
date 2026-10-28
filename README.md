@@ -5,7 +5,7 @@ An incident management platform for tracking, triaging, and resolving incidents.
 ## Tech Stack
 
 - **Backend**: Django 5.2, Django REST Framework, PostgreSQL
-- **Frontend**: React 19, TypeScript, TanStack Router/Query, Tailwind CSS, Radix UI
+- **Frontend**: React 19, TypeScript, TanStack Router/Query, StyleXJS, Radix UI
 - **SDK**: Python SDK with JWT auth for programmatic access
 - **Tooling**: uv (Python), pnpm (JS), Docker Compose
 
