@@ -551,6 +551,13 @@ class TestSlackService:
         assert url == "https://sentry.slack.com/archives/C12345"
         assert service.parse_channel_id_from_url(url) == "C12345"
 
+    def test_build_message_url(self):
+        service, _ = self._make_service()
+        assert (
+            service.build_message_url("C12345", "1111.2222")
+            == "https://sentry.slack.com/archives/C12345/p11112222"
+        )
+
     def test_get_channel_info_unexpected_error_returns_none(self):
         service, mock_client = self._make_service()
         mock_client.conversations_info.side_effect = TimeoutError

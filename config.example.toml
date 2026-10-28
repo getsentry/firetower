@@ -64,6 +64,11 @@ incident_guide_message = "This is the message posted whenever a new incident sla
 slash_command = "/inc"
 triage_bot_user_id = ""
 triage_bot_prompt = "We've been alerted by {alert_url}, run incident triage for this issue."
+# Set to collect postmortem meeting attendees by reaction when a P0/P1 is resolved; omit to disable.
+# After the window, Firetower posts the scheduler bot prompt (mentioning the bot when its user id is set).
+# postmortem_attendee_collection_minutes = 10
+postmortem_scheduler_bot_user_id = ""
+postmortem_scheduler_bot_prompt = "Schedule the {incident_number} postmortem meeting with everyone who reacted to {prompt_url}"
 
 [auth]
 iap_enabled = false

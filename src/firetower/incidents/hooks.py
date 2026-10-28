@@ -1,3 +1,4 @@
+import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
@@ -63,6 +64,18 @@ PAGE_RESOLVE_STATUSES = {
 }
 
 DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES = 0
+
+POSTMORTEM_ATTENDEE_PROMPT_MESSAGE = (
+    ":calendar: *Postmortem meeting*\n"
+    "React to this message with any emoji to be invited to the postmortem "
+    "meeting for *{incident_number}*. Collecting attendees for the next "
+    "*{minutes} minutes*."
+)
+
+
+def get_postmortem_attendee_collection_minutes() -> int | None:
+    raw = settings.SLACK.get("POSTMORTEM_ATTENDEE_COLLECTION_MINUTES")
+    return int(raw) if raw is not None else None
 
 
 def get_statuspage_initial_reminder_delay_minutes() -> int | None:
@@ -1387,6 +1400,42 @@ def _schedule_statuspage_reminder(
         Schedule.objects.get_or_create(name=schedule_name, defaults=defaults)
 
 
+def start_postmortem_attendee_collection(incident: Incident, channel_id: str) -> None:
+    """Post a reaction prompt and schedule the follow-up that hands reactors off for scheduling."""
+    if incident.severity not in HIGH_SEVERITIES:
+        return
+
+    minutes = get_postmortem_attendee_collection_minutes()
+    if minutes is None:
+        return
+
+    message_ts = _slack_service.post_message(
+        channel_id,
+        POSTMORTEM_ATTENDEE_PROMPT_MESSAGE.format(
+            incident_number=incident.incident_number, minutes=minutes
+        ),
+    )
+    if not message_ts:
+        return
+
+    Schedule.objects.update_or_create(
+        name=f"postmortem_attendee_collection_{incident.id}",
+        defaults={
+            "func": "firetower.incidents.tasks.send_postmortem_attendee_followup",
+            "kwargs": json.dumps(
+                {
+                    "incident_id": incident.id,
+                    "channel_id": channel_id,
+                    "message_ts": message_ts,
+                }
+            ),
+            "schedule_type": Schedule.ONCE,
+            "next_run": timezone.now() + timedelta(minutes=minutes),
+            "repeats": -1,
+        },
+    )
+
+
 def cancel_statuspage_followup_reminder(incident: Incident) -> None:
     Schedule.objects.filter(name=f"statuspage_followup_reminder_{incident.id}").delete()
 
@@ -1871,6 +1920,18 @@ def on_incident_updated(
         except Exception:
             logger.exception(
                 f"Failed to trigger slack dump in on_incident_updated for incident {incident.id}"
+            )
+
+    if (
+        old_status is not None
+        and incident.status == IncidentStatus.POSTMORTEM
+        and channel_id
+    ):
+        try:
+            start_postmortem_attendee_collection(incident, channel_id)
+        except Exception:
+            logger.exception(
+                f"Failed to start postmortem attendee collection for incident {incident.id}"
             )
 
     # Status change into a mitigated/terminal state: resolve any PD pages we sent.

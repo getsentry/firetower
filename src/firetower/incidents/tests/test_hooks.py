@@ -32,6 +32,7 @@ from firetower.incidents.hooks import (
     page_for_channel,
     resolve_pages_for_incident,
     schedule_statuspage_followup_reminder,
+    start_postmortem_attendee_collection,
 )
 from firetower.incidents.models import (
     ExternalLink,
@@ -4142,3 +4143,122 @@ class TestOnIncidentUpdated:
         on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
 
         mock_get_linear.return_value.update_issue.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestPostmortemAttendeeCollection:
+    @pytest.fixture(autouse=True)
+    def _configure_collection(self, settings):
+        settings.SLACK = {
+            **settings.SLACK,
+            "POSTMORTEM_ATTENDEE_COLLECTION_MINUTES": 10,
+        }
+
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "severity": IncidentSeverity.P1,
+            "status": IncidentStatus.POSTMORTEM,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_prompt_and_schedules_collection(self, mock_slack):
+        mock_slack.post_message.return_value = "1111.2222"
+        incident = self._make_incident()
+
+        before = timezone.now()
+        start_postmortem_attendee_collection(incident, "C12345")
+
+        prompt = mock_slack.post_message.call_args[0][1]
+        assert incident.incident_number in prompt
+        assert "10 minutes" in prompt
+
+        schedule = Schedule.objects.get(
+            name=f"postmortem_attendee_collection_{incident.id}"
+        )
+        assert (
+            schedule.func
+            == "firetower.incidents.tasks.send_postmortem_attendee_followup"
+        )
+        assert schedule.schedule_type == Schedule.ONCE
+        assert ast.literal_eval(schedule.kwargs) == {
+            "incident_id": incident.id,
+            "channel_id": "C12345",
+            "message_ts": "1111.2222",
+        }
+        assert schedule.next_run >= before + timedelta(minutes=10)
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_low_severity(self, mock_slack):
+        incident = self._make_incident(severity=IncidentSeverity.P2)
+
+        start_postmortem_attendee_collection(incident, "C12345")
+
+        mock_slack.post_message.assert_not_called()
+        assert not Schedule.objects.filter(
+            name__startswith="postmortem_attendee_collection_"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_when_not_configured(self, mock_slack, settings):
+        settings.SLACK = {
+            **settings.SLACK,
+            "POSTMORTEM_ATTENDEE_COLLECTION_MINUTES": None,
+        }
+        incident = self._make_incident()
+
+        start_postmortem_attendee_collection(incident, "C12345")
+
+        mock_slack.post_message.assert_not_called()
+        assert not Schedule.objects.filter(
+            name__startswith="postmortem_attendee_collection_"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_schedule_when_prompt_fails(self, mock_slack):
+        mock_slack.post_message.return_value = None
+        incident = self._make_incident()
+
+        start_postmortem_attendee_collection(incident, "C12345")
+
+        assert not Schedule.objects.filter(
+            name__startswith="postmortem_attendee_collection_"
+        ).exists()
+
+    @patch("firetower.incidents.hooks.start_postmortem_attendee_collection")
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_on_incident_updated_starts_collection_on_resolve(
+        self, mock_slack, _mock_dump, mock_start
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        incident = self._make_incident()
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
+
+        mock_start.assert_called_once_with(incident, "C12345")
+
+    @patch("firetower.incidents.hooks.start_postmortem_attendee_collection")
+    @patch("firetower.slack_app.handlers.dumpslack.trigger_slack_dump_async")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_on_incident_updated_ignores_other_transitions(
+        self, mock_slack, _mock_dump, mock_start
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        incident = self._make_incident(status=IncidentStatus.DONE)
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+
+        on_incident_updated(incident, old_status=IncidentStatus.POSTMORTEM)
+
+        mock_start.assert_not_called()

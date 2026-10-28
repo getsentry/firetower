@@ -466,6 +466,9 @@ class SlackService:
     def build_channel_url(self, channel_id: str) -> str:
         return f"https://{self.team_id}.slack.com/archives/{channel_id}"
 
+    def build_message_url(self, channel_id: str, message_ts: str) -> str:
+        return f"{self.build_channel_url(channel_id)}/p{message_ts.replace('.', '')}"
+
     def get_channel_info(self, channel_id: str) -> dict | None:
         if not self.client:
             logger.warning("Cannot fetch channel info - Slack client not initialized")

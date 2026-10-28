@@ -23,6 +23,7 @@ from firetower.incidents.tasks import (
     datadog_log,
     schedule_demo,
     send_action_item_reminder,
+    send_postmortem_attendee_followup,
     send_statuspage_followup_reminder,
     send_statuspage_reminder,
 )
@@ -1236,3 +1237,78 @@ class TestSendActionItemReminder:
 
         action_item.refresh_from_db()
         assert action_item.last_nag is not None
+
+
+@pytest.mark.django_db
+class TestSendPostmortemAttendeeFollowup:
+    @pytest.fixture(autouse=True)
+    def _configure_scheduler_bot(self):
+        slack_settings = {
+            **settings.SLACK,
+            "POSTMORTEM_SCHEDULER_BOT_USER_ID": "U_SCHEDULER",
+            "POSTMORTEM_SCHEDULER_BOT_PROMPT": (
+                "Schedule {incident_number} with reactors on {prompt_url}"
+            ),
+        }
+        with patch.object(settings, "SLACK", slack_settings):
+            yield
+
+    def _make_incident(self, **kwargs):
+        defaults = {
+            "title": "Test Incident",
+            "status": IncidentStatus.POSTMORTEM,
+            "severity": IncidentSeverity.P1,
+        }
+        defaults.update(kwargs)
+        return Incident.objects.create(**defaults)
+
+    def _run(self, incident):
+        mock_slack = MagicMock()
+        mock_slack.build_message_url.return_value = (
+            "https://sentry.slack.com/archives/C12345/p11112222"
+        )
+        with patch(
+            "firetower.incidents.tasks.postmortem.SlackService",
+            return_value=mock_slack,
+        ):
+            send_postmortem_attendee_followup(incident.id, "C12345", "1111.2222")
+        return mock_slack
+
+    def test_invites_and_mentions_scheduler_bot(self):
+        incident = self._make_incident()
+
+        mock_slack = self._run(incident)
+
+        mock_slack.build_message_url.assert_called_once_with("C12345", "1111.2222")
+        mock_slack.invite_to_channel.assert_called_once_with("C12345", ["U_SCHEDULER"])
+        mock_slack.post_message.assert_called_once_with(
+            "C12345",
+            f"<@U_SCHEDULER> Schedule {incident.incident_number} with reactors on "
+            "https://sentry.slack.com/archives/C12345/p11112222",
+        )
+
+    def test_posts_prompt_without_mention_when_no_bot(self):
+        incident = self._make_incident()
+        settings.SLACK["POSTMORTEM_SCHEDULER_BOT_USER_ID"] = ""
+
+        mock_slack = self._run(incident)
+
+        mock_slack.invite_to_channel.assert_not_called()
+        message = mock_slack.post_message.call_args[0][1]
+        assert message.startswith(f"Schedule {incident.incident_number}")
+
+    def test_skips_when_prompt_empty(self):
+        incident = self._make_incident()
+        settings.SLACK["POSTMORTEM_SCHEDULER_BOT_PROMPT"] = ""
+
+        mock_slack = self._run(incident)
+
+        mock_slack.post_message.assert_not_called()
+
+    @pytest.mark.parametrize("status", [IncidentStatus.ACTIVE, IncidentStatus.CANCELED])
+    def test_skips_when_incident_left_postmortem(self, status):
+        incident = self._make_incident(status=status)
+
+        mock_slack = self._run(incident)
+
+        mock_slack.post_message.assert_not_called()

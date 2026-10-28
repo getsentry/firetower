@@ -262,6 +262,9 @@ class SlackSettings(TypedDict):
     SLASH_COMMAND: str
     TRIAGE_BOT_USER_ID: str
     TRIAGE_BOT_PROMPT: str
+    POSTMORTEM_ATTENDEE_COLLECTION_MINUTES: int | None
+    POSTMORTEM_SCHEDULER_BOT_USER_ID: str
+    POSTMORTEM_SCHEDULER_BOT_PROMPT: str
 
 
 SLACK: SlackSettings = {
@@ -274,6 +277,9 @@ SLACK: SlackSettings = {
     "SLASH_COMMAND": config.slack.slash_command,
     "TRIAGE_BOT_USER_ID": config.slack.triage_bot_user_id,
     "TRIAGE_BOT_PROMPT": config.slack.triage_bot_prompt,
+    "POSTMORTEM_ATTENDEE_COLLECTION_MINUTES": config.slack.postmortem_attendee_collection_minutes,
+    "POSTMORTEM_SCHEDULER_BOT_USER_ID": config.slack.postmortem_scheduler_bot_user_id,
+    "POSTMORTEM_SCHEDULER_BOT_PROMPT": config.slack.postmortem_scheduler_bot_prompt,
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)
