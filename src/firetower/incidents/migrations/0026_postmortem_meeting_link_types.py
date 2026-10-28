@@ -6,13 +6,13 @@ from django.db import migrations, models
 def rename_meeting_recording(apps, schema_editor):
     ExternalLink = apps.get_model("incidents", "ExternalLink")
     ExternalLink.objects.filter(type="MEETING_RECORDING").update(
-        type="POSTMORTEM_MEETING"
+        type="POSTMORTEM_MEETING_RECORDING"
     )
 
 
 def restore_meeting_recording(apps, schema_editor):
     ExternalLink = apps.get_model("incidents", "ExternalLink")
-    ExternalLink.objects.filter(type="POSTMORTEM_MEETING").update(
+    ExternalLink.objects.filter(type="POSTMORTEM_MEETING_RECORDING").update(
         type="MEETING_RECORDING"
     )
 
@@ -37,7 +37,11 @@ class Migration(migrations.Migration):
                     ("NOTION", "Notion"),
                     ("NOTION_TROUBLESHOOTING", "Notion Troubleshooting"),
                     ("LINEAR", "Linear"),
-                    ("POSTMORTEM_MEETING", "Postmortem Meeting"),
+                    (
+                        "POSTMORTEM_MEETING_RECORDING",
+                        "Postmortem Meeting Recording",
+                    ),
+                    ("POSTMORTEM_MEETING_LINK", "Postmortem Meeting Link"),
                 ],
                 max_length=30,
             ),

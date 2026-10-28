@@ -54,7 +54,9 @@ class TestHandlePostmortemMeetingMessage:
         handle_postmortem_meeting_message(_event())
 
         assert (
-            incident.external_links.get(type=ExternalLinkType.POSTMORTEM_MEETING).url
+            incident.external_links.get(
+                type=ExternalLinkType.POSTMORTEM_MEETING_LINK
+            ).url
             == MEET_URL
         )
 
@@ -62,5 +64,5 @@ class TestHandlePostmortemMeetingMessage:
         handle_postmortem_meeting_message(_event())
 
         assert not incident.external_links.filter(
-            type=ExternalLinkType.POSTMORTEM_MEETING
+            type=ExternalLinkType.POSTMORTEM_MEETING_LINK
         ).exists()

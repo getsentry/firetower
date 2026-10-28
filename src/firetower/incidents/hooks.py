@@ -1446,7 +1446,7 @@ def record_postmortem_meeting(incident: Incident, meeting_url: str) -> None:
     """Save the postmortem meeting link on the incident."""
     ExternalLink.objects.update_or_create(
         incident=incident,
-        type=ExternalLinkType.POSTMORTEM_MEETING,
+        type=ExternalLinkType.POSTMORTEM_MEETING_LINK,
         defaults={"url": meeting_url},
     )
 

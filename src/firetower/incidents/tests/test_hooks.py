@@ -4293,7 +4293,7 @@ class TestRecordPostmortemMeeting:
         record_postmortem_meeting(incident, self.MEET_URL)
 
         link = ExternalLink.objects.get(
-            incident=incident, type=ExternalLinkType.POSTMORTEM_MEETING
+            incident=incident, type=ExternalLinkType.POSTMORTEM_MEETING_LINK
         )
         assert link.url == self.MEET_URL
 
@@ -4305,6 +4305,6 @@ class TestRecordPostmortemMeeting:
         record_postmortem_meeting(incident, new_url)
 
         link = ExternalLink.objects.get(
-            incident=incident, type=ExternalLinkType.POSTMORTEM_MEETING
+            incident=incident, type=ExternalLinkType.POSTMORTEM_MEETING_LINK
         )
         assert link.url == new_url
