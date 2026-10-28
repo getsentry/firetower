@@ -129,7 +129,7 @@ sdk/                 # Python SDK
 
 ## Incident Action Labels
 
-Action item sync adds the existing workspace-wide `incident-action` label to incident sub-issues, including pre-existing issues adopted as follow-ups. Other labels are preserved.
+Set `LINEAR_ACTION_ITEM_LABEL_ID` to the workspace-wide `incident-action` label's ID to enable automatic labeling during action item sync, including pre-existing issues adopted as follow-ups. Other labels are preserved. Labeling is skipped when the environment variable is unset.
 
 ## Scheduled Tasks
 

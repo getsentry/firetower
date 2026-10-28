@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 LINEAR_API_URL = "https://api.linear.app/graphql"
 LINEAR_TOKEN_URL = "https://api.linear.app/oauth/token"
-INCIDENT_ACTION_LABEL_NAME = "incident-action"
 
 LINEAR_STATE_TYPE_MAP = {
     "triage": "Todo",
@@ -169,7 +168,6 @@ class LinearService:
             timeout if timeout is not None else LINEAR_DEFAULT_TIMEOUT_SECONDS
         )
         self._workflow_states_cache: dict[str, str] | None = None
-        self._issue_label_ids_cache: dict[str, str] = {}
 
     @classmethod
     def for_allocation(cls) -> "LinearService":
@@ -536,39 +534,6 @@ class LinearService:
             "identifier": issue["identifier"],
             "url": issue["url"],
         }
-
-    def get_issue_label_id(self, name: str) -> str | None:
-        """Find an existing workspace-wide label that can be used across teams."""
-        if name in self._issue_label_ids_cache:
-            return self._issue_label_ids_cache[name]
-
-        query = """
-        query($name: String!) {
-            issueLabels(
-                filter: {
-                    name: { eq: $name },
-                    team: { null: true },
-                    isGroup: { eq: false }
-                },
-                first: 2
-            ) {
-                nodes {
-                    id
-                }
-            }
-        }
-        """
-        data = self._graphql(query, {"name": name})
-        if not data:
-            return None
-        labels = data.get("issueLabels", {}).get("nodes", [])
-        if len(labels) != 1:
-            logger.warning("Expected one Linear workspace label named %s", name)
-            return None
-
-        label_id = labels[0]["id"]
-        self._issue_label_ids_cache[name] = label_id
-        return label_id
 
     def add_issue_label(self, issue_id: str, label_id: str) -> bool:
         """Add a label atomically without replacing any existing issue labels."""

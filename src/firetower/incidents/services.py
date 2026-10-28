@@ -21,7 +21,6 @@ from firetower.incidents.models import (
     IncidentStatus,
 )
 from firetower.integrations.services import LinearService, SlackService
-from firetower.integrations.services.linear import INCIDENT_ACTION_LABEL_NAME
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
@@ -190,18 +189,9 @@ def _set_action_item_sla(linear_service: LinearService, issue: dict) -> None:
 def _set_action_item_labels(
     linear_service: LinearService, issues: list[dict]
 ) -> list[str]:
-    if not issues:
+    label_id = (settings.LINEAR or {}).get("ACTION_ITEM_LABEL_ID")
+    if not issues or not label_id:
         return []
-
-    try:
-        label_id = linear_service.get_issue_label_id(INCIDENT_ACTION_LABEL_NAME)
-    except Exception:
-        logger.exception("Failed to fetch Linear incident action label")
-        return ["Failed to fetch Linear incident action label"]
-    if not label_id:
-        error = f"Linear workspace label {INCIDENT_ACTION_LABEL_NAME} is unavailable"
-        logger.warning(error)
-        return [error]
 
     errors = []
     for issue in issues:

@@ -33,10 +33,12 @@ def issue():
 
 @pytest.fixture
 def service(settings, issue):
-    settings.LINEAR = {"TEAM_ID": "incident-team"}
+    settings.LINEAR = {
+        "TEAM_ID": "incident-team",
+        "ACTION_ITEM_LABEL_ID": "action-label",
+    }
     service = MagicMock(spec=LinearService)
     service.get_child_issues.return_value = [issue]
-    service.get_issue_label_id.return_value = "action-label"
     service.add_issue_label.return_value = True
     with patch(
         "firetower.incidents.services._get_linear_service", return_value=service
@@ -74,7 +76,6 @@ class TestActionItemLabels:
         item = incident.action_items.get()
         assert item.created_at == issue["created_at"]
         service.add_issue_label.assert_called_once_with("issue-1", "action-label")
-        service.get_issue_label_id.assert_called_once_with("incident-action")
 
     @pytest.mark.parametrize("severity", IncidentSeverity.values)
     @pytest.mark.parametrize("status", ["Todo", "In Progress", "Done", "Canceled"])
@@ -117,21 +118,16 @@ class TestActionItemLabels:
         assert stats.errors == []
         assert stats.updated == 2
 
-    @pytest.mark.parametrize("failure", [None, RuntimeError("Label lookup failed")])
-    def test_missing_label_does_not_block_sync(self, incident, service, failure):
-        if isinstance(failure, Exception):
-            service.get_issue_label_id.side_effect = failure
-        else:
-            service.get_issue_label_id.return_value = failure
+    def test_skips_labeling_without_configured_id(self, settings, incident, service):
+        settings.LINEAR.pop("ACTION_ITEM_LABEL_ID")
 
         stats = sync_action_items_from_linear(incident, force=True)
 
         assert stats.created == 1
-        assert len(stats.errors) == 1
+        assert stats.errors == []
         service.add_issue_label.assert_not_called()
 
-    def test_does_not_fetch_label_without_children(self, incident, service):
+    def test_does_not_label_without_children(self, incident, service):
         service.get_child_issues.return_value = []
         sync_action_items_from_linear(incident, force=True)
-        service.get_issue_label_id.assert_not_called()
         service.add_issue_label.assert_not_called()

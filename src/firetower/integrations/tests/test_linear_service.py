@@ -821,36 +821,6 @@ class TestParseIssue:
 
 
 class TestIssueLabels:
-    def test_finds_and_caches_workspace_label(self, linear_service):
-        response = {"issueLabels": {"nodes": [{"id": "action-label"}]}}
-        with patch.object(linear_service, "_graphql", return_value=response) as graphql:
-            assert (
-                linear_service.get_issue_label_id("incident-action") == "action-label"
-            )
-            assert (
-                linear_service.get_issue_label_id("incident-action") == "action-label"
-            )
-
-        graphql.assert_called_once()
-        query, variables = graphql.call_args.args
-        assert variables == {"name": "incident-action"}
-        assert "team: { null: true }" in query
-        assert "isGroup: { eq: false }" in query
-
-    @pytest.mark.parametrize(
-        "response",
-        [
-            None,
-            {"issueLabels": {"nodes": []}},
-            {"issueLabels": {"nodes": [{"id": "a"}, {"id": "b"}]}},
-        ],
-    )
-    def test_does_not_cache_missing_or_ambiguous_label(self, linear_service, response):
-        with patch.object(linear_service, "_graphql", return_value=response) as graphql:
-            assert linear_service.get_issue_label_id("incident-action") is None
-            assert linear_service.get_issue_label_id("incident-action") is None
-        assert graphql.call_count == 2
-
     def test_adds_label_without_replacing_existing_labels(self, linear_service):
         with patch.object(
             linear_service,
