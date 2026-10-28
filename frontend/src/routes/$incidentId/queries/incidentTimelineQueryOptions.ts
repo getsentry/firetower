@@ -15,6 +15,7 @@ const TimelineEventTypeSchema = z.enum([
   'statuspage_incident_created',
   'statuspage_update_posted',
   'pagerduty_incident_triggered',
+  'postmortem_meeting_scheduled',
 ]);
 
 const TimelineActorSchema = z.object({

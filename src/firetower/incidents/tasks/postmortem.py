@@ -3,6 +3,7 @@ from collections import defaultdict
 
 from django.conf import settings
 
+from firetower.incidents.hooks import get_postmortem_scheduler_bot_user_id
 from firetower.incidents.models import Incident, IncidentStatus
 from firetower.incidents.tasks.decorators import datadog_log
 from firetower.integrations.services.slack import SlackService
@@ -39,9 +40,7 @@ def send_postmortem_attendee_followup(
         )
     )
 
-    bot_user_id = settings.SLACK.get(
-        "POSTMORTEM_SCHEDULER_BOT_USER_ID"
-    ) or settings.SLACK.get("TRIAGE_BOT_USER_ID", "")
+    bot_user_id = get_postmortem_scheduler_bot_user_id()
     if bot_user_id:
         slack.invite_to_channel(channel_id, [bot_user_id])
         text = f"<@{bot_user_id}> {text}"

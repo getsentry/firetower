@@ -24,6 +24,7 @@ from firetower.incidents.services import (
     get_linear_parent_issue_state_id,
     sync_linear_parent_issue_status,
 )
+from firetower.incidents.timeline.events import record_postmortem_meeting_scheduled
 from firetower.integrations.services import (
     DatadogService,
     LinearService,
@@ -76,6 +77,12 @@ POSTMORTEM_ATTENDEE_PROMPT_MESSAGE = (
 def get_postmortem_attendee_collection_minutes() -> int | None:
     raw = settings.SLACK.get("POSTMORTEM_ATTENDEE_COLLECTION_MINUTES")
     return int(raw) if raw is not None else None
+
+
+def get_postmortem_scheduler_bot_user_id() -> str:
+    return settings.SLACK.get("POSTMORTEM_SCHEDULER_BOT_USER_ID") or settings.SLACK.get(
+        "TRIAGE_BOT_USER_ID", ""
+    )
 
 
 def get_statuspage_initial_reminder_delay_minutes() -> int | None:
@@ -1434,6 +1441,22 @@ def start_postmortem_attendee_collection(incident: Incident, channel_id: str) ->
             "repeats": -1,
         },
     )
+
+
+def record_postmortem_meeting(incident: Incident, meeting_url: str) -> None:
+    """Save the postmortem meeting link on the incident and add it to the timeline."""
+    with transaction.atomic():
+        link, created = ExternalLink.objects.get_or_create(
+            incident=incident,
+            type=ExternalLinkType.POSTMORTEM_MEETING,
+            defaults={"url": meeting_url},
+        )
+        if not created:
+            if link.url == meeting_url:
+                return
+            link.url = meeting_url
+            link.save(update_fields=["url"])
+        record_postmortem_meeting_scheduled(incident, meeting_url=meeting_url)
 
 
 def cancel_statuspage_followup_reminder(incident: Incident) -> None:

@@ -33,6 +33,10 @@ const linkConfigs = {
     label: 'Meeting Recording',
     icon: '/meeting_recording.svg',
   },
+  postmortem_meeting: {
+    label: 'Postmortem meeting',
+    icon: '/meeting_recording.svg',
+  },
   statuspage: {
     label: 'Statuspage',
     icon: '/statuspage.svg',

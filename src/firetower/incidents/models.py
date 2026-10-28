@@ -87,6 +87,10 @@ class TimelineEventType(models.TextChoices):
         "pagerduty_incident_triggered",
         "PagerDuty incident triggered",
     )
+    POSTMORTEM_MEETING_SCHEDULED = (
+        "postmortem_meeting_scheduled",
+        "Postmortem meeting scheduled",
+    )
 
 
 class ServiceTier(models.TextChoices):
@@ -122,6 +126,7 @@ class ExternalLinkType(models.TextChoices):
     NOTION_TROUBLESHOOTING = "NOTION_TROUBLESHOOTING", "Notion Troubleshooting"
     LINEAR = "LINEAR", "Linear"
     MEETING_RECORDING = "MEETING_RECORDING", "Meeting Recording"
+    POSTMORTEM_MEETING = "POSTMORTEM_MEETING", "Postmortem Meeting"
 
 
 class Tag(models.Model):

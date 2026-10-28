@@ -79,7 +79,7 @@ class SlackConfig:
     postmortem_scheduler_bot_user_id: str = ""
     postmortem_scheduler_bot_prompt: str = (
         "Schedule the {incident_number} postmortem meeting with everyone who "
-        "reacted to {prompt_url}"
+        "reacted to {prompt_url}, then reply with the Google Meet link."
     )
 
 

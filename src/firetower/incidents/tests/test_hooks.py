@@ -30,6 +30,7 @@ from firetower.incidents.hooks import (
     on_title_changed,
     on_visibility_changed,
     page_for_channel,
+    record_postmortem_meeting,
     resolve_pages_for_incident,
     schedule_statuspage_followup_reminder,
     start_postmortem_attendee_collection,
@@ -40,6 +41,8 @@ from firetower.incidents.models import (
     Incident,
     IncidentSeverity,
     IncidentStatus,
+    TimelineEvent,
+    TimelineEventType,
 )
 
 
@@ -4262,3 +4265,63 @@ class TestPostmortemAttendeeCollection:
         on_incident_updated(incident, old_status=IncidentStatus.POSTMORTEM)
 
         mock_start.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestRecordPostmortemMeeting:
+    MEET_URL = "https://meet.google.com/abc-defg-hij"
+
+    def _meeting_events(self, incident):
+        return TimelineEvent.objects.filter(
+            incident=incident,
+            event_type=TimelineEventType.POSTMORTEM_MEETING_SCHEDULED,
+        )
+
+    def test_saves_link_and_records_timeline_event(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.POSTMORTEM,
+        )
+
+        record_postmortem_meeting(incident, self.MEET_URL)
+
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.POSTMORTEM_MEETING
+        )
+        assert link.url == self.MEET_URL
+        event = self._meeting_events(incident).get()
+        assert event.link_url == self.MEET_URL
+
+    def test_same_link_is_recorded_once(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.POSTMORTEM,
+        )
+
+        record_postmortem_meeting(incident, self.MEET_URL)
+        record_postmortem_meeting(incident, self.MEET_URL)
+
+        assert self._meeting_events(incident).count() == 1
+
+    def test_new_link_replaces_previous(self):
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.POSTMORTEM,
+        )
+        new_url = "https://meet.google.com/xyz-wxyz-xyz"
+
+        record_postmortem_meeting(incident, self.MEET_URL)
+        record_postmortem_meeting(incident, new_url)
+
+        link = ExternalLink.objects.get(
+            incident=incident, type=ExternalLinkType.POSTMORTEM_MEETING
+        )
+        assert link.url == new_url
+        assert list(
+            self._meeting_events(incident)
+            .order_by("id")
+            .values_list("link_url", flat=True)
+        ) == [self.MEET_URL, new_url]

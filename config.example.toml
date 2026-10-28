@@ -69,7 +69,9 @@ triage_bot_prompt = "We've been alerted by {alert_url}, run incident triage for 
 # (or triage_bot_user_id when unset).
 # postmortem_attendee_collection_minutes = 10
 postmortem_scheduler_bot_user_id = ""
-postmortem_scheduler_bot_prompt = "Schedule the {incident_number} postmortem meeting with everyone who reacted to {prompt_url}"
+# When the scheduler bot replies in the incident channel with a Google Meet link, Firetower saves it
+# as the incident's postmortem meeting link and adds it to the timeline.
+postmortem_scheduler_bot_prompt = "Schedule the {incident_number} postmortem meeting with everyone who reacted to {prompt_url}, then reply with the Google Meet link."
 
 [auth]
 iap_enabled = false
