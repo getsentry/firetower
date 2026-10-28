@@ -1317,6 +1317,14 @@ class TestSendPostmortemAttendeeFollowup:
 
         mock_slack.post_message.assert_not_called()
 
+    def test_skips_private_incident(self):
+        incident = self._make_incident(is_private=True)
+
+        mock_slack = self._run(incident)
+
+        mock_slack.invite_to_channel.assert_not_called()
+        mock_slack.post_message.assert_not_called()
+
     @pytest.mark.parametrize("status", [IncidentStatus.ACTIVE, IncidentStatus.CANCELED])
     def test_skips_when_incident_left_postmortem(self, status):
         incident = self._make_incident(status=status)

@@ -1408,7 +1408,7 @@ def _schedule_statuspage_reminder(
 
 def start_postmortem_attendee_collection(incident: Incident, channel_id: str) -> None:
     """Post a reaction prompt and schedule the follow-up that hands reactors off for scheduling."""
-    if incident.severity not in HIGH_SEVERITIES:
+    if incident.is_private or incident.severity not in HIGH_SEVERITIES:
         return
 
     minutes = get_postmortem_attendee_collection_minutes()

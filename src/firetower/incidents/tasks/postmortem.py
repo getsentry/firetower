@@ -28,7 +28,10 @@ def send_postmortem_attendee_followup(
         )
         return
 
-    if incident.status not in (IncidentStatus.POSTMORTEM, IncidentStatus.DONE):
+    if incident.is_private or incident.status not in (
+        IncidentStatus.POSTMORTEM,
+        IncidentStatus.DONE,
+    ):
         return
 
     slack = SlackService()

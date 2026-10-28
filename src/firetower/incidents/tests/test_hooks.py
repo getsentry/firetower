@@ -4203,6 +4203,17 @@ class TestPostmortemAttendeeCollection:
         ).exists()
 
     @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_private_incident(self, mock_slack):
+        incident = self._make_incident(is_private=True)
+
+        start_postmortem_attendee_collection(incident, "C12345")
+
+        mock_slack.post_message.assert_not_called()
+        assert not Schedule.objects.filter(
+            name__startswith="postmortem_attendee_collection_"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._slack_service")
     def test_skips_when_not_configured(self, mock_slack, settings):
         settings.SLACK = {
             **settings.SLACK,
