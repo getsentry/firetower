@@ -20,7 +20,6 @@ const ExternalLinksSchema = z.object({
   notion: z.string().optional(),
   notion_troubleshooting: z.string().optional(),
   linear: z.string().optional(),
-  meeting_recording: z.string().optional(),
   postmortem_meeting: z.string().optional(),
 });
 

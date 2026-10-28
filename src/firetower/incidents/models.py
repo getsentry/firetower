@@ -121,7 +121,6 @@ class ExternalLinkType(models.TextChoices):
     NOTION = "NOTION", "Notion"
     NOTION_TROUBLESHOOTING = "NOTION_TROUBLESHOOTING", "Notion Troubleshooting"
     LINEAR = "LINEAR", "Linear"
-    MEETING_RECORDING = "MEETING_RECORDING", "Meeting Recording"
     POSTMORTEM_MEETING = "POSTMORTEM_MEETING", "Postmortem Meeting"
 
 
