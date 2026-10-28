@@ -61,8 +61,6 @@ def render_timeline_event(event: TimelineEvent) -> str:
             case TimelineEventType.PAGERDUTY_INCIDENT_TRIGGERED:
                 pagerduty = cast(PagerDutyPayload, event.payload)
                 return f"PagerDuty page triggered for {pagerduty['service']}"
-            case TimelineEventType.POSTMORTEM_MEETING_SCHEDULED:
-                return "Postmortem meeting scheduled"
             case _:
                 assert_never(event_type)
     except (KeyError, TypeError, ValueError):

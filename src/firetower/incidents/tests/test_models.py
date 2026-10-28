@@ -350,7 +350,7 @@ class TestTimelineEvent:
             "STATUSPAGE",
             "PAGERDUTY",
         ]
-        assert len(TimelineEventType.values) == 11
+        assert len(TimelineEventType.values) == 10
         assert str(event) == f"{incident.incident_number}: Incident created"
 
     def test_ordering_cascade_and_actor_set_null(self):

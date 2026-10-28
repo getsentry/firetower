@@ -239,16 +239,3 @@ def record_statuspage_update_posted(
         link_url=sp_url,
         external_id=sp_update_id,
     )
-
-
-def record_postmortem_meeting_scheduled(
-    incident: Incident, *, meeting_url: str
-) -> TimelineEvent:
-    return _record_event(
-        incident,
-        TimelineEventType.POSTMORTEM_MEETING_SCHEDULED,
-        {},
-        actor=None,
-        occurred_at=None,
-        link_url=meeting_url,
-    )

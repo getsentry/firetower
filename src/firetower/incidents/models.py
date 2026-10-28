@@ -87,10 +87,6 @@ class TimelineEventType(models.TextChoices):
         "pagerduty_incident_triggered",
         "PagerDuty incident triggered",
     )
-    POSTMORTEM_MEETING_SCHEDULED = (
-        "postmortem_meeting_scheduled",
-        "Postmortem meeting scheduled",
-    )
 
 
 class ServiceTier(models.TextChoices):

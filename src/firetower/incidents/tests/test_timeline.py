@@ -391,11 +391,6 @@ class TestTimelineRenderer:
                 {"service": "Backend"},
                 "PagerDuty page triggered for Backend",
             ),
-            (
-                TimelineEventType.POSTMORTEM_MEETING_SCHEDULED,
-                {},
-                "Postmortem meeting scheduled",
-            ),
         ],
     )
     def test_renders_every_declared_event_type(self, event_type, payload, expected):
