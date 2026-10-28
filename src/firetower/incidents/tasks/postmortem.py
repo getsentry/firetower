@@ -39,7 +39,9 @@ def send_postmortem_attendee_followup(
         )
     )
 
-    bot_user_id = settings.SLACK.get("POSTMORTEM_SCHEDULER_BOT_USER_ID", "")
+    bot_user_id = settings.SLACK.get(
+        "POSTMORTEM_SCHEDULER_BOT_USER_ID"
+    ) or settings.SLACK.get("TRIAGE_BOT_USER_ID", "")
     if bot_user_id:
         slack.invite_to_channel(channel_id, [bot_user_id])
         text = f"<@{bot_user_id}> {text}"
