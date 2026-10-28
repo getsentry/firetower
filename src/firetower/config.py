@@ -109,6 +109,7 @@ class LinearConfig:
     action_item_sync_throttle_seconds: int = 300
     team_id: str = ""
     project_id: str = ""
+    action_item_label_id: str = ""
     sync_identifiers: bool = False
     adopt_on_create: bool = False
     api_key: str = ""

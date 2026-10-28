@@ -86,6 +86,7 @@ client_secret = ""  # Overridable via LINEAR_CLIENT_SECRET
 action_item_sync_throttle_seconds = 300
 team_id = ""
 project_id = ""
+action_item_label_id = ""
 # When true, claim the Linear issue matching the incident number (e.g. INC-2160) instead of creating a new one.
 sync_identifiers = false
 # When true (and sync_identifiers is true), allocate incident ids by claiming or
