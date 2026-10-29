@@ -69,12 +69,12 @@ POSTMORTEM_ATTENDEE_PROMPT_MESSAGE = (
     ":calendar: *Postmortem meeting*\n"
     "React to this message with any emoji to be invited to the postmortem "
     "meeting for *{incident_number}*. Collecting attendees for the next "
-    "*{minutes} minutes*."
+    "*{days} days*."
 )
 
 
-def get_postmortem_attendee_collection_minutes() -> int | None:
-    raw = settings.SLACK.get("POSTMORTEM_ATTENDEE_COLLECTION_MINUTES")
+def get_postmortem_attendee_collection_days() -> int | None:
+    raw = settings.SLACK.get("POSTMORTEM_ATTENDEE_COLLECTION_DAYS")
     return int(raw) if raw is not None else None
 
 
@@ -1411,14 +1411,17 @@ def start_postmortem_attendee_collection(incident: Incident, channel_id: str) ->
     if incident.is_private or incident.severity not in HIGH_SEVERITIES:
         return
 
-    minutes = get_postmortem_attendee_collection_minutes()
-    if minutes is None:
+    if not get_postmortem_scheduler_bot_user_id():
+        return
+
+    days = get_postmortem_attendee_collection_days()
+    if days is None:
         return
 
     message_ts = _slack_service.post_message(
         channel_id,
         POSTMORTEM_ATTENDEE_PROMPT_MESSAGE.format(
-            incident_number=incident.incident_number, minutes=minutes
+            incident_number=incident.incident_number, days=days
         ),
     )
     if not message_ts:
@@ -1436,7 +1439,7 @@ def start_postmortem_attendee_collection(incident: Incident, channel_id: str) ->
                 }
             ),
             "schedule_type": Schedule.ONCE,
-            "next_run": timezone.now() + timedelta(minutes=minutes),
+            "next_run": timezone.now() + timedelta(days=days),
             "repeats": -1,
         },
     )

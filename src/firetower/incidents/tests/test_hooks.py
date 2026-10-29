@@ -4152,7 +4152,8 @@ class TestPostmortemAttendeeCollection:
     def _configure_collection(self, settings):
         settings.SLACK = {
             **settings.SLACK,
-            "POSTMORTEM_ATTENDEE_COLLECTION_MINUTES": 10,
+            "POSTMORTEM_ATTENDEE_COLLECTION_DAYS": 2,
+            "POSTMORTEM_SCHEDULER_BOT_USER_ID": "U_SCHEDULER",
         }
 
     def _make_incident(self, **kwargs):
@@ -4174,7 +4175,7 @@ class TestPostmortemAttendeeCollection:
 
         prompt = mock_slack.post_message.call_args[0][1]
         assert incident.incident_number in prompt
-        assert "10 minutes" in prompt
+        assert "2 days" in prompt
 
         schedule = Schedule.objects.get(
             name=f"postmortem_attendee_collection_{incident.id}"
@@ -4189,7 +4190,7 @@ class TestPostmortemAttendeeCollection:
             "channel_id": "C12345",
             "message_ts": "1111.2222",
         }
-        assert schedule.next_run >= before + timedelta(minutes=10)
+        assert schedule.next_run >= before + timedelta(days=2)
 
     @patch("firetower.incidents.hooks._slack_service")
     def test_skips_low_severity(self, mock_slack):
@@ -4217,7 +4218,23 @@ class TestPostmortemAttendeeCollection:
     def test_skips_when_not_configured(self, mock_slack, settings):
         settings.SLACK = {
             **settings.SLACK,
-            "POSTMORTEM_ATTENDEE_COLLECTION_MINUTES": None,
+            "POSTMORTEM_ATTENDEE_COLLECTION_DAYS": None,
+        }
+        incident = self._make_incident()
+
+        start_postmortem_attendee_collection(incident, "C12345")
+
+        mock_slack.post_message.assert_not_called()
+        assert not Schedule.objects.filter(
+            name__startswith="postmortem_attendee_collection_"
+        ).exists()
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_when_no_scheduler_bot(self, mock_slack, settings):
+        settings.SLACK = {
+            **settings.SLACK,
+            "POSTMORTEM_SCHEDULER_BOT_USER_ID": "",
+            "TRIAGE_BOT_USER_ID": "",
         }
         incident = self._make_incident()
 

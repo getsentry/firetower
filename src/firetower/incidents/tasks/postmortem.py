@@ -17,7 +17,8 @@ def send_postmortem_attendee_followup(
 ) -> None:
     """Close the reaction window by posting the scheduler bot prompt for the reactors."""
     prompt = settings.SLACK.get("POSTMORTEM_SCHEDULER_BOT_PROMPT", "")
-    if not prompt:
+    bot_user_id = get_postmortem_scheduler_bot_user_id()
+    if not prompt or not bot_user_id:
         return
 
     try:
@@ -35,7 +36,7 @@ def send_postmortem_attendee_followup(
         return
 
     slack = SlackService()
-    text = prompt.format_map(
+    text = f"<@{bot_user_id}> " + prompt.format_map(
         defaultdict(
             str,
             incident_number=incident.incident_number,
@@ -43,9 +44,5 @@ def send_postmortem_attendee_followup(
         )
     )
 
-    bot_user_id = get_postmortem_scheduler_bot_user_id()
-    if bot_user_id:
-        slack.invite_to_channel(channel_id, [bot_user_id])
-        text = f"<@{bot_user_id}> {text}"
-
-    slack.post_message(channel_id, text)
+    slack.invite_to_channel(channel_id, [bot_user_id])
+    slack.post_message(channel_id, text, thread_ts=message_ts)

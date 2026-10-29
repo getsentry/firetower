@@ -403,7 +403,7 @@ class TestSlackService:
         mock_client.chat_postMessage.return_value = {"ts": "1111.2222"}
         assert service.post_message("C12345", "hello") == "1111.2222"
         mock_client.chat_postMessage.assert_called_once_with(
-            channel="C12345", text="hello", blocks=None
+            channel="C12345", text="hello", blocks=None, thread_ts=None
         )
 
     def test_post_message_with_blocks(self):
@@ -412,7 +412,18 @@ class TestSlackService:
         mock_client.chat_postMessage.return_value = {"ts": "1111.2222"}
         assert service.post_message("C12345", "hello", blocks=blocks) == "1111.2222"
         mock_client.chat_postMessage.assert_called_once_with(
-            channel="C12345", text="hello", blocks=blocks
+            channel="C12345", text="hello", blocks=blocks, thread_ts=None
+        )
+
+    def test_post_message_in_thread(self):
+        service, mock_client = self._make_service()
+        mock_client.chat_postMessage.return_value = {"ts": "3333.4444"}
+        assert (
+            service.post_message("C12345", "hello", thread_ts="1111.2222")
+            == "3333.4444"
+        )
+        mock_client.chat_postMessage.assert_called_once_with(
+            channel="C12345", text="hello", blocks=None, thread_ts="1111.2222"
         )
 
     def test_post_message_no_client(self):

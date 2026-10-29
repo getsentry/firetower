@@ -1285,6 +1285,7 @@ class TestSendPostmortemAttendeeFollowup:
             "C12345",
             f"<@U_SCHEDULER> Schedule {incident.incident_number} with reactors on "
             "https://sentry.slack.com/archives/C12345/p11112222",
+            thread_ts="1111.2222",
         )
 
     def test_falls_back_to_triage_bot(self):
@@ -1298,7 +1299,7 @@ class TestSendPostmortemAttendeeFollowup:
         message = mock_slack.post_message.call_args[0][1]
         assert message.startswith("<@U_TRIAGE> ")
 
-    def test_posts_prompt_without_mention_when_no_bot(self):
+    def test_skips_when_no_bot(self):
         incident = self._make_incident()
         settings.SLACK["POSTMORTEM_SCHEDULER_BOT_USER_ID"] = ""
         settings.SLACK["TRIAGE_BOT_USER_ID"] = ""
@@ -1306,8 +1307,7 @@ class TestSendPostmortemAttendeeFollowup:
         mock_slack = self._run(incident)
 
         mock_slack.invite_to_channel.assert_not_called()
-        message = mock_slack.post_message.call_args[0][1]
-        assert message.startswith(f"Schedule {incident.incident_number}")
+        mock_slack.post_message.assert_not_called()
 
     def test_skips_when_prompt_empty(self):
         incident = self._make_incident()

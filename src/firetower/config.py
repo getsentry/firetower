@@ -75,7 +75,7 @@ class SlackConfig:
     triage_bot_prompt: str = (
         "We've been alerted by {alert_url}, run incident triage for this issue."
     )
-    postmortem_attendee_collection_minutes: int | None = None
+    postmortem_attendee_collection_days: int | None = None
     postmortem_scheduler_bot_user_id: str = ""
     postmortem_scheduler_bot_prompt: str = (
         "Schedule the {incident_number} postmortem meeting with everyone who "
