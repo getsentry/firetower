@@ -186,6 +186,29 @@ def _set_action_item_sla(linear_service: LinearService, issue: dict) -> None:
         logger.error("Failed to set Linear SLA for action item %s", issue["identifier"])
 
 
+def _set_action_item_labels(
+    linear_service: LinearService, issues: list[dict]
+) -> list[str]:
+    label_id = (settings.LINEAR or {}).get("ACTION_ITEM_LABEL_ID")
+    if not issues or not label_id:
+        return []
+
+    errors = []
+    for issue in issues:
+        if label_id in issue.get("label_ids", []):
+            continue
+        try:
+            success = linear_service.add_issue_label(issue["id"], label_id)
+        except Exception:
+            logger.exception("Failed to label action item %s", issue["identifier"])
+            success = False
+        if not success:
+            error = f"Failed to label action item {issue['identifier']}"
+            logger.warning(error)
+            errors.append(error)
+    return errors
+
+
 def _resolve_assignees(
     issues: dict[str, dict],
 ) -> dict[str, User | None]:
@@ -389,6 +412,10 @@ def sync_action_items_from_linear(
 
         incident.action_items_last_synced_at = timezone.now()
         incident.save(update_fields=["action_items_last_synced_at"])
+
+    stats.errors.extend(
+        _set_action_item_labels(linear_service, list(all_issues.values()))
+    )
 
     if incident.severity in (IncidentSeverity.P0, IncidentSeverity.P1):
         for issue in all_issues.values():

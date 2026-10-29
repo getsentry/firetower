@@ -46,6 +46,11 @@ ISSUE_FIELDS = """
     priority
     createdAt
     slaBreachesAt
+    labels {
+        nodes {
+            id
+        }
+    }
     state {
         id
         type
@@ -406,6 +411,9 @@ class LinearService:
             "url": issue["url"],
             "status": status,
             "priority": issue.get("priority", 0),
+            "label_ids": [
+                label["id"] for label in (issue.get("labels") or {}).get("nodes", [])
+            ],
             "created_at": parse_datetime(created_at) if created_at else None,
             "sla_breaches_at": (
                 parse_datetime(sla_breaches_at) if sla_breaches_at else None
@@ -526,6 +534,20 @@ class LinearService:
             "identifier": issue["identifier"],
             "url": issue["url"],
         }
+
+    def add_issue_label(self, issue_id: str, label_id: str) -> bool:
+        """Add a label atomically without replacing any existing issue labels."""
+        mutation = """
+        mutation($id: String!, $labelId: String!) {
+            issueAddLabel(id: $id, labelId: $labelId) {
+                success
+            }
+        }
+        """
+        data = self._graphql(mutation, {"id": issue_id, "labelId": label_id})
+        if not data:
+            return False
+        return data.get("issueAddLabel", {}).get("success", False)
 
     def create_attachment(self, issue_id: str, url: str, title: str) -> bool:
         mutation = """

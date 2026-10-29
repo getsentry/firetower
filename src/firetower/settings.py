@@ -346,6 +346,7 @@ LINEAR: dict | None = (
         "API_KEY": config.linear.api_key,
         "TEAM_ID": config.linear.team_id,
         "PROJECT_ID": config.linear.project_id,
+        "ACTION_ITEM_LABEL_ID": config.linear.action_item_label_id,
         "SYNC_IDENTIFIERS": config.linear.sync_identifiers,
         "INCIDENT_ADOPT_ON_CREATE": config.linear.adopt_on_create,
         "ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY": config.linear.action_item_slo_days_high_priority,

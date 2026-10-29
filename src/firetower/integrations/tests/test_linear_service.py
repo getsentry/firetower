@@ -779,12 +779,26 @@ class TestParseIssue:
             "url": "https://linear.app/team/issue/ENG-123",
             "status": "In Progress",
             "priority": 2,
+            "label_ids": [],
             "created_at": datetime(2026, 10, 16, 12, 30, tzinfo=UTC),
             "sla_breaches_at": datetime(2026, 10, 30, 12, 30, tzinfo=UTC),
             "assignee_email": "alice@sentry.io",
             "assignee_linear_id": "user-1",
             "relation_type": "child",
         }
+
+    def test_parses_existing_label_ids(self, linear_service):
+        issue = {
+            "id": "issue-1",
+            "identifier": "ENG-1",
+            "title": "An existing issue",
+            "url": "https://linear.app/issue/ENG-1",
+            "labels": {"nodes": [{"id": "existing-label"}, {"id": "action-label"}]},
+        }
+        assert linear_service._parse_issue(issue)["label_ids"] == [
+            "existing-label",
+            "action-label",
+        ]
 
     def test_maps_all_state_types(self, linear_service):
         for state_type, expected_status in [
@@ -804,6 +818,25 @@ class TestParseIssue:
                 "assignee": None,
             }
             assert linear_service._parse_issue(issue)["status"] == expected_status
+
+
+class TestIssueLabels:
+    def test_adds_label_without_replacing_existing_labels(self, linear_service):
+        with patch.object(
+            linear_service,
+            "_graphql",
+            return_value={"issueAddLabel": {"success": True}},
+        ) as graphql:
+            assert linear_service.add_issue_label("issue-1", "action-label") is True
+
+        query, variables = graphql.call_args.args
+        assert "issueAddLabel" in query
+        assert variables == {"id": "issue-1", "labelId": "action-label"}
+
+    @pytest.mark.parametrize("response", [None, {"issueAddLabel": {"success": False}}])
+    def test_reports_addition_failure(self, linear_service, response):
+        with patch.object(linear_service, "_graphql", return_value=response):
+            assert linear_service.add_issue_label("issue-1", "action-label") is False
 
 
 class TestGetChildIssues:

@@ -127,6 +127,10 @@ frontend/            # React frontend
 sdk/                 # Python SDK
 ```
 
+## Incident Action Labels
+
+Set `action_item_label_id` in the `[linear]` section of `config.toml` to the workspace-wide `incident-action` label's ID to enable automatic labeling during action item sync, including pre-existing issues adopted as follow-ups. Other labels are preserved. Labeling is skipped when the value is empty or omitted.
+
 ## Scheduled Tasks
 
 Scheduled tasks are stored as database objects and are managed via migrations.
