@@ -29,8 +29,12 @@ const linkConfigs = {
     label: 'PagerDuty',
     icon: '/pagerduty.svg',
   },
-  meeting_recording: {
-    label: 'Meeting Recording',
+  postmortem_meeting_link: {
+    label: 'Postmortem meeting',
+    icon: '/meeting_recording.svg',
+  },
+  postmortem_meeting_recording: {
+    label: 'Postmortem meeting recording',
     icon: '/meeting_recording.svg',
   },
   statuspage: {

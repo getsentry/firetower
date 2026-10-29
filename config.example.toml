@@ -64,6 +64,14 @@ incident_guide_message = "This is the message posted whenever a new incident sla
 slash_command = "/inc"
 triage_bot_user_id = ""
 triage_bot_prompt = "We've been alerted by {alert_url}, run incident triage for this issue."
+# Set to collect postmortem meeting attendees by reaction for this many days when a P0/P1 is resolved;
+# omit to disable. After the window, Firetower replies in the prompt's thread with the scheduler bot
+# prompt, mentioning postmortem_scheduler_bot_user_id (or triage_bot_user_id when unset).
+# postmortem_attendee_collection_days = 2
+postmortem_scheduler_bot_user_id = ""
+# When the scheduler bot replies in the incident channel with a Google Meet link, Firetower saves it
+# as the incident's postmortem meeting link.
+postmortem_scheduler_bot_prompt = "Schedule the {incident_number} postmortem meeting with everyone who reacted to {prompt_url}, then reply with the Google Meet link."
 
 [auth]
 iap_enabled = false

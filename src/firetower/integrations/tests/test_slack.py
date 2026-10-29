@@ -403,7 +403,7 @@ class TestSlackService:
         mock_client.chat_postMessage.return_value = {"ts": "1111.2222"}
         assert service.post_message("C12345", "hello") == "1111.2222"
         mock_client.chat_postMessage.assert_called_once_with(
-            channel="C12345", text="hello", blocks=None
+            channel="C12345", text="hello", blocks=None, thread_ts=None
         )
 
     def test_post_message_with_blocks(self):
@@ -412,7 +412,18 @@ class TestSlackService:
         mock_client.chat_postMessage.return_value = {"ts": "1111.2222"}
         assert service.post_message("C12345", "hello", blocks=blocks) == "1111.2222"
         mock_client.chat_postMessage.assert_called_once_with(
-            channel="C12345", text="hello", blocks=blocks
+            channel="C12345", text="hello", blocks=blocks, thread_ts=None
+        )
+
+    def test_post_message_in_thread(self):
+        service, mock_client = self._make_service()
+        mock_client.chat_postMessage.return_value = {"ts": "3333.4444"}
+        assert (
+            service.post_message("C12345", "hello", thread_ts="1111.2222")
+            == "3333.4444"
+        )
+        mock_client.chat_postMessage.assert_called_once_with(
+            channel="C12345", text="hello", blocks=None, thread_ts="1111.2222"
         )
 
     def test_post_message_no_client(self):
@@ -550,6 +561,13 @@ class TestSlackService:
         url = service.build_channel_url("C12345")
         assert url == "https://sentry.slack.com/archives/C12345"
         assert service.parse_channel_id_from_url(url) == "C12345"
+
+    def test_build_message_url(self):
+        service, _ = self._make_service()
+        assert (
+            service.build_message_url("C12345", "1111.2222")
+            == "https://sentry.slack.com/archives/C12345/p11112222"
+        )
 
     def test_get_channel_info_unexpected_error_returns_none(self):
         service, mock_client = self._make_service()
