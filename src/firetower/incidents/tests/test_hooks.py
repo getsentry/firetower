@@ -3503,6 +3503,16 @@ class TestScheduleStatuspageFollowupReminder:
             name=f"statuspage_followup_reminder_{incident.id}"
         ).exists()
 
+    def test_skips_for_mitigated_status(self):
+        incident = self._make_incident(
+            severity=IncidentSeverity.P0, status=IncidentStatus.MITIGATED
+        )
+        schedule_statuspage_followup_reminder(incident)
+
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
+
     def test_skips_for_cancelled_status(self):
         incident = self._make_incident(
             severity=IncidentSeverity.P0, status=IncidentStatus.CANCELED
@@ -3887,6 +3897,34 @@ class TestOnIncidentUpdated:
         on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
 
         mock_dump_async.assert_called_once_with(mock_client, "C12345", incident)
+
+    @patch("firetower.incidents.hooks.cancel_statuspage_followup_reminder")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_cancels_statuspage_followup_on_active_to_mitigated(
+        self, mock_slack, mock_cancel
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.MITIGATED)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.ACTIVE)
+
+        mock_cancel.assert_called_once_with(incident)
+
+    @patch("firetower.incidents.hooks.schedule_statuspage_followup_reminder")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_schedules_statuspage_followup_on_mitigated_to_active(
+        self, mock_slack, mock_schedule
+    ):
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+
+        incident = self._make_incident(status=IncidentStatus.ACTIVE)
+        self._link_slack(incident)
+
+        on_incident_updated(incident, old_status=IncidentStatus.MITIGATED)
+
+        mock_schedule.assert_called_once_with(incident)
 
     @patch("firetower.incidents.hooks.resolve_pages_for_incident")
     @patch("firetower.incidents.hooks._slack_service")

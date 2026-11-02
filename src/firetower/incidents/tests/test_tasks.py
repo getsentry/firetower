@@ -359,7 +359,7 @@ class TestSendStatuspageReminder:
 
         mock_slack.post_message.assert_not_called()
 
-    def test_posts_for_mitigated_status(self):
+    def test_skips_for_mitigated_status(self):
         incident = self._make_incident(
             severity=IncidentSeverity.P0, status=IncidentStatus.MITIGATED
         )
@@ -373,7 +373,7 @@ class TestSendStatuspageReminder:
         ):
             send_statuspage_reminder(incident.id)
 
-        mock_slack.post_message.assert_called_once()
+        mock_slack.post_message.assert_not_called()
 
     def test_skips_when_delay_not_configured(self):
         incident = self._make_incident(severity=IncidentSeverity.P0)
@@ -723,7 +723,7 @@ class TestSendStatuspageFollowupReminder:
 
         mock_slack.post_message.assert_not_called()
 
-    def test_posts_for_mitigated_status(self):
+    def test_skips_and_does_not_reschedule_for_mitigated_status(self):
         incident = self._make_incident(
             severity=IncidentSeverity.P0, status=IncidentStatus.MITIGATED
         )
@@ -749,7 +749,10 @@ class TestSendStatuspageFollowupReminder:
         ):
             send_statuspage_followup_reminder(incident.id)
 
-        mock_slack.post_message.assert_called_once()
+        mock_slack.post_message.assert_not_called()
+        assert not Schedule.objects.filter(
+            name=f"statuspage_followup_reminder_{incident.id}"
+        ).exists()
 
     def test_includes_ic_slack_mention(self):
         captain = User.objects.create_user(

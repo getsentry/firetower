@@ -1397,7 +1397,7 @@ def schedule_statuspage_followup_reminder(
     if (
         incident.is_private
         or incident.severity not in HIGH_SEVERITIES
-        or incident.status not in ACTIVE_STATUSES
+        or incident.status != IncidentStatus.ACTIVE
     ):
         return
 
@@ -1888,6 +1888,17 @@ def on_incident_updated(
         except Exception:
             logger.exception(
                 f"Failed to resolve pages in on_incident_updated for incident {incident.id}"
+            )
+
+    if old_status is not None and old_status != incident.status:
+        try:
+            if incident.status == IncidentStatus.ACTIVE:
+                schedule_statuspage_followup_reminder(incident)
+            elif old_status == IncidentStatus.ACTIVE:
+                cancel_statuspage_followup_reminder(incident)
+        except Exception:
+            logger.exception(
+                f"Failed to update statuspage followup reminder in on_incident_updated for incident {incident.id}"
             )
 
     if old_severity is not None:
