@@ -5,7 +5,6 @@ from django.conf import settings
 from django.utils import timezone
 
 from firetower.incidents.hooks import (
-    ACTIVE_STATUSES,
     HIGH_SEVERITIES,
     get_slack_user_id,
     get_statuspage_followup_reminder_delay_minutes,
@@ -14,6 +13,7 @@ from firetower.incidents.hooks import (
 from firetower.incidents.models import (
     ExternalLinkType,
     Incident,
+    IncidentStatus,
 )
 from firetower.incidents.tasks.decorators import datadog_log
 from firetower.integrations.services.slack import SlackService
@@ -67,7 +67,7 @@ def send_statuspage_reminder(incident_id: int, scheduled_at: str | None = None) 
     if (
         incident.is_private
         or incident.severity not in HIGH_SEVERITIES
-        or incident.status not in ACTIVE_STATUSES
+        or incident.status != IncidentStatus.ACTIVE
     ):
         return
 
@@ -131,7 +131,7 @@ def send_statuspage_followup_reminder(
     if (
         incident.is_private
         or incident.severity not in HIGH_SEVERITIES
-        or incident.status not in ACTIVE_STATUSES
+        or incident.status != IncidentStatus.ACTIVE
     ):
         return
 
