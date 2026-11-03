@@ -40,7 +40,19 @@ function getSentryEnvironment(): string {
 if (import.meta.env.MODE != 'development') {
   Sentry.init({
     dsn: 'https://82cb16514b69a48430dc945408138e0d@o1.ingest.us.sentry.io/4510076293283840',
-    sendDefaultPii: false,
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: {
+        request: {deny: ['forwarded', '-ip', 'remote-', 'via', '-user']},
+        response: {deny: ['forwarded', '-ip', 'remote-', 'via', '-user']},
+      },
+      httpBodies: [],
+      urlQueryParams: {deny: ['forwarded', '-ip', 'remote-', 'via', '-user']},
+      genAI: {inputs: false, outputs: false},
+      databaseQueryData: false,
+      graphQL: {document: false, variables: false},
+    },
     environment: getSentryEnvironment(),
     integrations: [
       Sentry.spanStreamingIntegration(),
