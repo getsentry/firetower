@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -7,6 +8,7 @@ from firetower.incidents.models import ExternalLinkType, IncidentStatus
 from firetower.slack_app.handlers.postmortem_meeting import (
     handle_postmortem_meeting_message,
     is_postmortem_meeting_message,
+    parse_meeting_start,
 )
 
 from .conftest import CHANNEL_ID
@@ -66,3 +68,65 @@ class TestHandlePostmortemMeetingMessage:
         assert not incident.external_links.filter(
             type=ExternalLinkType.POSTMORTEM_MEETING_LINK
         ).exists()
+
+    @patch(
+        "firetower.slack_app.handlers.postmortem_meeting.schedule_postmortem_final_call"
+    )
+    def test_schedules_final_call_from_threaded_reply(self, mock_schedule, incident):
+        incident.status = IncidentStatus.POSTMORTEM
+        incident.save()
+        event = {
+            **_event(text=f"Scheduled for 2026-11-03T17:00:00Z: <{MEET_URL}|Join>"),
+            "thread_ts": "1111.2222",
+        }
+
+        handle_postmortem_meeting_message(event)
+
+        mock_schedule.assert_called_once_with(
+            incident,
+            CHANNEL_ID,
+            "1111.2222",
+            datetime(2026, 11, 3, 17, 0, tzinfo=UTC),
+        )
+
+    @patch(
+        "firetower.slack_app.handlers.postmortem_meeting.schedule_postmortem_final_call"
+    )
+    def test_skips_final_call_without_start_time(self, mock_schedule, incident):
+        incident.status = IncidentStatus.POSTMORTEM
+        incident.save()
+
+        handle_postmortem_meeting_message({**_event(), "thread_ts": "1111.2222"})
+
+        mock_schedule.assert_not_called()
+
+    @patch(
+        "firetower.slack_app.handlers.postmortem_meeting.schedule_postmortem_final_call"
+    )
+    def test_skips_final_call_outside_thread(self, mock_schedule, incident):
+        incident.status = IncidentStatus.POSTMORTEM
+        incident.save()
+
+        handle_postmortem_meeting_message(
+            _event(text=f"2026-11-03T17:00:00Z <{MEET_URL}|Join>")
+        )
+
+        mock_schedule.assert_not_called()
+
+
+class TestParseMeetingStart:
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            ("at 2026-11-03T17:00:00Z", datetime(2026, 11, 3, 17, 0, tzinfo=UTC)),
+            ("at 2026-11-03T17:00Z", datetime(2026, 11, 3, 17, 0, tzinfo=UTC)),
+            (
+                "at 2026-11-03T09:00:00-08:00",
+                datetime(2026, 11, 3, 17, 0, tzinfo=UTC),
+            ),
+            ("at 2026-11-03T17:00:00", None),
+            ("next Tuesday", None),
+        ],
+    )
+    def test_parse(self, text, expected):
+        assert parse_meeting_start(text) == expected

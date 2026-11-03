@@ -79,7 +79,12 @@ class SlackConfig:
     postmortem_scheduler_bot_user_id: str = ""
     postmortem_scheduler_bot_prompt: str = (
         "Schedule the {incident_number} postmortem meeting with everyone who "
-        "reacted to {prompt_url}, then reply with the Google Meet link."
+        "reacted to {prompt_url}, then reply in this thread with the Google Meet "
+        "link and the meeting start time in ISO 8601 UTC (e.g. 2026-11-03T17:00:00Z)."
+    )
+    postmortem_final_call_prompt: str = (
+        "The {incident_number} postmortem meeting ({meeting_url}) is tomorrow. "
+        "Invite anyone who has reacted to {prompt_url} and isn't on the invite yet."
     )
 
 

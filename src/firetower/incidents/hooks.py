@@ -1454,6 +1454,34 @@ def record_postmortem_meeting(incident: Incident, meeting_url: str) -> None:
     )
 
 
+def schedule_postmortem_final_call(
+    incident: Incident, channel_id: str, message_ts: str, meeting_start: datetime
+) -> None:
+    """Schedule one last scheduler bot ping the day before the postmortem meeting."""
+    schedule_name = f"postmortem_final_call_{incident.id}"
+    run_at = meeting_start - timedelta(days=1)
+    if run_at <= timezone.now():
+        Schedule.objects.filter(name=schedule_name).delete()
+        return
+
+    Schedule.objects.update_or_create(
+        name=schedule_name,
+        defaults={
+            "func": "firetower.incidents.tasks.send_postmortem_final_call",
+            "kwargs": json.dumps(
+                {
+                    "incident_id": incident.id,
+                    "channel_id": channel_id,
+                    "message_ts": message_ts,
+                }
+            ),
+            "schedule_type": Schedule.ONCE,
+            "next_run": run_at,
+            "repeats": -1,
+        },
+    )
+
+
 def cancel_statuspage_followup_reminder(incident: Incident) -> None:
     Schedule.objects.filter(name=f"statuspage_followup_reminder_{incident.id}").delete()
 

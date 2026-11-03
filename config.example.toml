@@ -70,8 +70,11 @@ triage_bot_prompt = "We've been alerted by {alert_url}, run incident triage for 
 # postmortem_attendee_collection_days = 2
 postmortem_scheduler_bot_user_id = ""
 # When the scheduler bot replies in the incident channel with a Google Meet link, Firetower saves it
-# as the incident's postmortem meeting link.
-postmortem_scheduler_bot_prompt = "Schedule the {incident_number} postmortem meeting with everyone who reacted to {prompt_url}, then reply with the Google Meet link."
+# as the incident's postmortem meeting link. If the reply is in the prompt's thread and includes an
+# ISO 8601 start time with a UTC offset, Firetower also pings the bot again with
+# postmortem_final_call_prompt the day before the meeting.
+postmortem_scheduler_bot_prompt = "Schedule the {incident_number} postmortem meeting with everyone who reacted to {prompt_url}, then reply in this thread with the Google Meet link and the meeting start time in ISO 8601 UTC (e.g. 2026-11-03T17:00:00Z)."
+postmortem_final_call_prompt = "The {incident_number} postmortem meeting ({meeting_url}) is tomorrow. Invite anyone who has reacted to {prompt_url} and isn't on the invite yet."
 
 [auth]
 iap_enabled = false

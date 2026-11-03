@@ -32,6 +32,7 @@ from firetower.incidents.hooks import (
     page_for_channel,
     record_postmortem_meeting,
     resolve_pages_for_incident,
+    schedule_postmortem_final_call,
     schedule_statuspage_followup_reminder,
     start_postmortem_attendee_collection,
 )
@@ -4325,3 +4326,55 @@ class TestRecordPostmortemMeeting:
             incident=incident, type=ExternalLinkType.POSTMORTEM_MEETING_LINK
         )
         assert link.url == new_url
+
+
+@pytest.mark.django_db
+class TestSchedulePostmortemFinalCall:
+    def _make_incident(self):
+        return Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            status=IncidentStatus.POSTMORTEM,
+        )
+
+    def test_schedules_day_before_meeting(self):
+        incident = self._make_incident()
+        meeting_start = timezone.now() + timedelta(days=5)
+
+        schedule_postmortem_final_call(incident, "C12345", "1111.2222", meeting_start)
+
+        schedule = Schedule.objects.get(name=f"postmortem_final_call_{incident.id}")
+        assert schedule.func == "firetower.incidents.tasks.send_postmortem_final_call"
+        assert schedule.schedule_type == Schedule.ONCE
+        assert schedule.next_run == meeting_start - timedelta(days=1)
+        assert ast.literal_eval(schedule.kwargs) == {
+            "incident_id": incident.id,
+            "channel_id": "C12345",
+            "message_ts": "1111.2222",
+        }
+
+    def test_reschedule_replaces_previous(self):
+        incident = self._make_incident()
+        new_start = timezone.now() + timedelta(days=7)
+
+        schedule_postmortem_final_call(
+            incident, "C12345", "1111.2222", timezone.now() + timedelta(days=5)
+        )
+        schedule_postmortem_final_call(incident, "C12345", "1111.2222", new_start)
+
+        schedule = Schedule.objects.get(name=f"postmortem_final_call_{incident.id}")
+        assert schedule.next_run == new_start - timedelta(days=1)
+
+    def test_skips_and_clears_when_meeting_within_a_day(self):
+        incident = self._make_incident()
+        schedule_postmortem_final_call(
+            incident, "C12345", "1111.2222", timezone.now() + timedelta(days=5)
+        )
+
+        schedule_postmortem_final_call(
+            incident, "C12345", "1111.2222", timezone.now() + timedelta(hours=12)
+        )
+
+        assert not Schedule.objects.filter(
+            name=f"postmortem_final_call_{incident.id}"
+        ).exists()
