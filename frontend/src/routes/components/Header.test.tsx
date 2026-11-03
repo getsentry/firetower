@@ -124,8 +124,9 @@ function createTestRouter(initialPath = '/') {
   });
 }
 
-const renderRoute = (initialPath = '/') => {
+const renderRoute = async (initialPath = '/') => {
   const router = createTestRouter(initialPath);
+  await router.load();
   return render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
@@ -149,7 +150,7 @@ describe('Header - Root Route (Incident List)', () => {
   });
 
   it('shows nav tabs and centered logo without back button', async () => {
-    renderRoute('/');
+    await renderRoute('/');
 
     expect(await screen.findByText('INC-1247')).toBeInTheDocument();
 
@@ -164,7 +165,7 @@ describe('Header - Root Route (Incident List)', () => {
 
   it('stores search params in sessionStorage when filtering', async () => {
     const user = userEvent.setup();
-    renderRoute('/');
+    await renderRoute('/');
 
     await screen.findByText('INC-1247');
 
@@ -179,7 +180,7 @@ describe('Header - Root Route (Incident List)', () => {
   });
 
   it('stores empty search params in sessionStorage on initial load', async () => {
-    renderRoute('/');
+    await renderRoute('/');
 
     await screen.findByText('INC-1247');
 
@@ -207,7 +208,7 @@ describe('Header - Availability Route', () => {
   });
 
   it('shows nav tabs with Availability active', async () => {
-    renderRoute('/availability');
+    await renderRoute('/availability');
 
     expect(await screen.findByText('Availability by Region')).toBeInTheDocument();
 
@@ -238,7 +239,7 @@ describe('Header - Incident Detail Route', () => {
   });
 
   it('shows back button with centered logo', async () => {
-    renderRoute('/INC-1247');
+    await renderRoute('/INC-1247');
 
     expect(
       await screen.findByText('Database Connection Pool Exhausted')
@@ -251,7 +252,7 @@ describe('Header - Incident Detail Route', () => {
   });
 
   it('back button links to root without search params when sessionStorage is empty', async () => {
-    renderRoute('/INC-1247');
+    await renderRoute('/INC-1247');
 
     await screen.findByText('Database Connection Pool Exhausted');
 
@@ -262,7 +263,7 @@ describe('Header - Incident Detail Route', () => {
   it('back button preserves search params from sessionStorage', async () => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({status: ['Postmortem']}));
 
-    renderRoute('/INC-1247');
+    await renderRoute('/INC-1247');
 
     await screen.findByText('Database Connection Pool Exhausted');
 
@@ -275,7 +276,7 @@ describe('Header - Incident Detail Route', () => {
 
   it('navigates back to list with preserved filters', async () => {
     const user = userEvent.setup();
-    renderRoute('/');
+    await renderRoute('/');
 
     await screen.findByText('INC-1247');
 
@@ -317,7 +318,7 @@ describe('Header - User Avatar', () => {
   });
 
   it('displays user avatar with initials when no avatar_url', async () => {
-    renderRoute('/');
+    await renderRoute('/');
 
     await screen.findByText('INC-1247');
 
@@ -341,7 +342,7 @@ describe('Header - User Avatar', () => {
       return Promise.reject(new Error('Not found'));
     });
 
-    renderRoute('/');
+    await renderRoute('/');
 
     await screen.findByText('INC-1247');
 
@@ -365,7 +366,7 @@ describe('Header - User Avatar', () => {
       return Promise.reject(new Error('Not found'));
     });
 
-    renderRoute('/INC-1247');
+    await renderRoute('/INC-1247');
 
     await screen.findByText('Database Connection Pool Exhausted');
 
@@ -395,7 +396,7 @@ describe('Header - sessionStorage Handling', () => {
   it('handles invalid JSON in sessionStorage gracefully', async () => {
     sessionStorage.setItem(STORAGE_KEY, '{invalid json}');
 
-    renderRoute('/INC-1247');
+    await renderRoute('/INC-1247');
 
     await screen.findByText('Database Connection Pool Exhausted');
 
@@ -406,7 +407,7 @@ describe('Header - sessionStorage Handling', () => {
   });
 
   it('handles missing sessionStorage gracefully', async () => {
-    renderRoute('/INC-1247');
+    await renderRoute('/INC-1247');
 
     await screen.findByText('Database Connection Pool Exhausted');
 
@@ -418,7 +419,7 @@ describe('Header - sessionStorage Handling', () => {
 
   it('updates sessionStorage when filters change', async () => {
     const user = userEvent.setup();
-    renderRoute('/');
+    await renderRoute('/');
 
     await screen.findByText('INC-1247');
 
