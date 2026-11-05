@@ -25,6 +25,7 @@ actions = ["opened", "synchronize", "reopened"]
 
 [[skills]]
 name = "django-perf-review"
+incremental = true
 remote = "getsentry/skills"
 paths = ["src/**/*.py"]
 ignorePaths = ["**/tests/**", "**/test_*.py", "**/*_test.py"]
@@ -35,6 +36,7 @@ actions = ["opened", "synchronize", "reopened"]
 
 [[skills]]
 name = "code-review"
+incremental = true
 remote = "getsentry/skills"
 
 [[skills.triggers]]
@@ -43,6 +45,7 @@ actions = ["opened", "synchronize", "reopened"]
 
 [[skills]]
 name = "find-bugs"
+incremental = true
 remote = "getsentry/skills"
 
 [[skills.triggers]]
