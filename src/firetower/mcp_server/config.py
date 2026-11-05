@@ -9,6 +9,7 @@ See ``.env.mcp.example`` for the full list of variables.
 
 import os
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 WORKSPACE_DOMAIN = "sentry.io"
 
@@ -21,6 +22,20 @@ def _require(name: str) -> str:
     value = os.environ.get(name)
     if not value:
         raise ConfigError(f"Missing required environment variable: {name}")
+    return value
+
+
+def _optional_https_url(name: str) -> str | None:
+    value = (os.environ.get(name) or "").strip()
+    if not value:
+        return None
+    try:
+        parts = urlsplit(value)
+        hostname = parts.hostname
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be an absolute https:// URL.") from exc
+    if parts.scheme != "https" or not hostname:
+        raise ConfigError(f"{name} must be an absolute https:// URL.")
     return value
 
 
@@ -37,6 +52,8 @@ class MCPConfig:
     allowed_redirect_uris: tuple[str, ...]
     host: str
     port: int
+    bot_issuer: str | None = None
+    bot_jwks_url: str | None = None
 
     @classmethod
     def from_env(cls) -> "MCPConfig":
@@ -50,6 +67,12 @@ class MCPConfig:
             raise ConfigError(
                 "MCP_ALLOWED_REDIRECT_URIS must list at least one redirect URI."
             )
+        bot_issuer = _optional_https_url("MCP_BOT_ISSUER")
+        bot_jwks_url = _optional_https_url("MCP_BOT_JWKS_URL")
+        if bool(bot_issuer) != bool(bot_jwks_url):
+            raise ConfigError(
+                "MCP_BOT_ISSUER and MCP_BOT_JWKS_URL must be set together."
+            )
         return cls(
             google_client_id=_require("MCP_GOOGLE_CLIENT_ID"),
             google_client_secret=_require("MCP_GOOGLE_CLIENT_SECRET"),
@@ -60,4 +83,6 @@ class MCPConfig:
             allowed_redirect_uris=allowed_redirect_uris,
             host=os.environ.get("MCP_HOST", "0.0.0.0"),
             port=int(os.environ.get("PORT", "8080")),
+            bot_issuer=bot_issuer,
+            bot_jwks_url=bot_jwks_url,
         )
