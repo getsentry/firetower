@@ -1,5 +1,5 @@
-FROM python:3.12.11-alpine3.22 AS build_backend
-COPY --from=ghcr.io/astral-sh/uv:0.13.5 /uv /uvx /bin/
+FROM python:3.12.16-alpine3.23 AS build_backend
+COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /uvx /bin/
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY README.md .
 COPY src/ src/
 RUN uv sync --group prod --no-dev --frozen --compile-bytecode --no-editable
 
-FROM python:3.12.11-alpine3.22
+FROM python:3.12.16-alpine3.23
 
 ENV \
       PYTHONUNBUFFERED="True" \
