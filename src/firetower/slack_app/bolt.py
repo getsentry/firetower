@@ -33,6 +33,10 @@ from firetower.slack_app.handlers.new_incident import (
     handle_severity_action,
     handle_tag_options,
 )
+from firetower.slack_app.handlers.postmortem_meeting import (
+    handle_postmortem_meeting_message,
+    is_postmortem_meeting_message,
+)
 from firetower.slack_app.handlers.reopen import handle_reopen_command
 from firetower.slack_app.handlers.resolved import (
     handle_resolved_command,
@@ -296,9 +300,9 @@ def _ignore_message_event(ack: Any) -> None:
 
     Subscribing to message.channels/message.groups opts the bot into the full
     message firehose. Without a catch-all listener Bolt logs an "Unhandled
-    request" warning for every non-topic message. This listener is registered
-    after the channel_topic handler, so for topic changes the specific handler
-    runs first and returns before this one is reached.
+    request" warning for every unmatched message. This listener is registered
+    after the specific message handlers, so they run first and this one is only
+    reached when none of them match.
     """
     ack()
 
@@ -307,5 +311,8 @@ def _register_event_handlers(app: App) -> None:
     """Register Slack event subscriptions on the Bolt app."""
     app.event({"type": "message", "subtype": "channel_topic"})(
         _with_event_metrics("channel_topic")(handle_channel_topic_change)
+    )
+    app.event("message", matchers=[is_postmortem_meeting_message])(
+        _with_event_metrics("postmortem_meeting")(handle_postmortem_meeting_message)
     )
     app.event("message")(_ignore_message_event)
