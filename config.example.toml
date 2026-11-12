@@ -64,11 +64,6 @@ incident_guide_message = "This is the message posted whenever a new incident sla
 slash_command = "/inc"
 triage_bot_user_id = ""
 triage_bot_prompt = "We've been alerted by {alert_url}, run incident triage for this issue."
-# Optional: channel where Cloud Monitoring posts Google Cloud Service Health alerts.
-# When set, new incidents get a message listing open GCP incidents from this channel.
-gcp_incident_alert_channel_id = ""
-gcp_incident_alert_policy_name = "Emerging incidents"
-gcp_incident_alert_lookback_hours = 24
 
 [auth]
 iap_enabled = false
@@ -128,6 +123,11 @@ troubleshooting_template_markdown = """
 api_key = ""  # Overridable via OPENROUTER_API_KEY
 # OpenRouter model slug; routes to Google's Gemini 2.5 Flash.
 model = "google/gemini-2.5-flash"
+
+[gcp_service_health]
+# GCP projects to check for open Google Cloud incidents when an incident is declared.
+# Firetower's service account needs roles/servicehealth.viewer on each. Omit to disable.
+projects = ["your-gcp-project"]
 
 [statuspage]
 api_key = ""  # Overridable via STATUSPAGE_API_KEY

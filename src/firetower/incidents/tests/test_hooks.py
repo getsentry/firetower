@@ -31,7 +31,7 @@ from firetower.incidents.hooks import (
     on_title_changed,
     on_visibility_changed,
     page_for_channel,
-    post_gcp_incident_alerts,
+    post_gcp_incidents,
     resolve_pages_for_incident,
     schedule_statuspage_followup_reminder,
 )
@@ -41,6 +41,10 @@ from firetower.incidents.models import (
     Incident,
     IncidentSeverity,
     IncidentStatus,
+)
+from firetower.integrations.services.gcp_service_health import (
+    GcpIncident,
+    GcpServiceHealthService,
 )
 
 
@@ -598,21 +602,18 @@ class TestOnIncidentCreated:
         assert "Incident Captain: <@U_CAPTAIN>" in info_calls[0][0][1]
 
 
-def _gcp_incident_message(ts: str, event_id: str = "LDYWVWM") -> dict:
-    return {
-        "type": "message",
-        "ts": ts,
-        "text": (
-            "*<https://console.cloud.google.com/monitoring/alerting/alerts/0.a"
-            "|Emerging incidents>* Log match condition with labels "
-            "{impactedLocations=['us-east1'],impactedProducts=['Cloud Run'],"
-            "startTime=2026-11-12T07:48:02Z,state=ACTIVE,title=Cloud Run errors} "
-            f"fired for Event with {{event_id={event_id}, location=global}}."
-        ),
-    }
+def _gcp_incident(title: str = "Cloud Run errors") -> GcpIncident:
+    return GcpIncident(
+        event_id="LDYWVWM",
+        name="projects/internal-sentry/locations/global/events/LDYWVWM",
+        title=title,
+        detailed_state="CONFIRMED",
+        relevance="RELATED",
+        update_time="2026-11-12T08:00:00Z",
+    )
 
 
-class TestPostGcpIncidentAlerts:
+class TestPostGcpIncidents:
     def _ctx(self) -> ChannelSetupContext:
         return ChannelSetupContext(
             channel_id="C99999",
@@ -622,70 +623,61 @@ class TestPostGcpIncidentAlerts:
             is_private=False,
         )
 
-    def _configure(self, settings, channel_id: str = "C_GCP") -> None:
-        settings.SLACK = {
-            **settings.SLACK,
-            "GCP_INCIDENT_ALERT_CHANNEL_ID": channel_id,
-            "GCP_INCIDENT_ALERT_POLICY_NAME": "Emerging incidents",
-            "GCP_INCIDENT_ALERT_LOOKBACK_HOURS": 6,
-        }
-
     def test_noop_when_not_configured(self, settings):
-        self._configure(settings, channel_id="")
+        settings.GCP_SERVICE_HEALTH = None
         slack = MagicMock()
 
-        post_gcp_incident_alerts(self._ctx(), slack)
+        with patch.object(GcpServiceHealthService, "list_active_incidents") as mock:
+            post_gcp_incidents(self._ctx(), slack)
 
-        slack.get_messages_since.assert_not_called()
+        mock.assert_not_called()
         slack.post_message.assert_not_called()
 
     def test_posts_open_gcp_incidents(self, settings):
-        self._configure(settings)
+        settings.GCP_SERVICE_HEALTH = {"PROJECTS": ["internal-sentry"]}
         slack = MagicMock()
-        slack.get_messages_since.return_value = [_gcp_incident_message("100.5")]
-        slack.build_message_url.return_value = "https://slack/p1005"
 
-        before = timezone.now()
-        post_gcp_incident_alerts(self._ctx(), slack)
+        with patch.object(
+            GcpServiceHealthService,
+            "list_active_incidents",
+            return_value=[_gcp_incident()],
+        ):
+            post_gcp_incidents(self._ctx(), slack)
 
-        channel_id, oldest = slack.get_messages_since.call_args[0]
-        assert channel_id == "C_GCP"
-        expected_oldest = (before - timedelta(hours=6)).timestamp()
-        assert abs(oldest - expected_oldest) < 5
-        slack.build_message_url.assert_called_once_with("C_GCP", "100.5")
         slack.post_message.assert_called_once()
         target, text = slack.post_message.call_args[0]
         assert target == "C99999"
-        assert "(from <#C_GCP>)" in text
+        assert "Open GCP incidents" in text
         assert "Cloud Run errors" in text
-        assert "<https://slack/p1005|alert>" in text
 
     def test_does_not_post_without_open_incidents(self, settings):
-        self._configure(settings)
+        settings.GCP_SERVICE_HEALTH = {"PROJECTS": ["internal-sentry"]}
         slack = MagicMock()
-        slack.get_messages_since.return_value = [
-            {"type": "message", "ts": "1.0", "text": "unrelated"}
-        ]
 
-        post_gcp_incident_alerts(self._ctx(), slack)
+        with patch.object(
+            GcpServiceHealthService, "list_active_incidents", return_value=[]
+        ):
+            post_gcp_incidents(self._ctx(), slack)
 
         slack.post_message.assert_not_called()
 
 
 @pytest.mark.django_db
-class TestOnIncidentCreatedGcpAlerts:
+class TestOnIncidentCreatedGcpIncidents:
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
     @patch("firetower.incidents.hooks._slack_service")
-    def test_posts_gcp_alerts_before_triage_bot(self, mock_slack, settings):
+    def test_posts_gcp_incidents_before_triage_bot(
+        self, mock_slack, mock_list, settings
+    ):
+        settings.GCP_SERVICE_HEALTH = {"PROJECTS": ["internal-sentry"]}
         settings.SLACK = {
             **settings.SLACK,
-            "GCP_INCIDENT_ALERT_CHANNEL_ID": "C_GCP",
             "TRIAGE_BOT_USER_ID": "U_TRIAGE_BOT",
             "TRIAGE_BOT_PROMPT": "Alert: {alert_url}",
         }
+        mock_list.return_value = [_gcp_incident()]
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
-        mock_slack.get_messages_since.return_value = [_gcp_incident_message("100.5")]
-        mock_slack.build_message_url.return_value = "https://slack/p1005"
 
         incident = Incident.objects.create(
             title="Test Incident",
@@ -705,12 +697,16 @@ class TestOnIncidentCreatedGcpAlerts:
         assert channel_messages[-1].startswith("<@U_TRIAGE_BOT>")
         assert gcp_index < len(channel_messages) - 1
 
+    @patch.object(
+        GcpServiceHealthService,
+        "list_active_incidents",
+        side_effect=Exception("boom"),
+    )
     @patch("firetower.incidents.hooks._slack_service")
-    def test_gcp_alert_failure_does_not_break_creation(self, mock_slack, settings):
-        settings.SLACK = {**settings.SLACK, "GCP_INCIDENT_ALERT_CHANNEL_ID": "C_GCP"}
+    def test_gcp_failure_does_not_break_creation(self, mock_slack, _, settings):
+        settings.GCP_SERVICE_HEALTH = {"PROJECTS": ["internal-sentry"]}
         mock_slack.create_channel.return_value = "C99999"
         mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
-        mock_slack.get_messages_since.side_effect = Exception("boom")
 
         incident = Incident.objects.create(
             title="Test Incident",

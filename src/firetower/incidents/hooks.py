@@ -29,9 +29,9 @@ from firetower.integrations.services import (
     PagerDutyService,
     SlackService,
 )
-from firetower.integrations.services.gcp_incident_alerts import (
-    find_open_gcp_incidents,
-    format_gcp_incidents_message,
+from firetower.integrations.services.gcp_service_health import (
+    GcpServiceHealthService,
+    format_incidents_message,
 )
 from firetower.integrations.services.notion import NotionService
 from firetower.integrations.services.slack import escape_slack_text
@@ -900,32 +900,18 @@ def ping_triage_bot(ctx: ChannelSetupContext, slack_service: SlackService) -> No
         logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
 
 
-def post_gcp_incident_alerts(
-    ctx: ChannelSetupContext, slack_service: SlackService
-) -> None:
-    """Post open GCP incidents from the configured GCP alert channel, if any."""
-    source_channel_id = settings.SLACK.get("GCP_INCIDENT_ALERT_CHANNEL_ID", "")
-    if not source_channel_id:
+def post_gcp_incidents(ctx: ChannelSetupContext, slack_service: SlackService) -> None:
+    """Post open GCP incidents from the Service Health API, if any."""
+    service = GcpServiceHealthService.from_settings()
+    if service is None:
         return
 
-    policy_name = settings.SLACK["GCP_INCIDENT_ALERT_POLICY_NAME"]
-    lookback_hours = settings.SLACK["GCP_INCIDENT_ALERT_LOOKBACK_HOURS"]
-    oldest = (timezone.now() - timedelta(hours=lookback_hours)).timestamp()
-
-    messages = slack_service.get_messages_since(source_channel_id, oldest)
-    alerts = find_open_gcp_incidents(messages, policy_name)
-    if not alerts:
+    incidents = service.list_active_incidents()
+    if not incidents:
         logger.info(f"No open GCP incidents found for {ctx.channel_name}")
         return
 
-    slack_service.post_message(
-        ctx.channel_id,
-        format_gcp_incidents_message(
-            alerts,
-            source_channel_id,
-            lambda ts: slack_service.build_message_url(source_channel_id, ts),
-        ),
-    )
+    slack_service.post_message(ctx.channel_id, format_incidents_message(incidents))
 
 
 def decorate_incident_channel(
@@ -1087,9 +1073,9 @@ def decorate_incident_channel(
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
 
     try:
-        post_gcp_incident_alerts(ctx, slack_service)
+        post_gcp_incidents(ctx, slack_service)
     except Exception:
-        logger.exception(f"Failed to post GCP incident alerts in {ctx.channel_name}")
+        logger.exception(f"Failed to post GCP incidents in {ctx.channel_name}")
 
     return status_channel_id
 
