@@ -221,6 +221,7 @@ class Incident(models.Model):
     participants_last_synced_at = models.DateTimeField(null=True, blank=True)
     action_items_last_synced_at = models.DateTimeField(null=True, blank=True)
     linear_parent_issue_id = models.CharField(max_length=255, null=True, blank=True)
+    posted_gcp_event_ids = models.JSONField(default=list, blank=True)
 
     # Milestone timestamps (for postmortem)
     total_downtime = models.IntegerField(

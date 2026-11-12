@@ -605,10 +605,12 @@ class TestOnIncidentCreated:
         assert "Incident Captain: <@U_CAPTAIN>" in info_calls[0][0][1]
 
 
-def _gcp_incident(title: str = "Cloud Run errors") -> GcpIncident:
+def _gcp_incident(
+    title: str = "Cloud Run errors", event_id: str = "LDYWVWM"
+) -> GcpIncident:
     return GcpIncident(
-        event_id="LDYWVWM",
-        name="projects/internal-sentry/locations/global/events/LDYWVWM",
+        event_id=event_id,
+        name=f"projects/internal-sentry/locations/global/events/{event_id}",
         title=title,
         detailed_state="CONFIRMED",
         relevance="RELATED",
@@ -728,6 +730,8 @@ class TestOnIncidentCreatedGcpIncidents:
         )
         assert channel_messages[-1].startswith("<@U_TRIAGE_BOT>")
         assert gcp_index < len(channel_messages) - 1
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["LDYWVWM"]
 
     @patch.object(
         GcpServiceHealthService,
@@ -780,6 +784,62 @@ class TestOnAffectedRegionsAdded:
         target, text = mock_slack.post_message.call_args[0]
         assert target == "C12345"
         assert "may be relevant to geico" in text
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["LDYWVWM"]
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_already_posted_gcp_incidents(self, mock_slack, mock_list, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_list.return_value = [
+            _gcp_incident(),
+            _gcp_incident(title="GKE node pool errors", event_id="NEWEVENT"),
+        ]
+        incident = self._incident_with_channel()
+        incident.posted_gcp_event_ids = ["LDYWVWM"]
+        incident.save()
+
+        on_affected_regions_added(incident, ["us"])
+
+        _, text = mock_slack.post_message.call_args[0]
+        assert "GKE node pool errors" in text
+        assert "Cloud Run errors" not in text
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["LDYWVWM", "NEWEVENT"]
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_post_when_all_already_posted(
+        self, mock_slack, mock_list, settings
+    ):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_list.return_value = [_gcp_incident()]
+        incident = self._incident_with_channel()
+        incident.posted_gcp_event_ids = ["LDYWVWM"]
+        incident.save()
+
+        on_affected_regions_added(incident, ["us"])
+
+        mock_slack.post_message.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "status",
+        [IncidentStatus.POSTMORTEM, IncidentStatus.DONE, IncidentStatus.CANCELED],
+    )
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_closed_incidents(self, mock_slack, mock_list, settings, status):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        incident = self._incident_with_channel()
+        incident.status = status
+        incident.save()
+
+        on_affected_regions_added(incident, ["us"])
+
+        mock_list.assert_not_called()
+        mock_slack.post_message.assert_not_called()
 
     @patch.object(GcpServiceHealthService, "list_active_incidents")
     @patch("firetower.incidents.hooks._slack_service")
