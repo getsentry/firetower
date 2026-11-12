@@ -124,6 +124,15 @@ api_key = ""  # Overridable via OPENROUTER_API_KEY
 # OpenRouter model slug; routes to Google's Gemini 2.5 Flash.
 model = "google/gemini-2.5-flash"
 
+# Optional: check Google Cloud Service Health for open GCP incidents.
+# Maps affected region tag names to the GCP projects to check for them. New
+# incidents check the projects for their affected regions (all projects when no
+# mapped region is set), and adding a region later checks that region's projects.
+# Firetower's service account needs roles/servicehealth.viewer on each project.
+[gcp_service_health.region_projects]
+us = ["your-us-gcp-project"]
+de = ["your-de-gcp-project"]
+
 [statuspage]
 api_key = ""  # Overridable via STATUSPAGE_API_KEY
 page_id = ""

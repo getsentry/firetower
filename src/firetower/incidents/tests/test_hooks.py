@@ -10,6 +10,7 @@ from django_q.models import Schedule
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
     DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
+    ChannelSetupContext,
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_to_channel,
@@ -22,6 +23,7 @@ from firetower.incidents.hooks import (
     build_channel_topic,
     cancel_statuspage_followup_reminder,
     create_linear_parent_issue,
+    on_affected_regions_added,
     on_captain_changed,
     on_incident_created,
     on_incident_updated,
@@ -30,6 +32,7 @@ from firetower.incidents.hooks import (
     on_title_changed,
     on_visibility_changed,
     page_for_channel,
+    post_gcp_incidents,
     resolve_pages_for_incident,
     schedule_statuspage_followup_reminder,
 )
@@ -39,6 +42,12 @@ from firetower.incidents.models import (
     Incident,
     IncidentSeverity,
     IncidentStatus,
+    Tag,
+    TagType,
+)
+from firetower.integrations.services.gcp_service_health import (
+    GcpIncident,
+    GcpServiceHealthService,
 )
 
 
@@ -594,6 +603,325 @@ class TestOnIncidentCreated:
         ]
         assert len(info_calls) == 1
         assert "Incident Captain: <@U_CAPTAIN>" in info_calls[0][0][1]
+
+
+def _gcp_incident(
+    title: str = "Cloud Run errors", event_id: str = "LDYWVWM"
+) -> GcpIncident:
+    return GcpIncident(
+        event_id=event_id,
+        name=f"projects/internal-sentry/locations/global/events/{event_id}",
+        title=title,
+        detailed_state="CONFIRMED",
+        relevance="RELATED",
+        update_time="2026-11-12T08:00:00Z",
+    )
+
+
+REGION_PROJECTS = {
+    "us": ["internal-sentry"],
+    "de": ["sentry-eu-west3"],
+    "geico": ["sentry-st-geico"],
+}
+
+
+class TestPostGcpIncidents:
+    def _ctx(self, affected_regions: list[str] | None = None) -> ChannelSetupContext:
+        return ChannelSetupContext(
+            channel_id="C99999",
+            channel_name="inc-1",
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            is_private=False,
+            affected_regions=affected_regions or [],
+        )
+
+    def test_noop_when_not_configured(self, settings):
+        settings.GCP_SERVICE_HEALTH = None
+        slack = MagicMock()
+
+        with patch.object(GcpServiceHealthService, "list_active_incidents") as mock:
+            post_gcp_incidents(self._ctx(), slack)
+
+        mock.assert_not_called()
+        slack.post_message.assert_not_called()
+
+    def test_checks_projects_for_affected_regions(self, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        slack = MagicMock()
+
+        with patch.object(
+            GcpServiceHealthService,
+            "list_active_incidents",
+            return_value=[_gcp_incident()],
+        ) as mock:
+            post_gcp_incidents(self._ctx(["DE", "unmapped"]), slack)
+
+        mock.assert_called_once_with(["sentry-eu-west3"])
+        target, text = slack.post_message.call_args[0]
+        assert target == "C99999"
+        assert "may be relevant to DE:*" in text
+        assert "Cloud Run errors" in text
+
+    def test_checks_all_projects_without_mapped_region(self, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        slack = MagicMock()
+
+        with patch.object(
+            GcpServiceHealthService,
+            "list_active_incidents",
+            return_value=[_gcp_incident()],
+        ) as mock:
+            post_gcp_incidents(self._ctx(["unmapped"]), slack)
+
+        mock.assert_called_once_with(
+            ["internal-sentry", "sentry-eu-west3", "sentry-st-geico"]
+        )
+        _, text = slack.post_message.call_args[0]
+        assert "may be relevant:*" in text
+
+    def test_does_not_post_without_open_incidents(self, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        slack = MagicMock()
+
+        with patch.object(
+            GcpServiceHealthService, "list_active_incidents", return_value=[]
+        ):
+            post_gcp_incidents(self._ctx(), slack)
+
+        slack.post_message.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestOnIncidentCreatedGcpIncidents:
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_gcp_incidents_before_triage_bot(
+        self, mock_slack, mock_list, settings
+    ):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        settings.SLACK = {
+            **settings.SLACK,
+            "TRIAGE_BOT_USER_ID": "U_TRIAGE_BOT",
+            "TRIAGE_BOT_PROMPT": "Alert: {alert_url}",
+        }
+        mock_list.return_value = [_gcp_incident()]
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+        incident.affected_region_tags.add(
+            Tag.objects.create(name="us", type=TagType.AFFECTED_REGION)
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/1")
+
+        mock_list.assert_called_once_with(["internal-sentry"])
+        channel_messages = [
+            c[0][1]
+            for c in mock_slack.post_message.call_args_list
+            if c[0][0] == "C99999"
+        ]
+        gcp_index = next(
+            i for i, m in enumerate(channel_messages) if "Cloud Run errors" in m
+        )
+        assert channel_messages[-1].startswith("<@U_TRIAGE_BOT>")
+        assert gcp_index < len(channel_messages) - 1
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["LDYWVWM"]
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_merges_with_ids_stored_during_creation(
+        self, mock_slack, mock_list, settings
+    ):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        def stored_by_region_add(projects):
+            Incident.objects.filter(pk=incident.pk).update(
+                posted_gcp_event_ids=["FROMREGIONADD"]
+            )
+            return [_gcp_incident()]
+
+        mock_list.side_effect = stored_by_region_add
+
+        on_incident_created(incident)
+
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["FROMREGIONADD", "LDYWVWM"]
+
+    @patch.object(
+        GcpServiceHealthService,
+        "list_active_incidents",
+        side_effect=Exception("boom"),
+    )
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_gcp_failure_does_not_break_creation(self, mock_slack, _, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        assert ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.SLACK
+        ).exists()
+
+
+@pytest.mark.django_db
+class TestOnAffectedRegionsAdded:
+    def _incident_with_channel(self) -> Incident:
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.SLACK,
+            url="https://slack.com/archives/C12345",
+        )
+        return incident
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_incidents_for_added_regions(self, mock_slack, mock_list, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_list.return_value = [_gcp_incident()]
+        incident = self._incident_with_channel()
+
+        on_affected_regions_added(incident, ["geico"])
+
+        mock_list.assert_called_once_with(["sentry-st-geico"])
+        target, text = mock_slack.post_message.call_args[0]
+        assert target == "C12345"
+        assert "may be relevant to geico" in text
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["LDYWVWM"]
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_already_posted_gcp_incidents(self, mock_slack, mock_list, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_list.return_value = [
+            _gcp_incident(),
+            _gcp_incident(title="GKE node pool errors", event_id="NEWEVENT"),
+        ]
+        incident = self._incident_with_channel()
+        incident.posted_gcp_event_ids = ["LDYWVWM"]
+        incident.save()
+
+        on_affected_regions_added(incident, ["us"])
+
+        _, text = mock_slack.post_message.call_args[0]
+        assert "GKE node pool errors" in text
+        assert "Cloud Run errors" not in text
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["LDYWVWM", "NEWEVENT"]
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_uses_stored_ids_not_stale_instance(self, mock_slack, mock_list, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_list.return_value = [
+            _gcp_incident(),
+            _gcp_incident(title="GKE node pool errors", event_id="NEWEVENT"),
+        ]
+        incident = self._incident_with_channel()
+        Incident.objects.filter(pk=incident.pk).update(posted_gcp_event_ids=["LDYWVWM"])
+
+        on_affected_regions_added(incident, ["us"])
+
+        _, text = mock_slack.post_message.call_args[0]
+        assert "Cloud Run errors" not in text
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["LDYWVWM", "NEWEVENT"]
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_record_ids_when_post_fails(self, mock_slack, mock_list, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.post_message.return_value = None
+        mock_list.return_value = [_gcp_incident()]
+        incident = self._incident_with_channel()
+
+        on_affected_regions_added(incident, ["us"])
+
+        mock_slack.post_message.assert_called_once()
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == []
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_post_when_all_already_posted(
+        self, mock_slack, mock_list, settings
+    ):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_list.return_value = [_gcp_incident()]
+        incident = self._incident_with_channel()
+        incident.posted_gcp_event_ids = ["LDYWVWM"]
+        incident.save()
+
+        on_affected_regions_added(incident, ["us"])
+
+        mock_slack.post_message.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "status",
+        [IncidentStatus.POSTMORTEM, IncidentStatus.DONE, IncidentStatus.CANCELED],
+    )
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_closed_incidents(self, mock_slack, mock_list, settings, status):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        incident = self._incident_with_channel()
+        incident.status = status
+        incident.save()
+
+        on_affected_regions_added(incident, ["us"])
+
+        mock_list.assert_not_called()
+        mock_slack.post_message.assert_not_called()
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_skips_unmapped_regions(self, mock_slack, mock_list, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        incident = self._incident_with_channel()
+
+        on_affected_regions_added(incident, ["unmapped"])
+
+        mock_list.assert_not_called()
+        mock_slack.post_message.assert_not_called()
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_noop_when_not_configured(self, mock_slack, mock_list, settings):
+        settings.GCP_SERVICE_HEALTH = None
+        incident = self._incident_with_channel()
+
+        on_affected_regions_added(incident, ["us"])
+
+        mock_list.assert_not_called()
+        mock_slack.post_message.assert_not_called()
 
 
 @pytest.mark.django_db

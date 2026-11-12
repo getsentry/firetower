@@ -320,6 +320,11 @@ GENAI: dict | None = (
     if config.genai
     else None
 )
+GCP_SERVICE_HEALTH: dict | None = (
+    {"REGION_PROJECTS": config.gcp_service_health.region_projects}
+    if config.gcp_service_health
+    else None
+)
 HOOKS_ENABLED = config.hooks_enabled
 
 # PagerDuty Integration Configuration

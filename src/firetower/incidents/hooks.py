@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -28,6 +28,10 @@ from firetower.integrations.services import (
     LinearService,
     PagerDutyService,
     SlackService,
+)
+from firetower.integrations.services.gcp_service_health import (
+    GcpServiceHealthService,
+    format_incidents_message,
 )
 from firetower.integrations.services.notion import NotionService
 from firetower.integrations.services.slack import escape_slack_text
@@ -102,6 +106,9 @@ PAGING_POLICIES: dict[str, PolicyConfig] = {
 PD_SUMMARY_MAX_LENGTH = 1024
 
 
+GCP_CHECK_STATUSES = {IncidentStatus.ACTIVE, IncidentStatus.MITIGATED}
+
+
 @dataclass
 class ChannelSetupContext:
     """Primitive-arg context shared by normal and fallback incident channel setup."""
@@ -120,6 +127,8 @@ class ChannelSetupContext:
     incident_number: str | None = None
     topic: str | None = None
     alert_url: str | None = None
+    affected_regions: list[str] = field(default_factory=list)
+    posted_gcp_event_ids: list[str] = field(default_factory=list)
 
 
 def page_for_channel(
@@ -896,6 +905,69 @@ def ping_triage_bot(ctx: ChannelSetupContext, slack_service: SlackService) -> No
         logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
 
 
+def _post_gcp_incidents(
+    channel_id: str,
+    channel_name: str,
+    slack_service: SlackService,
+    service: GcpServiceHealthService,
+    projects: list[str],
+    regions: list[str],
+    already_posted: list[str],
+) -> list[str]:
+    """Post open GCP incidents not already posted; return the event ids posted."""
+    incidents = [
+        i
+        for i in service.list_active_incidents(projects)
+        if i.event_id not in already_posted
+    ]
+    if not incidents:
+        logger.info(f"No new open GCP incidents found for {channel_name}")
+        return []
+    if not slack_service.post_message(
+        channel_id, format_incidents_message(incidents, regions=regions)
+    ):
+        logger.warning(f"Failed to post GCP incidents to {channel_name}")
+        return []
+    return [i.event_id for i in incidents]
+
+
+def _record_posted_gcp_event_ids(incident: Incident, event_ids: list[str]) -> None:
+    """Merge event_ids into the incident's stored posted GCP event ids."""
+    if not event_ids:
+        return
+    with transaction.atomic():
+        locked = Incident.objects.select_for_update().only("posted_gcp_event_ids")
+        current = locked.get(pk=incident.pk).posted_gcp_event_ids
+        merged = [*current, *(e for e in event_ids if e not in current)]
+        Incident.objects.filter(pk=incident.pk).update(posted_gcp_event_ids=merged)
+    incident.posted_gcp_event_ids = merged
+
+
+def post_gcp_incidents(ctx: ChannelSetupContext, slack_service: SlackService) -> None:
+    """Post open GCP incidents for the incident's affected regions.
+
+    Checks every configured project when no affected region maps to one, and
+    records the posted event ids on ctx.posted_gcp_event_ids.
+    """
+    service = GcpServiceHealthService.from_settings()
+    if service is None:
+        return
+
+    regions = service.mapped_regions(ctx.affected_regions)
+    projects = service.projects_for_regions(regions) or service.all_projects
+    ctx.posted_gcp_event_ids.extend(
+        _post_gcp_incidents(
+            ctx.channel_id,
+            ctx.channel_name,
+            slack_service,
+            service,
+            projects,
+            regions,
+            ctx.posted_gcp_event_ids,
+        )
+    )
+
+
 def decorate_incident_channel(
     ctx: ChannelSetupContext,
     slack_service: SlackService,
@@ -1053,6 +1125,11 @@ def decorate_incident_channel(
             slack_service.post_message(feed_channel_id, feed_message)
         except Exception:
             logger.exception(f"Failed to post to feed channel for {ctx.channel_name}")
+
+    try:
+        post_gcp_incidents(ctx, slack_service)
+    except Exception:
+        logger.exception(f"Failed to post GCP incidents in {ctx.channel_name}")
 
     return status_channel_id
 
@@ -1518,6 +1595,7 @@ def on_incident_created(
             incident_number=incident.incident_number,
             topic=build_channel_topic(incident, captain_slack_id),
             alert_url=alert_url,
+            affected_regions=incident.affected_region_tag_names,
         )
         status_channel_id = decorate_incident_channel(
             ctx,
@@ -1528,6 +1606,7 @@ def on_incident_created(
         )
         if status_channel_id:
             _save_status_channel_link(incident, status_channel_id)
+        _record_posted_gcp_event_ids(incident, ctx.posted_gcp_event_ids)
 
         # DB-dedup Datadog/Notion after shared decoration so the guide message
         # appears first in the channel.
@@ -1739,6 +1818,43 @@ def on_captain_changed(incident: Incident) -> None:
                     )
     except Exception:
         logger.exception(f"Error in on_captain_changed for incident {incident.id}")
+
+
+def on_affected_regions_added(incident: Incident, regions: list[str]) -> None:
+    """Post open GCP incidents for regions newly added to an open incident.
+
+    Skips GCP incidents already posted to the channel.
+    """
+    try:
+        if incident.status not in GCP_CHECK_STATUSES:
+            return
+        service = GcpServiceHealthService.from_settings()
+        if service is None:
+            return
+        mapped = service.mapped_regions(regions)
+        if not mapped:
+            return
+        channel_id = _get_channel_id(incident)
+        if not channel_id:
+            return
+        already_posted = (
+            Incident.objects.filter(pk=incident.pk)
+            .values_list("posted_gcp_event_ids", flat=True)
+            .first()
+            or []
+        )
+        posted = _post_gcp_incidents(
+            channel_id,
+            incident.incident_number,
+            _slack_service,
+            service,
+            service.projects_for_regions(mapped),
+            mapped,
+            already_posted,
+        )
+        _record_posted_gcp_event_ids(incident, posted)
+    except Exception:
+        logger.exception(f"Failed to post GCP incidents for incident {incident.id}")
 
 
 def on_incident_updated(

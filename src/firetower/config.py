@@ -84,6 +84,11 @@ class GenAIConfig:
 
 
 @deserialize
+class GcpServiceHealthConfig:
+    region_projects: dict[str, list[str]]
+
+
+@deserialize
 class NotionConfig:
     database_id: str
     integration_token: str = ""  # secret: NOTION_INTEGRATION_TOKEN
@@ -163,6 +168,7 @@ class ConfigFile:
     salt_keys: list[str] = field(default_factory=list)
     notion: NotionConfig | None = None
     genai: GenAIConfig | None = None
+    gcp_service_health: GcpServiceHealthConfig | None = None
     log_level: str = "INFO"
     hooks_enabled: bool = (
         False  # TODO: remove after hooks migration is complete and always enable
@@ -327,6 +333,7 @@ class DummyConfigFile(ConfigFile):
         self.linear = None
         self.notion = None
         self.genai = None
+        self.gcp_service_health = None
         self.pagerduty = None
         self.statuspage = None
         self.project_key = ""
