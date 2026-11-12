@@ -262,6 +262,9 @@ class SlackSettings(TypedDict):
     SLASH_COMMAND: str
     TRIAGE_BOT_USER_ID: str
     TRIAGE_BOT_PROMPT: str
+    GCP_INCIDENT_ALERT_CHANNEL_ID: str
+    GCP_INCIDENT_ALERT_POLICY_NAME: str
+    GCP_INCIDENT_ALERT_LOOKBACK_HOURS: int
 
 
 SLACK: SlackSettings = {
@@ -274,6 +277,9 @@ SLACK: SlackSettings = {
     "SLASH_COMMAND": config.slack.slash_command,
     "TRIAGE_BOT_USER_ID": config.slack.triage_bot_user_id,
     "TRIAGE_BOT_PROMPT": config.slack.triage_bot_prompt,
+    "GCP_INCIDENT_ALERT_CHANNEL_ID": config.slack.gcp_incident_alert_channel_id,
+    "GCP_INCIDENT_ALERT_POLICY_NAME": config.slack.gcp_incident_alert_policy_name,
+    "GCP_INCIDENT_ALERT_LOOKBACK_HOURS": config.slack.gcp_incident_alert_lookback_hours,
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)

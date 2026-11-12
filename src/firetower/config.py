@@ -75,6 +75,9 @@ class SlackConfig:
     triage_bot_prompt: str = (
         "We've been alerted by {alert_url}, run incident triage for this issue."
     )
+    gcp_incident_alert_channel_id: str = ""
+    gcp_incident_alert_policy_name: str = "Emerging incidents"
+    gcp_incident_alert_lookback_hours: int = 24
 
 
 @deserialize

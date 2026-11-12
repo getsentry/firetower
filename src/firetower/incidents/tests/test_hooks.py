@@ -10,6 +10,7 @@ from django_q.models import Schedule
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.hooks import (
     DEFAULT_STATUSPAGE_WARNING_BUFFER_MINUTES,
+    ChannelSetupContext,
     _create_status_channel,
     _create_troubleshooting_doc,
     _invite_oncall_to_channel,
@@ -30,6 +31,7 @@ from firetower.incidents.hooks import (
     on_title_changed,
     on_visibility_changed,
     page_for_channel,
+    post_gcp_incident_alerts,
     resolve_pages_for_incident,
     schedule_statuspage_followup_reminder,
 )
@@ -594,6 +596,132 @@ class TestOnIncidentCreated:
         ]
         assert len(info_calls) == 1
         assert "Incident Captain: <@U_CAPTAIN>" in info_calls[0][0][1]
+
+
+def _gcp_incident_message(ts: str, event_id: str = "LDYWVWM") -> dict:
+    return {
+        "type": "message",
+        "ts": ts,
+        "text": (
+            "*<https://console.cloud.google.com/monitoring/alerting/alerts/0.a"
+            "|Emerging incidents>* Log match condition with labels "
+            "{impactedLocations=['us-east1'],impactedProducts=['Cloud Run'],"
+            "startTime=2026-11-12T07:48:02Z,state=ACTIVE,title=Cloud Run errors} "
+            f"fired for Event with {{event_id={event_id}, location=global}}."
+        ),
+    }
+
+
+class TestPostGcpIncidentAlerts:
+    def _ctx(self) -> ChannelSetupContext:
+        return ChannelSetupContext(
+            channel_id="C99999",
+            channel_name="inc-1",
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+            is_private=False,
+        )
+
+    def _configure(self, settings, channel_id: str = "C_GCP") -> None:
+        settings.SLACK = {
+            **settings.SLACK,
+            "GCP_INCIDENT_ALERT_CHANNEL_ID": channel_id,
+            "GCP_INCIDENT_ALERT_POLICY_NAME": "Emerging incidents",
+            "GCP_INCIDENT_ALERT_LOOKBACK_HOURS": 6,
+        }
+
+    def test_noop_when_not_configured(self, settings):
+        self._configure(settings, channel_id="")
+        slack = MagicMock()
+
+        post_gcp_incident_alerts(self._ctx(), slack)
+
+        slack.get_messages_since.assert_not_called()
+        slack.post_message.assert_not_called()
+
+    def test_posts_open_gcp_incidents(self, settings):
+        self._configure(settings)
+        slack = MagicMock()
+        slack.get_messages_since.return_value = [_gcp_incident_message("100.5")]
+        slack.build_message_url.return_value = "https://slack/p1005"
+
+        before = timezone.now()
+        post_gcp_incident_alerts(self._ctx(), slack)
+
+        channel_id, oldest = slack.get_messages_since.call_args[0]
+        assert channel_id == "C_GCP"
+        expected_oldest = (before - timedelta(hours=6)).timestamp()
+        assert abs(oldest - expected_oldest) < 5
+        slack.build_message_url.assert_called_once_with("C_GCP", "100.5")
+        slack.post_message.assert_called_once()
+        target, text = slack.post_message.call_args[0]
+        assert target == "C99999"
+        assert "(from <#C_GCP>)" in text
+        assert "Cloud Run errors" in text
+        assert "<https://slack/p1005|alert>" in text
+
+    def test_does_not_post_without_open_incidents(self, settings):
+        self._configure(settings)
+        slack = MagicMock()
+        slack.get_messages_since.return_value = [
+            {"type": "message", "ts": "1.0", "text": "unrelated"}
+        ]
+
+        post_gcp_incident_alerts(self._ctx(), slack)
+
+        slack.post_message.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestOnIncidentCreatedGcpAlerts:
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_posts_gcp_alerts_before_triage_bot(self, mock_slack, settings):
+        settings.SLACK = {
+            **settings.SLACK,
+            "GCP_INCIDENT_ALERT_CHANNEL_ID": "C_GCP",
+            "TRIAGE_BOT_USER_ID": "U_TRIAGE_BOT",
+            "TRIAGE_BOT_PROMPT": "Alert: {alert_url}",
+        }
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+        mock_slack.get_messages_since.return_value = [_gcp_incident_message("100.5")]
+        mock_slack.build_message_url.return_value = "https://slack/p1005"
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident, alert_url="https://sentry.io/issues/1")
+
+        channel_messages = [
+            c[0][1]
+            for c in mock_slack.post_message.call_args_list
+            if c[0][0] == "C99999"
+        ]
+        gcp_index = next(
+            i for i, m in enumerate(channel_messages) if "Cloud Run errors" in m
+        )
+        assert channel_messages[-1].startswith("<@U_TRIAGE_BOT>")
+        assert gcp_index < len(channel_messages) - 1
+
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_gcp_alert_failure_does_not_break_creation(self, mock_slack, settings):
+        settings.SLACK = {**settings.SLACK, "GCP_INCIDENT_ALERT_CHANNEL_ID": "C_GCP"}
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+        mock_slack.get_messages_since.side_effect = Exception("boom")
+
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        on_incident_created(incident)
+
+        assert ExternalLink.objects.filter(
+            incident=incident, type=ExternalLinkType.SLACK
+        ).exists()
 
 
 @pytest.mark.django_db

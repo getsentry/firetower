@@ -64,6 +64,11 @@ incident_guide_message = "This is the message posted whenever a new incident sla
 slash_command = "/inc"
 triage_bot_user_id = ""
 triage_bot_prompt = "We've been alerted by {alert_url}, run incident triage for this issue."
+# Optional: channel where Cloud Monitoring posts Google Cloud Service Health alerts.
+# When set, new incidents get a message listing open GCP incidents from this channel.
+gcp_incident_alert_channel_id = ""
+gcp_incident_alert_policy_name = "Emerging incidents"
+gcp_incident_alert_lookback_hours = 24
 
 [auth]
 iap_enabled = false

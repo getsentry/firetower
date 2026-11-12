@@ -612,6 +612,81 @@ class TestSlackService:
 
         assert service.get_channel_history("C123") == []
 
+    def test_build_message_url(self):
+        service, _ = self._make_service()
+        assert (
+            service.build_message_url("C123", "1794474114.449229")
+            == "https://sentry.slack.com/archives/C123/p1794474114449229"
+        )
+
+    def test_get_messages_since_passes_oldest_and_paginates(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.side_effect = [
+            {
+                "ok": True,
+                "has_more": True,
+                "messages": [{"type": "message", "text": "p1", "ts": "2.0"}],
+                "response_metadata": {"next_cursor": "cur1"},
+            },
+            {
+                "ok": True,
+                "has_more": False,
+                "messages": [{"type": "message", "text": "p2", "ts": "1.0"}],
+                "response_metadata": {"next_cursor": ""},
+            },
+        ]
+
+        messages = service.get_messages_since("C123", 1.5)
+
+        assert [m["text"] for m in messages] == ["p1", "p2"]
+        mock_client.conversations_history.assert_any_call(
+            channel="C123", oldest="1.500000", limit=200
+        )
+        mock_client.conversations_history.assert_any_call(
+            channel="C123", oldest="1.500000", limit=200, cursor="cur1"
+        )
+
+    def test_get_messages_since_stops_at_max_messages(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.return_value = {
+            "ok": True,
+            "has_more": True,
+            "messages": [{"type": "message", "ts": "1.0"}] * 2,
+            "response_metadata": {"next_cursor": "cur"},
+        }
+
+        messages = service.get_messages_since("C123", 0, max_messages=3)
+
+        assert len(messages) == 3
+        assert mock_client.conversations_history.call_count == 2
+        mock_client.conversations_history.assert_called_with(
+            channel="C123", oldest="0.000000", limit=1, cursor="cur"
+        )
+
+    def test_get_messages_since_joins_channel_when_not_in_channel(self):
+        service, mock_client = self._make_service()
+        mock_response = MagicMock()
+        mock_response.get.return_value = "not_in_channel"
+        mock_client.conversations_history.side_effect = [
+            SlackApiError("not_in_channel", mock_response),
+            {
+                "ok": True,
+                "has_more": False,
+                "messages": [{"type": "message", "ts": "1.0"}],
+            },
+        ]
+
+        messages = service.get_messages_since("C123", 0)
+
+        assert len(messages) == 1
+        mock_client.conversations_join.assert_called_once_with(channel="C123")
+
+    def test_get_messages_since_returns_empty_on_error(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_history.side_effect = Exception("timeout")
+
+        assert service.get_messages_since("C123", 0) == []
+
     def test_get_thread_replies_excludes_parent(self):
         service, mock_client = self._make_service()
         mock_client.conversations_replies.return_value = {

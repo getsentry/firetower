@@ -466,6 +466,9 @@ class SlackService:
     def build_channel_url(self, channel_id: str) -> str:
         return f"https://{self.team_id}.slack.com/archives/{channel_id}"
 
+    def build_message_url(self, channel_id: str, message_ts: str) -> str:
+        return f"{self.build_channel_url(channel_id)}/p{message_ts.replace('.', '')}"
+
     def get_channel_info(self, channel_id: str) -> dict | None:
         if not self.client:
             logger.warning("Cannot fetch channel info - Slack client not initialized")
@@ -571,6 +574,48 @@ class SlackService:
             if not response.get("has_more") or not cursor:
                 break
         return messages
+
+    def get_messages_since(
+        self, channel_id: str, oldest: float, max_messages: int = 1000
+    ) -> list[dict[str, Any]]:
+        """Return top-level messages newer than `oldest` (unix ts), newest first.
+
+        Joins the channel and retries once when the bot is not a member.
+        Stops after `max_messages` so a noisy channel can't stall the caller.
+        """
+        if not self.client:
+            return []
+        messages: list[dict[str, Any]] = []
+        cursor: str | None = None
+        joined = False
+        while len(messages) < max_messages:
+            kwargs: dict[str, Any] = {
+                "channel": channel_id,
+                "oldest": f"{oldest:.6f}",
+                "limit": min(200, max_messages - len(messages)),
+            }
+            if cursor:
+                kwargs["cursor"] = cursor
+            try:
+                response = self.client.conversations_history(**kwargs)
+            except SlackApiError as e:
+                if e.response.get("error") == "not_in_channel" and not joined:
+                    joined = True
+                    if self.join_channel(channel_id):
+                        continue
+                logger.error(
+                    f"Error fetching history: {e}", extra={"channel_id": channel_id}
+                )
+                break
+            except Exception:
+                logger.exception("Failed to fetch history for channel %s", channel_id)
+                break
+            messages.extend(response.get("messages", []))
+            metadata: dict[str, Any] = response.get("response_metadata") or {}
+            cursor = metadata.get("next_cursor") or None
+            if not response.get("has_more") or not cursor:
+                break
+        return messages[:max_messages]
 
     def get_thread_replies(
         self, channel_id: str, thread_ts: str

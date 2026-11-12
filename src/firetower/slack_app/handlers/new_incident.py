@@ -99,7 +99,7 @@ def _create_fallback_channel(
     except Exception:
         logger.exception("Failed to post warning in fallback channel %s", channel_name)
 
-    # Shared channel setup (guide, DD, Notion, invites, oncall, status, feed)
+    # Shared channel setup (guide, DD, Notion, invites, oncall, status, feed, GCP alerts)
     ctx = ChannelSetupContext(
         channel_id=channel_id,
         channel_name=channel_name,
