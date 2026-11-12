@@ -733,6 +733,32 @@ class TestOnIncidentCreatedGcpIncidents:
         incident.refresh_from_db()
         assert incident.posted_gcp_event_ids == ["LDYWVWM"]
 
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_merges_with_ids_stored_during_creation(
+        self, mock_slack, mock_list, settings
+    ):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.create_channel.return_value = "C99999"
+        mock_slack.build_channel_url.return_value = "https://slack.com/archives/C99999"
+        incident = Incident.objects.create(
+            title="Test Incident",
+            severity=IncidentSeverity.P1,
+        )
+
+        def stored_by_region_add(projects):
+            Incident.objects.filter(pk=incident.pk).update(
+                posted_gcp_event_ids=["FROMREGIONADD"]
+            )
+            return [_gcp_incident()]
+
+        mock_list.side_effect = stored_by_region_add
+
+        on_incident_created(incident)
+
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["FROMREGIONADD", "LDYWVWM"]
+
     @patch.object(
         GcpServiceHealthService,
         "list_active_incidents",
@@ -804,6 +830,25 @@ class TestOnAffectedRegionsAdded:
 
         _, text = mock_slack.post_message.call_args[0]
         assert "GKE node pool errors" in text
+        assert "Cloud Run errors" not in text
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == ["LDYWVWM", "NEWEVENT"]
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
+    def test_uses_stored_ids_not_stale_instance(self, mock_slack, mock_list, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_list.return_value = [
+            _gcp_incident(),
+            _gcp_incident(title="GKE node pool errors", event_id="NEWEVENT"),
+        ]
+        incident = self._incident_with_channel()
+        Incident.objects.filter(pk=incident.pk).update(posted_gcp_event_ids=["LDYWVWM"])
+
+        on_affected_regions_added(incident, ["us"])
+
+        _, text = mock_slack.post_message.call_args[0]
         assert "Cloud Run errors" not in text
         incident.refresh_from_db()
         assert incident.posted_gcp_event_ids == ["LDYWVWM", "NEWEVENT"]

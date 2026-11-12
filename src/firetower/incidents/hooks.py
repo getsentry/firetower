@@ -929,6 +929,18 @@ def _post_gcp_incidents(
     return [i.event_id for i in incidents]
 
 
+def _record_posted_gcp_event_ids(incident: Incident, event_ids: list[str]) -> None:
+    """Merge event_ids into the incident's stored posted GCP event ids."""
+    if not event_ids:
+        return
+    with transaction.atomic():
+        locked = Incident.objects.select_for_update().only("posted_gcp_event_ids")
+        current = locked.get(pk=incident.pk).posted_gcp_event_ids
+        merged = [*current, *(e for e in event_ids if e not in current)]
+        Incident.objects.filter(pk=incident.pk).update(posted_gcp_event_ids=merged)
+    incident.posted_gcp_event_ids = merged
+
+
 def post_gcp_incidents(ctx: ChannelSetupContext, slack_service: SlackService) -> None:
     """Post open GCP incidents for the incident's affected regions.
 
@@ -1592,10 +1604,7 @@ def on_incident_created(
         )
         if status_channel_id:
             _save_status_channel_link(incident, status_channel_id)
-        if ctx.posted_gcp_event_ids:
-            Incident.objects.filter(pk=incident.pk).update(
-                posted_gcp_event_ids=ctx.posted_gcp_event_ids
-            )
+        _record_posted_gcp_event_ids(incident, ctx.posted_gcp_event_ids)
 
         # DB-dedup Datadog/Notion after shared decoration so the guide message
         # appears first in the channel.
@@ -1826,6 +1835,12 @@ def on_affected_regions_added(incident: Incident, regions: list[str]) -> None:
         channel_id = _get_channel_id(incident)
         if not channel_id:
             return
+        already_posted = (
+            Incident.objects.filter(pk=incident.pk)
+            .values_list("posted_gcp_event_ids", flat=True)
+            .first()
+            or []
+        )
         posted = _post_gcp_incidents(
             channel_id,
             incident.incident_number,
@@ -1833,13 +1848,9 @@ def on_affected_regions_added(incident: Incident, regions: list[str]) -> None:
             service,
             service.projects_for_regions(mapped),
             mapped,
-            incident.posted_gcp_event_ids,
+            already_posted,
         )
-        if posted:
-            incident.posted_gcp_event_ids = [*incident.posted_gcp_event_ids, *posted]
-            Incident.objects.filter(pk=incident.pk).update(
-                posted_gcp_event_ids=incident.posted_gcp_event_ids
-            )
+        _record_posted_gcp_event_ids(incident, posted)
     except Exception:
         logger.exception(f"Failed to post GCP incidents for incident {incident.id}")
 
