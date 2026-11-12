@@ -855,6 +855,21 @@ class TestOnAffectedRegionsAdded:
 
     @patch.object(GcpServiceHealthService, "list_active_incidents")
     @patch("firetower.incidents.hooks._slack_service")
+    def test_does_not_record_ids_when_post_fails(self, mock_slack, mock_list, settings):
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": REGION_PROJECTS}
+        mock_slack.parse_channel_id_from_url.return_value = "C12345"
+        mock_slack.post_message.return_value = None
+        mock_list.return_value = [_gcp_incident()]
+        incident = self._incident_with_channel()
+
+        on_affected_regions_added(incident, ["us"])
+
+        mock_slack.post_message.assert_called_once()
+        incident.refresh_from_db()
+        assert incident.posted_gcp_event_ids == []
+
+    @patch.object(GcpServiceHealthService, "list_active_incidents")
+    @patch("firetower.incidents.hooks._slack_service")
     def test_does_not_post_when_all_already_posted(
         self, mock_slack, mock_list, settings
     ):

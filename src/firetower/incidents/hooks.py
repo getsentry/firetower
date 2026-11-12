@@ -923,9 +923,11 @@ def _post_gcp_incidents(
     if not incidents:
         logger.info(f"No new open GCP incidents found for {channel_name}")
         return []
-    slack_service.post_message(
+    if not slack_service.post_message(
         channel_id, format_incidents_message(incidents, regions=regions)
-    )
+    ):
+        logger.warning(f"Failed to post GCP incidents to {channel_name}")
+        return []
     return [i.event_id for i in incidents]
 
 
