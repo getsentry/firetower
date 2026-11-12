@@ -117,6 +117,15 @@ class TestFormatIncidentsMessage:
             in message
         )
 
+    def test_names_regions_in_header(self):
+        message = format_incidents_message(
+            [parse_event(_event())], regions=["us", "de"]
+        )
+
+        assert message.startswith(
+            ":cloud: *Open GCP incidents that may be relevant to us, de:*"
+        )
+
     def test_omits_label_for_unknown_relevance(self):
         message = format_incidents_message([parse_event(_event(relevance="UNKNOWN"))])
 
@@ -128,14 +137,42 @@ class TestGcpServiceHealthService:
         settings.GCP_SERVICE_HEALTH = None
         assert GcpServiceHealthService.from_settings() is None
 
-        settings.GCP_SERVICE_HEALTH = {"PROJECTS": []}
+        settings.GCP_SERVICE_HEALTH = {"REGION_PROJECTS": {}}
         assert GcpServiceHealthService.from_settings() is None
 
-    def test_from_settings(self, settings):
-        settings.GCP_SERVICE_HEALTH = {"PROJECTS": ["internal-sentry"]}
+    def test_maps_regions_to_projects(self, settings):
+        settings.GCP_SERVICE_HEALTH = {
+            "REGION_PROJECTS": {
+                "US": ["internal-sentry"],
+                "de": ["sentry-eu-west3"],
+                "tools": ["snty-tools", "internal-sentry"],
+            }
+        }
         service = GcpServiceHealthService.from_settings()
         assert service is not None
-        assert service.projects == ["internal-sentry"]
+
+        assert service.projects_for_regions(["us", "DE"]) == [
+            "internal-sentry",
+            "sentry-eu-west3",
+        ]
+        assert service.projects_for_regions(["us", "tools"]) == [
+            "internal-sentry",
+            "snty-tools",
+        ]
+        assert service.projects_for_regions(["unknown"]) == []
+        assert service.mapped_regions(["US", "unknown", "de"]) == ["US", "de"]
+        assert service.all_projects == [
+            "internal-sentry",
+            "sentry-eu-west3",
+            "snty-tools",
+        ]
+
+    def test_list_active_incidents_without_projects(self):
+        with patch(
+            "firetower.integrations.services.gcp_service_health.google.auth.default"
+        ) as mock_auth:
+            assert GcpServiceHealthService({}).list_active_incidents([]) == []
+        mock_auth.assert_not_called()
 
     def _response(self, body: dict) -> MagicMock:
         response = MagicMock()
@@ -155,8 +192,8 @@ class TestGcpServiceHealthService:
             self._response({"events": [_event(project="sentry-s4s2", event_id="A")]}),
         ]
 
-        service = GcpServiceHealthService(["internal-sentry", "sentry-s4s2"])
-        incidents = service.list_active_incidents()
+        service = GcpServiceHealthService({})
+        incidents = service.list_active_incidents(["internal-sentry", "sentry-s4s2"])
 
         assert sorted(i.event_id for i in incidents) == ["A", "B"]
         first_call = session.get.call_args_list[0]
@@ -182,7 +219,7 @@ class TestGcpServiceHealthService:
             self._response({"events": [_event(project="sentry-s4s2")]}),
         ]
 
-        service = GcpServiceHealthService(["internal-sentry", "sentry-s4s2"])
-        incidents = service.list_active_incidents()
+        service = GcpServiceHealthService({})
+        incidents = service.list_active_incidents(["internal-sentry", "sentry-s4s2"])
 
         assert [i.event_id for i in incidents] == ["LDYWVWM"]

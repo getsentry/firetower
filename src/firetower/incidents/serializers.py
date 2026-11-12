@@ -19,6 +19,7 @@ from .allocation import (
     allocate_incident_identity,
 )
 from .hooks import (
+    on_affected_regions_added,
     on_incident_created,
     on_incident_updated,
 )
@@ -658,12 +659,17 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                 )
                 instance.affected_service_tags.set(tags)
 
+            added_regions: list[str] = []
             if affected_region_tag_names is not None:
+                old_regions = set(instance.affected_region_tag_names)
                 tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
                     name_lower__in=[n.lower() for n in affected_region_tag_names],
                     type=TagType.AFFECTED_REGION,
                 )
                 instance.affected_region_tags.set(tags)
+                added_regions = sorted(
+                    tag.name for tag in tags if tag.name not in old_regions
+                )
 
             if root_cause_tag_names is not None:
                 tags = Tag.objects.annotate(name_lower=Lower("name")).filter(
@@ -738,6 +744,13 @@ class IncidentWriteSerializer(serializers.ModelSerializer):
                         actor=actor,
                         occurred_at=occurred_at,
                     )
+
+        if (
+            added_regions
+            and settings.HOOKS_ENABLED
+            and not self.context.get("skip_hooks")
+        ):
+            on_affected_regions_added(instance, added_regions)
 
         if (
             tracked_changes

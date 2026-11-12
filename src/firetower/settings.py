@@ -321,7 +321,7 @@ GENAI: dict | None = (
     else None
 )
 GCP_SERVICE_HEALTH: dict | None = (
-    {"PROJECTS": config.gcp_service_health.projects}
+    {"REGION_PROJECTS": config.gcp_service_health.region_projects}
     if config.gcp_service_health
     else None
 )

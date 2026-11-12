@@ -85,7 +85,7 @@ class GenAIConfig:
 
 @deserialize
 class GcpServiceHealthConfig:
-    projects: list[str]
+    region_projects: dict[str, list[str]]
 
 
 @deserialize

@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -124,6 +124,7 @@ class ChannelSetupContext:
     incident_number: str | None = None
     topic: str | None = None
     alert_url: str | None = None
+    affected_regions: list[str] = field(default_factory=list)
 
 
 def page_for_channel(
@@ -900,18 +901,37 @@ def ping_triage_bot(ctx: ChannelSetupContext, slack_service: SlackService) -> No
         logger.exception(f"Failed to post triage bot message in {ctx.channel_name}")
 
 
+def _post_gcp_incidents(
+    channel_id: str,
+    channel_name: str,
+    slack_service: SlackService,
+    service: GcpServiceHealthService,
+    projects: list[str],
+    regions: list[str],
+) -> None:
+    incidents = service.list_active_incidents(projects)
+    if not incidents:
+        logger.info(f"No open GCP incidents found for {channel_name}")
+        return
+    slack_service.post_message(
+        channel_id, format_incidents_message(incidents, regions=regions)
+    )
+
+
 def post_gcp_incidents(ctx: ChannelSetupContext, slack_service: SlackService) -> None:
-    """Post open GCP incidents from the Service Health API, if any."""
+    """Post open GCP incidents for the incident's affected regions.
+
+    Checks every configured project when no affected region maps to one.
+    """
     service = GcpServiceHealthService.from_settings()
     if service is None:
         return
 
-    incidents = service.list_active_incidents()
-    if not incidents:
-        logger.info(f"No open GCP incidents found for {ctx.channel_name}")
-        return
-
-    slack_service.post_message(ctx.channel_id, format_incidents_message(incidents))
+    regions = service.mapped_regions(ctx.affected_regions)
+    projects = service.projects_for_regions(regions) or service.all_projects
+    _post_gcp_incidents(
+        ctx.channel_id, ctx.channel_name, slack_service, service, projects, regions
+    )
 
 
 def decorate_incident_channel(
@@ -1541,6 +1561,7 @@ def on_incident_created(
             incident_number=incident.incident_number,
             topic=build_channel_topic(incident, captain_slack_id),
             alert_url=alert_url,
+            affected_regions=incident.affected_region_tag_names,
         )
         status_channel_id = decorate_incident_channel(
             ctx,
@@ -1762,6 +1783,30 @@ def on_captain_changed(incident: Incident) -> None:
                     )
     except Exception:
         logger.exception(f"Error in on_captain_changed for incident {incident.id}")
+
+
+def on_affected_regions_added(incident: Incident, regions: list[str]) -> None:
+    """Post open GCP incidents for regions newly added to an incident."""
+    try:
+        service = GcpServiceHealthService.from_settings()
+        if service is None:
+            return
+        mapped = service.mapped_regions(regions)
+        if not mapped:
+            return
+        channel_id = _get_channel_id(incident)
+        if not channel_id:
+            return
+        _post_gcp_incidents(
+            channel_id,
+            incident.incident_number,
+            _slack_service,
+            service,
+            service.projects_for_regions(mapped),
+            mapped,
+        )
+    except Exception:
+        logger.exception(f"Failed to post GCP incidents for incident {incident.id}")
 
 
 def on_incident_updated(

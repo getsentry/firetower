@@ -110,8 +110,11 @@ def select_relevant_incidents(events: list[dict[str, Any]]) -> list[GcpIncident]
     )
 
 
-def format_incidents_message(incidents: list[GcpIncident]) -> str:
-    lines = [":cloud: *Open GCP incidents that may be relevant:*"]
+def format_incidents_message(
+    incidents: list[GcpIncident], regions: list[str] | None = None
+) -> str:
+    scope = f" to {escape_slack_text(', '.join(regions))}" if regions else ""
+    lines = [f":cloud: *Open GCP incidents that may be relevant{scope}:*"]
     for incident in incidents:
         line = f"• <{incident.dashboard_url}|{escape_slack_text(incident.title)}>"
 
@@ -137,12 +140,34 @@ class GcpServiceHealthService:
     @classmethod
     def from_settings(cls) -> "GcpServiceHealthService | None":
         config = getattr(settings, "GCP_SERVICE_HEALTH", None)
-        if not config or not config.get("PROJECTS"):
+        if not config or not config.get("REGION_PROJECTS"):
             return None
-        return cls(projects=config["PROJECTS"])
+        return cls(region_projects=config["REGION_PROJECTS"])
 
-    def __init__(self, projects: list[str]) -> None:
-        self.projects = projects
+    def __init__(self, region_projects: dict[str, list[str]]) -> None:
+        self.region_projects = {
+            region.lower(): projects for region, projects in region_projects.items()
+        }
+
+    @property
+    def all_projects(self) -> list[str]:
+        return _unique(
+            [p for projects in self.region_projects.values() for p in projects]
+        )
+
+    def mapped_regions(self, regions: list[str]) -> list[str]:
+        """Return the given regions that have projects configured."""
+        return [r for r in regions if r.lower() in self.region_projects]
+
+    def projects_for_regions(self, regions: list[str]) -> list[str]:
+        """Return the projects mapped to the given region names, ignoring case."""
+        return _unique(
+            [
+                project
+                for region in regions
+                for project in self.region_projects.get(region.lower(), [])
+            ]
+        )
 
     def _list_project_events(
         self, session: AuthorizedSession, project: str
@@ -164,12 +189,14 @@ class GcpServiceHealthService:
             params["pageToken"] = token
         return events
 
-    def list_active_incidents(self) -> list[GcpIncident]:
-        """Return active GCP incidents that may affect any configured project."""
+    def list_active_incidents(self, projects: list[str]) -> list[GcpIncident]:
+        """Return active GCP incidents that may affect any of the given projects."""
+        if not projects:
+            return []
         credentials, _ = google.auth.default(scopes=SCOPES)
         session = AuthorizedSession(credentials)
         events: list[dict[str, Any]] = []
-        for project in self.projects:
+        for project in projects:
             try:
                 events.extend(self._list_project_events(session, project))
             except Exception:
