@@ -1,7 +1,10 @@
+import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
+from openrouter import OpenRouter
 
 from firetower.integrations.services.genai import (
     _DEFAULT_MODEL,
@@ -208,6 +211,50 @@ class TestGenAIService:
         result = genai_service.generate_timeline(self._make_messages())
         assert result is not None
         assert "Timeline" in result
+
+    def test_roundtrip_with_real_sdk_and_mock_http(self, genai_service):
+        requests = []
+
+        def respond(request):
+            requests.append(request)
+            return httpx.Response(
+                200,
+                json={
+                    "id": "gen-test",
+                    "object": "chat.completion",
+                    "created": 1705327200,
+                    "model": _DEFAULT_MODEL,
+                    "system_fingerprint": None,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "finish_reason": "stop",
+                            "message": {
+                                "role": "assistant",
+                                "content": "## Timeline\n- Test event",
+                            },
+                        }
+                    ],
+                },
+            )
+
+        with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+            with OpenRouter(api_key="sk-test", client=client) as sdk:
+                genai_service._client = sdk
+                result = genai_service.generate_timeline(self._make_messages())
+
+        assert result == "## Timeline\n- Test event"
+        assert len(requests) == 1
+        request = requests[0]
+        assert request.method == "POST"
+        assert request.url == "https://openrouter.ai/api/v1/chat/completions"
+        assert request.headers["Authorization"] == "Bearer sk-test"
+        payload = json.loads(request.content)
+        assert payload["model"] == _DEFAULT_MODEL
+        assert payload["stream"] is False
+        assert payload["messages"][0]["role"] == "user"
+        assert "Message 0" in payload["messages"][0]["content"]
+        assert "provider" not in payload
 
     def test_returns_none_for_empty_messages(self, genai_service):
         result = genai_service.generate_timeline([])
