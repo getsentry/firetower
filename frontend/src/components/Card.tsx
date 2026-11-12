@@ -38,12 +38,12 @@ type TitleProps = StyledProps<React.HTMLAttributes<HTMLHeadingElement>> & {
   size?: keyof typeof sizes | null;
   ref?: React.Ref<HTMLHeadingElement>;
 };
-const CardRoot = ({style, ref, ...props}: CardProps) => (
-  <div ref={ref} {...stylex.props(styles.root, style)} {...props} />
-);
+export function Card({style, ref, ...props}: CardProps) {
+  return <div ref={ref} {...stylex.props(styles.root, style)} {...props} />;
+}
 const Title = ({style, size = 'lg', children, ref, ...props}: TitleProps) => (
   <h3 ref={ref} {...stylex.props(styles.title, size && sizes[size], style)} {...props}>
     {children}
   </h3>
 );
-export const Card = Object.assign(CardRoot, {Title});
+Card.Title = Title;
