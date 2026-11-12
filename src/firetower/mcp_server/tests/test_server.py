@@ -114,6 +114,7 @@ def _bot_token(
     client: TestClient,
     signing_key: rsa.RSAPrivateKey = BOT_KEY,
     kid: str = "junior-test",
+    subject: str = "user:user-123",
 ) -> httpx.Response:
     registration = client.post(
         "/register",
@@ -128,7 +129,7 @@ def _bot_token(
     assertion = jwt.encode(
         {
             "iss": BOT_ISSUER,
-            "sub": "firetower",
+            "sub": subject,
             "aud": f"{BASE_URL}/",
             "iat": now,
             "exp": now + 300,
@@ -356,7 +357,7 @@ def test_bot_assertion_mints_token_that_can_call_read_tools(
     [audit] = [
         r for r in caplog.records if getattr(r, "event", None) == "mcp_tool_call"
     ]
-    assert audit.actor_sub == "bot:firetower"
+    assert audit.actor_sub == "bot:user:user-123"
     assert audit.actor_email is None
 
 
