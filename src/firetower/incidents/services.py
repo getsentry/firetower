@@ -362,6 +362,8 @@ def sync_action_items_from_linear(
         "linear_team_id",
         "linear_team_key",
         "linear_team_name",
+        "linear_due_date",
+        "linear_sla_breaches_at",
     ]
 
     for issue in all_issues.values():
@@ -383,6 +385,8 @@ def sync_action_items_from_linear(
             ai.linear_team_id = issue.get("linear_team_id") or ""
             ai.linear_team_key = issue.get("linear_team_key") or ""
             ai.linear_team_name = issue.get("linear_team_name") or ""
+            ai.linear_due_date = issue.get("due_date")
+            ai.linear_sla_breaches_at = issue.get("sla_breaches_at")
             if created_at is not None:
                 ai.created_at = created_at
             ai.updated_at = timezone.now()
@@ -405,6 +409,8 @@ def sync_action_items_from_linear(
                     linear_team_id=issue.get("linear_team_id") or "",
                     linear_team_key=issue.get("linear_team_key") or "",
                     linear_team_name=issue.get("linear_team_name") or "",
+                    linear_due_date=issue.get("due_date"),
+                    linear_sla_breaches_at=issue.get("sla_breaches_at"),
                 )
             )
 

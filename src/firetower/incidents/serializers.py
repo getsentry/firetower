@@ -814,7 +814,7 @@ class ActionItemSerializer(serializers.ModelSerializer):
         return None
 
     def get_slo_deadline(self, obj: ActionItem) -> str | None:
-        deadline = obj.slo_deadline
+        deadline = obj.deadline
         return deadline.isoformat() if deadline else None
 
 
@@ -848,6 +848,10 @@ class DashboardActionItemSerializer(ActionItemSerializer):
     incident_id = serializers.CharField(source="incident.incident_number")
     incident_title = serializers.CharField(source="incident.title")
     incident_severity = serializers.CharField(source="incident.severity")
+    deadline_source = serializers.CharField(read_only=True, allow_null=True)
+    due_date = serializers.DateField(
+        source="linear_due_date", read_only=True, allow_null=True
+    )
 
     class Meta(ActionItemSerializer.Meta):
         fields = [
@@ -863,6 +867,8 @@ class DashboardActionItemSerializer(ActionItemSerializer):
             "linear_team_id",
             "linear_team_key",
             "linear_team_name",
+            "deadline_source",
+            "due_date",
             "created_at",
             "linear_updated_at",
         ]

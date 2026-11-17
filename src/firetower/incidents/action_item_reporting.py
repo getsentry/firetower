@@ -40,7 +40,7 @@ def build_action_item_dashboard(
     ]
     flags: dict[int, dict[str, bool]] = {}
     for item in open_items:
-        deadline = item.slo_deadline
+        deadline = item.deadline
         flags[item.id] = {
             "overdue": deadline is not None and deadline <= now,
             "due_soon": deadline is not None
@@ -64,11 +64,11 @@ def build_action_item_dashboard(
         for item in recent_done
         if item.completed_at is not None
     ]
-    with_target = [item for item in recent_done if item.slo_deadline is not None]
+    with_target = [item for item in recent_done if item.deadline is not None]
     on_time = sum(
-        item.completed_at <= item.slo_deadline
+        item.completed_at <= item.deadline
         for item in with_target
-        if item.completed_at is not None and item.slo_deadline is not None
+        if item.completed_at is not None and item.deadline is not None
     )
     counts = Counter(item.status for item in items)
     summary = {

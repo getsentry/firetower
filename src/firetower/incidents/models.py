@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 
 from django.conf import settings
@@ -449,6 +449,8 @@ class ActionItem(models.Model):
     linear_team_id = models.CharField(max_length=255, blank=True, default="")
     linear_team_key = models.CharField(max_length=25, blank=True, default="")
     linear_team_name = models.CharField(max_length=255, blank=True, default="")
+    linear_due_date = models.DateField(null=True, blank=True)
+    linear_sla_breaches_at = models.DateTimeField(null=True, blank=True)
 
     @property
     def slo_deadline(self) -> datetime | None:
@@ -460,6 +462,22 @@ class ActionItem(models.Model):
         }
         days = days_by_priority.get(self.priority)
         return self.created_at + timedelta(days=days) if days else None
+
+    @property
+    def deadline(self) -> datetime | None:
+        if self.linear_due_date is not None:
+            return datetime.combine(self.linear_due_date, time.max, tzinfo=UTC)
+        if self.linear_sla_breaches_at is not None:
+            return self.linear_sla_breaches_at
+        return self.slo_deadline
+
+    @property
+    def deadline_source(self) -> str | None:
+        if self.linear_due_date is not None:
+            return "linear_due_date"
+        if self.linear_sla_breaches_at is not None:
+            return "linear_sla"
+        return "priority_slo" if self.slo_deadline is not None else None
 
     class Meta:
         ordering = ["created_at"]
