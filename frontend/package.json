@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@happy-dom/global-registrator": "^20.0.11",
+    "@happy-dom/global-registrator": "^21.0.4",
     "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
     "@stylexjs/eslint-plugin": "^0.19.1",
     "@stylexjs/unplugin": "^0.19.1",
