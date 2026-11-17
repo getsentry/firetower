@@ -15,6 +15,7 @@ export function syncActionItemsMutationOptions(
     },
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['ActionItems', incidentId]});
+      queryClient.invalidateQueries({queryKey: ['ActionItemDashboard']});
     },
   });
 }
