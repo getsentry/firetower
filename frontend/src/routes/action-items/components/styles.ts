@@ -207,13 +207,39 @@ export const styles = stylex.create({
     fontSize: fontSize.sm,
     textAlign: 'center',
   },
+  searchForm: {marginTop: space.md},
   scroll: {overflowX: 'auto'},
   table: {
+    display: {default: 'block', '@media (min-width: 640px)': 'table'},
     width: '100%',
     borderCollapse: 'collapse',
     textAlign: 'left',
     fontSize: fontSize.sm,
   },
+  tableCaption: {
+    display: {default: 'block', '@media (min-width: 640px)': 'revert'},
+    textAlign: 'left',
+  },
+  tableHead: {
+    display: {default: 'none', '@media (min-width: 640px)': 'table-header-group'},
+  },
+  tableBody: {
+    display: {default: 'block', '@media (min-width: 640px)': 'table-row-group'},
+  },
+  tableRow: {
+    display: {default: 'grid', '@media (min-width: 640px)': 'table-row'},
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gap: space.md,
+    paddingBlock: {default: space.lg, '@media (min-width: 640px)': 0},
+    borderBottomWidth: {default: 1, '@media (min-width: 640px)': 0},
+    borderBottomStyle: 'solid',
+    borderBottomColor: border.secondary,
+  },
+  mobileLabel: {
+    display: {default: 'inline', '@media (min-width: 640px)': 'none'},
+    color: content.secondary,
+  },
+  signalsCell: {gridColumn: '1 / -1'},
   th: {
     color: content.secondary,
     fontWeight: 400,
@@ -225,14 +251,18 @@ export const styles = stylex.create({
     whiteSpace: 'nowrap',
   },
   td: {
-    paddingBlock: space.lg,
-    paddingInlineEnd: space.md,
+    paddingBlock: {default: 0, '@media (min-width: 640px)': space.lg},
+    paddingInlineEnd: {default: 0, '@media (min-width: 640px)': space.md},
     verticalAlign: 'top',
-    borderBottomWidth: 1,
+    borderBottomWidth: {default: 0, '@media (min-width: 640px)': 1},
     borderBottomStyle: 'solid',
     borderBottomColor: border.secondary,
   },
-  followup: {minWidth: 200, overflowWrap: 'anywhere'},
+  followup: {
+    minWidth: {default: 0, '@media (min-width: 640px)': 200},
+    gridColumn: '1 / -1',
+    overflowWrap: 'anywhere',
+  },
   link: {
     color: {default: content.primary, ':hover': content.accent},
     textDecoration: {default: 'none', ':hover': 'underline'},
@@ -251,10 +281,15 @@ export const styles = stylex.create({
     color: content.secondary,
     fontSize: fontSize.xs,
   },
-  ownerCell: {maxWidth: 120, overflowWrap: 'anywhere'},
+  ownerCell: {
+    minWidth: {default: 0, '@media (min-width: 640px)': 80},
+    maxWidth: {default: 'none', '@media (min-width: 640px)': 120},
+    overflowWrap: 'anywhere',
+  },
   badges: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: {default: 'row', '@media (min-width: 640px)': 'column'},
+    flexWrap: 'wrap',
     alignItems: 'flex-start',
     gap: space.xs,
     minWidth: 85,
@@ -287,6 +322,7 @@ export const styles = stylex.create({
   },
   aside: {display: 'flex', flexDirection: 'column', gap: space.xl, minWidth: 0},
   facts: {
+    marginTop: space.lg,
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: space.lg,
