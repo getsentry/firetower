@@ -22,7 +22,7 @@ STALE_STATUS_BUSINESS_DAYS = 1
 QUIET_CHANNEL_BUSINESS_DAYS = 1
 NUDGE_EVERY_BUSINESS_DAYS = 3
 
-NUDGE_TIMEZONE = ZoneInfo("America/New_York")
+NUDGE_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 HUMAN_MESSAGE_SUBTYPES = {None, "thread_broadcast", "file_share"}
 

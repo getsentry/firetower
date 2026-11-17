@@ -266,12 +266,13 @@ class TestSendStaleIncidentNudges:
     @pytest.mark.parametrize(
         ("now", "nudged"),
         [
-            (datetime(2026, 11, 18, 8, 0, tzinfo=UTC), True),  # Wed 3 AM ET
-            (datetime(2026, 11, 21, 3, 0, tzinfo=UTC), True),  # Fri 10 PM ET
-            (datetime(2026, 11, 23, 3, 0, tzinfo=UTC), False),  # Sun 10 PM ET
+            (datetime(2026, 11, 18, 8, 0, tzinfo=UTC), True),  # Wed 12 AM PT
+            (datetime(2026, 11, 21, 7, 59, tzinfo=UTC), True),  # Fri 11:59 PM PT
+            (datetime(2026, 11, 21, 8, 0, tzinfo=UTC), False),  # Sat 12 AM PT
+            (datetime(2026, 11, 23, 7, 59, tzinfo=UTC), False),  # Sun 11:59 PM PT
         ],
     )
-    def test_uses_eastern_business_days(self, slack, now, nudged):
+    def test_uses_pacific_business_days(self, slack, now, nudged):
         self._make_incident()
 
         self._run(now=now)
