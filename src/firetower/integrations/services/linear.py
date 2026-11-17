@@ -45,6 +45,8 @@ ISSUE_FIELDS = """
     url
     priority
     createdAt
+    updatedAt
+    completedAt
     slaBreachesAt
     labels {
         nodes {
@@ -403,6 +405,8 @@ class LinearService:
         status = LINEAR_STATE_TYPE_MAP.get(state_type, "Todo")
         assignee = issue.get("assignee") or {}
         created_at = issue.get("createdAt")
+        updated_at = issue.get("updatedAt")
+        completed_at = issue.get("completedAt")
         sla_breaches_at = issue.get("slaBreachesAt")
         return {
             "id": issue["id"],
@@ -415,6 +419,8 @@ class LinearService:
                 label["id"] for label in (issue.get("labels") or {}).get("nodes", [])
             ],
             "created_at": parse_datetime(created_at) if created_at else None,
+            "linear_updated_at": parse_datetime(updated_at) if updated_at else None,
+            "completed_at": parse_datetime(completed_at) if completed_at else None,
             "sla_breaches_at": (
                 parse_datetime(sla_breaches_at) if sla_breaches_at else None
             ),

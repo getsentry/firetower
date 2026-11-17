@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 from django.conf import settings
@@ -443,6 +444,19 @@ class ActionItem(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     last_nag = models.DateTimeField(null=True, blank=True)
+    linear_updated_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def slo_deadline(self) -> datetime | None:
+        linear = settings.LINEAR or {}
+        days_by_priority = {
+            1: linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 0),
+            2: linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 0),
+            3: linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 0),
+        }
+        days = days_by_priority.get(self.priority)
+        return self.created_at + timedelta(days=days) if days else None
 
     class Meta:
         ordering = ["created_at"]
