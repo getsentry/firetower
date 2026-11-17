@@ -150,7 +150,7 @@ def build_action_item_dashboard(
         )
 
     teams: dict[str, dict[str, Any]] = {}
-    for item in open_items:
+    for item in items:
         key = item.linear_team_id or "unknown"
         group = teams.setdefault(
             key,
@@ -167,11 +167,25 @@ def build_action_item_dashboard(
                 "open": 0,
                 "overdue": 0,
                 "stalled": 0,
+                "completed": 0,
+                "canceled": 0,
+                "total": 0,
             },
         )
-        group["open"] += 1
-        group["overdue"] += flags[item.id]["overdue"]
-        group["stalled"] += flags[item.id]["stalled"]
+        group["total"] += 1
+        if item.status == ActionItemStatus.DONE:
+            group["completed"] += 1
+        elif item.status == ActionItemStatus.CANCELED:
+            group["canceled"] += 1
+        elif item.id in flags:
+            group["open"] += 1
+            group["overdue"] += flags[item.id]["overdue"]
+            group["stalled"] += flags[item.id]["stalled"]
+    for group in teams.values():
+        active_total = group["completed"] + group["open"]
+        group["completion_rate"] = (
+            round(group["completed"] * 100 / active_total, 1) if active_total else None
+        )
     team_rows = sorted(
         teams.values(),
         key=lambda group: (
