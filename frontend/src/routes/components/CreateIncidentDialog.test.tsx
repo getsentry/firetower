@@ -64,6 +64,8 @@ describe('CreateIncidentDialog', () => {
     expect(screen.getByText('Create Incident')).toBeInTheDocument();
     expect(screen.getByLabelText('Title')).toBeInTheDocument();
     expect(screen.getByLabelText('Severity')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/description/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/impact summary/i)).not.toBeInTheDocument();
   });
 
   it('disables submit when title is empty', () => {
@@ -108,12 +110,12 @@ describe('CreateIncidentDialog', () => {
     expect(mockApiPost).toHaveBeenCalledWith(
       expect.objectContaining({
         path: '/incidents/',
-        body: expect.objectContaining({
+        body: {
           title: 'Test incident',
           severity: 'P3',
           captain: 'test.user@example.com',
           reporter: 'test.user@example.com',
-        }),
+        },
       })
     );
     expect(mockNavigate).toHaveBeenCalledWith({

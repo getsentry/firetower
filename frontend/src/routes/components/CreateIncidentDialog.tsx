@@ -32,14 +32,12 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
 
   const [title, setTitle] = useState('');
   const [severity, setSeverity] = useState('P3');
-  const [description, setDescription] = useState('');
   const {isPending, reset} = createIncident;
 
   const handleClose = useCallback(() => {
     if (isPending) return;
     setTitle('');
     setSeverity('P3');
-    setDescription('');
     reset();
     onClose();
   }, [isPending, reset, onClose]);
@@ -67,7 +65,6 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
       const result = await createIncident.mutateAsync({
         title: title.trim(),
         severity,
-        description: description.trim() || undefined,
         captain: currentUser.email,
         reporter: currentUser.email,
       });
@@ -120,24 +117,11 @@ export function CreateIncidentDialog({isOpen, onClose}: CreateIncidentDialogProp
               ))}
             </select>
           </div>
-          <div {...stylex.props(styles.field)}>
-            <Label htmlFor="incident-description">
-              Description <span {...stylex.props(styles.optional)}>(optional)</span>
-            </Label>
-            <textarea
-              id="incident-description"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="What is happening? What is the impact?"
-              rows={3}
-              {...stylex.props(styles.description)}
-            />
-          </div>
-          {createIncident.isError && (
+          {createIncident.isError ? (
             <p {...stylex.props(styles.error)}>
               Failed to create incident. Please try again.
             </p>
-          )}
+          ) : null}
           <div {...stylex.props(styles.actions)}>
             <Button variant="secondary" onClick={handleClose} type="button">
               Cancel
@@ -167,7 +151,6 @@ const styles = stylex.create({
   },
   form: {gap: space.lg, display: 'flex', flexDirection: 'column'},
   field: {gap: space.xs, display: 'flex', flexDirection: 'column'},
-  optional: {color: content.disabled, fontWeight: 400},
   error: {fontSize: fontSize.sm, color: '#dc2626'},
   actions: {gap: space.md, display: 'flex', justifyContent: 'flex-end'},
   overlay: {
@@ -200,18 +183,5 @@ const styles = stylex.create({
     paddingInline: 12,
     paddingBlock: 4,
     fontSize: fontSize.sm,
-  },
-  description: {
-    borderColor: border.secondary,
-    width: '100%',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderStyle: 'solid',
-    backgroundColor: 'transparent',
-    paddingInline: 12,
-    paddingBlock: 8,
-    fontSize: fontSize.sm,
-    color: {default: null, '::placeholder': content.disabled},
-    resize: 'vertical',
   },
 });

@@ -203,7 +203,11 @@ def _build_new_incident_modal(
     severity: str = "",
     selected_options: set[str] | None = None,
 ) -> dict:
-    blocks = build_incident_form_blocks(user_id=user_id)
+    blocks = [
+        block
+        for block in build_incident_form_blocks(user_id=user_id)
+        if block.get("block_id") not in {"description_block", "impact_summary_block"}
+    ]
 
     for block in blocks:
         if block.get("block_id") == "severity_block":

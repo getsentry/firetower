@@ -77,8 +77,6 @@ class TestNewIncidentModal:
             "captain_block",
             "severity_block",
             "title_block",
-            "description_block",
-            "impact_summary_block",
             "alert_url_block",
             "options_block",
         }
@@ -343,7 +341,6 @@ class TestNewIncidentSubmission:
                             "selected_option": {"value": "P1"},
                         }
                     },
-                    "description_block": {"description": {"value": "Description"}},
                     "options_block": {"incident_options": {"selected_options": []}},
                 }
             }
@@ -354,6 +351,8 @@ class TestNewIncidentSubmission:
         ack.assert_called_once_with()
         incident = Incident.objects.get(title="Test Incident")
         assert incident.severity == IncidentSeverity.P1
+        assert incident.description == ""
+        assert incident.impact_summary == ""
         assert incident.captain == self.user
         assert incident.reporter == self.user
         assert incident.timeline_events.get().actor == self.user
