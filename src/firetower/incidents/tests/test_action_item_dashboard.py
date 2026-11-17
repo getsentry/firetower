@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from django.apps import apps
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
 from django_q.models import Schedule
 from rest_framework.test import APIClient
 
@@ -362,11 +362,14 @@ class TestActionItemDashboard:
         client, _, _ = dashboard
         Incident.objects.create(
             title="Old",
+            severity="P1",
             linear_parent_issue_id="old",
             action_items_last_synced_at=NOW - timedelta(days=2),
         )
-        Incident.objects.create(title="Never synced", linear_parent_issue_id="never")
-        Incident.objects.create(title="No Linear parent")
+        Incident.objects.create(
+            title="Never synced", severity="P1", linear_parent_issue_id="never"
+        )
+        Incident.objects.create(title="No Linear parent", severity="P1")
         data = client.get(URL).data
         assert data["freshness"] == {
             "linked_incidents": 3,
@@ -377,7 +380,9 @@ class TestActionItemDashboard:
         }
 
     def test_anonymous_access_denied(self):
-        assert APIClient().get(URL).status_code in (401, 403)
+        client = APIClient()
+        client.force_authenticate(AnonymousUser())
+        assert client.get(URL).status_code in (401, 403)
 
     def test_get_is_read_only_and_has_constant_query_count(
         self, dashboard, django_assert_num_queries
@@ -456,9 +461,12 @@ class TestDashboardSync:
             created_at=NOW - timedelta(days=500),
         )
         Incident.objects.create(
-            title="Canceled", status="Canceled", linear_parent_issue_id="canceled"
+            title="Canceled",
+            severity="P1",
+            status="Canceled",
+            linear_parent_issue_id="canceled",
         )
-        Incident.objects.create(title="Unlinked")
+        Incident.objects.create(title="Unlinked", severity="P1")
         with patch(
             "firetower.incidents.tasks.action_items.sync_action_items_from_linear",
             side_effect=[RuntimeError("upstream"), ActionItemsSyncStats()],
