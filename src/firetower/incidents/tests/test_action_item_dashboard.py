@@ -458,8 +458,8 @@ class TestDashboardSync:
             status="Done",
             severity="P4",
             linear_parent_issue_id="old",
-            created_at=NOW - timedelta(days=500),
         )
+        Incident.objects.filter(pk=old.pk).update(created_at=NOW - timedelta(days=500))
         Incident.objects.create(
             title="Canceled",
             severity="P1",
@@ -467,6 +467,9 @@ class TestDashboardSync:
             linear_parent_issue_id="canceled",
         )
         Incident.objects.create(title="Unlinked", severity="P1")
+        Incident.objects.create(
+            title="Empty parent", severity="P1", linear_parent_issue_id=""
+        )
         with patch(
             "firetower.incidents.tasks.action_items.sync_action_items_from_linear",
             side_effect=[RuntimeError("upstream"), ActionItemsSyncStats()],

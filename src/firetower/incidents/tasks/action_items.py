@@ -152,7 +152,8 @@ def refresh_action_item_dashboard() -> None:
     if not settings.LINEAR:
         return
     incidents = (
-        Incident.objects.exclude(status=IncidentStatus.CANCELED)
+        Incident.objects.filter(linear_parent_issue_id__isnull=False)
+        .exclude(status=IncidentStatus.CANCELED)
         .exclude(linear_parent_issue_id="")
         .order_by("-created_at")
     )
