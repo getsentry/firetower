@@ -19,13 +19,6 @@ export const styles = stylex.create({
     gap: space.xl,
   },
   title: {fontSize: fontSize['2xl'], fontWeight: 600, color: content.headings},
-  eyebrow: {
-    fontSize: fontSize.xs,
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    color: content.accent,
-  },
   muted: {color: content.secondary, fontSize: fontSize.sm},
   controls: {display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: space.md},
   control: {
@@ -281,7 +274,7 @@ export const styles = stylex.create({
     color: content.secondary,
     fontSize: fontSize.xs,
   },
-  ownerCell: {
+  teamCell: {
     minWidth: {default: 0, '@media (min-width: 640px)': 80},
     maxWidth: {default: 'none', '@media (min-width: 640px)': 120},
     overflowWrap: 'anywhere',
@@ -338,8 +331,8 @@ export const styles = stylex.create({
     color: content.headings,
     display: 'block',
   },
-  ownerList: {display: 'flex', flexDirection: 'column', gap: space.sm},
-  ownerButton: {
+  teamList: {display: 'flex', flexDirection: 'column', gap: space.sm},
+  teamButton: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: space.md,
@@ -355,8 +348,8 @@ export const styles = stylex.create({
     width: '100%',
     fontSize: fontSize.sm,
   },
-  ownerName: {overflowWrap: 'anywhere', minWidth: 0},
-  ownerCount: {whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'},
+  teamName: {overflowWrap: 'anywhere', minWidth: 0},
+  teamCount: {whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'},
   details: {fontSize: fontSize.sm, color: content.secondary},
   detailsBody: {
     display: 'flex',

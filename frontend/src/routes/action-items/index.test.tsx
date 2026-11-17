@@ -17,6 +17,9 @@ import {
 const {mockApiGet} = vi.hoisted(() => ({mockApiGet: vi.fn()}));
 vi.mock('../../api', () => ({Api: {get: mockApiGet}}));
 
+const ENGINEERING_TEAM = '11111111-1111-4111-8111-111111111111';
+const INFRASTRUCTURE_TEAM = '22222222-2222-4222-8222-222222222222';
+
 const mockData: DashboardData = {
   generated_at: '2026-11-17T12:00:00+00:00',
   stalled_days: 14,
@@ -40,6 +43,7 @@ const mockData: DashboardData = {
     on_time_percent: 75,
     on_time_sample: 4,
     unknown_activity: 0,
+    unknown_team: 0,
     unknown_completion: 0,
   },
   weeks: Array.from({length: 8}, (_, index) => ({
@@ -54,10 +58,23 @@ const mockData: DashboardData = {
     {label: '31–60 days', count: 2, overdue: 1},
     {label: '61+ days', count: 1, overdue: 1},
   ],
-  owners: [
-    {id: '1', name: 'Alice Engineer', open: 7, overdue: 3, stalled: 2},
-    {id: '2', name: 'Bob Engineer', open: 4, overdue: 0, stalled: 0},
-    {id: 'unassigned', name: 'Unassigned', open: 1, overdue: 0, stalled: 0},
+  teams: [
+    {
+      id: ENGINEERING_TEAM,
+      key: 'ENG',
+      name: 'Engineering',
+      open: 7,
+      overdue: 3,
+      stalled: 2,
+    },
+    {
+      id: INFRASTRUCTURE_TEAM,
+      key: 'INFRA',
+      name: 'Infrastructure',
+      open: 5,
+      overdue: 0,
+      stalled: 0,
+    },
   ],
   freshness: {
     linked_incidents: 5,
@@ -77,9 +94,9 @@ const mockData: DashboardData = {
         linear_identifier: 'ENG-123',
         status: 'Todo',
         priority: 2,
-        assignee_name: 'Alice Engineer',
-        assignee_id: 1,
-        assignee_avatar_url: null,
+        linear_team_id: ENGINEERING_TEAM,
+        linear_team_key: 'ENG',
+        linear_team_name: 'Engineering',
         url: 'https://linear.app/issue/ENG-123',
         slo_deadline: '2026-11-14T12:00:00Z',
         incident_id: 'INC-2345',
@@ -97,9 +114,9 @@ const mockData: DashboardData = {
         linear_identifier: 'ENG-124',
         status: 'In Progress',
         priority: 0,
-        assignee_name: null,
-        assignee_id: null,
-        assignee_avatar_url: null,
+        linear_team_id: INFRASTRUCTURE_TEAM,
+        linear_team_key: 'INFRA',
+        linear_team_name: 'Infrastructure',
         url: 'https://linear.app/issue/ENG-124',
         slo_deadline: null,
         incident_id: 'INC-2346',
@@ -194,9 +211,9 @@ describe('Action item dashboard', () => {
   it('drills metrics into the queue and clears unrelated queue filters', async () => {
     const user = userEvent.setup();
     const router = await renderRoute(
-      '/action-items?severity=P1&page=2&assignee=1&q=alerts'
+      `/action-items?severity=P1&page=2&team=${ENGINEERING_TEAM}&q=alerts`
     );
-    await user.click(screen.getByRole('button', {name: /^Overdue 3/}));
+    await user.click(screen.getByRole('button', {name: /^Overdue SLOs 3/}));
     await waitFor(() =>
       expect(router.state.location.search).toEqual({severity: 'P1', view: 'overdue'})
     );
@@ -208,21 +225,24 @@ describe('Action item dashboard', () => {
     );
   });
 
-  it('preserves severity while applying view, owner, and search, resetting the page', async () => {
+  it('preserves severity while applying view, team, and search, resetting the page', async () => {
     const user = userEvent.setup();
     const router = await renderRoute('/action-items?severity=P1&page=2');
     await user.selectOptions(
       screen.getByRole('combobox', {name: 'Queue view'}),
       'stalled'
     );
-    await user.selectOptions(screen.getByRole('combobox', {name: 'Queue owner'}), '2');
+    await user.selectOptions(
+      screen.getByRole('combobox', {name: 'Queue team'}),
+      INFRASTRUCTURE_TEAM
+    );
     await user.type(screen.getByRole('searchbox'), 'rollback');
     await user.click(screen.getByRole('button', {name: 'Search', exact: true}));
     await waitFor(() =>
       expect(router.state.location.search).toEqual({
         severity: 'P1',
         view: 'stalled',
-        assignee: '2',
+        team: INFRASTRUCTURE_TEAM,
         q: 'rollback',
       })
     );
@@ -230,26 +250,77 @@ describe('Action item dashboard', () => {
     await waitFor(() => expect(router.state.location.search).toEqual({severity: 'P1'}));
   });
 
-  it('drills owner hotspots into all of that owner’s open work', async () => {
+  it('drills team breakdowns into that team’s open work', async () => {
     const user = userEvent.setup();
     const router = await renderRoute('/action-items?q=old&page=2');
-    await user.click(screen.getByRole('button', {name: /^Alice Engineer/}));
+    await user.click(screen.getByRole('button', {name: /^Engineering/}));
     await waitFor(() =>
-      expect(router.state.location.search).toEqual({assignee: '1', view: 'open'})
+      expect(router.state.location.search).toEqual({team: ENGINEERING_TEAM, view: 'open'})
     );
   });
 
   it('changing severity resets queue filters and scopes the API request', async () => {
     const user = userEvent.setup();
-    const router = await renderRoute('/action-items?view=overdue&assignee=1&page=2');
-    await user.selectOptions(
-      screen.getByRole('combobox', {name: 'Incident severity'}),
-      'P2'
+    const router = await renderRoute(
+      `/action-items?view=overdue&team=${ENGINEERING_TEAM}&page=2`
     );
+    const selector = screen.getByRole('group', {name: 'Incident severity'});
+    await user.click(within(selector).getByRole('button', {name: 'All severities'}));
+    await user.click(screen.getByRole('option', {name: 'P2'}));
     await waitFor(() => expect(router.state.location.search).toEqual({severity: 'P2'}));
     expect(mockApiGet).toHaveBeenCalledWith(
       expect.objectContaining({path: '/ui/action-items/', query: {severity: 'P2'}})
     );
+  });
+
+  it('can clear severity with the existing pill selector', async () => {
+    const user = userEvent.setup();
+    const router = await renderRoute('/action-items?severity=P1');
+    const selector = screen.getByRole('group', {name: 'Incident severity'});
+    await user.click(within(selector).getByRole('button', {name: 'P1'}));
+    await user.click(screen.getByRole('option', {name: 'All severities'}));
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+  });
+
+  it('does not expose individual rankings, owner filters, or the tagline', async () => {
+    await renderRoute();
+    expect(screen.queryByRole('combobox', {name: 'Queue owner'})).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', {name: 'Queue team'})).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', {name: 'Linear team'})).toBeInTheDocument();
+    expect(screen.queryByText(/Learn from incidents/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Owners ranked/)).not.toBeInTheDocument();
+  });
+
+  it('explains priority-based SLOs rather than Linear due dates', async () => {
+    const user = userEvent.setup();
+    await renderRoute();
+    await user.click(screen.getByText('How to read this dashboard'));
+    expect(screen.getByText(/not Linear's explicit due date/)).toBeVisible();
+    expect(screen.getByText(/Low and unset priority have no SLO target/)).toBeVisible();
+    expect(screen.getByText('Completed within SLO')).toBeInTheDocument();
+  });
+
+  it('shows unsynced team metadata without attributing it to an individual', async () => {
+    setupMocks({
+      ...mockData,
+      summary: {...mockData.summary, unknown_team: 1},
+      teams: [
+        ...mockData.teams,
+        {
+          id: 'unknown',
+          key: '',
+          name: 'Team not synced',
+          open: 1,
+          overdue: 0,
+          stalled: 0,
+        },
+      ],
+    });
+    await renderRoute();
+    expect(
+      screen.getByText(/1 open follow-ups have no Linear team metadata yet/)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('option', {name: 'Team not synced (1)'})).toBeInTheDocument();
   });
 
   it('paginates without losing scope or queue filters', async () => {
@@ -307,7 +378,7 @@ describe('Action item dashboard', () => {
         median_completion_days: null,
         on_time_percent: null,
       },
-      owners: [],
+      teams: [],
       queue: {count: 0, page: 1, pages: 1, results: []},
     });
     await renderRoute();
@@ -354,13 +425,34 @@ describe('Dashboard contracts', () => {
         page: -3,
         view: 'bad',
         severity: 'P9',
-        assignee: 'bad',
+        team: 'bad',
         q: 'x'.repeat(201),
       })
     ).toEqual({});
     expect(DashboardSearchSchema.parse({page: 2, view: 'open', q: '  alerts  '})).toEqual(
       {page: 2, view: 'open', q: 'alerts'}
     );
+  });
+
+  it('drops individual identity fields from dashboard rows', () => {
+    const withIdentity = {
+      ...mockData,
+      queue: {
+        ...mockData.queue,
+        results: [
+          {
+            ...mockData.queue.results[0],
+            assignee_name: 'Not a public ranking',
+            assignee_id: 42,
+            assignee_avatar_url: 'https://example.com/avatar.png',
+          },
+        ],
+      },
+    };
+    const row = DashboardSchema.parse(withIdentity).queue.results[0];
+    expect(row).not.toHaveProperty('assignee_name');
+    expect(row).not.toHaveProperty('assignee_id');
+    expect(row).not.toHaveProperty('assignee_avatar_url');
   });
 
   it('passes scope, queue filters, and abort signal through the shared API client', async () => {

@@ -31,7 +31,7 @@ export function DashboardOverview({
       view: 'open' as const,
     },
     {
-      label: 'Overdue',
+      label: 'Overdue SLOs',
       value: summary.overdue,
       detail: `${summary.due_soon} due in the next ${data.due_soon_days} days`,
       view: 'overdue' as const,
@@ -178,12 +178,12 @@ export function DashboardOverview({
   );
 }
 
-export function OwnerHotspots({
+export function TeamHotspots({
   data,
-  onOwner,
+  onTeam,
 }: {
   data: DashboardData;
-  onOwner: (id: string) => void;
+  onTeam: (id: string) => void;
 }) {
   const {summary} = data;
   return (
@@ -200,7 +200,7 @@ export function OwnerHotspots({
             </dd>
           </div>
           <div>
-            <dt {...stylex.props(styles.muted)}>Completed on time</dt>
+            <dt {...stylex.props(styles.muted)}>Completed within SLO</dt>
             <dd {...stylex.props(styles.factValue)}>
               {summary.on_time_percent === null ? '—' : `${summary.on_time_percent}%`}
             </dd>
@@ -214,41 +214,41 @@ export function OwnerHotspots({
           <h2 {...stylex.props(styles.heading)}>Where help is needed</h2>
         </div>
         <p {...stylex.props(styles.muted)}>
-          Owners ranked by overdue work, then stalled work.
+          Linear teams with overdue or stalled follow-ups.
         </p>
-        <ul {...stylex.props(styles.ownerList)}>
-          {data.owners.slice(0, 5).map(owner => (
-            <li key={owner.id}>
+        <ul {...stylex.props(styles.teamList)}>
+          {data.teams.slice(0, 5).map(team => (
+            <li key={team.id}>
               <button
                 type="button"
-                onClick={() => onOwner(owner.id)}
-                {...stylex.props(styles.ownerButton)}
+                onClick={() => onTeam(team.id)}
+                {...stylex.props(styles.teamButton)}
               >
-                <span {...stylex.props(styles.ownerName)}>
-                  {owner.name}
+                <span {...stylex.props(styles.teamName)}>
+                  {team.name}
                   <span {...stylex.props(styles.metadata)}>
-                    {owner.open} open · {owner.stalled} stalled
+                    {team.open} open · {team.stalled} stalled
                   </span>
                 </span>
                 <span
                   {...stylex.props(
-                    styles.ownerCount,
-                    owner.overdue ? styles.danger : styles.muted
+                    styles.teamCount,
+                    team.overdue ? styles.danger : styles.muted
                   )}
                 >
-                  {owner.overdue} overdue
+                  {team.overdue} overdue
                 </span>
               </button>
             </li>
           ))}
         </ul>
-        {data.owners.length === 0 ? (
+        {data.teams.length === 0 ? (
           <p {...stylex.props(styles.empty)}>No open work.</p>
         ) : null}
-        {data.owners.length > 5 ? (
+        {data.teams.length > 5 ? (
           <p {...stylex.props(styles.caption)}>
-            Top 5 of {data.owners.length} owners. Use the queue's owner filter to see
-            anyone.
+            Showing 5 of {data.teams.length} teams. Use the queue's team filter to see any
+            team.
           </p>
         ) : null}
       </Card>
@@ -263,9 +263,16 @@ export function OwnerHotspots({
             </p>
             <p>
               SLO deadlines use the configured priority targets and the issue's original
-              creation time. Low and unset priority have no target. Stalled means no issue
-              update in Linear for {data.stalled_days} days, not time since Firetower's
-              last sync.
+              creation time, not Linear's explicit due date. A missing Linear due date
+              does not remove the priority-based SLO. Low and unset priority have no SLO
+              target and are excluded from overdue, due-soon, and on-time metrics; they
+              still count toward open work, aging, and stalled work.
+            </p>
+            <p>
+              Stalled means no issue update in Linear for {data.stalled_days} days, not
+              time since Firetower's last sync. Teams are the child issues' Linear teams,
+              not the incident's team or individual assignees. Missing team metadata is
+              shown as Team not synced until the next sync.
             </p>
             <p>
               Delivery metrics use the completion timestamps of currently completed Linear

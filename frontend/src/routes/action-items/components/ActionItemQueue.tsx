@@ -17,8 +17,8 @@ import {styles} from './styles';
 const VIEWS: {value: QueueView; label: string}[] = [
   {value: 'attention', label: 'Needs attention'},
   {value: 'open', label: 'All open'},
-  {value: 'overdue', label: 'Overdue'},
-  {value: 'due_soon', label: 'Due soon'},
+  {value: 'overdue', label: 'Overdue SLOs'},
+  {value: 'due_soon', label: 'SLOs due soon'},
   {value: 'stalled', label: 'Stalled'},
   {value: 'unassigned', label: 'Unassigned'},
   {value: 'no_priority', label: 'No priority'},
@@ -61,7 +61,7 @@ export function ActionItemQueue({
 }) {
   const {queue, summary} = data;
   const view = search.view ?? 'attention';
-  const clear = () => onSearch({view: undefined, assignee: undefined, q: undefined});
+  const clear = () => onSearch({view: undefined, team: undefined, q: undefined});
   return (
     <Card style={styles.card}>
       <section aria-labelledby="queue-heading">
@@ -92,15 +92,15 @@ export function ActionItemQueue({
             ))}
           </select>
           <select
-            aria-label="Queue owner"
-            value={search.assignee ?? ''}
-            onChange={event => onSearch({assignee: event.target.value || undefined})}
+            aria-label="Queue team"
+            value={search.team ?? ''}
+            onChange={event => onSearch({team: event.target.value || undefined})}
             {...stylex.props(styles.control)}
           >
-            <option value="">All owners</option>
-            {data.owners.map(owner => (
-              <option key={owner.id} value={owner.id}>
-                {owner.name} ({owner.open})
+            <option value="">All teams</option>
+            {data.teams.map(team => (
+              <option key={team.id} value={team.id}>
+                {team.name} ({team.open})
               </option>
             ))}
           </select>
@@ -122,8 +122,8 @@ export function ActionItemQueue({
           <input
             type="search"
             name="q"
-            aria-label="Search title, issue, incident, or owner"
-            placeholder="Search title, issue, incident, or owner…"
+            aria-label="Search title, issue, incident, or team"
+            placeholder="Search title, issue, incident, or team…"
             defaultValue={search.q ?? ''}
             maxLength={200}
             {...stylex.props(styles.control, styles.search)}
@@ -144,7 +144,7 @@ export function ActionItemQueue({
                     Follow-up / incident
                   </th>
                   <th scope="col" {...stylex.props(styles.th)}>
-                    Owner
+                    Linear team
                   </th>
                   <th scope="col" {...stylex.props(styles.th)}>
                     Age
@@ -183,9 +183,9 @@ export function ActionItemQueue({
                         <span>{item.incident_severity} incident</span>
                       </div>
                     </td>
-                    <td {...stylex.props(styles.td, styles.ownerCell)}>
-                      <span {...stylex.props(styles.mobileLabel)}>Owner: </span>
-                      {item.assignee_name ?? 'Unassigned'}
+                    <td {...stylex.props(styles.td, styles.teamCell)}>
+                      <span {...stylex.props(styles.mobileLabel)}>Team: </span>
+                      {item.linear_team_name || item.linear_team_key || 'Team not synced'}
                     </td>
                     <td
                       {...stylex.props(styles.td)}
@@ -213,7 +213,9 @@ export function ActionItemQueue({
                             </span>
                           ))
                         ) : (
-                          <span {...stylex.props(styles.muted)}>On track</span>
+                          <span {...stylex.props(styles.muted)}>
+                            {item.slo_deadline ? 'Within SLO' : 'No SLO target'}
+                          </span>
                         )}
                         {item.idle_days === null ? (
                           <span {...stylex.props(styles.muted)}>Activity unknown</span>
@@ -236,9 +238,7 @@ export function ActionItemQueue({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() =>
-                  onSearch({view: 'open', assignee: undefined, q: undefined})
-                }
+                onClick={() => onSearch({view: 'open', team: undefined, q: undefined})}
               >
                 Show all open work
               </Button>
