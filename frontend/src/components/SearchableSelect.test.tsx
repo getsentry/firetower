@@ -33,10 +33,13 @@ function setup() {
 }
 
 describe('SearchableSelect', () => {
-  it('uses a tag-style trigger and focuses a searchable listbox', async () => {
+  it('uses one button surface without an inset tag and focuses a searchable listbox', async () => {
     const {user} = setup();
     const trigger = screen.getByRole('combobox', {name: 'Team'});
     expect(trigger).toHaveTextContent('All teams');
+    expect(trigger.firstElementChild).toBe(screen.getByText('All teams'));
+    expect(trigger.firstElementChild?.childElementCount).toBe(0);
+    expect(trigger.lastElementChild?.tagName.toLowerCase()).toBe('svg');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(document.querySelector('select')).toBeNull();
     await user.click(trigger);
