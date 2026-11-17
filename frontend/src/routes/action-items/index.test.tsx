@@ -99,6 +99,8 @@ const mockData: DashboardData = {
         linear_team_name: 'Engineering',
         url: 'https://linear.app/issue/ENG-123',
         slo_deadline: '2026-11-14T12:00:00Z',
+        deadline_source: 'priority_slo',
+        due_date: null,
         incident_id: 'INC-2345',
         incident_title: 'Database outage',
         incident_severity: 'P1',
@@ -119,6 +121,8 @@ const mockData: DashboardData = {
         linear_team_name: 'Infrastructure',
         url: 'https://linear.app/issue/ENG-124',
         slo_deadline: null,
+        deadline_source: null,
+        due_date: null,
         incident_id: 'INC-2346',
         incident_title: 'Release outage',
         incident_severity: 'P2',
@@ -178,6 +182,11 @@ describe('Action item dashboard', () => {
       await screen.findByRole('heading', {name: 'Action items'})
     ).toBeInTheDocument();
     const nav = screen.getByRole('navigation');
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map(link => link.textContent?.trim())
+    ).toEqual(['Incidents', 'Action Items', 'Availability']);
     expect(within(nav).getByRole('link', {name: 'Availability'})).toBeInTheDocument();
     expect(within(nav).getByRole('link', {name: 'Action Items'})).toHaveAttribute(
       'href',
@@ -213,7 +222,7 @@ describe('Action item dashboard', () => {
     const router = await renderRoute(
       `/action-items?severity=P1&page=2&team=${ENGINEERING_TEAM}&q=alerts`
     );
-    await user.click(screen.getByRole('button', {name: /^Overdue SLOs 3/}));
+    await user.click(screen.getByRole('button', {name: /^Overdue 3/}));
     await waitFor(() =>
       expect(router.state.location.search).toEqual({severity: 'P1', view: 'overdue'})
     );
@@ -265,7 +274,7 @@ describe('Action item dashboard', () => {
       `/action-items?view=overdue&team=${ENGINEERING_TEAM}&page=2`
     );
     const selector = screen.getByRole('group', {name: 'Incident severity'});
-    await user.click(within(selector).getByRole('button', {name: 'All severities'}));
+    await user.click(within(selector).getByRole('button', {name: 'All', exact: true}));
     await user.click(screen.getByRole('option', {name: 'P2'}));
     await waitFor(() => expect(router.state.location.search).toEqual({severity: 'P2'}));
     expect(mockApiGet).toHaveBeenCalledWith(
@@ -278,7 +287,7 @@ describe('Action item dashboard', () => {
     const router = await renderRoute('/action-items?severity=P1');
     const selector = screen.getByRole('group', {name: 'Incident severity'});
     await user.click(within(selector).getByRole('button', {name: 'P1'}));
-    await user.click(screen.getByRole('option', {name: 'All severities'}));
+    await user.click(screen.getByRole('option', {name: 'All', exact: true}));
     await waitFor(() => expect(router.state.location.search).toEqual({}));
   });
 
@@ -288,16 +297,59 @@ describe('Action item dashboard', () => {
     expect(screen.getByRole('combobox', {name: 'Queue team'})).toBeInTheDocument();
     expect(screen.getByRole('columnheader', {name: 'Linear team'})).toBeInTheDocument();
     expect(screen.queryByText(/Learn from incidents/)).not.toBeInTheDocument();
+    expect(screen.queryByText('All severities')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('group', {name: 'Incident severity'})).getByRole('button', {
+        name: 'All',
+        exact: true,
+      })
+    ).toBeInTheDocument();
     expect(screen.queryByText(/Owners ranked/)).not.toBeInTheDocument();
   });
 
-  it('explains priority-based SLOs rather than Linear due dates', async () => {
+  it('explains Linear deadline precedence and sync timing', async () => {
     const user = userEvent.setup();
     await renderRoute();
     await user.click(screen.getByText('How to read this dashboard'));
-    expect(screen.getByText(/not Linear's explicit due date/)).toBeVisible();
-    expect(screen.getByText(/Low and unset priority have no SLO target/)).toBeVisible();
-    expect(screen.getByText('Completed within SLO')).toBeInTheDocument();
+    expect(screen.getByText(/explicit Linear due date first/)).toBeVisible();
+    expect(screen.getByText(/Clearing a due date falls back/)).toBeVisible();
+    expect(screen.getByText(/end of that date in UTC/)).toBeVisible();
+    expect(screen.getByText('Completed on time')).toBeInTheDocument();
+  });
+
+  it.each([
+    {source: 'linear_due_date', label: 'Linear due date', date: '2026-11-14'},
+    {source: 'linear_sla', label: 'Linear SLA', date: null},
+    {source: 'priority_slo', label: 'Priority SLO', date: null},
+  ] as const)(
+    'shows the actual deadline source: $source',
+    async ({source, label, date}) => {
+      setupMocks({
+        ...mockData,
+        queue: {
+          ...mockData.queue,
+          results: [
+            {...mockData.queue.results[0], deadline_source: source, due_date: date},
+          ],
+        },
+      });
+      await renderRoute();
+      expect(screen.getByText(new RegExp('^' + label + ':'))).toBeInTheDocument();
+      if (date) expect(screen.getByText(label + ': ' + date)).toBeInTheDocument();
+    }
+  );
+
+  it('does not call work without a deadline on time', async () => {
+    setupMocks({
+      ...mockData,
+      queue: {
+        ...mockData.queue,
+        results: [{...mockData.queue.results[1], priority: 4, flags: []}],
+      },
+    });
+    await renderRoute();
+    expect(screen.getByText('No deadline')).toBeInTheDocument();
+    expect(screen.queryByText('Within deadline')).not.toBeInTheDocument();
   });
 
   it('shows unsynced team metadata without attributing it to an individual', async () => {

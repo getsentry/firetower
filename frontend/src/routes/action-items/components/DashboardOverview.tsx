@@ -31,7 +31,7 @@ export function DashboardOverview({
       view: 'open' as const,
     },
     {
-      label: 'Overdue SLOs',
+      label: 'Overdue',
       value: summary.overdue,
       detail: `${summary.due_soon} due in the next ${data.due_soon_days} days`,
       view: 'overdue' as const,
@@ -200,14 +200,14 @@ export function TeamHotspots({
             </dd>
           </div>
           <div>
-            <dt {...stylex.props(styles.muted)}>Completed within SLO</dt>
+            <dt {...stylex.props(styles.muted)}>Completed on time</dt>
             <dd {...stylex.props(styles.factValue)}>
               {summary.on_time_percent === null ? '—' : `${summary.on_time_percent}%`}
             </dd>
           </div>
         </dl>
         <p {...stylex.props(styles.caption)}>
-          {summary.on_time_sample} completed follow-ups with an SLO target. No target is
+          {summary.on_time_sample} completed follow-ups with a deadline. No deadline is
           not the same as on time.
         </p>
         <div {...stylex.props(styles.cardHeader)}>
@@ -262,11 +262,18 @@ export function TeamHotspots({
               signals.
             </p>
             <p>
-              SLO deadlines use the configured priority targets and the issue's original
-              creation time, not Linear's explicit due date. A missing Linear due date
-              does not remove the priority-based SLO. Low and unset priority have no SLO
-              target and are excluded from overdue, due-soon, and on-time metrics; they
-              still count toward open work, aging, and stalled work.
+              Deadlines use the explicit Linear due date first, then Linear's SLA
+              deadline, then the configured priority SLO from the issue's creation time.
+              Date-only due dates run through the end of that date in UTC. A low or
+              unprioritized item can still have an explicit deadline; items without any
+              deadline are excluded from overdue, due-soon, and on-time metrics but still
+              count toward open work, aging, and stalled work.
+            </p>
+            <p>
+              Edits and removals in Linear are picked up by the hourly sync. Use the
+              incident's Sync action items button to fetch them immediately, then refresh
+              this dashboard. Clearing a due date falls back to the remaining SLA or
+              priority target; Refresh dashboard alone only reloads cached data.
             </p>
             <p>
               Stalled means no issue update in Linear for {data.stalled_days} days, not
@@ -277,7 +284,8 @@ export function TeamHotspots({
             <p>
               Delivery metrics use the completion timestamps of currently completed Linear
               issues. They are not a historical status ledger. Reopened and canceled items
-              are not counted as completed.
+              are not counted as completed. On-time comparisons use the currently synced
+              deadline, not a historical deadline snapshot.
             </p>
             <p>
               All-time totals: {summary.done} completed, {summary.canceled} canceled.{' '}
