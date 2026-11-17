@@ -164,7 +164,7 @@ class TestSendStaleIncidentNudges:
     def test_skips_when_human_posted_recently(self, slack):
         self._make_incident()
         slack.get_channel_history.return_value = [
-            {"type": "message", "user": "UHUMAN", "ts": _ts(NOW - timedelta(days=1))}
+            {"type": "message", "user": "UHUMAN", "ts": _ts(NOW - timedelta(hours=12))}
         ]
 
         self._run()
@@ -216,16 +216,16 @@ class TestSendStaleIncidentNudges:
         slack.post_message.assert_not_called()
 
     def test_skips_new_incident(self, slack):
-        self._make_incident(created_at=NOW - timedelta(days=1))
+        self._make_incident(created_at=NOW - timedelta(hours=12))
 
         self._run()
 
         slack.post_message.assert_not_called()
 
-    def test_waits_three_business_days_between_nudges(self, slack):
+    def test_waits_two_business_days_between_nudges(self, slack):
         incident = self._make_incident(created_at=NOW - timedelta(days=14))
         Incident.objects.filter(pk=incident.pk).update(
-            last_nudge_at=NOW - timedelta(days=2)
+            last_nudge_at=NOW - timedelta(days=1)
         )
 
         self._run()
@@ -248,6 +248,36 @@ class TestSendStaleIncidentNudges:
         self._run()
 
         slack.post_message.assert_not_called()
+
+    def test_says_one_business_day_in_singular(self, slack):
+        self._make_incident()
+        slack.get_channel_history.return_value = [
+            {
+                "type": "message",
+                "user": "UHUMAN",
+                "ts": _ts(NOW - timedelta(days=1, hours=1)),
+            }
+        ]
+
+        self._run()
+
+        assert "for 1 business day." in slack.post_message.call_args.args[1]
+
+    @pytest.mark.parametrize(
+        ("now", "nudged"),
+        [
+            (datetime(2026, 11, 18, 12, 59, tzinfo=UTC), False),  # 7:59 AM ET
+            (datetime(2026, 11, 18, 13, 0, tzinfo=UTC), True),  # 8:00 AM ET
+            (datetime(2026, 11, 19, 0, 59, tzinfo=UTC), True),  # 7:59 PM ET
+            (datetime(2026, 11, 19, 1, 0, tzinfo=UTC), False),  # 8:00 PM ET
+        ],
+    )
+    def test_only_nudges_between_8am_and_8pm_eastern(self, slack, now, nudged):
+        self._make_incident()
+
+        self._run(now=now)
+
+        assert slack.post_message.called is nudged
 
     def test_skips_weekends(self, slack):
         self._make_incident()

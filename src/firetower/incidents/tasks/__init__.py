@@ -42,7 +42,7 @@ SCHEDULES = {
     },
     "send_stale_incident_nudges": {
         "func": "firetower.incidents.tasks.send_stale_incident_nudges",
-        "schedule_type": Schedule.DAILY,
+        "schedule_type": Schedule.HOURLY,
         "repeats": -1,
     },
 }

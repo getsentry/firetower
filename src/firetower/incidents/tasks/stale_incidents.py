@@ -1,6 +1,7 @@
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.utils import timezone
@@ -18,8 +19,12 @@ from firetower.integrations.services.slack import SlackService
 logger = logging.getLogger(__name__)
 
 STALE_STATUS_BUSINESS_DAYS = 1
-QUIET_CHANNEL_BUSINESS_DAYS = 2
-NUDGE_EVERY_BUSINESS_DAYS = 3
+QUIET_CHANNEL_BUSINESS_DAYS = 1
+NUDGE_EVERY_BUSINESS_DAYS = 2
+
+NUDGE_TIMEZONE = ZoneInfo("America/New_York")
+NUDGE_START_HOUR = 8
+NUDGE_END_HOUR = 20
 
 HUMAN_MESSAGE_SUBTYPES = {None, "thread_broadcast", "file_share"}
 
@@ -28,7 +33,7 @@ HELP_CHANNEL_ID = "C08RJKP6NR0"
 
 STALE_INCIDENT_NUDGE_MESSAGE = (
     "{ic_mention}This incident has been *{status}* since {status_since}, and "
-    "nobody has posted here for {quiet_days} business days.\n"
+    "nobody has posted here for {quiet_days}.\n"
     "If it's fixed, run {commands}. If work is still ongoing, a short update "
     "here helps.\n\n"
     f"_This is an experimental nudge. If it looks wrong, let <#{HELP_CHANNEL_ID}> know._"
@@ -36,7 +41,7 @@ STALE_INCIDENT_NUDGE_MESSAGE = (
 
 
 def subtract_business_days(moment: datetime, days: int) -> datetime:
-    """Return the time `days` weekdays (Mon–Fri, UTC) before `moment`."""
+    """Return the time `days` weekdays (Mon–Fri, in `moment`'s timezone) before `moment`."""
     result = moment
     remaining = days
     while remaining > 0:
@@ -47,7 +52,7 @@ def subtract_business_days(moment: datetime, days: int) -> datetime:
 
 
 def count_business_days(start: datetime, end: datetime) -> int:
-    """Return how many whole weekdays (Mon–Fri, UTC) have passed from `start` to `end`."""
+    """Return how many whole weekdays (Mon–Fri, in `start`'s timezone) have passed from `start` to `end`."""
     days = 0
     cursor = start + timedelta(days=1)
     while cursor <= end:
@@ -124,7 +129,7 @@ def _build_message(incident: Incident, status_since: datetime, quiet_days: int) 
         ic_mention=f"<@{captain_slack_id}> " if captain_slack_id else "",
         status=incident.status,
         status_since=status_since.strftime("%a %b %-d"),
-        quiet_days=quiet_days,
+        quiet_days=f"{quiet_days} business day{'' if quiet_days == 1 else 's'}",
         commands=commands,
     )
 
@@ -136,13 +141,14 @@ def send_stale_incident_nudges() -> None:
     An incident is forgotten when its status has not changed for
     STALE_STATUS_BUSINESS_DAYS and nobody has posted in its channel for
     QUIET_CHANNEL_BUSINESS_DAYS. Each incident gets at most one nudge every
-    NUDGE_EVERY_BUSINESS_DAYS.
+    NUDGE_EVERY_BUSINESS_DAYS. Runs hourly; nudges only go out on weekdays
+    between NUDGE_START_HOUR and NUDGE_END_HOUR in NUDGE_TIMEZONE.
     """
     if not settings.SLACK.get("STALE_INCIDENT_NUDGES_ENABLED"):
         return
 
-    now = timezone.now()
-    if now.weekday() >= 5:
+    now = timezone.now().astimezone(NUDGE_TIMEZONE)
+    if now.weekday() >= 5 or not NUDGE_START_HOUR <= now.hour < NUDGE_END_HOUR:
         return
 
     stale_cutoff = subtract_business_days(now, STALE_STATUS_BUSINESS_DAYS)
@@ -178,7 +184,9 @@ def send_stale_incident_nudges() -> None:
             )
             continue
         last_activity = _last_human_activity(slack, channel_id, history, quiet_cutoff)
-        quiet_since = max(last_activity or incident.created_at, incident.created_at)
+        quiet_since = max(
+            last_activity or incident.created_at, incident.created_at
+        ).astimezone(NUDGE_TIMEZONE)
         if quiet_since > quiet_cutoff:
             continue
 
