@@ -765,6 +765,7 @@ class TestParseIssue:
             "url": "https://linear.app/team/issue/ENG-123",
             "priority": 2,
             "createdAt": "2026-10-16T12:30:00.000Z",
+            "team": {"id": "team-1", "key": "ENG", "name": "Engineering"},
             "slaBreachesAt": "2026-10-30T12:30:00.000Z",
             "state": {"type": "started"},
             "assignee": {"id": "user-1", "email": "alice@sentry.io"},
@@ -786,8 +787,26 @@ class TestParseIssue:
             "sla_breaches_at": datetime(2026, 10, 30, 12, 30, tzinfo=UTC),
             "assignee_email": "alice@sentry.io",
             "assignee_linear_id": "user-1",
+            "linear_team_id": "team-1",
+            "linear_team_key": "ENG",
+            "linear_team_name": "Engineering",
             "relation_type": "child",
         }
+
+    @pytest.mark.parametrize("team", [None, {}])
+    def test_missing_team_metadata(self, linear_service, team):
+        result = linear_service._parse_issue(
+            {
+                "id": "issue-1",
+                "identifier": "ENG-1",
+                "title": "Test",
+                "url": "https://linear.app/issue/ENG-1",
+                "team": team,
+            }
+        )
+        assert result["linear_team_id"] == ""
+        assert result["linear_team_key"] == ""
+        assert result["linear_team_name"] == ""
 
     def test_parses_existing_label_ids(self, linear_service):
         issue = {

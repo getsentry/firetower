@@ -834,25 +834,35 @@ class ActionItemDashboardQuerySerializer(serializers.Serializer):
         ],
         default="attention",
     )
-    assignee = serializers.RegexField(r"^(unassigned|[0-9]+)$", required=False)
+    team = serializers.CharField(max_length=36, required=False)
     q = serializers.CharField(max_length=200, required=False, allow_blank=True)
     page = serializers.IntegerField(min_value=1, max_value=100000, default=1)
+
+    def validate_team(self, value: str) -> str:
+        if value == "unknown":
+            return value
+        return str(serializers.UUIDField().run_validation(value))
 
 
 class DashboardActionItemSerializer(ActionItemSerializer):
     incident_id = serializers.CharField(source="incident.incident_number")
     incident_title = serializers.CharField(source="incident.title")
     incident_severity = serializers.CharField(source="incident.severity")
-    assignee_id = serializers.IntegerField(allow_null=True)
 
     class Meta(ActionItemSerializer.Meta):
         fields = [
-            *ActionItemSerializer.Meta.fields,
+            *[
+                field
+                for field in ActionItemSerializer.Meta.fields
+                if not field.startswith("assignee_")
+            ],
             "id",
             "incident_id",
             "incident_title",
             "incident_severity",
-            "assignee_id",
+            "linear_team_id",
+            "linear_team_key",
+            "linear_team_name",
             "created_at",
             "linear_updated_at",
         ]

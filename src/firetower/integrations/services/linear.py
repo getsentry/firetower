@@ -48,6 +48,11 @@ ISSUE_FIELDS = """
     updatedAt
     completedAt
     slaBreachesAt
+    team {
+        id
+        key
+        name
+    }
     labels {
         nodes {
             id
@@ -404,6 +409,7 @@ class LinearService:
         state_type = (issue.get("state") or {}).get("type", "")
         status = LINEAR_STATE_TYPE_MAP.get(state_type, "Todo")
         assignee = issue.get("assignee") or {}
+        team = issue.get("team") or {}
         created_at = issue.get("createdAt")
         updated_at = issue.get("updatedAt")
         completed_at = issue.get("completedAt")
@@ -424,6 +430,9 @@ class LinearService:
             "sla_breaches_at": (
                 parse_datetime(sla_breaches_at) if sla_breaches_at else None
             ),
+            "linear_team_id": team.get("id") or "",
+            "linear_team_key": team.get("key") or "",
+            "linear_team_name": team.get("name") or "",
             "assignee_email": assignee.get("email"),
             "assignee_linear_id": assignee.get("id"),
             "relation_type": relation_type,
