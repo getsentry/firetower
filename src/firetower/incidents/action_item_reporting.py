@@ -6,6 +6,7 @@ from typing import Any
 
 from django.db.models import QuerySet
 
+from .action_item_periods import TIME_RANGES, get_range_start, get_trend_periods
 from .models import ActionItem, ActionItemStatus, Incident
 from .serializers import DashboardActionItemSerializer
 
@@ -18,6 +19,7 @@ def build_action_item_dashboard(
     incidents: QuerySet[Incident],
     *,
     now: datetime,
+    time_range: str = "all",
     view: str = "attention",
     team: str = "",
     q: str = "",
@@ -25,11 +27,13 @@ def build_action_item_dashboard(
 ) -> dict[str, Any]:
     """Report on cached follow-ups, scoped to incidents the caller can see."""
     now = now.astimezone(UTC)
-    items = list(
-        ActionItem.objects.filter(incident__in=incidents)
-        .select_related("incident")
-        .order_by("created_at", "id")
+    range_start = get_range_start(time_range, now)
+    item_queryset = ActionItem.objects.filter(
+        incident__in=incidents, created_at__lte=now
     )
+    if range_start is not None:
+        item_queryset = item_queryset.filter(created_at__gte=range_start)
+    items = list(item_queryset.select_related("incident").order_by("created_at", "id"))
     incident_rows = list(
         incidents.only("linear_parent_issue_id", "action_items_last_synced_at")
     )
@@ -51,20 +55,20 @@ def build_action_item_dashboard(
             "no_priority": item.priority == 0,
         }
 
-    recent_done = [
+    completed = [
         item
         for item in items
         if item.status == ActionItemStatus.DONE
         and item.completed_at is not None
-        and now - timedelta(days=30) <= item.completed_at <= now
+        and item.completed_at <= now
         and item.completed_at >= item.created_at
     ]
     completion_days = [
         (item.completed_at - item.created_at).total_seconds() / 86400
-        for item in recent_done
+        for item in completed
         if item.completed_at is not None
     ]
-    with_target = [item for item in recent_done if item.deadline is not None]
+    with_target = [item for item in completed if item.deadline is not None]
     on_time = sum(
         item.completed_at <= item.deadline
         for item in with_target
@@ -83,10 +87,8 @@ def build_action_item_dashboard(
             for key in ("overdue", "due_soon", "stalled", "unassigned", "no_priority")
         },
         "attention": sum(any(item_flags.values()) for item_flags in flags.values()),
-        "created_30d": sum(
-            now - timedelta(days=30) <= item.created_at <= now for item in items
-        ),
-        "completed_30d": len(recent_done),
+        "created_count": len(items),
+        "completed_count": len(completed),
         "median_completion_days": round(median(completion_days), 1)
         if completion_days
         else None,
@@ -102,30 +104,28 @@ def build_action_item_dashboard(
         ),
     }
 
-    monday = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
-        days=now.weekday()
+    trend_start = (
+        range_start
+        if range_start is not None
+        else (items[0].created_at if items else now)
     )
-    weeks = []
-    for offset in range(7, -1, -1):
-        start = monday - timedelta(weeks=offset)
-        end = start + timedelta(weeks=1)
-        weeks.append(
-            {
-                "start": start.date().isoformat(),
-                "created": sum(
-                    start <= item.created_at < end and item.created_at <= now
-                    for item in items
-                ),
-                "completed": sum(
-                    item.status == ActionItemStatus.DONE
-                    and item.completed_at is not None
-                    and start <= item.completed_at < end
-                    and item.completed_at <= now
-                    and item.completed_at >= item.created_at
-                    for item in items
-                ),
-            }
-        )
+    trend_interval, periods = get_trend_periods(trend_start, now)
+    trend = [
+        {
+            "start": period["start"].isoformat(),
+            "end": period["end"].isoformat(),
+            "label": period["label"],
+            "created": sum(
+                period["start"] <= item.created_at < period["end"] for item in items
+            ),
+            "completed": sum(
+                period["start"] <= item.completed_at < period["end"]
+                for item in completed
+                if item.completed_at is not None
+            ),
+        }
+        for period in periods
+    ]
 
     aging = []
     for label, lower, upper in [
@@ -262,10 +262,16 @@ def build_action_item_dashboard(
     ]
     return {
         "generated_at": now.isoformat(),
+        "time_range": {
+            "key": time_range,
+            "label": TIME_RANGES[time_range],
+            "start": range_start.isoformat() if range_start is not None else None,
+            "end": now.isoformat(),
+        },
         "stalled_days": STALLED_DAYS,
         "due_soon_days": DUE_SOON_DAYS,
         "summary": summary,
-        "weeks": weeks,
+        "trend": {"interval": trend_interval, "buckets": trend},
         "aging": aging,
         "teams": team_rows,
         "freshness": {

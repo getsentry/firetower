@@ -10,6 +10,7 @@ import {
   actionItemDashboardQueryOptions,
   DashboardSchema,
   DashboardSearchSchema,
+  TIME_RANGE_OPTIONS,
   type DashboardData,
   type DashboardSearch,
 } from './queries/actionItemDashboardQueryOptions';
@@ -22,6 +23,12 @@ const INFRASTRUCTURE_TEAM = '22222222-2222-4222-8222-222222222222';
 
 const mockData: DashboardData = {
   generated_at: '2026-11-17T12:00:00+00:00',
+  time_range: {
+    key: 'all',
+    label: 'All time',
+    start: null,
+    end: '2026-11-17T12:00:00+00:00',
+  },
   stalled_days: 14,
   due_soon_days: 3,
   summary: {
@@ -37,8 +44,8 @@ const mockData: DashboardData = {
     unassigned: 1,
     no_priority: 1,
     attention: 6,
-    created_30d: 7,
-    completed_30d: 8,
+    created_count: 24,
+    completed_count: 10,
     median_completion_days: 9.5,
     on_time_percent: 75,
     on_time_sample: 4,
@@ -46,11 +53,20 @@ const mockData: DashboardData = {
     unknown_team: 0,
     unknown_completion: 0,
   },
-  weeks: Array.from({length: 8}, (_, index) => ({
-    start: `2026-10-${String(index + 1).padStart(2, '0')}`,
-    created: index,
-    completed: index + 1,
-  })),
+  trend: {
+    interval: 'Monthly',
+    buckets: Array.from({length: 8}, (_, index) => ({
+      start: new Date(Date.UTC(2026, index + 3, 1)).toISOString(),
+      end: new Date(Date.UTC(2026, index + 4, 1)).toISOString(),
+      label: new Date(Date.UTC(2026, index + 3, 1)).toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+      }),
+      created: [2, 4, 3, 2, 5, 4, 2, 2][index],
+      completed: [0, 1, 1, 1, 2, 2, 1, 2][index],
+    })),
+  },
   aging: [
     {label: '0–7 days', count: 4, overdue: 0},
     {label: '8–14 days', count: 3, overdue: 0},
@@ -146,14 +162,38 @@ const mockData: DashboardData = {
 
 let queryClient: QueryClient;
 
-function setupMocks(data = mockData) {
+function setupMocks(data = mockData, scopedData?: DashboardData) {
   mockApiGet.mockImplementation(
     ({path, query}: {path: string; query?: DashboardSearch}) => {
       if (path === '/ui/users/me/')
         return Promise.resolve({name: 'Reader', avatar_url: null});
       if (path === '/ui/action-items/') {
+        const key = query?.time_range ?? 'all';
+        const starts = {
+          '7d': '2026-11-10',
+          '14d': '2026-11-03',
+          '1m': '2026-10-17',
+          '3m': '2026-08-17',
+          '6m': '2026-05-17',
+          '9m': '2026-02-17',
+          '12m': '2025-11-17',
+        };
+        const source = key !== 'all' && scopedData ? scopedData : data;
+        const time_range = {
+          key,
+          label:
+            key === 'all'
+              ? 'All time'
+              : TIME_RANGE_OPTIONS.find(option => option.value === key)!.description,
+          start: key === 'all' ? null : starts[key] + 'T12:00:00+00:00',
+          end: data.generated_at,
+        };
         return Promise.resolve(
-          DashboardSchema.parse({...data, queue: {...data.queue, page: query?.page ?? 1}})
+          DashboardSchema.parse({
+            ...source,
+            time_range,
+            queue: {...source.queue, page: query?.page ?? 1},
+          })
         );
       }
       return Promise.reject(new Error('Unexpected request'));
@@ -212,7 +252,10 @@ describe('Action item dashboard', () => {
     expect(screen.queryByText('All Incidents')).not.toBeInTheDocument();
     expect(screen.getByRole('button', {name: /Open follow-ups 12/})).toBeInTheDocument();
     expect(screen.getByRole('heading', {name: 'Are we keeping up?'})).toBeInTheDocument();
-    expect(screen.getAllByRole('img', {name: /Week of/})).toHaveLength(8);
+    expect(screen.getAllByRole('img', {name: /created,.*completed/})).toHaveLength(8);
+    expect(screen.getByRole('combobox', {name: 'Time range'})).toHaveTextContent(
+      'All time'
+    );
     expect(
       screen.getByRole('heading', {name: 'How old is the backlog?'})
     ).toBeInTheDocument();
@@ -397,7 +440,7 @@ describe('Action item dashboard', () => {
   it('keeps the delivery sample above the divider and only lists at-risk teams', async () => {
     await renderRoute();
     const card = screen.getByRole('heading', {
-      name: 'Delivery · last 30 days',
+      name: 'Delivery · all time',
     }).parentElement!;
     const note = within(card).getByText(/4 completed follow-ups with a deadline/);
     const divider = within(card).getByRole('separator');
@@ -423,6 +466,128 @@ describe('Action item dashboard', () => {
     expect(router.state.location.search).toEqual({});
     expect(mockApiGet).toHaveBeenCalledTimes(before);
     expect(document.querySelector('main select')).toBeNull();
+  });
+
+  it('offers all requested global time ranges and applies scoped data to every panel', async () => {
+    const user = userEvent.setup();
+    const scoped: DashboardData = {
+      ...mockData,
+      summary: {
+        ...mockData.summary,
+        open: 1,
+        todo: 0,
+        in_progress: 1,
+        done: 1,
+        canceled: 0,
+        high_priority_open: 0,
+        overdue: 0,
+        due_soon: 0,
+        stalled: 0,
+        unassigned: 1,
+        no_priority: 1,
+        attention: 1,
+        created_count: 2,
+        completed_count: 1,
+        median_completion_days: 2,
+        on_time_percent: 100,
+        on_time_sample: 1,
+      },
+      trend: {
+        interval: 'Daily',
+        buckets: [
+          {
+            start: '2026-11-16T00:00:00Z',
+            end: '2026-11-17T00:00:00Z',
+            label: 'Nov 16',
+            created: 1,
+            completed: 0,
+          },
+          {
+            start: '2026-11-17T00:00:00Z',
+            end: '2026-11-18T00:00:00Z',
+            label: 'Nov 17',
+            created: 1,
+            completed: 1,
+          },
+        ],
+      },
+      aging: mockData.aging.map((bucket, index) => ({
+        ...bucket,
+        count: index === 0 ? 1 : 0,
+        overdue: 0,
+      })),
+      teams: [
+        {
+          ...mockData.teams[1],
+          open: 1,
+          completed: 1,
+          overdue: 0,
+          stalled: 0,
+          canceled: 0,
+          total: 2,
+          completion_rate: 50,
+        },
+      ],
+      queue: {count: 1, page: 1, pages: 1, results: [mockData.queue.results[1]]},
+    };
+    setupMocks(mockData, scoped);
+    const router = await renderRoute(
+      `/action-items?severity=P1&view=overdue&team=${ENGINEERING_TEAM}&page=2&q=alerts`
+    );
+    await user.click(screen.getByRole('combobox', {name: 'Time range'}));
+    for (const option of TIME_RANGE_OPTIONS) {
+      expect(
+        screen.getByRole('option', {name: new RegExp('^' + option.label)})
+      ).toBeInTheDocument();
+    }
+    await user.click(screen.getByRole('option', {name: /^7d/}));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({severity: 'P1', time_range: '7d'})
+    );
+    expect(mockApiGet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/ui/action-items/',
+        query: {severity: 'P1', time_range: '7d'},
+      })
+    );
+    expect(screen.getByRole('button', {name: /Open follow-ups 1/})).toBeInTheDocument();
+    expect(screen.getByText('Completed · last 7 days')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {name: 'Delivery · last 7 days'})
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Last 7 days · current linked follow-ups/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Older open and overdue work is excluded/)
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('img', {name: /created,.*completed/})).toHaveLength(2);
+    expect(screen.getAllByRole('rowheader')).toHaveLength(1);
+    expect(screen.getByText('1 matching follow-up')).toBeInTheDocument();
+    await chooseOption(user, 'Time range', /^All time/);
+    await waitFor(() => expect(router.state.location.search).toEqual({severity: 'P1'}));
+    expect(screen.getByRole('button', {name: /Open follow-ups 12/})).toBeInTheDocument();
+  });
+
+  it('preserves the global range through severity, queue filters, and pagination', async () => {
+    const user = userEvent.setup();
+    const router = await renderRoute('/action-items?time_range=3m&severity=P1');
+    const selector = screen.getByRole('group', {name: 'Incident severity'});
+    await user.click(within(selector).getByRole('button', {name: 'P1'}));
+    await user.click(screen.getByRole('option', {name: 'P2'}));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({severity: 'P2', time_range: '3m'})
+    );
+    await chooseOption(user, 'Queue view', /^All open/);
+    await user.click(screen.getByRole('button', {name: 'Next', exact: true}));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({
+        severity: 'P2',
+        time_range: '3m',
+        view: 'open',
+        page: 2,
+      })
+    );
   });
 
   it('paginates without losing scope or queue filters', async () => {
@@ -527,6 +692,7 @@ describe('Dashboard contracts', () => {
         page: -3,
         view: 'bad',
         severity: 'P9',
+        time_range: '30d',
         team: 'bad',
         q: 'x'.repeat(201),
       })
