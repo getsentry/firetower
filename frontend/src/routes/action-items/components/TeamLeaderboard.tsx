@@ -19,7 +19,13 @@ const METRICS = [
 type TeamMetric = (typeof METRICS)[number]['value'];
 const VISIBLE_TEAMS = 8;
 
-export function TeamLeaderboard({data}: {data: Pick<DashboardData, 'teams'>}) {
+export function TeamLeaderboard({
+  data,
+  rangeLabel = 'All time',
+}: {
+  data: Pick<DashboardData, 'teams'>;
+  rangeLabel?: string;
+}) {
   const [metric, setMetric] = useState<TeamMetric>('completed');
   const [teamFilter, setTeamFilter] = useState('');
   const [expanded, setExpanded] = useState(false);
@@ -88,7 +94,7 @@ export function TeamLeaderboard({data}: {data: Pick<DashboardData, 'teams'>}) {
           >
             <table {...stylex.props(tableStyles.table)}>
               <caption {...stylex.props(tableStyles.caption)}>
-                All time · current linked follow-ups. Total includes canceled work;
+                {rangeLabel} · current linked follow-ups. Total includes canceled work;
                 completion rate is completed ÷ (completed + open). Rankings are among all
                 teams in this scope; unsynced team metadata is unranked.
               </caption>

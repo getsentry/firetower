@@ -6,6 +6,7 @@ import {Button} from 'components/Button';
 import {Card} from 'components/Card';
 import {EditablePill} from 'components/EditablePill';
 import {ErrorState} from 'components/ErrorState';
+import {SearchableSelect} from 'components/SearchableSelect';
 import {Skeleton} from 'components/Skeleton';
 import {RefreshCw} from 'lucide-react';
 
@@ -18,6 +19,7 @@ import {TeamLeaderboard} from './components/TeamLeaderboard';
 import {
   actionItemDashboardQueryOptions,
   DashboardSearchSchema,
+  TIME_RANGE_OPTIONS,
   type DashboardSearch,
   type QueueView,
 } from './queries/actionItemDashboardQueryOptions';
@@ -76,6 +78,19 @@ function ActionItemsDashboard() {
           </p>
         </div>
         <div {...stylex.props(styles.controls)}>
+          <SearchableSelect
+            label="Time range"
+            value={search.time_range ?? 'all'}
+            options={TIME_RANGE_OPTIONS}
+            onChange={time_range => {
+              void navigate({
+                search: previous => ({
+                  severity: previous.severity,
+                  time_range: time_range === 'all' ? undefined : time_range,
+                }),
+              });
+            }}
+          />
           <div
             role="group"
             aria-label="Incident severity"
@@ -88,7 +103,10 @@ function ActionItemsDashboard() {
               getVariant={value => (value === 'All' ? 'default' : value)}
               onSave={async value => {
                 await navigate({
-                  search: value === 'All' ? {} : {severity: value},
+                  search: previous => ({
+                    time_range: previous.time_range,
+                    severity: value === 'All' ? undefined : value,
+                  }),
                 });
               }}
             />
@@ -106,6 +124,25 @@ function ActionItemsDashboard() {
           </Button>
         </div>
       </header>
+      <p {...stylex.props(styles.muted)}>
+        Scope: follow-ups created in Linear{' '}
+        {data.time_range.start ? (
+          <>
+            since{' '}
+            <time dateTime={data.time_range.start}>
+              {new Date(data.time_range.start).toLocaleString(undefined, {
+                timeZone: 'UTC',
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })}
+            </time>{' '}
+            UTC. Older open and overdue work is excluded; choose All time for the full
+            backlog.
+          </>
+        ) : (
+          'across all time, including the full open backlog.'
+        )}
+      </p>
       {isRefetchError ? (
         <p role="alert" {...stylex.props(styles.warningBox)}>
           Refresh failed. Showing the previous snapshot; try again.
@@ -115,8 +152,9 @@ function ActionItemsDashboard() {
       data.summary.unknown_activity > 0 ||
       data.summary.unknown_team > 0 ? (
         <p role="status" {...stylex.props(styles.warningBox)}>
-          Data may be incomplete: {data.freshness.unsynced_incidents} linked incidents
-          have never synced, {data.freshness.stale_incidents} have not synced in 24h, and{' '}
+          Sync coverage across all visible incidents may be incomplete:{' '}
+          {data.freshness.unsynced_incidents} linked incidents have never synced,{' '}
+          {data.freshness.stale_incidents} have not synced in 24h, and{' '}
           {data.summary.unknown_activity} open follow-ups have no activity timestamp.{' '}
           {data.summary.unknown_team} open follow-ups have no Linear team metadata yet.
           The hourly Linear sync fills these in. Open an incident to sync it individually.
@@ -135,7 +173,7 @@ function ActionItemsDashboard() {
         </Card>
       ) : null}
       <DashboardOverview data={data} onView={onView} />
-      <TeamLeaderboard data={data} />
+      <TeamLeaderboard data={data} rangeLabel={data.time_range.label} />
       <div {...stylex.props(styles.lowerGrid)}>
         <ActionItemQueue data={data} search={search} onSearch={onSearch} />
         <TeamHotspots
@@ -144,7 +182,7 @@ function ActionItemsDashboard() {
         />
       </div>
       <p {...stylex.props(styles.muted)}>
-        Open follow-ups remain visible after an incident is closed. Severity scopes the
+        Includes follow-ups from closed incidents. Time range and severity scope the
         entire dashboard; queue and team-progress controls filter independently.
         <br />
         Cached Linear data · synced hourly · snapshot{' '}

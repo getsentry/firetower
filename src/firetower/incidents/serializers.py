@@ -12,6 +12,7 @@ from rest_framework import serializers
 from firetower.auth.serializers import UserSerializer
 from firetower.auth.services import get_or_create_user_from_email
 
+from .action_item_periods import TIME_RANGES
 from .allocation import (
     AllocatedIdentity,
     adopt_on_create_enabled,
@@ -819,6 +820,7 @@ class ActionItemSerializer(serializers.ModelSerializer):
 
 
 class ActionItemDashboardQuerySerializer(serializers.Serializer):
+    time_range = serializers.ChoiceField(choices=TIME_RANGES, default="all")
     severity = serializers.ChoiceField(
         choices=["P0", "P1", "P2", "P3", "P4"], required=False
     )

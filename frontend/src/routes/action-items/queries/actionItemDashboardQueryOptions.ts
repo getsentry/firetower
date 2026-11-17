@@ -5,6 +5,27 @@ import {z} from 'zod';
 import {ActionItemSchema} from '../../$incidentId/queries/actionItemsQueryOptions';
 import {SeveritySchema} from '../../types';
 
+export const TimeRangeSchema = z.enum([
+  '7d',
+  '14d',
+  '1m',
+  '3m',
+  '6m',
+  '9m',
+  '12m',
+  'all',
+]);
+export const TIME_RANGE_OPTIONS = [
+  {value: '7d', label: '7d', description: 'Last 7 days'},
+  {value: '14d', label: '14d', description: 'Last 14 days'},
+  {value: '1m', label: '1m', description: 'Last month'},
+  {value: '3m', label: '3m', description: 'Last 3 months'},
+  {value: '6m', label: '6m', description: 'Last 6 months'},
+  {value: '9m', label: '9m', description: 'Last 9 months'},
+  {value: '12m', label: '12m', description: 'Last 12 months'},
+  {value: 'all', label: 'All time', description: 'Entire cached history'},
+] as const;
+
 export const QueueViewSchema = z.enum([
   'attention',
   'open',
@@ -15,6 +36,7 @@ export const QueueViewSchema = z.enum([
   'no_priority',
 ]);
 export const DashboardSearchSchema = z.object({
+  time_range: TimeRangeSchema.optional().catch(undefined),
   severity: SeveritySchema.optional().catch(undefined),
   view: QueueViewSchema.optional().catch(undefined),
   team: z
@@ -60,6 +82,12 @@ const DashboardTeamSchema = z.object({
 
 export const DashboardSchema = z.object({
   generated_at: z.string(),
+  time_range: z.object({
+    key: TimeRangeSchema,
+    label: z.string(),
+    start: z.string().nullable(),
+    end: z.string(),
+  }),
   stalled_days: z.number(),
   due_soon_days: z.number(),
   summary: z.object({
@@ -75,8 +103,8 @@ export const DashboardSchema = z.object({
     unassigned: z.number(),
     no_priority: z.number(),
     attention: z.number(),
-    created_30d: z.number(),
-    completed_30d: z.number(),
+    created_count: z.number(),
+    completed_count: z.number(),
     median_completion_days: z.number().nullable(),
     on_time_percent: z.number().nullable(),
     on_time_sample: z.number(),
@@ -84,9 +112,18 @@ export const DashboardSchema = z.object({
     unknown_team: z.number(),
     unknown_completion: z.number(),
   }),
-  weeks: z.array(
-    z.object({start: z.string(), created: z.number(), completed: z.number()})
-  ),
+  trend: z.object({
+    interval: z.string(),
+    buckets: z.array(
+      z.object({
+        start: z.string(),
+        end: z.string(),
+        label: z.string(),
+        created: z.number(),
+        completed: z.number(),
+      })
+    ),
+  }),
   aging: z.array(z.object({label: z.string(), count: z.number(), overdue: z.number()})),
   teams: z.array(DashboardTeamSchema),
   freshness: z.object({

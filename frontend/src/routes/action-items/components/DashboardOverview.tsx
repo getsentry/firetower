@@ -5,14 +5,6 @@ import type {DashboardData, QueueView} from '../queries/actionItemDashboardQuery
 
 import {styles} from './styles';
 
-function weekLabel(start: string) {
-  return new Date(`${start}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
 export function DashboardOverview({
   data,
   onView,
@@ -20,8 +12,11 @@ export function DashboardOverview({
   data: DashboardData;
   onView: (view: QueueView) => void;
 }) {
-  const {summary, weeks, aging} = data;
-  const maxFlow = Math.max(1, ...weeks.flatMap(week => [week.created, week.completed]));
+  const {summary, trend, aging} = data;
+  const maxFlow = Math.max(
+    1,
+    ...trend.buckets.flatMap(bucket => [bucket.created, bucket.completed])
+  );
   const maxAge = Math.max(1, ...aging.map(bucket => bucket.count));
   const metrics = [
     {
@@ -66,12 +61,14 @@ export function DashboardOverview({
           </button>
         ))}
         <div {...stylex.props(styles.metric)}>
-          <span {...stylex.props(styles.metricLabel)}>Completed · last 30 days</span>
+          <span {...stylex.props(styles.metricLabel)}>
+            Completed · {data.time_range.label.toLowerCase()}
+          </span>
           <strong {...stylex.props(styles.metricValue, styles.success)}>
-            {summary.completed_30d}
+            {summary.completed_count}
           </strong>
           <span {...stylex.props(styles.muted)}>
-            {summary.created_30d} created in the same period
+            {summary.created_count} created in the selected range
           </span>
         </div>
       </div>
@@ -93,43 +90,46 @@ export function DashboardOverview({
                 </span>
               </div>
             </div>
-            <div {...stylex.props(styles.flowChart)}>
-              {weeks.map(week => (
-                <div
-                  key={week.start}
-                  role="img"
-                  aria-label={`Week of ${weekLabel(week.start)}: ${week.created} created, ${week.completed} completed`}
-                  {...stylex.props(styles.week)}
-                >
-                  <div {...stylex.props(styles.barPair)} aria-hidden="true">
-                    <div {...stylex.props(styles.barColumn)}>
-                      <span>{week.created}</span>
-                      <div
-                        {...stylex.props(
-                          styles.bar((week.created / maxFlow) * 88),
-                          styles.createdFill
-                        )}
-                      />
+            <div {...stylex.props(styles.scroll)}>
+              <div {...stylex.props(styles.flowChart(trend.buckets.length))}>
+                {trend.buckets.map(bucket => (
+                  <div
+                    key={bucket.start}
+                    role="img"
+                    aria-label={`${bucket.label}: ${bucket.created} created, ${bucket.completed} completed`}
+                    title={`${new Date(bucket.start).toUTCString()} – ${new Date(bucket.end).toUTCString()}`}
+                    {...stylex.props(styles.trendBucket)}
+                  >
+                    <div {...stylex.props(styles.barPair)} aria-hidden="true">
+                      <div {...stylex.props(styles.barColumn)}>
+                        <span>{bucket.created}</span>
+                        <div
+                          {...stylex.props(
+                            styles.bar((bucket.created / maxFlow) * 88),
+                            styles.createdFill
+                          )}
+                        />
+                      </div>
+                      <div {...stylex.props(styles.barColumn)}>
+                        <span>{bucket.completed}</span>
+                        <div
+                          {...stylex.props(
+                            styles.bar((bucket.completed / maxFlow) * 88),
+                            styles.completedFill
+                          )}
+                        />
+                      </div>
                     </div>
-                    <div {...stylex.props(styles.barColumn)}>
-                      <span>{week.completed}</span>
-                      <div
-                        {...stylex.props(
-                          styles.bar((week.completed / maxFlow) * 88),
-                          styles.completedFill
-                        )}
-                      />
-                    </div>
+                    <span {...stylex.props(styles.periodLabel)} aria-hidden="true">
+                      {bucket.label}
+                    </span>
                   </div>
-                  <span {...stylex.props(styles.weekLabel)} aria-hidden="true">
-                    {weekLabel(week.start)}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
             <figcaption {...stylex.props(styles.caption)}>
-              Last 8 weeks · UTC · current week is partial. Canceled work is not counted
-              as completed.
+              {data.time_range.label} · {trend.interval} · UTC · boundary periods are
+              partial. Canceled work is not counted as completed.
             </figcaption>
           </figure>
         </Card>
@@ -168,8 +168,8 @@ export function DashboardOverview({
               ))}
             </div>
             <figcaption {...stylex.props(styles.caption)}>
-              Age since creation in Linear · all open follow-ups, including closed
-              incidents.
+              Age since creation in Linear · open follow-ups in the selected range,
+              including closed incidents.
             </figcaption>
           </figure>
         </Card>
@@ -190,7 +190,9 @@ export function TeamHotspots({
   return (
     <aside {...stylex.props(styles.aside)}>
       <Card style={styles.card}>
-        <h2 {...stylex.props(styles.heading)}>Delivery · last 30 days</h2>
+        <h2 {...stylex.props(styles.heading)}>
+          Delivery · {data.time_range.label.toLowerCase()}
+        </h2>
         <dl {...stylex.props(styles.facts)}>
           <div>
             <dt {...stylex.props(styles.muted)}>Median time to finish</dt>
@@ -287,13 +289,17 @@ export function TeamHotspots({
               deadline, not a historical deadline snapshot.
             </p>
             <p>
-              Team progress uses current statuses across all time, including teams with
-              only completed work. Total includes canceled items; completion rate is
-              completed divided by completed plus open work, excluding canceled items.
-              Delivery's last-30-day metrics additionally require a completion timestamp.
+              The global time range selects follow-ups by their Linear creation time, not
+              the parent incident's date. Finite ranges exclude older open and overdue
+              work; choose All time for the full backlog. Team progress uses current
+              statuses in that same range, including completed-only teams. Total includes
+              canceled items; completion rate is completed divided by completed plus open
+              work, excluding canceled items. Delivery metrics additionally require a
+              valid completion timestamp. Sync coverage is reported across all visible
+              incidents, independent of the time range.
             </p>
             <p>
-              All-time totals: {summary.done} completed, {summary.canceled} canceled.{' '}
+              Totals in this range: {summary.done} completed, {summary.canceled} canceled.{' '}
               {summary.unknown_completion} completed items lack a completion date and are
               excluded from delivery metrics. {summary.unknown_activity} open items lack
               activity dates and are not classified as stalled.

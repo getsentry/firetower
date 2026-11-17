@@ -111,13 +111,13 @@ export const styles = stylex.create({
   createdFill: {backgroundColor: content.accent},
   completedFill: {backgroundColor: content.success},
   overdueFill: {backgroundColor: content.danger},
-  flowChart: {
+  flowChart: (columns: number) => ({
     display: 'grid',
-    gridTemplateColumns: 'repeat(8, minmax(0, 1fr))',
+    gridTemplateColumns: `repeat(${columns}, minmax(42px, 1fr))`,
     gap: space.sm,
     marginTop: space.lg,
-  },
-  week: {
+  }),
+  trendBucket: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -154,11 +154,11 @@ export const styles = stylex.create({
     borderStartEndRadius: radius['2xs'],
     minHeight: 2,
   }),
-  weekLabel: {
+  periodLabel: {
     fontSize: fontSize.xs,
     color: content.secondary,
     textAlign: 'center',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'normal',
   },
   agingRows: {display: 'flex', flexDirection: 'column', gap: space.lg},
   agingRow: {

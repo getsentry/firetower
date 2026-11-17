@@ -8,6 +8,7 @@ from django.contrib.auth.models import AnonymousUser, User
 from django_q.models import Schedule
 from rest_framework.test import APIClient
 
+from firetower.incidents.action_item_periods import TIME_RANGES, get_range_start
 from firetower.incidents.action_item_reporting import build_action_item_dashboard
 from firetower.incidents.models import ActionItem, Incident, filter_visible_to_user
 from firetower.incidents.services import (
@@ -129,8 +130,9 @@ class TestActionItemDashboard:
         assert summary["unassigned"] == 1
         assert summary["no_priority"] == 1
         assert summary["attention"] == 5
-        assert summary["completed_30d"] == 2
-        assert summary["median_completion_days"] == 20.5
+        assert summary["created_count"] == 11
+        assert summary["completed_count"] == 3
+        assert summary["median_completion_days"] == 30
         assert summary["on_time_percent"] == 50
         assert summary["on_time_sample"] == 2
         assert summary["canceled"] == 1
@@ -138,12 +140,128 @@ class TestActionItemDashboard:
         assert data["queue"]["count"] == 5
         assert data["queue"]["results"][0]["flags"] == ["overdue", "stalled"]
         assert sum(bucket["count"] for bucket in data["aging"]) == 6
-        assert sum(week["completed"] for week in data["weeks"]) == 3
+        assert sum(bucket["completed"] for bucket in data["trend"]["buckets"]) == 3
         assert sum(team["open"] for team in data["teams"]) == 6
         assert data["teams"][0]["completed"] == 4
         assert data["teams"][0]["canceled"] == 1
         assert data["teams"][0]["total"] == 11
         assert data["teams"][0]["completion_rate"] == 40
+
+    @pytest.mark.parametrize("time_range", TIME_RANGES)
+    def test_presets_return_server_resolved_bounds(self, dashboard, time_range):
+        client, _, _ = dashboard
+        response = client.get(URL, {"time_range": time_range})
+        assert response.status_code == 200
+        start = get_range_start(time_range, NOW)
+        assert response.data["time_range"] == {
+            "key": time_range,
+            "label": TIME_RANGES[time_range],
+            "start": start.isoformat() if start is not None else None,
+            "end": NOW.isoformat(),
+        }
+        assert 1 <= len(response.data["trend"]["buckets"]) <= 15
+
+    def test_range_scopes_every_activity_view_by_linear_creation_not_incident_date(
+        self, dashboard
+    ):
+        client, user, incident = dashboard
+        Incident.objects.filter(pk=incident.pk).update(
+            created_at=NOW - timedelta(days=200)
+        )
+        old_open = make_item(
+            incident, assignee=user, priority=2, created_at=NOW - timedelta(days=50)
+        )
+        make_item(
+            incident,
+            status="Done",
+            created_at=NOW - timedelta(days=40),
+            completed_at=NOW - timedelta(days=1),
+        )
+        boundary = make_item(
+            incident,
+            assignee=user,
+            priority=2,
+            created_at=NOW - timedelta(days=7),
+            linear_due_date=NOW.date() - timedelta(days=1),
+        )
+        make_item(
+            incident,
+            status="Done",
+            priority=2,
+            created_at=NOW - timedelta(days=2),
+            completed_at=NOW - timedelta(days=1),
+        )
+        make_item(incident, status="Canceled", created_at=NOW - timedelta(days=3))
+        make_item(
+            incident,
+            status="Done",
+            created_at=NOW - timedelta(days=1),
+            completed_at=None,
+        )
+        make_item(incident, created_at=NOW + timedelta(seconds=1))
+        private = Incident.objects.create(
+            title="Private incident", severity="P1", is_private=True
+        )
+        make_item(private, status="Done", linear_team_name="Private team")
+        minor = Incident.objects.create(title="Minor incident", severity="P2")
+        make_item(
+            minor,
+            status="Done",
+            linear_team_id=INFRA_TEAM_ID,
+            linear_team_name="Infrastructure",
+        )
+
+        data = client.get(
+            URL, {"time_range": "7d", "severity": "P1", "view": "open"}
+        ).data
+        assert data["summary"]["created_count"] == 4
+        assert data["summary"]["completed_count"] == 1
+        assert data["summary"]["open"] == data["summary"]["overdue"] == 1
+        assert data["summary"]["unknown_completion"] == 1
+        assert data["summary"]["on_time_sample"] == 1
+        assert data["summary"]["on_time_percent"] == 100
+        assert [row["id"] for row in data["queue"]["results"]] == [boundary.id]
+        assert sum(bucket["count"] for bucket in data["aging"]) == 1
+        assert sum(bucket["created"] for bucket in data["trend"]["buckets"]) == 4
+        assert sum(bucket["completed"] for bucket in data["trend"]["buckets"]) == 1
+        assert len(data["teams"]) == 1
+        assert data["teams"][0]["completed"] == 2
+        assert data["teams"][0]["total"] == 4
+        assert data["teams"][0]["completion_rate"] == 66.7
+        assert "Private team" not in str(data)
+        assert "Infrastructure" not in str(data)
+
+        all_time = client.get(URL, {"severity": "P1", "view": "open"}).data
+        assert all_time["time_range"]["key"] == "all"
+        assert all_time["summary"]["created_count"] == 6
+        assert all_time["summary"]["completed_count"] == 2
+        assert all_time["summary"]["open"] == 2
+        assert old_open.id in [row["id"] for row in all_time["queue"]["results"]]
+
+    def test_range_start_and_now_are_inclusive_but_future_items_are_excluded(
+        self, dashboard
+    ):
+        client, _, incident = dashboard
+        start = NOW - timedelta(days=7)
+        make_item(incident, created_at=start - timedelta(microseconds=1))
+        first = make_item(incident, created_at=start)
+        last = make_item(incident, created_at=NOW)
+        make_item(incident, created_at=NOW + timedelta(microseconds=1))
+        data = client.get(URL, {"time_range": "7d", "view": "open"}).data
+        assert data["summary"]["created_count"] == 2
+        assert {row["id"] for row in data["queue"]["results"]} == {first.id, last.id}
+        assert sum(bucket["created"] for bucket in data["trend"]["buckets"]) == 2
+
+    def test_range_does_not_change_integration_coverage_reporting(self, dashboard):
+        client, _, incident = dashboard
+        make_item(incident, created_at=NOW - timedelta(days=100))
+        Incident.objects.create(
+            title="Never synced", severity="P1", linear_parent_issue_id="other"
+        )
+        data = client.get(URL, {"time_range": "7d"}).data
+        assert data["summary"]["open"] == 0
+        assert data["freshness"]["linked_incidents"] == 2
+        assert data["freshness"]["unsynced_incidents"] == 1
 
     def test_deadline_and_idle_boundaries(self, dashboard):
         client, user, incident = dashboard
@@ -236,7 +354,7 @@ class TestActionItemDashboard:
         )
         make_item(incident, priority=4, **done)
         data = client.get(URL).data
-        assert data["summary"]["completed_30d"] == 4
+        assert data["summary"]["completed_count"] == 4
         assert data["summary"]["on_time_sample"] == 3
         assert data["summary"]["on_time_percent"] == 66.7
         dated.linear_due_date = NOW.date() - timedelta(days=5)
@@ -559,6 +677,8 @@ class TestActionItemDashboard:
             {"page": 100001},
             {"q": "x" * 201},
             {"team": "bad"},
+            {"time_range": "30d"},
+            {"time_range": "1y"},
         ],
     )
     def test_invalid_parameters(self, dashboard, params):
@@ -572,7 +692,7 @@ class TestActionItemDashboard:
         assert data["summary"]["median_completion_days"] is None
         assert data["summary"]["on_time_percent"] is None
         assert data["queue"] == {"count": 0, "page": 1, "pages": 1, "results": []}
-        assert len(data["weeks"]) == 8
+        assert len(data["trend"]["buckets"]) == 1
 
     def test_no_target_is_not_on_time_and_impossible_dates_are_excluded(
         self, dashboard
@@ -595,10 +715,10 @@ class TestActionItemDashboard:
             completed_at=NOW - timedelta(days=1),
         )
         data = client.get(URL).data
-        assert data["summary"]["completed_30d"] == 1
+        assert data["summary"]["completed_count"] == 1
         assert data["summary"]["on_time_percent"] is None
         assert data["summary"]["on_time_sample"] == 0
-        assert sum(week["completed"] for week in data["weeks"]) == 1
+        assert sum(bucket["completed"] for bucket in data["trend"]["buckets"]) == 1
 
     def test_freshness_reports_missing_and_stale_syncs(self, dashboard):
         client, _, _ = dashboard
