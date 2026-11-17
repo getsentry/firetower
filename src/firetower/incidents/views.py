@@ -15,6 +15,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .action_item_reporting import build_action_item_dashboard
 from .filters import (
     filter_by_captain,
     filter_by_date_range,
@@ -29,6 +30,7 @@ from .models import (
     ActionItem,
     Incident,
     IncidentOrRedirect,
+    IncidentStatus,
     ServiceTier,
     Tag,
     TagType,
@@ -44,6 +46,7 @@ from .reporting_utils import (
     get_year_periods,
 )
 from .serializers import (
+    ActionItemDashboardQuerySerializer,
     ActionItemSerializer,
     IncidentListUISerializer,
     IncidentOrRedirectReadSerializer,
@@ -554,6 +557,21 @@ class TagListCreateAPIView(generics.ListCreateAPIView):
             return Response(serializer.data)
 
         return super().list(request, *args, **kwargs)
+
+
+class ActionItemDashboardView(APIView):
+    def get(self, request: Request) -> Response:
+        params = ActionItemDashboardQuerySerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+        options = params.validated_data
+        incidents = filter_visible_to_user(
+            Incident.objects.exclude(status=IncidentStatus.CANCELED), request.user
+        )
+        if severity := options.pop("severity", None):
+            incidents = incidents.filter(severity=severity)
+        return Response(
+            build_action_item_dashboard(incidents, now=timezone.now(), **options)
+        )
 
 
 class AvailabilityView(APIView):

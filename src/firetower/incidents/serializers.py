@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
@@ -785,13 +784,6 @@ class TagCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(e.message_dict)
 
 
-def _get_action_item_slo_days() -> dict[int, int]:
-    linear = getattr(settings, "LINEAR", None) or {}
-    high = linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 0)
-    medium = linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 0)
-    return {1: high, 2: high, 3: medium}
-
-
 class ActionItemSerializer(serializers.ModelSerializer):
     assignee_name = serializers.SerializerMethodField()
     assignee_avatar_url = serializers.SerializerMethodField()
@@ -822,11 +814,48 @@ class ActionItemSerializer(serializers.ModelSerializer):
         return None
 
     def get_slo_deadline(self, obj: ActionItem) -> str | None:
-        slo_days = _get_action_item_slo_days().get(obj.priority)
-        if not slo_days:
-            return None
-        deadline = obj.created_at + timedelta(days=slo_days)
-        return deadline.isoformat()
+        deadline = obj.slo_deadline
+        return deadline.isoformat() if deadline else None
+
+
+class ActionItemDashboardQuerySerializer(serializers.Serializer):
+    severity = serializers.ChoiceField(
+        choices=["P0", "P1", "P2", "P3", "P4"], required=False
+    )
+    view = serializers.ChoiceField(
+        choices=[
+            "attention",
+            "open",
+            "overdue",
+            "due_soon",
+            "stalled",
+            "unassigned",
+            "no_priority",
+        ],
+        default="attention",
+    )
+    assignee = serializers.RegexField(r"^(unassigned|[0-9]+)$", required=False)
+    q = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    page = serializers.IntegerField(min_value=1, max_value=100000, default=1)
+
+
+class DashboardActionItemSerializer(ActionItemSerializer):
+    incident_id = serializers.CharField(source="incident.incident_number")
+    incident_title = serializers.CharField(source="incident.title")
+    incident_severity = serializers.CharField(source="incident.severity")
+    assignee_id = serializers.IntegerField(allow_null=True)
+
+    class Meta(ActionItemSerializer.Meta):
+        fields = [
+            *ActionItemSerializer.Meta.fields,
+            "id",
+            "incident_id",
+            "incident_title",
+            "incident_severity",
+            "assignee_id",
+            "created_at",
+            "linear_updated_at",
+        ]
 
 
 class IncidentOrRedirectReadSerializer(serializers.Serializer):

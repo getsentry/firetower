@@ -332,8 +332,6 @@ def sync_action_items_from_linear(
         error_msg = f"Failed to fetch child issues for incident {incident.id}"
         logger.warning(error_msg)
         stats.errors.append(error_msg)
-        incident.action_items_last_synced_at = timezone.now()
-        incident.save(update_fields=["action_items_last_synced_at"])
         return stats
 
     all_issues: dict[str, dict] = {}
@@ -359,6 +357,8 @@ def sync_action_items_from_linear(
         "url",
         "created_at",
         "updated_at",
+        "linear_updated_at",
+        "completed_at",
     ]
 
     for issue in all_issues.values():
@@ -375,6 +375,8 @@ def sync_action_items_from_linear(
             ai.relation_type = issue["relation_type"]
             ai.assignee = assignee
             ai.url = issue["url"]
+            ai.linear_updated_at = issue.get("linear_updated_at")
+            ai.completed_at = issue.get("completed_at")
             if created_at is not None:
                 ai.created_at = created_at
             ai.updated_at = timezone.now()
@@ -392,6 +394,8 @@ def sync_action_items_from_linear(
                     assignee=assignee,
                     url=issue["url"],
                     created_at=created_at or timezone.now(),
+                    linear_updated_at=issue.get("linear_updated_at"),
+                    completed_at=issue.get("completed_at"),
                 )
             )
 

@@ -131,6 +131,20 @@ sdk/                 # Python SDK
 
 Set `action_item_label_id` in the `[linear]` section of `config.toml` to the workspace-wide `incident-action` label's ID to enable automatic labeling during action item sync, including pre-existing issues adopted as follow-ups. Other labels are preserved. Labeling is skipped when the value is empty or omitted.
 
+## Action Item Dashboard
+
+The **Action Items** navigation tab summarizes cached Linear child issues across all visible, non-canceled incidents, including old and completed incidents. Incident severity scopes the full dashboard; queue view, owner, search, and pagination only narrow the follow-up queue. Filters are shareable in the URL.
+
+- **Health:** open work, overdue SLOs, items due within three days, missing owners/priorities, and issues with no Linear update for 14 days.
+- **Progress:** eight UTC calendar weeks of creation/completion counts, open backlog age, and the last 30 days' completions, median completion time, and on-time completion percentage.
+- **Triage:** a risk-ordered queue linking directly to Linear and the incident, plus owner hotspots that drill into the queue.
+
+SLOs use the same configured priority targets and original issue creation time as the incident page. Low and unset priorities have no SLO. Canceled work is not a completion. Delivery metrics use Linear completion timestamps on currently completed issues, not historical transitions; reopened issues are excluded. Missing activity/completion timestamps are reported rather than inferred from Firetower sync times.
+
+The read-only `GET /api/ui/action-items/` endpoint accepts `severity` (P0–P4), `view` (attention/open/overdue/due_soon/stalled/unassigned/no_priority), `assignee` (user ID or unassigned), `q`, and a one-based `page`. Queue pages contain up to ten items. Every aggregate and row obeys the existing incident visibility rules; admin status does not bypass private-incident restrictions.
+
+Migration 0026 adds nullable Linear activity/completion timestamps and an hourly Django-Q cache refresh for every linked, non-canceled incident, without an age or severity cutoff. Existing rows are backfilled by the next sync, with no external calls during migration or dashboard reads. The dashboard warns about never-synced incidents, syncs older than 24 hours, and missing activity dates. **Refresh dashboard** reloads the cache; use an incident's existing sync button to refresh that incident from Linear immediately.
+
 ## Scheduled Tasks
 
 Scheduled tasks are stored as database objects and are managed via migrations.
