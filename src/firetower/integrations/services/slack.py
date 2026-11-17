@@ -17,6 +17,10 @@ from slack_sdk.errors import SlackApiError
 logger = logging.getLogger(__name__)
 
 
+class SlackReadError(Exception):
+    """Raised when a Slack read fails and the caller asked to know about it."""
+
+
 class SlackRateLimitRetry:
     def __init__(self, max_retries: int = 1, max_delay: int = 30) -> None:
         self.remaining = max_retries
@@ -573,10 +577,16 @@ class SlackService:
         return messages
 
     def get_thread_replies(
-        self, channel_id: str, thread_ts: str
+        self, channel_id: str, thread_ts: str, raise_on_error: bool = False
     ) -> list[dict[str, Any]]:
-        """Return all non-parent human replies for a thread, paginating automatically."""
+        """Return all non-parent human replies for a thread, paginating automatically.
+
+        With `raise_on_error`, a failed read raises SlackReadError instead of
+        returning the replies read so far.
+        """
         if not self.client:
+            if raise_on_error:
+                raise SlackReadError("Slack client not initialized")
             return []
         replies: list[dict[str, Any]] = []
         cursor: str | None = None
@@ -590,13 +600,17 @@ class SlackService:
                 kwargs["cursor"] = cursor
             try:
                 response = self.client.conversations_replies(**kwargs)
-            except Exception:
+            except Exception as e:
                 logger.exception("Failed to fetch replies for thread %s", thread_ts)
+                if raise_on_error:
+                    raise SlackReadError(f"Failed to fetch thread {thread_ts}") from e
                 break
             if not response.get("ok"):
                 logger.error(
                     "conversations_replies returned not-ok for thread %s", thread_ts
                 )
+                if raise_on_error:
+                    raise SlackReadError(f"Failed to fetch thread {thread_ts}")
                 break
             raw_messages: list[dict[str, Any]] = response.get("messages") or []
             replies.extend(

@@ -14,7 +14,7 @@ from firetower.incidents.models import (
     TimelineEventType,
 )
 from firetower.incidents.tasks.decorators import datadog_log
-from firetower.integrations.services.slack import SlackService
+from firetower.integrations.services.slack import SlackReadError, SlackService
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,8 @@ def _last_human_activity(
     """Return the latest human post in the channel history or its threads.
 
     Replies are only fetched for threads with a reply after `quiet_cutoff`.
-    For older threads, `latest_reply` is used as an upper bound.
+    For older threads, `latest_reply` is used as an upper bound. Raises
+    SlackReadError if a thread can't be read.
     """
     latest: datetime | None = None
     for message in history:
@@ -97,7 +98,9 @@ def _last_human_activity(
             else:
                 candidates.extend(
                     _ts_to_datetime(reply["ts"])
-                    for reply in slack.get_thread_replies(channel_id, message["ts"])
+                    for reply in slack.get_thread_replies(
+                        channel_id, message["ts"], raise_on_error=True
+                    )
                 )
         for candidate in candidates:
             if latest is None or candidate > latest:
@@ -126,7 +129,7 @@ def _build_message(incident: Incident, status_since: datetime, quiet_days: int) 
     return STALE_INCIDENT_NUDGE_MESSAGE.format(
         ic_mention=f"<@{captain_slack_id}> " if captain_slack_id else "",
         status=incident.status,
-        status_since=status_since.strftime("%a %b %-d"),
+        status_since=status_since.astimezone(NUDGE_TIMEZONE).strftime("%a %b %-d"),
         quiet_days=f"{quiet_days} business day{'' if quiet_days == 1 else 's'}",
         commands=commands,
     )
@@ -181,7 +184,16 @@ def send_stale_incident_nudges() -> None:
                 incident.incident_number,
             )
             continue
-        last_activity = _last_human_activity(slack, channel_id, history, quiet_cutoff)
+        try:
+            last_activity = _last_human_activity(
+                slack, channel_id, history, quiet_cutoff
+            )
+        except SlackReadError:
+            logger.info(
+                "Couldn't read threads for %s, skipping stale incident nudge",
+                incident.incident_number,
+            )
+            continue
         quiet_since = max(
             last_activity or incident.created_at, incident.created_at
         ).astimezone(NUDGE_TIMEZONE)

@@ -21,6 +21,7 @@ from firetower.incidents.tasks.stale_incidents import (
     count_business_days,
     subtract_business_days,
 )
+from firetower.integrations.services.slack import SlackReadError
 
 # Wednesday
 NOW = datetime(2026, 11, 18, 14, 0, tzinfo=UTC)
@@ -189,7 +190,9 @@ class TestSendStaleIncidentNudges:
 
         self._run()
 
-        slack.get_thread_replies.assert_called_once_with(CHANNEL_ID, parent_ts)
+        slack.get_thread_replies.assert_called_once_with(
+            CHANNEL_ID, parent_ts, raise_on_error=True
+        )
         slack.post_message.assert_not_called()
 
     def test_thread_with_only_bot_replies_counts_as_quiet(self, slack):
@@ -207,6 +210,33 @@ class TestSendStaleIncidentNudges:
         self._run()
 
         slack.post_message.assert_called_once()
+
+    def test_skips_when_thread_read_fails(self, slack):
+        self._make_incident()
+        slack.get_channel_history.return_value = [
+            {
+                "type": "message",
+                "user": "UBOT",
+                "bot_id": "BBOT",
+                "ts": _ts(NOW - timedelta(days=6)),
+                "latest_reply": _ts(NOW - timedelta(hours=3)),
+            }
+        ]
+        slack.get_thread_replies.side_effect = SlackReadError("boom")
+
+        self._run()
+
+        slack.post_message.assert_not_called()
+
+    def test_shows_status_date_in_pacific_time(self, slack):
+        self._make_incident(
+            status=IncidentStatus.MITIGATED,
+            status_changed_at=datetime(2026, 11, 13, 1, 0, tzinfo=UTC),
+        )
+
+        self._run()
+
+        assert "since Thu Nov 12" in slack.post_message.call_args.args[1]
 
     def test_skips_recent_status_change(self, slack):
         self._make_incident(status_changed_at=NOW - timedelta(hours=12))
