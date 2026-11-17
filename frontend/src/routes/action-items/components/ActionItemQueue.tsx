@@ -117,7 +117,7 @@ export function ActionItemQueue({
             const value = String(new FormData(event.currentTarget).get('q') ?? '').trim();
             onSearch({q: value || undefined});
           }}
-          {...stylex.props(styles.controls)}
+          {...stylex.props(styles.controls, styles.searchForm)}
         >
           <input
             type="search"
@@ -134,11 +134,11 @@ export function ActionItemQueue({
         </form>
         {queue.results.length ? (
           <div {...stylex.props(styles.scroll)}>
-            <table {...stylex.props(styles.table)}>
-              <caption {...stylex.props(styles.caption)}>
+            <table role="table" {...stylex.props(styles.table)}>
+              <caption {...stylex.props(styles.caption, styles.tableCaption)}>
                 Open follow-ups · {VIEWS.find(option => option.value === view)?.label}
               </caption>
-              <thead>
+              <thead {...stylex.props(styles.tableHead)}>
                 <tr>
                   <th scope="col" {...stylex.props(styles.th)}>
                     Follow-up / incident
@@ -154,9 +154,9 @@ export function ActionItemQueue({
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody {...stylex.props(styles.tableBody)}>
                 {queue.results.map(item => (
-                  <tr key={item.id}>
+                  <tr key={item.id} {...stylex.props(styles.tableRow)}>
                     <td {...stylex.props(styles.td, styles.followup)}>
                       <a
                         href={item.url}
@@ -184,15 +184,17 @@ export function ActionItemQueue({
                       </div>
                     </td>
                     <td {...stylex.props(styles.td, styles.ownerCell)}>
+                      <span {...stylex.props(styles.mobileLabel)}>Owner: </span>
                       {item.assignee_name ?? 'Unassigned'}
                     </td>
                     <td
                       {...stylex.props(styles.td)}
                       title={`Created ${new Date(item.created_at).toLocaleString()}`}
                     >
+                      <span {...stylex.props(styles.mobileLabel)}>Age: </span>
                       {item.age_days}d
                     </td>
-                    <td {...stylex.props(styles.td)}>
+                    <td {...stylex.props(styles.td, styles.signalsCell)}>
                       <div {...stylex.props(styles.badges)}>
                         {item.flags.length ? (
                           item.flags.map(flag => (
