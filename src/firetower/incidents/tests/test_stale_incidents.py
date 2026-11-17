@@ -50,13 +50,7 @@ class TestBusinessDays:
 class TestSendStaleIncidentNudges:
     @pytest.fixture(autouse=True)
     def _enable_nudges(self):
-        with patch.dict(
-            settings.SLACK,
-            {
-                "STALE_INCIDENT_NUDGES_ENABLED": True,
-                "STALE_INCIDENT_NUDGE_FEEDBACK_CHANNEL_ID": "CFEEDBACK",
-            },
-        ):
+        with patch.dict(settings.SLACK, {"STALE_INCIDENT_NUDGES_ENABLED": True}):
             yield
 
     @pytest.fixture
@@ -154,7 +148,7 @@ class TestSendStaleIncidentNudges:
         assert "for 4 business days" in message
         assert "`/inc resolved`" in message
         assert "`/inc mitigated`" not in message
-        assert "let <#CFEEDBACK> know" in message
+        assert "let <#C08RJKP6NR0> know" in message
         incident.refresh_from_db()
         assert incident.last_nudge_at == NOW
 

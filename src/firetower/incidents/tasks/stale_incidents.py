@@ -23,12 +23,15 @@ NUDGE_EVERY_BUSINESS_DAYS = 3
 
 HUMAN_MESSAGE_SUBTYPES = {None, "thread_broadcast", "file_share"}
 
+# #team-sre, the same channel as the frontend's GetHelpLink.
+HELP_CHANNEL_ID = "C08RJKP6NR0"
+
 STALE_INCIDENT_NUDGE_MESSAGE = (
     "{ic_mention}This incident has been *{status}* since {status_since}, and "
     "nobody has posted here for {quiet_days} business days.\n"
     "If it's fixed, run {commands}. If work is still ongoing, a short update "
     "here helps.\n\n"
-    "_This is an experimental nudge.{feedback}_"
+    f"_This is an experimental nudge. If it looks wrong, let <#{HELP_CHANNEL_ID}> know._"
 )
 
 
@@ -117,18 +120,12 @@ def _build_message(incident: Incident, status_since: datetime, quiet_days: int) 
         commands = f"`{slash_command} resolved`"
 
     captain_slack_id = get_slack_user_id(incident.captain) if incident.captain else None
-    feedback_channel_id = settings.SLACK.get("STALE_INCIDENT_NUDGE_FEEDBACK_CHANNEL_ID")
     return STALE_INCIDENT_NUDGE_MESSAGE.format(
         ic_mention=f"<@{captain_slack_id}> " if captain_slack_id else "",
         status=incident.status,
         status_since=status_since.strftime("%a %b %-d"),
         quiet_days=quiet_days,
         commands=commands,
-        feedback=(
-            f" If it looks wrong, let <#{feedback_channel_id}> know."
-            if feedback_channel_id
-            else ""
-        ),
     )
 
 
