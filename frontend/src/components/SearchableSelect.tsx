@@ -4,9 +4,9 @@ import {Check, ChevronDown} from 'lucide-react';
 
 import {background, content, fontSize, radius, space} from '../styles/tokens.stylex';
 
+import {Button} from './Button';
 import {Input} from './Input';
 import {Popover, PopoverContent, PopoverTrigger} from './Popover';
-import {Tag} from './Tag';
 
 export interface SelectOption<T extends string> {
   value: T;
@@ -64,8 +64,9 @@ export function SearchableSelect<T extends string>({
   return (
     <Popover open={isOpen} onOpenChange={openChange}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           role="combobox"
           aria-label={label}
           aria-expanded={isOpen}
@@ -77,11 +78,11 @@ export function SearchableSelect<T extends string>({
               openChange(true);
             }
           }}
-          {...stylex.props(styles.trigger)}
+          style={styles.trigger}
         >
-          <Tag>{selected?.label ?? placeholder}</Tag>
-          <ChevronDown size={14} aria-hidden="true" />
-        </button>
+          <span {...stylex.props(styles.value)}>{selected?.label ?? placeholder}</span>
+          <ChevronDown size={14} aria-hidden="true" {...stylex.props(styles.chevron)} />
+        </Button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
@@ -162,18 +163,14 @@ export function SearchableSelect<T extends string>({
 }
 
 const styles = stylex.create({
-  trigger: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: space.sm,
-    minHeight: 32,
-    maxWidth: '100%',
-    borderRadius: radius.md,
-    cursor: 'pointer',
-    color: content.secondary,
-    paddingInlineEnd: space.sm,
-    backgroundColor: {default: background.primary, ':hover': background.secondary},
+  trigger: {minWidth: 0, maxWidth: '100%', textAlign: 'left'},
+  value: {
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
+  chevron: {flexShrink: 0},
   popover: {width: 320, maxWidth: 'calc(100vw - 32px)'},
   options: {marginTop: space.sm, maxHeight: 248, overflowY: 'auto'},
   option: {
