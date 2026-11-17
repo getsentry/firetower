@@ -82,12 +82,12 @@ function ActionItemsDashboard() {
           >
             <span {...stylex.props(styles.muted)}>Incident severity</span>
             <EditablePill
-              value={search.severity ?? 'All severities'}
-              options={['All severities', ...SeveritySchema.options] as const}
-              getVariant={value => (value === 'All severities' ? 'default' : value)}
+              value={search.severity ?? 'All'}
+              options={['All', ...SeveritySchema.options] as const}
+              getVariant={value => (value === 'All' ? 'default' : value)}
               onSave={async value => {
                 await navigate({
-                  search: value === 'All severities' ? {} : {severity: value},
+                  search: value === 'All' ? {} : {severity: value},
                 });
               }}
             />

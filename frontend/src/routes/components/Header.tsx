@@ -19,8 +19,8 @@ const STORAGE_KEY = 'firetower_list_search';
 
 const NAV_PAGES = [
   {label: 'Incidents', to: '/' as const},
-  {label: 'Availability', to: '/availability' as const},
   {label: 'Action Items', to: '/action-items' as const},
+  {label: 'Availability', to: '/availability' as const},
 ];
 
 export const Header = () => {

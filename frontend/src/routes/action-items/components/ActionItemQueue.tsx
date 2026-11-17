@@ -17,8 +17,8 @@ import {styles} from './styles';
 const VIEWS: {value: QueueView; label: string}[] = [
   {value: 'attention', label: 'Needs attention'},
   {value: 'open', label: 'All open'},
-  {value: 'overdue', label: 'Overdue SLOs'},
-  {value: 'due_soon', label: 'SLOs due soon'},
+  {value: 'overdue', label: 'Overdue'},
+  {value: 'due_soon', label: 'Due soon'},
   {value: 'stalled', label: 'Stalled'},
   {value: 'unassigned', label: 'Unassigned'},
   {value: 'no_priority', label: 'No priority'},
@@ -48,6 +48,31 @@ function flagLabel(
     case 'no_priority':
       return 'No priority';
   }
+}
+
+function Deadline({item}: {item: DashboardItem}) {
+  if (item.deadline_source === null || item.slo_deadline === null) return null;
+  const sources = {
+    linear_due_date: 'Linear due date',
+    linear_sla: 'Linear SLA',
+    priority_slo: 'Priority SLO',
+  };
+  const date =
+    item.due_date ??
+    new Date(item.slo_deadline).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
+  return (
+    <time
+      dateTime={item.due_date ?? item.slo_deadline}
+      title={new Date(item.slo_deadline).toUTCString()}
+      {...stylex.props(styles.muted)}
+    >
+      {sources[item.deadline_source]}: {date}
+    </time>
+  );
 }
 
 export function ActionItemQueue({
@@ -214,9 +239,10 @@ export function ActionItemQueue({
                           ))
                         ) : (
                           <span {...stylex.props(styles.muted)}>
-                            {item.slo_deadline ? 'Within SLO' : 'No SLO target'}
+                            {item.slo_deadline ? 'Within deadline' : 'No deadline'}
                           </span>
                         )}
+                        <Deadline item={item} />
                         {item.idle_days === null ? (
                           <span {...stylex.props(styles.muted)}>Activity unknown</span>
                         ) : null}

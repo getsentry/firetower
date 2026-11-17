@@ -36,6 +36,8 @@ const DashboardItemSchema = ActionItemSchema.omit({
   linear_team_id: z.string(),
   linear_team_key: z.string(),
   linear_team_name: z.string(),
+  deadline_source: z.enum(['linear_due_date', 'linear_sla', 'priority_slo']).nullable(),
+  due_date: z.string().nullable(),
   created_at: z.string(),
   linear_updated_at: z.string().nullable(),
   age_days: z.number(),
