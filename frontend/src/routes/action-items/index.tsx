@@ -4,12 +4,15 @@ import {createFileRoute, Link} from '@tanstack/react-router';
 import {zodValidator} from '@tanstack/zod-adapter';
 import {Button} from 'components/Button';
 import {Card} from 'components/Card';
+import {EditablePill} from 'components/EditablePill';
 import {ErrorState} from 'components/ErrorState';
 import {Skeleton} from 'components/Skeleton';
 import {RefreshCw} from 'lucide-react';
 
+import {SeveritySchema} from '../types';
+
 import {ActionItemQueue} from './components/ActionItemQueue';
-import {DashboardOverview, OwnerHotspots} from './components/DashboardOverview';
+import {DashboardOverview, TeamHotspots} from './components/DashboardOverview';
 import {styles} from './components/styles';
 import {
   actionItemDashboardQueryOptions,
@@ -57,7 +60,7 @@ function ActionItemsDashboard() {
   const onSearch = (patch: Partial<DashboardSearch>) => {
     void navigate({search: previous => ({...previous, page: undefined, ...patch})});
   };
-  const onView = (view: QueueView) => onSearch({view, assignee: undefined, q: undefined});
+  const onView = (view: QueueView) => onSearch({view, team: undefined, q: undefined});
   const freshnessIssues =
     data.freshness.unsynced_incidents + data.freshness.stale_incidents;
   const isEmpty = data.summary.open + data.summary.done + data.summary.canceled === 0;
@@ -66,34 +69,29 @@ function ActionItemsDashboard() {
     <div {...stylex.props(styles.page)}>
       <header {...stylex.props(styles.header)}>
         <div>
-          <p {...stylex.props(styles.eyebrow)}>
-            Learn from incidents. Finish the follow-through.
-          </p>
           <h1 {...stylex.props(styles.title)}>Action items</h1>
           <p {...stylex.props(styles.muted)}>
             The health of our incident follow-ups, not just our incidents.
           </p>
         </div>
         <div {...stylex.props(styles.controls)}>
-          <label htmlFor="dashboard-severity" {...stylex.props(styles.muted)}>
-            Incident severity
-          </label>
-          <select
-            id="dashboard-severity"
-            value={search.severity ?? ''}
-            onChange={event => {
-              const severity = event.target.value as DashboardSearch['severity'];
-              void navigate({search: severity ? {severity} : {}});
-            }}
-            {...stylex.props(styles.control)}
+          <div
+            role="group"
+            aria-label="Incident severity"
+            {...stylex.props(styles.controls)}
           >
-            <option value="">All severities</option>
-            {(['P0', 'P1', 'P2', 'P3', 'P4'] as const).map(severity => (
-              <option key={severity} value={severity}>
-                {severity}
-              </option>
-            ))}
-          </select>
+            <span {...stylex.props(styles.muted)}>Incident severity</span>
+            <EditablePill
+              value={search.severity ?? 'All severities'}
+              options={['All severities', ...SeveritySchema.options] as const}
+              getVariant={value => (value === 'All severities' ? 'default' : value)}
+              onSave={async value => {
+                await navigate({
+                  search: value === 'All severities' ? {} : {severity: value},
+                });
+              }}
+            />
+          </div>
           <Button
             variant="secondary"
             size="sm"
@@ -112,12 +110,15 @@ function ActionItemsDashboard() {
           Refresh failed. Showing the previous snapshot; try again.
         </p>
       ) : null}
-      {freshnessIssues > 0 || data.summary.unknown_activity > 0 ? (
+      {freshnessIssues > 0 ||
+      data.summary.unknown_activity > 0 ||
+      data.summary.unknown_team > 0 ? (
         <p role="status" {...stylex.props(styles.warningBox)}>
           Data may be incomplete: {data.freshness.unsynced_incidents} linked incidents
           have never synced, {data.freshness.stale_incidents} have not synced in 24h, and{' '}
-          {data.summary.unknown_activity} open follow-ups have no activity timestamp. The
-          hourly Linear sync fills these in. Open an incident to sync it individually.
+          {data.summary.unknown_activity} open follow-ups have no activity timestamp.{' '}
+          {data.summary.unknown_team} open follow-ups have no Linear team metadata yet.
+          The hourly Linear sync fills these in. Open an incident to sync it individually.
         </p>
       ) : null}
       {isEmpty ? (
@@ -135,14 +136,14 @@ function ActionItemsDashboard() {
       <DashboardOverview data={data} onView={onView} />
       <div {...stylex.props(styles.lowerGrid)}>
         <ActionItemQueue data={data} search={search} onSearch={onSearch} />
-        <OwnerHotspots
+        <TeamHotspots
           data={data}
-          onOwner={assignee => onSearch({assignee, view: 'open', q: undefined})}
+          onTeam={team => onSearch({team, view: 'open', q: undefined})}
         />
       </div>
       <p {...stylex.props(styles.muted)}>
-        All open work is included regardless of age or incident status. Severity scopes
-        the entire dashboard; queue filters only affect the queue.
+        Open follow-ups remain visible after an incident is closed. Severity scopes the
+        entire dashboard; queue filters only affect the queue.
         <br />
         Cached Linear data · synced hourly · snapshot{' '}
         <time dateTime={data.generated_at}>

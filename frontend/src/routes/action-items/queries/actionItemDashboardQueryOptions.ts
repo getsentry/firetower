@@ -3,6 +3,7 @@ import {Api} from 'api';
 import {z} from 'zod';
 
 import {ActionItemSchema} from '../../$incidentId/queries/actionItemsQueryOptions';
+import {SeveritySchema} from '../../types';
 
 export const QueueViewSchema = z.enum([
   'attention',
@@ -14,23 +15,27 @@ export const QueueViewSchema = z.enum([
   'no_priority',
 ]);
 export const DashboardSearchSchema = z.object({
-  severity: z.enum(['P0', 'P1', 'P2', 'P3', 'P4']).optional().catch(undefined),
+  severity: SeveritySchema.optional().catch(undefined),
   view: QueueViewSchema.optional().catch(undefined),
-  assignee: z
-    .string()
-    .regex(/^(unassigned|[0-9]+)$/)
+  team: z
+    .union([z.uuid(), z.literal('unknown')])
     .optional()
     .catch(undefined),
   q: z.string().trim().max(200).optional().catch(undefined),
   page: z.number().int().min(1).max(100000).optional().catch(undefined),
 });
 
-const DashboardItemSchema = ActionItemSchema.extend({
+const DashboardItemSchema = ActionItemSchema.omit({
+  assignee_name: true,
+  assignee_avatar_url: true,
+}).extend({
   id: z.number(),
   incident_id: z.string(),
   incident_title: z.string(),
   incident_severity: z.string(),
-  assignee_id: z.number().nullable(),
+  linear_team_id: z.string(),
+  linear_team_key: z.string(),
+  linear_team_name: z.string(),
   created_at: z.string(),
   linear_updated_at: z.string().nullable(),
   age_days: z.number(),
@@ -61,16 +66,18 @@ export const DashboardSchema = z.object({
     on_time_percent: z.number().nullable(),
     on_time_sample: z.number(),
     unknown_activity: z.number(),
+    unknown_team: z.number(),
     unknown_completion: z.number(),
   }),
   weeks: z.array(
     z.object({start: z.string(), created: z.number(), completed: z.number()})
   ),
   aging: z.array(z.object({label: z.string(), count: z.number(), overdue: z.number()})),
-  owners: z.array(
+  teams: z.array(
     z.object({
       id: z.string(),
       name: z.string(),
+      key: z.string(),
       open: z.number(),
       overdue: z.number(),
       stalled: z.number(),
