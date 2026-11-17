@@ -20,11 +20,9 @@ logger = logging.getLogger(__name__)
 
 STALE_STATUS_BUSINESS_DAYS = 1
 QUIET_CHANNEL_BUSINESS_DAYS = 1
-NUDGE_EVERY_BUSINESS_DAYS = 2
+NUDGE_EVERY_BUSINESS_DAYS = 3
 
 NUDGE_TIMEZONE = ZoneInfo("America/New_York")
-NUDGE_START_HOUR = 8
-NUDGE_END_HOUR = 20
 
 HUMAN_MESSAGE_SUBTYPES = {None, "thread_broadcast", "file_share"}
 
@@ -142,13 +140,13 @@ def send_stale_incident_nudges() -> None:
     STALE_STATUS_BUSINESS_DAYS and nobody has posted in its channel for
     QUIET_CHANNEL_BUSINESS_DAYS. Each incident gets at most one nudge every
     NUDGE_EVERY_BUSINESS_DAYS. Runs hourly; nudges only go out on weekdays
-    between NUDGE_START_HOUR and NUDGE_END_HOUR in NUDGE_TIMEZONE.
+    in NUDGE_TIMEZONE.
     """
     if not settings.SLACK.get("STALE_INCIDENT_NUDGES_ENABLED"):
         return
 
     now = timezone.now().astimezone(NUDGE_TIMEZONE)
-    if now.weekday() >= 5 or not NUDGE_START_HOUR <= now.hour < NUDGE_END_HOUR:
+    if now.weekday() >= 5:
         return
 
     stale_cutoff = subtract_business_days(now, STALE_STATUS_BUSINESS_DAYS)

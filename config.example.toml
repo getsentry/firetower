@@ -65,7 +65,7 @@ slash_command = "/inc"
 triage_bot_user_id = ""
 triage_bot_prompt = "We've been alerted by {alert_url}, run incident triage for this issue."
 # Nudge in the channel of an Active/Mitigated incident whose status and
-# channel have both gone quiet (weekdays, 8 AM–8 PM ET).
+# channel have both gone quiet (hourly on weekdays, ET).
 stale_incident_nudges_enabled = false
 
 [auth]

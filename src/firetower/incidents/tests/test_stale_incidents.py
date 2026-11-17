@@ -222,10 +222,10 @@ class TestSendStaleIncidentNudges:
 
         slack.post_message.assert_not_called()
 
-    def test_waits_two_business_days_between_nudges(self, slack):
+    def test_waits_three_business_days_between_nudges(self, slack):
         incident = self._make_incident(created_at=NOW - timedelta(days=14))
         Incident.objects.filter(pk=incident.pk).update(
-            last_nudge_at=NOW - timedelta(days=1)
+            last_nudge_at=NOW - timedelta(days=2)
         )
 
         self._run()
@@ -266,13 +266,12 @@ class TestSendStaleIncidentNudges:
     @pytest.mark.parametrize(
         ("now", "nudged"),
         [
-            (datetime(2026, 11, 18, 12, 59, tzinfo=UTC), False),  # 7:59 AM ET
-            (datetime(2026, 11, 18, 13, 0, tzinfo=UTC), True),  # 8:00 AM ET
-            (datetime(2026, 11, 19, 0, 59, tzinfo=UTC), True),  # 7:59 PM ET
-            (datetime(2026, 11, 19, 1, 0, tzinfo=UTC), False),  # 8:00 PM ET
+            (datetime(2026, 11, 18, 8, 0, tzinfo=UTC), True),  # Wed 3 AM ET
+            (datetime(2026, 11, 21, 3, 0, tzinfo=UTC), True),  # Fri 10 PM ET
+            (datetime(2026, 11, 23, 3, 0, tzinfo=UTC), False),  # Sun 10 PM ET
         ],
     )
-    def test_only_nudges_between_8am_and_8pm_eastern(self, slack, now, nudged):
+    def test_uses_eastern_business_days(self, slack, now, nudged):
         self._make_incident()
 
         self._run(now=now)
