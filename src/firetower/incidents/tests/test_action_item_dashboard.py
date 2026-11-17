@@ -19,6 +19,9 @@ from firetower.integrations.services.linear import ISSUE_FIELDS, LinearService
 
 NOW = datetime(2026, 11, 17, 12, tzinfo=UTC)
 URL = "/api/ui/action-items/"
+ENG_TEAM_ID = "11111111-1111-4111-8111-111111111111"
+INFRA_TEAM_ID = "22222222-2222-4222-8222-222222222222"
+SECRET_TEAM_ID = "33333333-3333-4333-8333-333333333333"
 
 
 @pytest.fixture
@@ -54,6 +57,9 @@ def make_item(incident, **kwargs):
         "priority": 4,
         "created_at": NOW - timedelta(days=1),
         "linear_updated_at": NOW,
+        "linear_team_id": ENG_TEAM_ID,
+        "linear_team_key": "ENG",
+        "linear_team_name": "Engineering",
     }
     defaults.update(kwargs)
     return ActionItem.objects.create(incident=incident, **defaults)
@@ -133,7 +139,7 @@ class TestActionItemDashboard:
         assert data["queue"]["results"][0]["flags"] == ["overdue", "stalled"]
         assert sum(bucket["count"] for bucket in data["aging"]) == 6
         assert sum(week["completed"] for week in data["weeks"]) == 3
-        assert sum(owner["open"] for owner in data["owners"]) == 6
+        assert sum(team["open"] for team in data["teams"]) == 6
 
     def test_deadline_and_idle_boundaries(self, dashboard):
         client, user, incident = dashboard
@@ -209,6 +215,9 @@ class TestActionItemDashboard:
             assignee=secret_owner,
             priority=1,
             title="Secret follow-up",
+            linear_team_id=SECRET_TEAM_ID,
+            linear_team_key="SECRET",
+            linear_team_name="Private ownership team",
             created_at=NOW - timedelta(days=20),
         )
         data = client.get(URL).data
@@ -217,8 +226,9 @@ class TestActionItemDashboard:
         assert data["summary"]["overdue"] == (1 if visible else 0)
         assert data["freshness"]["linked_incidents"] == (2 if visible else 1)
         assert ("Secret follow-up" in str(data)) is visible
-        assert ("hidden-owner" in str(data)) is visible
-        assert sum(owner["open"] for owner in data["owners"]) == (2 if visible else 1)
+        assert "hidden-owner" not in str(data)
+        assert ("Private ownership team" in str(data)) is visible
+        assert sum(team["open"] for team in data["teams"]) == (2 if visible else 1)
         assert sum(bucket["count"] for bucket in data["aging"]) == (2 if visible else 1)
 
     def test_canceled_incidents_excluded_but_closed_incidents_included(self, dashboard):
@@ -240,14 +250,19 @@ class TestActionItemDashboard:
             priority=2,
             created_at=NOW - timedelta(days=15),
         )
-        make_item(p1)
+        make_item(
+            p1,
+            linear_team_id=INFRA_TEAM_ID,
+            linear_team_key="INFRA",
+            linear_team_name="Infrastructure",
+        )
         make_item(p2, priority=2, created_at=NOW - timedelta(days=15))
         data = client.get(
             URL,
             {
                 "severity": "P1",
                 "view": "overdue",
-                "assignee": str(user.id),
+                "team": ENG_TEAM_ID,
                 "q": "CONNECTION",
             },
         ).data
@@ -255,8 +270,9 @@ class TestActionItemDashboard:
         assert data["summary"]["overdue"] == 1
         assert data["queue"]["count"] == 1
         assert data["queue"]["results"][0]["id"] == first.id
-        unassigned = client.get(URL, {"severity": "P1", "assignee": "unassigned"}).data
-        assert unassigned["queue"]["count"] == 1
+        infrastructure = client.get(URL, {"severity": "P1", "team": INFRA_TEAM_ID}).data
+        assert infrastructure["queue"]["count"] == 1
+        assert client.get(URL, {"q": "infrastructure"}).data["queue"]["count"] == 1
         assert (
             client.get(URL, {"q": p1.incident_number.lower()}).data["queue"]["count"]
             == 2
@@ -290,6 +306,74 @@ class TestActionItemDashboard:
         data = client.get(URL, {"view": view}).data
         assert data["queue"]["count"] == data["summary"][view]
 
+    def test_teams_group_work_without_individual_identity(self, dashboard):
+        client, user, incident = dashboard
+        other = User.objects.create_user(
+            username="another-engineer", first_name="Another", last_name="Engineer"
+        )
+        first = make_item(incident, assignee=user)
+        make_item(incident, assignee=other)
+        make_item(
+            incident,
+            assignee=user,
+            linear_team_id=INFRA_TEAM_ID,
+            linear_team_key="INFRA",
+            linear_team_name="Infrastructure",
+        )
+        data = client.get(URL, {"view": "open"}).data
+        assert [(team["id"], team["open"]) for team in data["teams"]] == [
+            (ENG_TEAM_ID, 2),
+            (INFRA_TEAM_ID, 1),
+        ]
+        assert data["summary"]["unknown_team"] == 0
+        assert "owners" not in data
+        assert user.get_full_name() not in str(data)
+        assert other.get_full_name() not in str(data)
+        for row in data["queue"]["results"]:
+            assert (
+                not {"assignee_name", "assignee_avatar_url", "assignee_id"} & row.keys()
+            )
+        assert (
+            client.get(URL, {"view": "open", "q": other.get_full_name()}).data["queue"][
+                "count"
+            ]
+            == 0
+        )
+        ActionItem.objects.filter(pk=first.pk).update(assignee=other)
+        assert (
+            client.get(URL, {"view": "open", "team": ENG_TEAM_ID}).data["queue"][
+                "count"
+            ]
+            == 2
+        )
+
+    def test_missing_team_metadata_is_explicit_and_filterable(self, dashboard):
+        client, _, incident = dashboard
+        make_item(incident, linear_team_id="", linear_team_key="", linear_team_name="")
+        make_item(incident)
+        data = client.get(URL, {"team": "unknown"}).data
+        assert data["summary"]["unknown_team"] == 1
+        assert data["summary"]["open"] == 2
+        assert data["queue"]["count"] == 1
+        assert (
+            next(team for team in data["teams"] if team["id"] == "unknown")["name"]
+            == "Team not synced"
+        )
+
+    def test_team_identity_comes_from_linear_not_identifier_prefix(self, dashboard):
+        client, _, incident = dashboard
+        item = make_item(
+            incident,
+            linear_identifier="ENG-123",
+            linear_team_id=INFRA_TEAM_ID,
+            linear_team_key="INFRA",
+            linear_team_name="Infrastructure",
+        )
+        data = client.get(URL, {"team": INFRA_TEAM_ID}).data
+        assert data["teams"][0]["id"] == INFRA_TEAM_ID
+        assert data["teams"][0]["name"] == "Infrastructure"
+        assert data["queue"]["results"][0]["id"] == item.id
+
     def test_pagination_is_stable_and_bounds_oversized_pages(self, dashboard):
         client, _, incident = dashboard
         for _ in range(22):
@@ -316,7 +400,7 @@ class TestActionItemDashboard:
             {"page": "bad"},
             {"page": 100001},
             {"q": "x" * 201},
-            {"assignee": "bad"},
+            {"team": "bad"},
         ],
     )
     def test_invalid_parameters(self, dashboard, params):
@@ -414,6 +498,7 @@ class TestDashboardSync:
             "updatedAt": (NOW - timedelta(days=5)).isoformat(),
             "completedAt": (NOW - timedelta(days=5)).isoformat(),
             "state": {"type": "completed"},
+            "team": {"id": ENG_TEAM_ID, "key": "ENG", "name": "Engineering"},
         }
         service = LinearService.__new__(LinearService)
         parsed = service._parse_issue(raw)
@@ -425,8 +510,16 @@ class TestDashboardSync:
             assert item.linear_updated_at == NOW - timedelta(days=5)
             assert item.completed_at == NOW - timedelta(days=5)
             assert item.updated_at == NOW
+            assert (
+                item.linear_team_id,
+                item.linear_team_key,
+                item.linear_team_name,
+            ) == (ENG_TEAM_ID, "ENG", "Engineering")
             raw.update(
-                state={"type": "started"}, completedAt=None, updatedAt=NOW.isoformat()
+                state={"type": "started"},
+                completedAt=None,
+                updatedAt=NOW.isoformat(),
+                team={"id": INFRA_TEAM_ID, "key": "INFRA", "name": "Infrastructure"},
             )
             get_service.return_value.get_child_issues.return_value = [
                 service._parse_issue(raw)
@@ -436,6 +529,11 @@ class TestDashboardSync:
             assert item.status == "In Progress"
             assert item.completed_at is None
             assert item.linear_updated_at == NOW
+            assert (
+                item.linear_team_id,
+                item.linear_team_key,
+                item.linear_team_name,
+            ) == (INFRA_TEAM_ID, "INFRA", "Infrastructure")
 
     def test_failed_sync_does_not_advance_freshness(self, dashboard):
         _, _, incident = dashboard

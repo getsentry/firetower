@@ -359,6 +359,9 @@ def sync_action_items_from_linear(
         "updated_at",
         "linear_updated_at",
         "completed_at",
+        "linear_team_id",
+        "linear_team_key",
+        "linear_team_name",
     ]
 
     for issue in all_issues.values():
@@ -377,6 +380,9 @@ def sync_action_items_from_linear(
             ai.url = issue["url"]
             ai.linear_updated_at = issue.get("linear_updated_at")
             ai.completed_at = issue.get("completed_at")
+            ai.linear_team_id = issue.get("linear_team_id") or ""
+            ai.linear_team_key = issue.get("linear_team_key") or ""
+            ai.linear_team_name = issue.get("linear_team_name") or ""
             if created_at is not None:
                 ai.created_at = created_at
             ai.updated_at = timezone.now()
@@ -396,6 +402,9 @@ def sync_action_items_from_linear(
                     created_at=created_at or timezone.now(),
                     linear_updated_at=issue.get("linear_updated_at"),
                     completed_at=issue.get("completed_at"),
+                    linear_team_id=issue.get("linear_team_id") or "",
+                    linear_team_key=issue.get("linear_team_key") or "",
+                    linear_team_name=issue.get("linear_team_name") or "",
                 )
             )
 

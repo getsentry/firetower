@@ -19,7 +19,7 @@ def build_action_item_dashboard(
     *,
     now: datetime,
     view: str = "attention",
-    assignee: str = "",
+    team: str = "",
     q: str = "",
     page: int = 1,
 ) -> dict[str, Any]:
@@ -27,7 +27,7 @@ def build_action_item_dashboard(
     now = now.astimezone(UTC)
     items = list(
         ActionItem.objects.filter(incident__in=incidents)
-        .select_related("incident", "assignee__userprofile")
+        .select_related("incident")
         .order_by("created_at", "id")
     )
     incident_rows = list(
@@ -95,6 +95,7 @@ def build_action_item_dashboard(
         else None,
         "on_time_sample": len(with_target),
         "unknown_activity": sum(item.linear_updated_at is None for item in open_items),
+        "unknown_team": sum(not item.linear_team_id for item in open_items),
         "unknown_completion": sum(
             item.status == ActionItemStatus.DONE and item.completed_at is None
             for item in items
@@ -148,32 +149,37 @@ def build_action_item_dashboard(
             }
         )
 
-    owners: dict[str, dict[str, Any]] = {}
+    teams: dict[str, dict[str, Any]] = {}
     for item in open_items:
-        key = str(item.assignee_id) if item.assignee_id else "unassigned"
-        owner = owners.setdefault(
+        key = item.linear_team_id or "unknown"
+        group = teams.setdefault(
             key,
             {
                 "id": key,
-                "name": (item.assignee.get_full_name() or item.assignee.username)
-                if item.assignee
-                else "Unassigned",
+                "key": item.linear_team_key,
+                "name": (
+                    item.linear_team_name
+                    or item.linear_team_key
+                    or "Unnamed Linear team"
+                )
+                if item.linear_team_id
+                else "Team not synced",
                 "open": 0,
                 "overdue": 0,
                 "stalled": 0,
             },
         )
-        owner["open"] += 1
-        owner["overdue"] += flags[item.id]["overdue"]
-        owner["stalled"] += flags[item.id]["stalled"]
-    owner_rows = sorted(
-        owners.values(),
-        key=lambda owner: (
-            -owner["overdue"],
-            -owner["stalled"],
-            -owner["open"],
-            owner["name"],
-            owner["id"],
+        group["open"] += 1
+        group["overdue"] += flags[item.id]["overdue"]
+        group["stalled"] += flags[item.id]["stalled"]
+    team_rows = sorted(
+        teams.values(),
+        key=lambda group: (
+            -group["overdue"],
+            -group["stalled"],
+            -group["open"],
+            group["name"],
+            group["id"],
         ),
     )
 
@@ -184,12 +190,8 @@ def build_action_item_dashboard(
         or (view == "attention" and any(flags[item.id].values()))
         or flags[item.id].get(view, False)
     ]
-    if assignee:
-        queue = [
-            item
-            for item in queue
-            if (str(item.assignee_id) if item.assignee_id else "unassigned") == assignee
-        ]
+    if team:
+        queue = [item for item in queue if (item.linear_team_id or "unknown") == team]
     if q:
         needle = q.casefold()
         queue = [
@@ -202,9 +204,8 @@ def build_action_item_dashboard(
                     item.linear_identifier,
                     item.incident.incident_number,
                     item.incident.title,
-                    (item.assignee.get_full_name() or item.assignee.username)
-                    if item.assignee
-                    else "Unassigned",
+                    item.linear_team_name,
+                    item.linear_team_key,
                 ]
             ).casefold()
         ]
@@ -252,7 +253,7 @@ def build_action_item_dashboard(
         "summary": summary,
         "weeks": weeks,
         "aging": aging,
-        "owners": owner_rows,
+        "teams": team_rows,
         "freshness": {
             "linked_incidents": len(linked),
             "unlinked_incidents": len(incident_rows) - len(linked),

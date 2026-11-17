@@ -446,6 +446,9 @@ class ActionItem(models.Model):
     last_nag = models.DateTimeField(null=True, blank=True)
     linear_updated_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    linear_team_id = models.CharField(max_length=255, blank=True, default="")
+    linear_team_key = models.CharField(max_length=25, blank=True, default="")
+    linear_team_name = models.CharField(max_length=255, blank=True, default="")
 
     @property
     def slo_deadline(self) -> datetime | None:
