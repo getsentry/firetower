@@ -20,6 +20,7 @@ const STORAGE_KEY = 'firetower_list_search';
 const NAV_PAGES = [
   {label: 'Incidents', to: '/' as const},
   {label: 'Availability', to: '/availability' as const},
+  {label: 'Action Items', to: '/action-items' as const},
 ];
 
 export const Header = () => {
@@ -120,15 +121,21 @@ const styles = stylex.create({
   navigation: {gap: space['2xs'], display: 'flex'},
   brand: {
     gap: space.sm,
-    position: 'absolute',
+    position: {default: 'static', '@media (min-width: 1024px)': 'absolute'},
     left: '50%',
     display: 'flex',
-    transform: 'translateX(-50%)',
+    transform: {default: 'none', '@media (min-width: 1024px)': 'translateX(-50%)'},
     alignItems: 'center',
     textDecoration: 'none',
   },
   logo: {height: 24, width: 24},
-  name: {color: content.headings, fontSize: 20, lineHeight: '28px', fontWeight: 600},
+  name: {
+    display: {default: 'none', '@media (min-width: 640px)': 'inline'},
+    color: content.headings,
+    fontSize: 20,
+    lineHeight: '28px',
+    fontWeight: 600,
+  },
   avatarPlaceholder: {height: 28, width: 28},
   backLink: {
     color: {default: content.secondary, ':hover': content.accent},
