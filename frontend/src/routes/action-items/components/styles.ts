@@ -319,11 +319,13 @@ export const styles = stylex.create({
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: space.lg,
-    paddingBottom: space.lg,
-    borderBottomWidth: 1,
-    borderBottomStyle: 'solid',
-    borderBottomColor: border.secondary,
-    marginBottom: space.lg,
+  },
+  divider: {
+    borderWidth: 0,
+    borderTopWidth: 1,
+    borderTopStyle: 'solid',
+    borderTopColor: border.secondary,
+    marginBlock: space.lg,
   },
   factValue: {
     fontSize: fontSize.xl,
@@ -331,7 +333,12 @@ export const styles = stylex.create({
     color: content.headings,
     display: 'block',
   },
-  teamList: {display: 'flex', flexDirection: 'column', gap: space.sm},
+  teamList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.sm,
+    marginTop: space.md,
+  },
   teamButton: {
     display: 'flex',
     justifyContent: 'space-between',

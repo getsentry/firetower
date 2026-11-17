@@ -63,6 +63,10 @@ const mockData: DashboardData = {
       id: ENGINEERING_TEAM,
       key: 'ENG',
       name: 'Engineering',
+      completed: 4,
+      canceled: 1,
+      total: 12,
+      completion_rate: 36.4,
       open: 7,
       overdue: 3,
       stalled: 2,
@@ -71,6 +75,10 @@ const mockData: DashboardData = {
       id: INFRASTRUCTURE_TEAM,
       key: 'INFRA',
       name: 'Infrastructure',
+      completed: 6,
+      canceled: 1,
+      total: 12,
+      completion_rate: 54.5,
       open: 5,
       overdue: 0,
       stalled: 0,
@@ -151,6 +159,15 @@ function setupMocks(data = mockData) {
       return Promise.reject(new Error('Unexpected request'));
     }
   );
+}
+
+async function chooseOption(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  option: string | RegExp
+) {
+  await user.click(screen.getByRole('combobox', {name: label}));
+  await user.click(await screen.findByRole('option', {name: option}));
 }
 
 async function renderRoute(path = '/action-items') {
@@ -237,14 +254,8 @@ describe('Action item dashboard', () => {
   it('preserves severity while applying view, team, and search, resetting the page', async () => {
     const user = userEvent.setup();
     const router = await renderRoute('/action-items?severity=P1&page=2');
-    await user.selectOptions(
-      screen.getByRole('combobox', {name: 'Queue view'}),
-      'stalled'
-    );
-    await user.selectOptions(
-      screen.getByRole('combobox', {name: 'Queue team'}),
-      INFRASTRUCTURE_TEAM
-    );
+    await chooseOption(user, 'Queue view', /^Stalled/);
+    await chooseOption(user, 'Queue team', /^Infrastructure/);
     await user.type(screen.getByRole('searchbox'), 'rollback');
     await user.click(screen.getByRole('button', {name: 'Search', exact: true}));
     await waitFor(() =>
@@ -362,6 +373,10 @@ describe('Action item dashboard', () => {
           id: 'unknown',
           key: '',
           name: 'Team not synced',
+          completed: 0,
+          canceled: 0,
+          total: 1,
+          completion_rate: 0,
           open: 1,
           overdue: 0,
           stalled: 0,
@@ -372,7 +387,42 @@ describe('Action item dashboard', () => {
     expect(
       screen.getByText(/1 open follow-ups have no Linear team metadata yet/)
     ).toBeInTheDocument();
-    expect(screen.getByRole('option', {name: 'Team not synced (1)'})).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('combobox', {name: 'Queue team'}));
+    expect(
+      await screen.findByRole('option', {name: /^Team not synced/})
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the delivery sample above the divider and only lists at-risk teams', async () => {
+    await renderRoute();
+    const card = screen.getByRole('heading', {
+      name: 'Delivery · last 30 days',
+    }).parentElement!;
+    const note = within(card).getByText(/4 completed follow-ups with a deadline/);
+    const divider = within(card).getByRole('separator');
+    expect(
+      note.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', {name: 'Where help is needed'})
+    ).not.toBeInTheDocument();
+    expect(within(card).getByRole('button', {name: /^Engineering/})).toBeInTheDocument();
+    expect(
+      within(card).queryByRole('button', {name: /^Infrastructure/})
+    ).not.toBeInTheDocument();
+  });
+
+  it('provides positive team progress without native selects or extra API requests', async () => {
+    const user = userEvent.setup();
+    const router = await renderRoute();
+    const before = mockApiGet.mock.calls.length;
+    expect(screen.getByRole('heading', {name: 'Team progress'})).toBeInTheDocument();
+    await chooseOption(user, 'Leaderboard metric', 'Completion rate');
+    await chooseOption(user, 'Leaderboard team', /^Infrastructure/);
+    expect(router.state.location.search).toEqual({});
+    expect(mockApiGet).toHaveBeenCalledTimes(before);
+    expect(document.querySelector('main select')).toBeNull();
   });
 
   it('paginates without losing scope or queue filters', async () => {

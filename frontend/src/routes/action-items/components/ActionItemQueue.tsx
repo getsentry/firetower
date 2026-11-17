@@ -3,6 +3,7 @@ import {Link} from '@tanstack/react-router';
 import {Button} from 'components/Button';
 import {Card} from 'components/Card';
 import {Pill} from 'components/Pill';
+import {SearchableSelect} from 'components/SearchableSelect';
 
 import {PriorityIcon} from '../../$incidentId/components/PriorityIcon';
 import type {
@@ -104,31 +105,28 @@ export function ActionItemQueue({
           </span>
         </div>
         <div {...stylex.props(styles.controls)}>
-          <select
-            aria-label="Queue view"
+          <SearchableSelect
+            label="Queue view"
             value={view}
-            onChange={event => onSearch({view: event.target.value as QueueView})}
-            {...stylex.props(styles.control)}
-          >
-            {VIEWS.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label} ({summary[option.value]})
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Queue team"
+            onChange={view => onSearch({view})}
+            options={VIEWS.map(option => ({
+              value: option.value,
+              label: option.label + ' (' + summary[option.value] + ')',
+            }))}
+          />
+          <SearchableSelect
+            label="Queue team"
             value={search.team ?? ''}
-            onChange={event => onSearch({team: event.target.value || undefined})}
-            {...stylex.props(styles.control)}
-          >
-            <option value="">All teams</option>
-            {data.teams.map(team => (
-              <option key={team.id} value={team.id}>
-                {team.name} ({team.open})
-              </option>
-            ))}
-          </select>
+            onChange={team => onSearch({team: team || undefined})}
+            options={[
+              {value: '', label: 'All teams'},
+              ...data.teams.map(team => ({
+                value: team.id,
+                label: team.name,
+                description: [team.key, team.open + ' open'].filter(Boolean).join(' · '),
+              })),
+            ]}
+          />
           <Button variant="secondary" size="sm" onClick={clear}>
             Clear filters
           </Button>

@@ -45,6 +45,19 @@ const DashboardItemSchema = ActionItemSchema.omit({
   flags: z.array(z.enum(['overdue', 'due_soon', 'stalled', 'unassigned', 'no_priority'])),
 });
 
+const DashboardTeamSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  key: z.string(),
+  open: z.number(),
+  overdue: z.number(),
+  stalled: z.number(),
+  completed: z.number(),
+  canceled: z.number(),
+  total: z.number(),
+  completion_rate: z.number().nullable(),
+});
+
 export const DashboardSchema = z.object({
   generated_at: z.string(),
   stalled_days: z.number(),
@@ -75,16 +88,7 @@ export const DashboardSchema = z.object({
     z.object({start: z.string(), created: z.number(), completed: z.number()})
   ),
   aging: z.array(z.object({label: z.string(), count: z.number(), overdue: z.number()})),
-  teams: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      key: z.string(),
-      open: z.number(),
-      overdue: z.number(),
-      stalled: z.number(),
-    })
-  ),
+  teams: z.array(DashboardTeamSchema),
   freshness: z.object({
     linked_incidents: z.number(),
     unlinked_incidents: z.number(),
@@ -101,6 +105,7 @@ export const DashboardSchema = z.object({
 });
 
 export type DashboardData = z.infer<typeof DashboardSchema>;
+export type DashboardTeam = z.infer<typeof DashboardTeamSchema>;
 export type DashboardItem = z.infer<typeof DashboardItemSchema>;
 export type DashboardSearch = z.infer<typeof DashboardSearchSchema>;
 export type QueueView = z.infer<typeof QueueViewSchema>;
