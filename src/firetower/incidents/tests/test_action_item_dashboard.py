@@ -140,6 +140,10 @@ class TestActionItemDashboard:
         assert sum(bucket["count"] for bucket in data["aging"]) == 6
         assert sum(week["completed"] for week in data["weeks"]) == 3
         assert sum(team["open"] for team in data["teams"]) == 6
+        assert data["teams"][0]["completed"] == 4
+        assert data["teams"][0]["canceled"] == 1
+        assert data["teams"][0]["total"] == 11
+        assert data["teams"][0]["completion_rate"] == 40
 
     def test_deadline_and_idle_boundaries(self, dashboard):
         client, user, incident = dashboard
@@ -450,6 +454,83 @@ class TestActionItemDashboard:
         assert data["teams"][0]["id"] == INFRA_TEAM_ID
         assert data["teams"][0]["name"] == "Infrastructure"
         assert data["queue"]["results"][0]["id"] == item.id
+
+    def test_team_progress_includes_completed_only_teams_and_excludes_canceled_from_rate(
+        self, dashboard
+    ):
+        client, _, incident = dashboard
+        for _ in range(4):
+            make_item(incident, status="Done")
+        for _ in range(2):
+            make_item(incident)
+        make_item(incident, status="Canceled")
+        for _ in range(2):
+            make_item(
+                incident,
+                status="Done",
+                linear_team_id=INFRA_TEAM_ID,
+                linear_team_key="INFRA",
+                linear_team_name="Infrastructure",
+            )
+        make_item(
+            incident,
+            status="Canceled",
+            linear_team_id=SECRET_TEAM_ID,
+            linear_team_key="OLD",
+            linear_team_name="Retired team",
+        )
+
+        data = client.get(URL).data
+        teams = {team["id"]: team for team in data["teams"]}
+        assert teams[ENG_TEAM_ID]["completed"] == 4
+        assert teams[ENG_TEAM_ID]["open"] == 2
+        assert teams[ENG_TEAM_ID]["canceled"] == 1
+        assert teams[ENG_TEAM_ID]["total"] == 7
+        assert teams[ENG_TEAM_ID]["completion_rate"] == 66.7
+        assert teams[INFRA_TEAM_ID]["completed"] == 2
+        assert teams[INFRA_TEAM_ID]["open"] == 0
+        assert teams[INFRA_TEAM_ID]["total"] == 2
+        assert teams[INFRA_TEAM_ID]["completion_rate"] == 100
+        assert teams[SECRET_TEAM_ID]["total"] == 1
+        assert teams[SECRET_TEAM_ID]["canceled"] == 1
+        assert teams[SECRET_TEAM_ID]["completion_rate"] is None
+        assert sum(team["total"] for team in teams.values()) == 10
+
+    def test_positive_team_metrics_respect_visibility_and_severity_not_queue_filters(
+        self, dashboard
+    ):
+        client, _, incident = dashboard
+        make_item(incident, status="Done")
+        make_item(incident, status="Done")
+        minor = Incident.objects.create(title="Minor incident", severity="P2")
+        make_item(
+            minor,
+            status="Done",
+            linear_team_id=INFRA_TEAM_ID,
+            linear_team_key="INFRA",
+            linear_team_name="Infrastructure",
+        )
+        hidden = Incident.objects.create(
+            title="Secret incident", severity="P1", is_private=True
+        )
+        make_item(
+            hidden,
+            status="Done",
+            linear_team_id=SECRET_TEAM_ID,
+            linear_team_key="SECRET",
+            linear_team_name="Private team",
+        )
+        data = client.get(
+            URL, {"severity": "P1", "view": "overdue", "q": "nothing-matches"}
+        ).data
+        assert data["queue"]["count"] == 0
+        assert len(data["teams"]) == 1
+        assert data["teams"][0]["id"] == ENG_TEAM_ID
+        assert data["teams"][0]["completed"] == 2
+        assert data["teams"][0]["total"] == 2
+        assert data["teams"][0]["completion_rate"] == 100
+        assert "Private team" not in str(data)
+        assert "Infrastructure" not in str(data)
 
     def test_pagination_is_stable_and_bounds_oversized_pages(self, dashboard):
         client, _, incident = dashboard
