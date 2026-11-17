@@ -781,6 +781,8 @@ class TestParseIssue:
             "priority": 2,
             "label_ids": [],
             "created_at": datetime(2026, 10, 16, 12, 30, tzinfo=UTC),
+            "linear_updated_at": None,
+            "completed_at": None,
             "sla_breaches_at": datetime(2026, 10, 30, 12, 30, tzinfo=UTC),
             "assignee_email": "alice@sentry.io",
             "assignee_linear_id": "user-1",
