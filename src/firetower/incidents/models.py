@@ -231,6 +231,7 @@ class Incident(models.Model):
     time_analyzed = models.DateTimeField(null=True, blank=True)
     time_mitigated = models.DateTimeField(null=True, blank=True)
     time_recovered = models.DateTimeField(null=True, blank=True)
+    last_nudge_at = models.DateTimeField(null=True, blank=True)
 
     # Relationships
     captain = models.ForeignKey(

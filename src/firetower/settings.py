@@ -262,6 +262,8 @@ class SlackSettings(TypedDict):
     SLASH_COMMAND: str
     TRIAGE_BOT_USER_ID: str
     TRIAGE_BOT_PROMPT: str
+    STALE_INCIDENT_NUDGES_ENABLED: bool
+    STALE_INCIDENT_NUDGE_FEEDBACK_CHANNEL_ID: str
 
 
 SLACK: SlackSettings = {
@@ -274,6 +276,10 @@ SLACK: SlackSettings = {
     "SLASH_COMMAND": config.slack.slash_command,
     "TRIAGE_BOT_USER_ID": config.slack.triage_bot_user_id,
     "TRIAGE_BOT_PROMPT": config.slack.triage_bot_prompt,
+    "STALE_INCIDENT_NUDGES_ENABLED": config.slack.stale_incident_nudges_enabled,
+    "STALE_INCIDENT_NUDGE_FEEDBACK_CHANNEL_ID": (
+        config.slack.stale_incident_nudge_feedback_channel_id
+    ),
 }
 
 PARTICIPANT_SYNC_THROTTLE_SECONDS = int(config.slack.participant_sync_throttle_seconds)

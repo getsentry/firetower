@@ -64,6 +64,10 @@ incident_guide_message = "This is the message posted whenever a new incident sla
 slash_command = "/inc"
 triage_bot_user_id = ""
 triage_bot_prompt = "We've been alerted by {alert_url}, run incident triage for this issue."
+# Daily nudge in the channel of an Active/Mitigated incident whose status and
+# channel have both gone quiet. The feedback channel is named in the nudge.
+stale_incident_nudges_enabled = false
+stale_incident_nudge_feedback_channel_id = ""
 
 [auth]
 iap_enabled = false
