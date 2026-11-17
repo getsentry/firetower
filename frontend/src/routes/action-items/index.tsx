@@ -14,6 +14,7 @@ import {SeveritySchema} from '../types';
 import {ActionItemQueue} from './components/ActionItemQueue';
 import {DashboardOverview, TeamHotspots} from './components/DashboardOverview';
 import {styles} from './components/styles';
+import {TeamLeaderboard} from './components/TeamLeaderboard';
 import {
   actionItemDashboardQueryOptions,
   DashboardSearchSchema,
@@ -134,6 +135,7 @@ function ActionItemsDashboard() {
         </Card>
       ) : null}
       <DashboardOverview data={data} onView={onView} />
+      <TeamLeaderboard data={data} />
       <div {...stylex.props(styles.lowerGrid)}>
         <ActionItemQueue data={data} search={search} onSearch={onSearch} />
         <TeamHotspots
@@ -143,7 +145,7 @@ function ActionItemsDashboard() {
       </div>
       <p {...stylex.props(styles.muted)}>
         Open follow-ups remain visible after an incident is closed. Severity scopes the
-        entire dashboard; queue filters only affect the queue.
+        entire dashboard; queue and team-progress controls filter independently.
         <br />
         Cached Linear data · synced hourly · snapshot{' '}
         <time dateTime={data.generated_at}>

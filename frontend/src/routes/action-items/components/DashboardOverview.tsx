@@ -186,6 +186,7 @@ export function TeamHotspots({
   onTeam: (id: string) => void;
 }) {
   const {summary} = data;
+  const atRisk = data.teams.filter(team => team.overdue > 0 || team.stalled > 0);
   return (
     <aside {...stylex.props(styles.aside)}>
       <Card style={styles.card}>
@@ -210,14 +211,12 @@ export function TeamHotspots({
           {summary.on_time_sample} completed follow-ups with a deadline. No deadline is
           not the same as on time.
         </p>
-        <div {...stylex.props(styles.cardHeader)}>
-          <h2 {...stylex.props(styles.heading)}>Where help is needed</h2>
-        </div>
+        <hr {...stylex.props(styles.divider)} />
         <p {...stylex.props(styles.muted)}>
           Linear teams with overdue or stalled follow-ups.
         </p>
         <ul {...stylex.props(styles.teamList)}>
-          {data.teams.slice(0, 5).map(team => (
+          {atRisk.slice(0, 5).map(team => (
             <li key={team.id}>
               <button
                 type="button"
@@ -242,12 +241,12 @@ export function TeamHotspots({
             </li>
           ))}
         </ul>
-        {data.teams.length === 0 ? (
-          <p {...stylex.props(styles.empty)}>No open work.</p>
+        {atRisk.length === 0 ? (
+          <p {...stylex.props(styles.empty)}>No overdue or stalled follow-ups.</p>
         ) : null}
-        {data.teams.length > 5 ? (
+        {atRisk.length > 5 ? (
           <p {...stylex.props(styles.caption)}>
-            Showing 5 of {data.teams.length} teams. Use the queue's team filter to see any
+            Showing 5 of {atRisk.length} teams. Use the queue's team filter to see any
             team.
           </p>
         ) : null}
@@ -286,6 +285,12 @@ export function TeamHotspots({
               issues. They are not a historical status ledger. Reopened and canceled items
               are not counted as completed. On-time comparisons use the currently synced
               deadline, not a historical deadline snapshot.
+            </p>
+            <p>
+              Team progress uses current statuses across all time, including teams with
+              only completed work. Total includes canceled items; completion rate is
+              completed divided by completed plus open work, excluding canceled items.
+              Delivery's last-30-day metrics additionally require a completion timestamp.
             </p>
             <p>
               All-time totals: {summary.done} completed, {summary.canceled} canceled.{' '}
