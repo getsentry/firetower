@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -765,6 +765,7 @@ class TestParseIssue:
             "url": "https://linear.app/team/issue/ENG-123",
             "priority": 2,
             "createdAt": "2026-10-16T12:30:00.000Z",
+            "dueDate": "2026-11-01",
             "team": {"id": "team-1", "key": "ENG", "name": "Engineering"},
             "slaBreachesAt": "2026-10-30T12:30:00.000Z",
             "state": {"type": "started"},
@@ -784,6 +785,7 @@ class TestParseIssue:
             "created_at": datetime(2026, 10, 16, 12, 30, tzinfo=UTC),
             "linear_updated_at": None,
             "completed_at": None,
+            "due_date": date(2026, 11, 1),
             "sla_breaches_at": datetime(2026, 10, 30, 12, 30, tzinfo=UTC),
             "assignee_email": "alice@sentry.io",
             "assignee_linear_id": "user-1",
@@ -792,6 +794,19 @@ class TestParseIssue:
             "linear_team_name": "Engineering",
             "relation_type": "child",
         }
+
+    @pytest.mark.parametrize("due_date", [None, ""])
+    def test_missing_due_date(self, linear_service, due_date):
+        result = linear_service._parse_issue(
+            {
+                "id": "issue-1",
+                "identifier": "ENG-1",
+                "title": "Test",
+                "url": "https://linear.app/issue/ENG-1",
+                "dueDate": due_date,
+            }
+        )
+        assert result["due_date"] is None
 
     @pytest.mark.parametrize("team", [None, {}])
     def test_missing_team_metadata(self, linear_service, team):

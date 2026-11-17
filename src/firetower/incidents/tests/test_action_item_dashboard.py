@@ -162,6 +162,83 @@ class TestActionItemDashboard:
         assert data["summary"]["stalled"] == 1
         assert [row["id"] for row in data["queue"]["results"]] == [overdue.id, soon.id]
 
+    def test_explicit_due_date_changes_and_removal_update_risk(self, dashboard):
+        client, user, incident = dashboard
+        item = make_item(
+            incident,
+            assignee=user,
+            priority=4,
+            linear_due_date=NOW.date() - timedelta(days=1),
+        )
+        data = client.get(URL, {"view": "open"}).data
+        assert data["summary"]["overdue"] == 1
+        assert data["queue"]["results"][0]["deadline_source"] == "linear_due_date"
+        assert data["queue"]["results"][0]["due_date"] == "2026-11-16"
+
+        item.linear_due_date = NOW.date() + timedelta(days=2)
+        item.save(update_fields=["linear_due_date"])
+        data = client.get(URL, {"view": "open"}).data
+        assert data["summary"]["overdue"] == 0
+        assert data["summary"]["due_soon"] == 1
+
+        item.linear_due_date = None
+        item.save(update_fields=["linear_due_date"])
+        data = client.get(URL, {"view": "open"}).data
+        assert data["summary"]["overdue"] == 0
+        assert data["summary"]["due_soon"] == 0
+        assert data["queue"]["results"][0]["slo_deadline"] is None
+        assert data["queue"]["results"][0]["deadline_source"] is None
+
+    def test_linear_sla_changes_override_the_priority_target(self, dashboard):
+        client, user, incident = dashboard
+        item = make_item(
+            incident,
+            assignee=user,
+            priority=2,
+            created_at=NOW - timedelta(days=20),
+            linear_sla_breaches_at=NOW + timedelta(days=5),
+        )
+        data = client.get(URL, {"view": "open"}).data
+        assert data["summary"]["overdue"] == 0
+        assert data["queue"]["results"][0]["deadline_source"] == "linear_sla"
+
+        item.linear_sla_breaches_at = NOW - timedelta(days=1)
+        item.save(update_fields=["linear_sla_breaches_at"])
+        assert client.get(URL).data["summary"]["overdue"] == 1
+
+        item.linear_sla_breaches_at = None
+        item.save(update_fields=["linear_sla_breaches_at"])
+        data = client.get(URL).data
+        assert data["summary"]["overdue"] == 1
+        assert data["queue"]["results"][0]["deadline_source"] == "priority_slo"
+
+    def test_on_time_metrics_use_current_linear_deadlines(self, dashboard):
+        client, _, incident = dashboard
+        done = {
+            "status": "Done",
+            "created_at": NOW - timedelta(days=10),
+            "completed_at": NOW - timedelta(days=1),
+        }
+        dated = make_item(incident, priority=0, linear_due_date=NOW.date(), **done)
+        make_item(
+            incident, priority=2, linear_sla_breaches_at=NOW - timedelta(days=5), **done
+        )
+        make_item(
+            incident,
+            priority=2,
+            linear_due_date=NOW.date(),
+            linear_sla_breaches_at=NOW - timedelta(days=5),
+            **done,
+        )
+        make_item(incident, priority=4, **done)
+        data = client.get(URL).data
+        assert data["summary"]["completed_30d"] == 4
+        assert data["summary"]["on_time_sample"] == 3
+        assert data["summary"]["on_time_percent"] == 66.7
+        dated.linear_due_date = NOW.date() - timedelta(days=5)
+        dated.save(update_fields=["linear_due_date"])
+        assert client.get(URL).data["summary"]["on_time_percent"] == 33.3
+
     def test_unknown_activity_is_not_fabricated_from_sync_time(self, dashboard):
         client, user, incident = dashboard
         make_item(
@@ -534,6 +611,56 @@ class TestDashboardSync:
                 item.linear_team_key,
                 item.linear_team_name,
             ) == (INFRA_TEAM_ID, "INFRA", "Infrastructure")
+
+    def test_sync_copies_edited_and_cleared_linear_deadlines(self, dashboard):
+        _, _, incident = dashboard
+        raw = {
+            "id": "dated-issue",
+            "identifier": "ENG-99",
+            "title": "Dated follow-up",
+            "url": "https://linear.app/issue/ENG-99",
+            "priority": 2,
+            "createdAt": (NOW - timedelta(days=20)).isoformat(),
+            "state": {"type": "unstarted"},
+            "dueDate": "2026-11-16",
+            "slaBreachesAt": (NOW + timedelta(days=14)).isoformat(),
+        }
+        service = LinearService.__new__(LinearService)
+        assert "dueDate" in ISSUE_FIELDS
+        with patch("firetower.incidents.services._get_linear_service") as get_service:
+
+            def sync():
+                get_service.return_value.get_child_issues.return_value = [
+                    service._parse_issue(raw)
+                ]
+                sync_action_items_from_linear(incident, force=True)
+                return incident.action_items.get()
+
+            item = sync()
+            assert item.linear_due_date == NOW.date() - timedelta(days=1)
+            assert item.linear_sla_breaches_at == NOW + timedelta(days=14)
+
+            raw.update(
+                dueDate="2026-11-20",
+                slaBreachesAt=(NOW + timedelta(days=30)).isoformat(),
+            )
+            item = sync()
+            assert item.linear_due_date == NOW.date() + timedelta(days=3)
+            assert item.linear_sla_breaches_at == NOW + timedelta(days=30)
+            assert item.deadline_source == "linear_due_date"
+
+            raw["dueDate"] = None
+            item = sync()
+            assert item.linear_due_date is None
+            assert item.deadline == NOW + timedelta(days=30)
+            assert item.deadline_source == "linear_sla"
+
+            raw.update(slaBreachesAt=None, priority=0)
+            item = sync()
+            assert item.linear_sla_breaches_at is None
+            assert item.deadline is None
+            assert item.deadline_source is None
+            get_service.return_value.update_issue.assert_not_called()
 
     def test_failed_sync_does_not_advance_freshness(self, dashboard):
         _, _, incident = dashboard

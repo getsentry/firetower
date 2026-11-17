@@ -8,7 +8,7 @@ from typing import Any
 import requests
 from django.conf import settings
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 
 from firetower.integrations.models import LinearOAuthToken
 
@@ -47,6 +47,7 @@ ISSUE_FIELDS = """
     createdAt
     updatedAt
     completedAt
+    dueDate
     slaBreachesAt
     team {
         id
@@ -413,6 +414,7 @@ class LinearService:
         created_at = issue.get("createdAt")
         updated_at = issue.get("updatedAt")
         completed_at = issue.get("completedAt")
+        due_date = issue.get("dueDate")
         sla_breaches_at = issue.get("slaBreachesAt")
         return {
             "id": issue["id"],
@@ -427,6 +429,7 @@ class LinearService:
             "created_at": parse_datetime(created_at) if created_at else None,
             "linear_updated_at": parse_datetime(updated_at) if updated_at else None,
             "completed_at": parse_datetime(completed_at) if completed_at else None,
+            "due_date": parse_date(due_date) if due_date else None,
             "sla_breaches_at": (
                 parse_datetime(sla_breaches_at) if sla_breaches_at else None
             ),
