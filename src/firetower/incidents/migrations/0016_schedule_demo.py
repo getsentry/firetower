@@ -1,13 +1,17 @@
 from django.db import migrations
 
-from firetower.incidents.tasks import SCHEDULES
-
 
 def create_schedule(apps, schema_editor):
     Schedule = apps.get_model("django_q", "Schedule")
     schedule_name = "schedule_demo"
     Schedule.objects.get_or_create(
-        name=schedule_name, defaults=SCHEDULES[schedule_name]
+        name=schedule_name,
+        defaults={
+            "func": "firetower.incidents.tasks.schedule_demo",
+            "schedule_type": "I",
+            "minutes": 5,
+            "repeats": -1,
+        },
     )
 
 
