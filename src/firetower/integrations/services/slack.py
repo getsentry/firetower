@@ -17,6 +17,10 @@ from slack_sdk.errors import SlackApiError
 logger = logging.getLogger(__name__)
 
 
+class SlackReadError(Exception):
+    """Raised when a Slack read fails and the caller asked to know about it."""
+
+
 class SlackRateLimitRetry:
     def __init__(self, max_retries: int = 1, max_delay: int = 30) -> None:
         self.remaining = max_retries
@@ -96,7 +100,7 @@ class SlackService:
             rate_limit_retry: Shared retry budget for Slack rate limits
 
         Returns:
-            dict with 'slack_user_id', 'name', 'first_name', 'last_name', 'avatar_url', or None if not found
+            dict with 'slack_user_id', 'name', 'first_name', 'last_name', 'avatar_url', 'timezone', or None if not found
         """
         if not self.client:
             logger.warning("Cannot fetch user - Slack client not initialized")
@@ -130,6 +134,7 @@ class SlackService:
                 "first_name": first_name,
                 "last_name": last_name,
                 "avatar_url": avatar_url,
+                "timezone": user.get("tz") or "",
             }
 
         except SlackApiError as e:
@@ -501,7 +506,7 @@ class SlackService:
             slack_user_id: Slack user ID (e.g., U12345678)
 
         Returns:
-            dict with 'email', 'first_name', 'last_name', 'avatar_url', or None if not found
+            dict with 'email', 'first_name', 'last_name', 'avatar_url', 'timezone', 'deleted', 'is_bot', or None if not found
         """
         if not self.client:
             logger.warning("Cannot fetch user info - Slack client not initialized")
@@ -534,6 +539,7 @@ class SlackService:
                 "first_name": first_name,
                 "last_name": last_name,
                 "avatar_url": avatar_url,
+                "timezone": user.get("tz") or "",
                 "deleted": deleted,
                 "is_bot": is_bot,
             }
@@ -573,10 +579,16 @@ class SlackService:
         return messages
 
     def get_thread_replies(
-        self, channel_id: str, thread_ts: str
+        self, channel_id: str, thread_ts: str, raise_on_error: bool = False
     ) -> list[dict[str, Any]]:
-        """Return all non-parent human replies for a thread, paginating automatically."""
+        """Return all non-parent human replies for a thread, paginating automatically.
+
+        With `raise_on_error`, a failed read raises SlackReadError instead of
+        returning the replies read so far.
+        """
         if not self.client:
+            if raise_on_error:
+                raise SlackReadError("Slack client not initialized")
             return []
         replies: list[dict[str, Any]] = []
         cursor: str | None = None
@@ -590,13 +602,17 @@ class SlackService:
                 kwargs["cursor"] = cursor
             try:
                 response = self.client.conversations_replies(**kwargs)
-            except Exception:
+            except Exception as e:
                 logger.exception("Failed to fetch replies for thread %s", thread_ts)
+                if raise_on_error:
+                    raise SlackReadError(f"Failed to fetch thread {thread_ts}") from e
                 break
             if not response.get("ok"):
                 logger.error(
                     "conversations_replies returned not-ok for thread %s", thread_ts
                 )
+                if raise_on_error:
+                    raise SlackReadError(f"Failed to fetch thread {thread_ts}")
                 break
             raw_messages: list[dict[str, Any]] = response.get("messages") or []
             replies.extend(

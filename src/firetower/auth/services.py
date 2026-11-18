@@ -139,6 +139,17 @@ def sync_user_profile_from_slack(
             except ValidationError:
                 logger.warning(f"Invalid or insecure avatar URL: {avatar_url}")
 
+    timezone = slack_profile.get("timezone", "")
+    if (
+        timezone
+        and hasattr(user, "userprofile")
+        and user.userprofile.timezone != timezone
+    ):
+        user.userprofile.timezone = timezone
+        user.userprofile.save(update_fields=["timezone"])
+        logger.info(f"Updated timezone for user {user.email}")
+        needs_save = True
+
     if slack_user_id:
         external_profile, created = ExternalProfile.objects.get_or_create(
             user=user,
@@ -205,6 +216,11 @@ def get_or_create_user_from_email(email: str) -> User | None:
         except ValidationError:
             logger.warning(f"Invalid avatar URL for email {email}")
 
+    timezone = slack_profile.get("timezone", "") if slack_profile else ""
+    if timezone and not user.userprofile.timezone:
+        user.userprofile.timezone = timezone
+        user.userprofile.save(update_fields=["timezone"])
+
     if slack_user_id:
         ExternalProfile.objects.get_or_create(
             user=user,
@@ -267,6 +283,11 @@ def get_or_create_user_from_slack_id(slack_user_id: str) -> User | None:
             user.userprofile.save()
         except ValidationError:
             logger.warning(f"Invalid avatar URL for Slack user {slack_user_id}")
+
+    timezone = slack_user_info.get("timezone", "")
+    if timezone and not user.userprofile.timezone:
+        user.userprofile.timezone = timezone
+        user.userprofile.save(update_fields=["timezone"])
 
     ExternalProfile.objects.get_or_create(
         user=user,

@@ -5,10 +5,12 @@ Basic pytest tests for Slack integration service.
 import os
 from unittest.mock import MagicMock, patch
 
+import pytest
 from slack_sdk.errors import SlackApiError
 
 from firetower.integrations.services.slack import (
     SlackRateLimitRetry,
+    SlackReadError,
     SlackService,
     is_slack_guest,
 )
@@ -268,6 +270,7 @@ class TestSlackService:
                         "id": "U12345",
                         "deleted": False,
                         "real_name": "John Doe",
+                        "tz": "America/New_York",
                         "profile": {
                             "email": "john@example.com",
                             "image_512": "https://example.com/avatar.jpg",
@@ -283,6 +286,7 @@ class TestSlackService:
                 assert result["email"] == "john@example.com"
                 assert result["first_name"] == "John"
                 assert result["last_name"] == "Doe"
+                assert result["timezone"] == "America/New_York"
 
     def _make_service(self):
         mock_slack_config = {
@@ -628,6 +632,14 @@ class TestSlackService:
 
         assert len(replies) == 1
         assert replies[0]["text"] == "reply"
+
+    def test_get_thread_replies_raises_when_asked(self):
+        service, mock_client = self._make_service()
+        mock_client.conversations_replies.return_value = {"ok": False}
+
+        assert service.get_thread_replies("C123", "1.0") == []
+        with pytest.raises(SlackReadError):
+            service.get_thread_replies("C123", "1.0", raise_on_error=True)
 
     def test_get_thread_replies_paginates(self):
         service, mock_client = self._make_service()

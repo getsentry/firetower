@@ -42,6 +42,27 @@ class TestSyncUserProfileFromSlack:
             )
             assert external_profile.external_id == "U12345"
 
+    def test_sync_updates_timezone(self):
+        user = User.objects.create_user(
+            username="test@example.com",
+            email="test@example.com",
+        )
+        user.userprofile.timezone = "America/Los_Angeles"
+        user.userprofile.save()
+
+        with patch(
+            "firetower.auth.services._slack_service.get_user_profile_by_email"
+        ) as mock_get_profile:
+            mock_get_profile.return_value = {
+                "slack_user_id": "U12345",
+                "timezone": "Europe/Vienna",
+            }
+
+            assert sync_user_profile_from_slack(user) is True
+
+        user.userprofile.refresh_from_db()
+        assert user.userprofile.timezone == "Europe/Vienna"
+
     def test_sync_updates_existing_external_profile(self):
         user = User.objects.create_user(
             username="test@example.com",
@@ -156,6 +177,7 @@ class TestGetOrCreateUserFromSlackId:
             "first_name": "Jane",
             "last_name": "Smith",
             "avatar_url": "https://example.com/avatar.jpg",
+            "timezone": "America/New_York",
         }
 
         with patch(
@@ -166,6 +188,7 @@ class TestGetOrCreateUserFromSlackId:
             user = get_or_create_user_from_slack_id("U67890")
 
             assert user is not None
+            assert user.userprofile.timezone == "America/New_York"
             assert user.username == "jane@example.com"
             assert user.email == "jane@example.com"
             assert user.first_name == "Jane"
