@@ -74,7 +74,9 @@ function ActionItemsDashboard() {
         <div>
           <h1 {...stylex.props(styles.title)}>Action items</h1>
           <p {...stylex.props(styles.muted)}>
-            The health of our incident follow-ups, not just our incidents.
+            The health of our incident follow-ups, not just our incidents. Note that this
+            page is very much vibe coded to get something up here quickly. Feel free to
+            contribute to this page if there's something you want to see.
           </p>
         </div>
         <div {...stylex.props(styles.controls)}>
