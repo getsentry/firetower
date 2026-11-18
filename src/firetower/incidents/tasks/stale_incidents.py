@@ -26,15 +26,11 @@ NUDGE_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 HUMAN_MESSAGE_SUBTYPES = {None, "thread_broadcast", "file_share"}
 
-# #team-sre, the same channel as the frontend's GetHelpLink.
-HELP_CHANNEL_ID = "C08RJKP6NR0"
-
 STALE_INCIDENT_NUDGE_MESSAGE = (
     "{ic_mention}This incident has been *{status}* since {status_since}, and "
     "nobody has posted here for {quiet_days}.\n"
     "If it's fixed, run {commands}. If work is still ongoing, a short update "
-    "here helps.\n\n"
-    f"_This is an experimental nudge. If it looks wrong, let <#{HELP_CHANNEL_ID}> know._"
+    "here helps."
 )
 
 

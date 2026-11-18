@@ -149,7 +149,6 @@ class TestSendStaleIncidentNudges:
         assert "for 4 business days" in message
         assert "`/inc resolved`" in message
         assert "`/inc mitigated`" not in message
-        assert "let <#C08RJKP6NR0> know" in message
         incident.refresh_from_db()
         assert incident.last_nudge_at == NOW
 
