@@ -1,9 +1,11 @@
 import logging
 import uuid
+from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
 from django.db import InterfaceError, OperationalError, close_old_connections
+from django.utils import timezone
 
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.allocation import LinearUnavailable
@@ -202,6 +204,7 @@ def _build_new_incident_modal(
     user_id: str = "",
     severity: str = "",
     selected_options: set[str] | None = None,
+    recent_incident_blocks: list[dict[str, Any]] | None = None,
 ) -> dict:
     blocks = build_incident_form_blocks(user_id=user_id)
 
@@ -211,17 +214,73 @@ def _build_new_incident_modal(
 
     blocks.append(_build_options_block(severity, selected_values=selected_options))
 
+    if recent_incident_blocks:
+        blocks = recent_incident_blocks + blocks
+
     modal: dict[str, Any] = {
         "type": "modal",
-        "callback_id": "new_incident_modal",
+        "callback_id": (
+            "new_incident_confirmation_modal"
+            if recent_incident_blocks
+            else "new_incident_modal"
+        ),
         "title": {"type": "plain_text", "text": "New Incident"},
-        "submit": {"type": "plain_text", "text": "Create"},
+        "submit": {
+            "type": "plain_text",
+            "text": "Create anyway" if recent_incident_blocks else "Create",
+        },
         "close": {"type": "plain_text", "text": "Cancel"},
         "blocks": blocks,
     }
     if channel_id:
         modal["private_metadata"] = channel_id
     return modal
+
+
+def _build_recent_incident_blocks() -> list[dict[str, Any]]:
+    incidents = list(
+        Incident.objects.filter(
+            created_at__gte=timezone.now() - timedelta(minutes=10),
+            is_private=False,
+        )
+        .only("id", "title", "severity")
+        .order_by("-created_at", "-id")[:10]
+    )
+    if not incidents:
+        return []
+
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "section",
+            "block_id": "recent_incidents_warning",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    ":warning: *Is this incident already being handled?*\n"
+                    "These incidents were opened in the last 10 minutes "
+                    "(up to 10, newest first). If one matches, cancel and open "
+                    "the existing incident. Otherwise, choose *Create anyway*."
+                ),
+            },
+        }
+    ]
+    for incident in incidents:
+        incident_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
+        blocks.append(
+            {
+                "type": "section",
+                "block_id": f"recent_incident_{incident.id}",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"*{incident.severity}* "
+                        f"<{incident_url}|{incident.incident_number}: "
+                        f"{escape_slack_text(incident.title)}>"
+                    ),
+                },
+            }
+        )
+    return blocks
 
 
 ACTION_ID_TO_TAG_TYPE = {
@@ -297,7 +356,10 @@ def handle_new_command(ack: Any, body: dict, command: dict, respond: Any) -> Non
 def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
     ack()
     view = body.get("view", {})
-    if view.get("callback_id") != "new_incident_modal":
+    if view.get("callback_id") not in {
+        "new_incident_modal",
+        "new_incident_confirmation_modal",
+    }:
         return
 
     values = view.get("state", {}).get("values", {})
@@ -321,6 +383,11 @@ def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
         user_id=user_id,
         severity=severity,
         selected_options=selected_values,
+        recent_incident_blocks=[
+            block
+            for block in view.get("blocks", [])
+            if block.get("block_id", "").startswith("recent_incident")
+        ],
     )
 
     client.views_update(view_id=view["id"], view=new_view)
@@ -423,9 +490,35 @@ def handle_new_incident_submission(
         )
         return
 
-    ack()
-
     slack_user_id = body.get("user", {}).get("id", "")
+
+    if view.get("callback_id") != "new_incident_confirmation_modal":
+        try:
+            recent_incident_blocks = _build_recent_incident_blocks()
+        except (OperationalError, InterfaceError):
+            logger.exception("Could not check for recent incidents before creation")
+        else:
+            if recent_incident_blocks:
+                selected_severity = (
+                    values.get("severity_block", {})
+                    .get("severity", {})
+                    .get("selected_option")
+                )
+                ack(
+                    response_action="update",
+                    view=_build_new_incident_modal(
+                        channel_id=view.get("private_metadata", ""),
+                        user_id=slack_user_id,
+                        severity=selected_severity["value"]
+                        if selected_severity
+                        else "",
+                        selected_options=selected_values,
+                        recent_incident_blocks=recent_incident_blocks,
+                    ),
+                )
+                return
+
+    ack()
 
     try:
         form = parse_incident_form_values(view)
