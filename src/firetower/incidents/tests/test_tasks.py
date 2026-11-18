@@ -1,7 +1,9 @@
 from datetime import UTC, datetime, timedelta
+from importlib import import_module
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -18,10 +20,10 @@ from firetower.incidents.models import (
     IncidentStatus,
 )
 from firetower.incidents.tasks import (
+    SCHEDULES,
     STATUSPAGE_FOLLOWUP_REMINDER_MESSAGE,
     STATUSPAGE_REMINDER_MESSAGE,
     datadog_log,
-    schedule_demo,
     send_action_item_reminder,
     send_statuspage_followup_reminder,
     send_statuspage_reminder,
@@ -127,41 +129,37 @@ class TestDatadogLogStatsdIncrements:
             wrapped()
 
 
-class TestScheduleDemoPrivateIncident:
-    @patch("firetower.incidents.tasks.decorators.statsd")
-    @patch("firetower.incidents.tasks.Incident")
-    def test_masks_title_for_private_incident(self, mock_incident_cls, mock_statsd):
-        mock_incident = MagicMock()
-        mock_incident.id = 42
-        mock_incident.title = "Secret outage details"
-        mock_incident.is_private = True
-        mock_incident_cls.objects.order_by.return_value.first.return_value = (
-            mock_incident
+@pytest.mark.django_db
+class TestRemoveDemoSchedule:
+    def test_removes_existing_demo_schedule_and_preserves_other_schedules(self):
+        original = import_module("firetower.incidents.migrations.0016_schedule_demo")
+        removal = import_module(
+            "firetower.incidents.migrations.0026_remove_demo_schedule"
+        )
+        original.create_schedule(apps, None)
+        original.create_schedule(apps, None)
+        demo = Schedule.objects.get(name="schedule_demo")
+        assert demo.func == "firetower.incidents.tasks.schedule_demo"
+        assert demo.schedule_type == Schedule.MINUTES
+        assert demo.minutes == 5
+        assert demo.repeats == -1
+        other = Schedule.objects.create(name="unrelated_task", func="unrelated.task")
+
+        removal.remove_demo_schedule(apps, None)
+        removal.remove_demo_schedule(apps, None)
+
+        assert not Schedule.objects.filter(name="schedule_demo").exists()
+        assert Schedule.objects.filter(pk=other.pk).exists()
+        assert "schedule_demo" not in SCHEDULES
+
+    def test_succeeds_without_a_demo_schedule(self):
+        removal = import_module(
+            "firetower.incidents.migrations.0026_remove_demo_schedule"
         )
 
-        with patch("firetower.incidents.tasks.logger") as mock_logger:
-            schedule_demo.__wrapped__()
+        removal.remove_demo_schedule(apps, None)
 
-        logged = mock_logger.info.call_args[0][0]
-        assert "Private Incident" in logged
-        assert "Secret outage details" not in logged
-
-    @patch("firetower.incidents.tasks.decorators.statsd")
-    @patch("firetower.incidents.tasks.Incident")
-    def test_shows_title_for_public_incident(self, mock_incident_cls, mock_statsd):
-        mock_incident = MagicMock()
-        mock_incident.id = 43
-        mock_incident.title = "Public outage"
-        mock_incident.is_private = False
-        mock_incident_cls.objects.order_by.return_value.first.return_value = (
-            mock_incident
-        )
-
-        with patch("firetower.incidents.tasks.logger") as mock_logger:
-            schedule_demo.__wrapped__()
-
-        logged = mock_logger.info.call_args[0][0]
-        assert "Public outage" in logged
+        assert not Schedule.objects.filter(name="schedule_demo").exists()
 
 
 @pytest.mark.django_db
