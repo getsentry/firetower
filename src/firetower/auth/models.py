@@ -30,6 +30,7 @@ class UserProfile(models.Model):
         "auth.User", on_delete=models.CASCADE, related_name="userprofile"
     )
     avatar_url = models.URLField(blank=True)
+    timezone = models.CharField(max_length=64, blank=True)
 
     @property
     def user_incidents(self) -> QuerySet[Incident]:

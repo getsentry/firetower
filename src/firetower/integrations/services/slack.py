@@ -100,7 +100,7 @@ class SlackService:
             rate_limit_retry: Shared retry budget for Slack rate limits
 
         Returns:
-            dict with 'slack_user_id', 'name', 'first_name', 'last_name', 'avatar_url', or None if not found
+            dict with 'slack_user_id', 'name', 'first_name', 'last_name', 'avatar_url', 'timezone', or None if not found
         """
         if not self.client:
             logger.warning("Cannot fetch user - Slack client not initialized")
@@ -134,6 +134,7 @@ class SlackService:
                 "first_name": first_name,
                 "last_name": last_name,
                 "avatar_url": avatar_url,
+                "timezone": user.get("tz") or "",
             }
 
         except SlackApiError as e:
@@ -505,7 +506,7 @@ class SlackService:
             slack_user_id: Slack user ID (e.g., U12345678)
 
         Returns:
-            dict with 'email', 'first_name', 'last_name', 'avatar_url', or None if not found
+            dict with 'email', 'first_name', 'last_name', 'avatar_url', 'timezone', 'deleted', 'is_bot', or None if not found
         """
         if not self.client:
             logger.warning("Cannot fetch user info - Slack client not initialized")
@@ -538,6 +539,7 @@ class SlackService:
                 "first_name": first_name,
                 "last_name": last_name,
                 "avatar_url": avatar_url,
+                "timezone": user.get("tz") or "",
                 "deleted": deleted,
                 "is_bot": is_bot,
             }

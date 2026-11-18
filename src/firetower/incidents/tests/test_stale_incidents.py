@@ -79,6 +79,15 @@ class TestSendStaleIncidentNudges:
             mock_tz.now.return_value = now
             send_stale_incident_nudges()
 
+    def _make_captain(self, tz: str = "America/Los_Angeles") -> User:
+        captain = User.objects.create_user(username="captain@example.com")
+        ExternalProfile.objects.create(
+            user=captain, type=ExternalProfileType.SLACK, external_id="UCAPTAIN"
+        )
+        captain.userprofile.timezone = tz
+        captain.userprofile.save()
+        return captain
+
     def _make_incident(
         self,
         status: str = IncidentStatus.ACTIVE,
@@ -110,10 +119,7 @@ class TestSendStaleIncidentNudges:
         return incident
 
     def test_nudges_captain_of_quiet_stale_incident(self, slack):
-        captain = User.objects.create_user(username="captain@example.com")
-        ExternalProfile.objects.create(
-            user=captain, type=ExternalProfileType.SLACK, external_id="UCAPTAIN"
-        )
+        captain = self._make_captain()
         incident = self._make_incident(
             status=IncidentStatus.MITIGATED,
             status_changed_at=datetime(2026, 11, 11, 15, 0, tzinfo=UTC),
@@ -227,10 +233,11 @@ class TestSendStaleIncidentNudges:
 
         slack.post_message.assert_not_called()
 
-    def test_shows_status_date_in_pacific_time(self, slack):
+    def test_shows_status_date_in_captain_timezone(self, slack):
         self._make_incident(
             status=IncidentStatus.MITIGATED,
             status_changed_at=datetime(2026, 11, 13, 1, 0, tzinfo=UTC),
+            captain=self._make_captain("America/Los_Angeles"),
         )
 
         self._run()
@@ -293,20 +300,54 @@ class TestSendStaleIncidentNudges:
         assert "for 1 business day." in slack.post_message.call_args.args[1]
 
     @pytest.mark.parametrize(
-        ("now", "nudged"),
+        ("tz", "now", "nudged"),
         [
-            (datetime(2026, 11, 18, 8, 0, tzinfo=UTC), True),  # Wed 12 AM PT
-            (datetime(2026, 11, 21, 7, 59, tzinfo=UTC), True),  # Fri 11:59 PM PT
-            (datetime(2026, 11, 21, 8, 0, tzinfo=UTC), False),  # Sat 12 AM PT
-            (datetime(2026, 11, 23, 7, 59, tzinfo=UTC), False),  # Sun 11:59 PM PT
+            ("America/Los_Angeles", datetime(2026, 11, 21, 7, 59, tzinfo=UTC), True),
+            ("America/Los_Angeles", datetime(2026, 11, 21, 8, 0, tzinfo=UTC), False),
+            ("America/Los_Angeles", datetime(2026, 11, 23, 7, 59, tzinfo=UTC), False),
+            ("America/Los_Angeles", datetime(2026, 11, 23, 8, 0, tzinfo=UTC), True),
+            ("Europe/Vienna", datetime(2026, 11, 20, 22, 59, tzinfo=UTC), True),
+            ("Europe/Vienna", datetime(2026, 11, 20, 23, 0, tzinfo=UTC), False),
+            ("Europe/Vienna", datetime(2026, 11, 22, 23, 0, tzinfo=UTC), True),
         ],
     )
-    def test_uses_pacific_business_days(self, slack, now, nudged):
-        self._make_incident()
+    def test_only_nudges_on_captain_weekdays(self, slack, tz, now, nudged):
+        self._make_incident(captain=self._make_captain(tz))
 
         self._run(now=now)
 
         assert slack.post_message.called is nudged
+
+    def test_fetches_and_stores_missing_captain_timezone(self, slack):
+        captain = self._make_captain(tz="")
+        self._make_incident(captain=captain)
+        slack.get_user_info.return_value = {"timezone": "America/New_York"}
+
+        self._run()
+
+        slack.get_user_info.assert_called_once_with("UCAPTAIN")
+        captain.userprofile.refresh_from_db()
+        assert captain.userprofile.timezone == "America/New_York"
+        slack.post_message.assert_called_once()
+
+    @pytest.mark.parametrize(
+        "user_info", [None, {"timezone": ""}, {"timezone": "Not/AZone"}]
+    )
+    def test_uses_utc_when_captain_timezone_is_unknown(self, slack, user_info):
+        captain = self._make_captain(tz="")
+        if user_info and user_info["timezone"]:
+            captain.userprofile.timezone = user_info["timezone"]
+            captain.userprofile.save()
+        self._make_incident(captain=captain)
+        slack.get_user_info.return_value = user_info
+
+        self._run(now=datetime(2026, 11, 20, 23, 59, tzinfo=UTC))
+        slack.post_message.assert_called_once()
+
+        slack.post_message.reset_mock()
+        Incident.objects.update(last_nudge_at=None)
+        self._run(now=datetime(2026, 11, 21, 0, 0, tzinfo=UTC))
+        slack.post_message.assert_not_called()
 
     def test_skips_weekends(self, slack):
         self._make_incident()

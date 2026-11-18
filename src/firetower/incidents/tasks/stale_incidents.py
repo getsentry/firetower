@@ -1,7 +1,7 @@
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
 from django.utils import timezone
@@ -21,8 +21,6 @@ logger = logging.getLogger(__name__)
 STALE_STATUS_BUSINESS_DAYS = 1
 QUIET_CHANNEL_BUSINESS_DAYS = 1
 NUDGE_EVERY_BUSINESS_DAYS = 3
-
-NUDGE_TIMEZONE = ZoneInfo("America/Los_Angeles")
 
 HUMAN_MESSAGE_SUBTYPES = {None, "thread_broadcast", "file_share"}
 
@@ -114,18 +112,47 @@ def _last_status_change(incident: Incident) -> datetime:
     return occurred_at or incident.created_at
 
 
-def _build_message(incident: Incident, status_since: datetime, quiet_days: int) -> str:
+def _nudge_timezone(
+    slack: SlackService, incident: Incident, captain_slack_id: str | None
+) -> tzinfo:
+    """Return the timezone that weekdays are counted in for this incident.
+
+    That is the captain's Slack timezone, which is stored on their profile the
+    first time it is fetched. Falls back to UTC when there is no captain or
+    their timezone can't be found.
+    """
+    profile = getattr(incident.captain, "userprofile", None)
+    if profile is None or not captain_slack_id:
+        return UTC
+    if not profile.timezone:
+        user_info = slack.get_user_info(captain_slack_id)
+        if not user_info or not user_info.get("timezone"):
+            return UTC
+        profile.timezone = user_info["timezone"]
+        profile.save(update_fields=["timezone"])
+
+    try:
+        return ZoneInfo(profile.timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        return UTC
+
+
+def _build_message(
+    incident: Incident,
+    captain_slack_id: str | None,
+    status_since: datetime,
+    quiet_days: int,
+) -> str:
     slash_command = settings.SLACK.get("SLASH_COMMAND", "/inc")
     if incident.status == IncidentStatus.ACTIVE:
         commands = f"`{slash_command} mitigated` or `{slash_command} resolved`"
     else:
         commands = f"`{slash_command} resolved`"
 
-    captain_slack_id = get_slack_user_id(incident.captain) if incident.captain else None
     return STALE_INCIDENT_NUDGE_MESSAGE.format(
         ic_mention=f"<@{captain_slack_id}> " if captain_slack_id else "",
         status=incident.status,
-        status_since=status_since.astimezone(NUDGE_TIMEZONE).strftime("%a %b %-d"),
+        status_since=status_since.strftime("%a %b %-d"),
         quiet_days=f"{quiet_days} business day{'' if quiet_days == 1 else 's'}",
         commands=commands,
     )
@@ -138,31 +165,36 @@ def send_stale_incident_nudges() -> None:
     An incident is forgotten when its status has not changed for
     STALE_STATUS_BUSINESS_DAYS and nobody has posted in its channel for
     QUIET_CHANNEL_BUSINESS_DAYS. Each incident gets at most one nudge every
-    NUDGE_EVERY_BUSINESS_DAYS. Runs hourly; nudges only go out on weekdays
-    in NUDGE_TIMEZONE.
+    NUDGE_EVERY_BUSINESS_DAYS. Runs hourly. Nudges only go out on the
+    captain's weekdays, and business days are counted in their timezone.
     """
     if not settings.SLACK.get("STALE_INCIDENT_NUDGES_ENABLED"):
         return
 
-    now = timezone.now().astimezone(NUDGE_TIMEZONE)
-    if now.weekday() >= 5:
-        return
-
-    stale_cutoff = subtract_business_days(now, STALE_STATUS_BUSINESS_DAYS)
-    quiet_cutoff = subtract_business_days(now, QUIET_CHANNEL_BUSINESS_DAYS)
-    nudge_cutoff = subtract_business_days(now, NUDGE_EVERY_BUSINESS_DAYS)
-
+    now = timezone.now()
     slack = SlackService()
     incidents = Incident.objects.filter(
         status__in=[IncidentStatus.ACTIVE, IncidentStatus.MITIGATED],
         is_private=False,
-    ).select_related("captain")
+    ).select_related("captain__userprofile")
 
     for incident in incidents:
+        captain_slack_id = (
+            get_slack_user_id(incident.captain) if incident.captain else None
+        )
+        tz = _nudge_timezone(slack, incident, captain_slack_id)
+        local_now = now.astimezone(tz)
+        if local_now.weekday() >= 5:
+            continue
+
+        stale_cutoff = subtract_business_days(local_now, STALE_STATUS_BUSINESS_DAYS)
+        quiet_cutoff = subtract_business_days(local_now, QUIET_CHANNEL_BUSINESS_DAYS)
+        nudge_cutoff = subtract_business_days(local_now, NUDGE_EVERY_BUSINESS_DAYS)
+
         if incident.last_nudge_at and incident.last_nudge_at > nudge_cutoff:
             continue
 
-        status_since = _last_status_change(incident)
+        status_since = _last_status_change(incident).astimezone(tz)
         if status_since > stale_cutoff:
             continue
 
@@ -192,12 +224,15 @@ def send_stale_incident_nudges() -> None:
             continue
         quiet_since = max(
             last_activity or incident.created_at, incident.created_at
-        ).astimezone(NUDGE_TIMEZONE)
+        ).astimezone(tz)
         if quiet_since > quiet_cutoff:
             continue
 
         message = _build_message(
-            incident, status_since, count_business_days(quiet_since, now)
+            incident,
+            captain_slack_id,
+            status_since,
+            count_business_days(quiet_since, local_now),
         )
         if slack.post_message(channel_id, message) is None:
             logger.info(
