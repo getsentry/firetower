@@ -7,11 +7,13 @@ from django.conf import settings
 from django.db import InterfaceError, OperationalError, close_old_connections
 from django.utils import timezone
 
+from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
 from firetower.incidents.allocation import LinearUnavailable
 from firetower.incidents.hooks import (
     HIGH_SEVERITIES,
     ChannelSetupContext,
+    build_channel_topic,
     decorate_incident_channel,
     page_for_channel,
     ping_triage_bot,
@@ -243,11 +245,28 @@ def _build_recent_incident_blocks() -> list[dict[str, Any]]:
             created_at__gte=timezone.now() - timedelta(minutes=10),
             is_private=False,
         )
-        .only("id", "title", "severity")
+        .select_related("captain")
+        .only(
+            "id",
+            "title",
+            "severity",
+            "captain__username",
+            "captain__first_name",
+            "captain__last_name",
+        )
         .order_by("-created_at", "-id")[:10]
     )
     if not incidents:
         return []
+
+    captain_slack_ids = dict(
+        ExternalProfile.objects.filter(
+            user_id__in={
+                incident.captain_id for incident in incidents if incident.captain_id
+            },
+            type=ExternalProfileType.SLACK,
+        ).values_list("user_id", "external_id")
+    )
 
     blocks: list[dict[str, Any]] = [
         {
@@ -257,29 +276,31 @@ def _build_recent_incident_blocks() -> list[dict[str, Any]]:
                 "type": "mrkdwn",
                 "text": (
                     ":warning: *Is this incident already being handled?*\n"
-                    "These incidents were opened in the last 10 minutes "
-                    "(up to 10, newest first). If one matches, cancel and open "
+                    "These incidents were opened in the last 10 minutes. "
+                    "If one matches, cancel and join "
                     "the existing incident. Otherwise, choose *Create anyway*."
                 ),
             },
         }
     ]
-    for incident in incidents:
-        incident_url = f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
-        blocks.append(
-            {
-                "type": "section",
-                "block_id": f"recent_incident_{incident.id}",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": (
-                        f"*{incident.severity}* "
-                        f"<{incident_url}|{incident.incident_number}: "
-                        f"{escape_slack_text(incident.title)}>"
+    blocks.extend(
+        {
+            "type": "section",
+            "block_id": f"recent_incident_{incident.id}",
+            "text": {
+                "type": "mrkdwn",
+                "text": build_channel_topic(
+                    incident,
+                    captain_slack_id=(
+                        captain_slack_ids.get(incident.captain_id, "")
+                        if incident.captain_id is not None
+                        else ""
                     ),
-                },
-            }
-        )
+                ),
+            },
+        }
+        for incident in incidents
+    )
     return blocks
 
 

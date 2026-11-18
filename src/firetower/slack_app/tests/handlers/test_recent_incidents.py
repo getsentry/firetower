@@ -3,9 +3,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db import InterfaceError, OperationalError
 from django.utils import timezone
 
+from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import Incident, IncidentSeverity
 from firetower.slack_app.bolt import _register_views
 from firetower.slack_app.handlers.new_incident import (
@@ -79,13 +81,59 @@ class TestRecentIncidentBlocks:
             f"recent_incident_{newest.id}",
             f"recent_incident_{boundary.id}",
         ]
-        assert "last 10 minutes" in blocks[0]["text"]["text"]
-        assert (
-            f"{settings.FIRETOWER_BASE_URL}/{newest.incident_number}"
-            in blocks[1]["text"]["text"]
+        assert blocks[0]["text"]["text"] == (
+            ":warning: *Is this incident already being handled?*\n"
+            "These incidents were opened in the last 10 minutes. "
+            "If one matches, cancel and join the existing incident. "
+            "Otherwise, choose *Create anyway*."
         )
-        assert "*P1*" in blocks[1]["text"]["text"]
-        assert "Newest" in blocks[1]["text"]["text"]
+        assert blocks[1]["text"]["text"] == (
+            f"[P1] <{settings.FIRETOWER_BASE_URL}/{newest.incident_number}"
+            f"|{newest.incident_number} Newest>"
+        )
+
+    @pytest.mark.parametrize("has_slack_profile", [True, False])
+    def test_topic_format_includes_captain(self, has_slack_profile):
+        captain = User.objects.create_user(
+            username="captain@example.com", first_name="Jane", last_name="Doe"
+        )
+        if has_slack_profile:
+            ExternalProfile.objects.create(
+                user=captain, type=ExternalProfileType.SLACK, external_id="U_CAPTAIN"
+            )
+        incident = Incident.objects.create(
+            title="Existing incident", severity="P1", captain=captain
+        )
+
+        blocks = _build_recent_incident_blocks()
+
+        captain_label = "<@U_CAPTAIN>" if has_slack_profile else "Jane Doe"
+        assert blocks[1]["text"]["text"] == (
+            f"[P1] <{settings.FIRETOWER_BASE_URL}/{incident.incident_number}"
+            f"|{incident.incident_number} Existing incident> | IC: {captain_label}"
+        )
+
+    def test_batches_captain_lookups(self, django_assert_num_queries):
+        for i in range(3):
+            captain = User.objects.create_user(username=f"captain-{i}")
+            ExternalProfile.objects.create(
+                user=captain,
+                type=ExternalProfileType.SLACK,
+                external_id=f"U_CAPTAIN_{i}",
+            )
+            Incident.objects.create(
+                title=f"Incident {i}", severity="P1", captain=captain
+            )
+
+        with django_assert_num_queries(2):
+            blocks = _build_recent_incident_blocks()
+
+        assert len(blocks) == 4
+        assert [block["text"]["text"].split(" | IC: ")[1] for block in blocks[1:]] == [
+            "<@U_CAPTAIN_2>",
+            "<@U_CAPTAIN_1>",
+            "<@U_CAPTAIN_0>",
+        ]
 
     def test_private_incident_alone_does_not_prompt(self):
         Incident.objects.create(title="Secret", severity="P0", is_private=True)
