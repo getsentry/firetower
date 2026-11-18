@@ -238,6 +238,13 @@ describe('Action item dashboard', () => {
     expect(
       await screen.findByRole('heading', {name: 'Action items'})
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'The health of our incident follow-ups, not just our incidents. ' +
+          'Note that this page is very much vibe coded to get something up here quickly. ' +
+          "Feel free to contribute to this page if there's something you want to see."
+      )
+    ).toBeInTheDocument();
     const nav = screen.getByRole('navigation');
     expect(
       within(nav)
