@@ -362,7 +362,11 @@ class SlackService:
             return False
 
     def post_message(
-        self, channel_id: str, text: str, blocks: list[dict] | None = None
+        self,
+        channel_id: str,
+        text: str,
+        blocks: list[dict] | None = None,
+        thread_ts: str | None = None,
     ) -> str | None:
         if not self.client:
             logger.warning("Cannot post message - Slack client not initialized")
@@ -371,7 +375,7 @@ class SlackService:
         try:
             logger.info(f"Posting message to channel {channel_id}")
             response = self.client.chat_postMessage(
-                channel=channel_id, text=text, blocks=blocks
+                channel=channel_id, text=text, blocks=blocks, thread_ts=thread_ts
             )
             return response.get("ts")
         except SlackApiError as e:
@@ -384,7 +388,10 @@ class SlackService:
                 if self.join_channel(channel_id):
                     try:
                         response = self.client.chat_postMessage(
-                            channel=channel_id, text=text, blocks=blocks
+                            channel=channel_id,
+                            text=text,
+                            blocks=blocks,
+                            thread_ts=thread_ts,
                         )
                         return response.get("ts")
                     except SlackApiError as retry_error:
@@ -465,6 +472,9 @@ class SlackService:
 
     def build_channel_url(self, channel_id: str) -> str:
         return f"https://{self.team_id}.slack.com/archives/{channel_id}"
+
+    def build_message_url(self, channel_id: str, message_ts: str) -> str:
+        return f"{self.build_channel_url(channel_id)}/p{message_ts.replace('.', '')}"
 
     def get_channel_info(self, channel_id: str) -> dict | None:
         if not self.client:
