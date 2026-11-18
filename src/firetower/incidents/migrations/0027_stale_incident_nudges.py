@@ -26,7 +26,7 @@ def delete_schedule(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("incidents", "0025_alter_actionitem_created_at"),
+        ("incidents", "0026_remove_demo_schedule"),
         ("django_q", "0018_task_success_index"),
     ]
 
