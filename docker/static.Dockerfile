@@ -47,7 +47,7 @@ RUN --mount=type=secret,id=sentry_auth_token \
     pnpm run build && \
     find dist -name '*.map' -delete
 
-FROM nginx:1.29.3-alpine3.22
+FROM nginx:1.31.9-alpine3.24
 
 RUN chown 101:101 -R /var/cache/nginx/ /var/log/nginx/
 RUN touch /run/nginx.pid && chown 101:101 /run/nginx.pid

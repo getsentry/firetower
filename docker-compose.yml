@@ -17,7 +17,7 @@ services:
 
   # Simulates the Global Load Balancer
   nginx:
-    image: nginx:1.29.1
+    image: nginx:1.31.9
     ports:
       - "8080:80"
     networks:
