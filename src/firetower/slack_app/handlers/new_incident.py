@@ -6,6 +6,7 @@ from typing import Any
 from django.conf import settings
 from django.db import InterfaceError, OperationalError, close_old_connections
 from django.utils import timezone
+from slack_sdk.errors import SlackApiError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
@@ -18,7 +19,7 @@ from firetower.incidents.hooks import (
     page_for_channel,
     ping_triage_bot,
 )
-from firetower.incidents.models import Incident, Tag, TagType
+from firetower.incidents.models import Incident, IncidentStatus, Tag, TagType
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.integrations.services import SlackService
 from firetower.integrations.services.slack import escape_slack_text
@@ -207,6 +208,7 @@ def _build_new_incident_modal(
     severity: str = "",
     selected_options: set[str] | None = None,
     recent_incident_blocks: list[dict[str, Any]] | None = None,
+    confirmation: bool = False,
 ) -> dict:
     blocks = build_incident_form_blocks(user_id=user_id)
 
@@ -216,21 +218,19 @@ def _build_new_incident_modal(
 
     blocks.append(_build_options_block(severity, selected_values=selected_options))
 
+    submit_text = "Create" if confirmation else "Continue"
     if recent_incident_blocks:
         blocks = recent_incident_blocks + blocks
+        confirmation = True
+        submit_text = "Create anyway"
 
     modal: dict[str, Any] = {
         "type": "modal",
         "callback_id": (
-            "new_incident_confirmation_modal"
-            if recent_incident_blocks
-            else "new_incident_modal"
+            "new_incident_confirmation_modal" if confirmation else "new_incident_modal"
         ),
         "title": {"type": "plain_text", "text": "New Incident"},
-        "submit": {
-            "type": "plain_text",
-            "text": "Create anyway" if recent_incident_blocks else "Create",
-        },
+        "submit": {"type": "plain_text", "text": submit_text},
         "close": {"type": "plain_text", "text": "Cancel"},
         "blocks": blocks,
     }
@@ -243,6 +243,7 @@ def _build_recent_incident_blocks() -> list[dict[str, Any]]:
     incidents = list(
         Incident.objects.filter(
             created_at__gte=timezone.now() - timedelta(minutes=10),
+            status__in=[IncidentStatus.ACTIVE, IncidentStatus.MITIGATED],
             is_private=False,
         )
         .select_related("captain")
@@ -409,6 +410,7 @@ def handle_severity_action(ack: Any, body: dict, client: Any) -> None:
             for block in view.get("blocks", [])
             if block.get("block_id", "").startswith("recent_incident")
         ],
+        confirmation=view.get("callback_id") == "new_incident_confirmation_modal",
     )
 
     client.views_update(view_id=view["id"], view=new_view)
@@ -513,31 +515,74 @@ def handle_new_incident_submission(
 
     slack_user_id = body.get("user", {}).get("id", "")
 
-    if view.get("callback_id") != "new_incident_confirmation_modal":
+    if view.get("callback_id") == "new_incident_modal":
+        selected_severity = (
+            values.get("severity_block", {}).get("severity", {}).get("selected_option")
+        )
+        confirmation_view = _build_new_incident_modal(
+            channel_id=view.get("private_metadata", ""),
+            user_id=slack_user_id,
+            severity=selected_severity["value"] if selected_severity else "",
+            selected_options=selected_values,
+            confirmation=True,
+        )
+        check_notice: dict[str, Any] = {
+            "type": "section",
+            "block_id": "recent_incidents_check",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    "Checking for recently opened incidents. "
+                    "If this is urgent, choose *Create anyway* without waiting."
+                ),
+            },
+        }
+        ack(
+            response_action="update",
+            view={
+                **confirmation_view,
+                "submit": {"type": "plain_text", "text": "Create anyway"},
+                "blocks": [check_notice, *confirmation_view["blocks"]],
+            },
+        )
+
         try:
             recent_incident_blocks = _build_recent_incident_blocks()
         except (OperationalError, InterfaceError):
             logger.exception("Could not check for recent incidents before creation")
-        else:
-            if recent_incident_blocks:
-                selected_severity = (
-                    values.get("severity_block", {})
-                    .get("severity", {})
-                    .get("selected_option")
+            recent_incident_blocks = [
+                {
+                    **check_notice,
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            "Could not check for recently opened incidents. "
+                            "You can still choose *Create anyway*."
+                        ),
+                    },
+                }
+            ]
+
+        try:
+            client.views_update(
+                view_id=view["id"],
+                view={
+                    **confirmation_view,
+                    "submit": {
+                        "type": "plain_text",
+                        "text": "Create anyway" if recent_incident_blocks else "Create",
+                    },
+                    "blocks": [*recent_incident_blocks, *confirmation_view["blocks"]],
+                },
+            )
+        except SlackApiError as exc:
+            if exc.response.get("error") == "not_found":
+                logger.info(
+                    "Incident modal closed before recent-incident check completed"
                 )
-                ack(
-                    response_action="update",
-                    view=_build_new_incident_modal(
-                        channel_id=view.get("private_metadata", ""),
-                        user_id=slack_user_id,
-                        severity=selected_severity["value"]
-                        if selected_severity
-                        else "",
-                        selected_options=selected_values,
-                        recent_incident_blocks=recent_incident_blocks,
-                    ),
-                )
-                return
+            else:
+                logger.exception("Could not update recent-incident confirmation")
+        return
 
     ack()
 
