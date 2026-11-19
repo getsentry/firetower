@@ -11,32 +11,11 @@ from firetower.slack_app.handlers.dumpslack import (
     _backfill_milestones,
     _download_image,
     _extract_image_urls,
-    _extract_notion_page_id,
     _get_channel_messages,
     _resolve_user_emails,
     _trigger_slack_dump,
     handle_dumpslack_command,
 )
-
-
-class TestExtractNotionPageId:
-    def test_extracts_id_without_hyphens(self):
-        url = "https://www.notion.so/sentry/Title-abc123def456abc123def456abc123de"
-        result = _extract_notion_page_id(url)
-        assert result == "abc123de-f456-abc1-23de-f456abc123de"
-
-    def test_extracts_uuid_with_hyphens(self):
-        url = "https://www.notion.so/abc123de-f456-abc1-23de-f456abc123de"
-        result = _extract_notion_page_id(url)
-        assert result == "abc123de-f456-abc1-23de-f456abc123de"
-
-    def test_returns_none_for_invalid_url(self):
-        assert _extract_notion_page_id("https://notion.so/no-id-here") is None
-
-    def test_handles_trailing_slash(self):
-        url = "https://www.notion.so/sentry/Title-abc123def456abc123def456abc123de/"
-        result = _extract_notion_page_id(url)
-        assert result == "abc123de-f456-abc1-23de-f456abc123de"
 
 
 class TestResolveUserEmails:
@@ -476,6 +455,71 @@ class TestTriggerSlackDump:
             _trigger_slack_dump(client, "C123", mock_incident)
 
         client.chat_postMessage.assert_not_called()
+
+    @pytest.mark.parametrize("metadata_fails", [False, True])
+    @pytest.mark.parametrize("has_captain", [False, True])
+    def test_refreshes_existing_page_metadata(
+        self, settings, metadata_fails, has_captain
+    ):
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        client = MagicMock()
+        incident = MagicMock(
+            is_private=False,
+            incident_number="INC-2000",
+            title="Updated title",
+            severity="P2",
+            created_at=datetime(2026, 1, 2, tzinfo=UTC),
+            captain=MagicMock(email="captain@sentry.io") if has_captain else None,
+        )
+        page_id = "abc123de-f456-abc1-23de-f456abc123de"
+        notion_link = MagicMock(url=f"https://notion.so/{page_id}")
+        notion = MagicMock()
+        if metadata_fails:
+            notion.update_postmortem_page.side_effect = RuntimeError(
+                "Notion unavailable"
+            )
+
+        with (
+            patch(
+                "firetower.slack_app.handlers.dumpslack.NotionService.from_settings",
+                return_value=notion,
+            ),
+            patch(
+                "firetower.slack_app.handlers.dumpslack._get_channel_messages",
+                return_value=[],
+            ),
+            patch("firetower.slack_app.handlers.dumpslack.ExternalLink") as mock_el,
+            patch("firetower.slack_app.handlers.dumpslack.transaction"),
+            patch(
+                "firetower.slack_app.handlers.dumpslack.GenAIService.from_settings",
+                return_value=None,
+            ),
+        ):
+            mock_el.objects.select_for_update.return_value.get_or_create.return_value = (
+                notion_link,
+                False,
+            )
+            _trigger_slack_dump(client, "C123", incident)
+
+        notion.update_postmortem_page.assert_called_once_with(
+            page_id=page_id,
+            incident_number="INC-2000",
+            incident_title="Updated title",
+            incident_url="https://firetower.example.com/INC-2000",
+            incident_date=incident.created_at,
+            severity="P2",
+            captain_email="captain@sentry.io" if has_captain else None,
+        )
+        notion.create_postmortem_page.assert_not_called()
+        notion.apply_template.assert_called_once_with(
+            page_id,
+            [],
+            update_slack=True,
+            incident=incident,
+        )
+        assert (
+            "Updated postmortem doc" in client.chat_postMessage.call_args.kwargs["text"]
+        )
 
     def test_posts_start_message_and_completion(self):
         client = MagicMock()

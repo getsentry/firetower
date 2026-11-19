@@ -29,7 +29,7 @@ from firetower.integrations.services import (
     PagerDutyService,
     SlackService,
 )
-from firetower.integrations.services.notion import NotionService
+from firetower.integrations.services.notion import NotionService, extract_notion_page_id
 from firetower.integrations.services.slack import escape_slack_text
 
 logger = logging.getLogger(__name__)
@@ -1088,6 +1088,36 @@ def _linear_issue_title(incident: Incident, sync_identifiers: bool = False) -> s
     return f"[{incident.incident_number}] {incident.title}"
 
 
+def _sync_notion_metadata(incident: Incident) -> None:
+    if incident.is_private or not NotionService.is_configured():
+        return
+    try:
+        notion_link = incident.external_links.filter(
+            type=ExternalLinkType.NOTION
+        ).first()
+        if not notion_link or not notion_link.url:
+            return
+        page_id = extract_notion_page_id(notion_link.url)
+        if not page_id:
+            logger.warning(
+                "Could not parse Notion page ID for incident %s", incident.id
+            )
+            return
+        notion = NotionService.from_settings()
+        if notion:
+            notion.update_postmortem_page(
+                page_id=page_id,
+                incident_number=incident.incident_number,
+                incident_title=incident.title,
+                incident_url=_build_incident_url(incident),
+                incident_date=incident.created_at,
+                severity=incident.severity,
+                captain_email=incident.captain.email if incident.captain else None,
+            )
+    except Exception:
+        logger.exception("Failed to sync Notion metadata for incident %s", incident.id)
+
+
 def _sync_linear_title(incident: Incident) -> None:
     if not settings.LINEAR or not incident.linear_parent_issue_id:
         return
@@ -1844,6 +1874,9 @@ def on_incident_updated(
             )
 
     # --- Side effects ---
+
+    if old_title is not None or old_severity is not None or captain_changed:
+        _sync_notion_metadata(incident)
 
     # Status change: mirror the lifecycle state to the Linear parent ticket.
     if old_status is not None:

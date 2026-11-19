@@ -26,6 +26,17 @@ _NOTION_RICH_TEXT_LIMIT = 2000
 _users_cache: dict[str, dict[str, dict[str, str]]] = {}
 
 
+def extract_notion_page_id(notion_url: str) -> str | None:
+    match = re.search(
+        r"([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})(?:[/?]|$)",
+        notion_url.lower(),
+    )
+    if not match:
+        return None
+    raw = match.group(1).replace("-", "")
+    return f"{raw[:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:]}"
+
+
 class NotionService:
     @classmethod
     def is_configured(cls) -> bool:
@@ -153,7 +164,7 @@ class NotionService:
         self._users = users
         return users
 
-    def create_postmortem_page(
+    def _postmortem_properties(
         self,
         incident_number: str,
         incident_title: str,
@@ -173,10 +184,9 @@ class NotionService:
             },
             "Incident": {"url": incident_url},
             "Inc Date": {"date": {"start": incident_date.date().isoformat()}},
+            "Severity": {"select": {"name": severity} if severity else None},
+            "Incident Captain": {"people": []},
         }
-
-        if severity:
-            properties["Severity"] = {"select": {"name": severity}}
 
         if captain_email:
             notion_user = self.get_users().get(captain_email)
@@ -185,13 +195,55 @@ class NotionService:
                     "people": [{"object": "user", "id": notion_user["id"]}]
                 }
 
-        logger.debug("Creating Notion page with database_id=%r", self.database_id)
+        return properties
+
+    def create_postmortem_page(
+        self,
+        incident_number: str,
+        incident_title: str,
+        incident_url: str,
+        incident_date: datetime,
+        severity: str | None = None,
+        captain_email: str | None = None,
+    ) -> dict[str, Any]:
+        properties = self._postmortem_properties(
+            incident_number,
+            incident_title,
+            incident_url,
+            incident_date,
+            severity,
+            captain_email,
+        )
+        logger.info("Creating Notion page with database_id=%r", self.database_id)
         return cast(
             dict[str, Any],
             self.client.pages.create(
                 parent={"database_id": self.database_id},
                 properties=properties,
             ),
+        )
+
+    def update_postmortem_page(
+        self,
+        page_id: str,
+        incident_number: str,
+        incident_title: str,
+        incident_url: str,
+        incident_date: datetime,
+        severity: str | None = None,
+        captain_email: str | None = None,
+    ) -> dict[str, Any]:
+        properties = self._postmortem_properties(
+            incident_number,
+            incident_title,
+            incident_url,
+            incident_date,
+            severity,
+            captain_email,
+        )
+        return cast(
+            dict[str, Any],
+            self.client.pages.update(page_id=page_id, properties=properties),
         )
 
     def create_troubleshooting_page(
