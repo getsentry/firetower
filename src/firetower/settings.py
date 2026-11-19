@@ -466,11 +466,13 @@ LOGGING = {
 Q_CLUSTER = {
     "name": "firetower",
     "orm": "default",
-    "workers": 4,
+    "workers": 2,
     "timeout": 180,
-    "retry": 210,
-    "queue_limit": 50,
-    "bulk": 10,
+    # The ORM lease includes queued time: five claimed tasks can take three
+    # execution waves (540s), plus a minute for process turnover and acknowledgement.
+    "retry": 600,
+    "queue_limit": 2,
+    "bulk": 1,
     "cache": "qcache",
 }
 
