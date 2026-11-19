@@ -227,6 +227,51 @@ class TestIncidentWriteSerializerHooks:
         )
 
     @patch("firetower.incidents.serializers.on_incident_updated")
+    @patch("firetower.incidents.serializers.on_affected_regions_added")
+    def test_update_calls_on_affected_regions_added_with_new_regions(
+        self, mock_regions_hook, mock_updated_hook
+    ):
+        us = Tag.objects.create(name="us", type=TagType.AFFECTED_REGION)
+        Tag.objects.create(name="de", type=TagType.AFFECTED_REGION)
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        incident.affected_region_tags.add(us)
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"affected_region_tags": ["us", "de"]},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        serializer.save()
+
+        mock_regions_hook.assert_called_once_with(incident, ["de"])
+        mock_updated_hook.assert_not_called()
+
+    @patch("firetower.incidents.serializers.on_affected_regions_added")
+    def test_update_skips_regions_hook_when_no_region_added(self, mock_hook):
+        us = Tag.objects.create(name="us", type=TagType.AFFECTED_REGION)
+        incident = Incident.objects.create(
+            title="Test",
+            severity=IncidentSeverity.P1,
+            captain=self.captain,
+            reporter=self.reporter,
+        )
+        incident.affected_region_tags.add(us)
+        serializer = IncidentWriteSerializer(
+            instance=incident,
+            data={"affected_region_tags": []},
+            partial=True,
+        )
+        assert serializer.is_valid(), serializer.errors
+        serializer.save()
+
+        mock_hook.assert_not_called()
+
+    @patch("firetower.incidents.serializers.on_incident_updated")
     def test_update_calls_on_incident_updated_with_severity(self, mock_hook):
         incident = Incident.objects.create(
             title="Test",
