@@ -58,18 +58,25 @@ class TestRecentIncidentBlocks:
     def test_no_recent_incidents(self):
         assert _build_recent_incident_blocks() == []
 
-    def test_time_window_privacy_and_order(self):
+    @pytest.mark.parametrize("configured_minutes", [None, 1, 5, 30])
+    def test_time_window_privacy_and_order(self, settings, configured_minutes):
+        if configured_minutes is not None:
+            settings.SLACK = {
+                **settings.SLACK,
+                "RECENT_INCIDENT_WINDOW_MINUTES": configured_minutes,
+            }
+        window_minutes = 10 if configured_minutes is None else configured_minutes
         now = timezone.now()
         boundary = Incident.objects.create(title="Boundary", severity="P2")
         newest = Incident.objects.create(title="Newest", severity="P1")
         old = Incident.objects.create(title="Old", severity="P3")
         Incident.objects.create(title="Secret", severity="P0", is_private=True)
         Incident.objects.filter(id=boundary.id).update(
-            created_at=now - timedelta(minutes=10)
+            created_at=now - timedelta(minutes=window_minutes)
         )
         Incident.objects.filter(id=newest.id).update(created_at=now)
         Incident.objects.filter(id=old.id).update(
-            created_at=now - timedelta(minutes=10, seconds=1)
+            created_at=now - timedelta(minutes=window_minutes, seconds=1)
         )
 
         with patch(
@@ -82,9 +89,10 @@ class TestRecentIncidentBlocks:
             f"recent_incident_{newest.id}",
             f"recent_incident_{boundary.id}",
         ]
+        unit = "minute" if window_minutes == 1 else "minutes"
         assert blocks[0]["text"]["text"] == (
             ":warning: *Is this incident already being handled?*\n"
-            "These incidents were opened in the last 10 minutes. "
+            f"These incidents were opened in the last {window_minutes} {unit}. "
             "If one matches, cancel and join the existing incident. "
             "Otherwise, choose *Create anyway*."
         )

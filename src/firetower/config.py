@@ -76,6 +76,7 @@ class SlackConfig:
         "We've been alerted by {alert_url}, run incident triage for this issue."
     )
     stale_incident_nudges_enabled: bool = False
+    recent_incident_window_minutes: int = 10
 
 
 @deserialize

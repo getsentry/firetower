@@ -116,6 +116,8 @@ All configuration lives in `config.toml` (copy `config.example.toml` as a starti
 - **auth**: IAP authentication
 - **datadog**: Datadog metrics and event logging
 
+Set `recent_incident_window_minutes` in `[slack]` to control how far back the incident-creation duplicate warning looks. It defaults to `10` minutes.
+
 ## Project Structure
 
 ```

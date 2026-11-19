@@ -240,9 +240,10 @@ def _build_new_incident_modal(
 
 
 def _build_recent_incident_blocks() -> list[dict[str, Any]]:
+    window_minutes = settings.SLACK.get("RECENT_INCIDENT_WINDOW_MINUTES", 10)
     incidents = list(
         Incident.objects.filter(
-            created_at__gte=timezone.now() - timedelta(minutes=10),
+            created_at__gte=timezone.now() - timedelta(minutes=window_minutes),
             status__in=[IncidentStatus.ACTIVE, IncidentStatus.MITIGATED],
             is_private=False,
         )
@@ -269,6 +270,7 @@ def _build_recent_incident_blocks() -> list[dict[str, Any]]:
         ).values_list("user_id", "external_id")
     )
 
+    unit = "minute" if window_minutes == 1 else "minutes"
     blocks: list[dict[str, Any]] = [
         {
             "type": "section",
@@ -277,7 +279,7 @@ def _build_recent_incident_blocks() -> list[dict[str, Any]]:
                 "type": "mrkdwn",
                 "text": (
                     ":warning: *Is this incident already being handled?*\n"
-                    "These incidents were opened in the last 10 minutes. "
+                    f"These incidents were opened in the last {window_minutes} {unit}. "
                     "If one matches, cancel and join "
                     "the existing incident. Otherwise, choose *Create anyway*."
                 ),
