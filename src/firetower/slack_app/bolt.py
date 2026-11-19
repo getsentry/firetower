@@ -253,6 +253,9 @@ def _register_views(app: App) -> None:
     app.view("new_incident_modal")(
         _with_metrics("new_incident_modal")(handle_new_incident_submission)
     )
+    app.view("new_incident_confirmation_modal")(
+        _with_metrics("new_incident_confirmation_modal")(handle_new_incident_submission)
+    )
     app.view("update_incident_modal")(
         _with_metrics("update_incident_modal")(handle_update_incident_submission)
     )

@@ -57,6 +57,7 @@ password = "dummy_dev_password"  # Overridable via DJANGO_PG_PASS
 bot_token = ""  # Overridable via SLACK_BOT_TOKEN
 team_id = "<slack-team-id>"
 participant_sync_throttle_seconds = 300
+recent_incident_window_minutes = 10
 app_token = ""  # Overridable via SLACK_APP_TOKEN
 incident_feed_channel_id = ""
 always_invited_ids = []

@@ -1,8 +1,9 @@
 """Tests for config loading, env-var overrides, and required-secret validation."""
 
 import pytest
+from serde.toml import from_toml
 
-from firetower.config import ConfigError, ConfigFile
+from firetower.config import ConfigError, ConfigFile, SlackConfig
 
 # Every env var that _apply_env_overrides consults. Cleared before each test so
 # ambient secrets in the CI/dev environment can't override file values or
@@ -63,6 +64,19 @@ def test_secrets_from_file_load_cleanly() -> None:
     assert config.django_secret_key == "file-django-key"
     assert config.slack.bot_token == "file-bot"
     assert config.postgres.password == "file-pg-pass"
+
+
+@pytest.mark.parametrize("window_minutes", [None, 1, 30])
+def test_recent_incident_window_from_toml(window_minutes: int | None) -> None:
+    toml = 'team_id = "T1"\nparticipant_sync_throttle_seconds = 300\n'
+    if window_minutes is not None:
+        toml += f"recent_incident_window_minutes = {window_minutes}\n"
+
+    config = from_toml(SlackConfig, toml)
+
+    assert config.recent_incident_window_minutes == (
+        10 if window_minutes is None else window_minutes
+    )
 
 
 def test_required_secret_supplied_purely_by_env(
