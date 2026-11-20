@@ -1,5 +1,4 @@
 import logging
-import re
 import threading
 from datetime import UTC, datetime
 from typing import Any
@@ -15,7 +14,7 @@ from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import ExternalLink, ExternalLinkType, Incident
 from firetower.incidents.serializers import IncidentWriteSerializer
 from firetower.integrations.services.genai import GenAIService, parse_key_timestamps
-from firetower.integrations.services.notion import NotionService
+from firetower.integrations.services.notion import NotionService, extract_notion_page_id
 from firetower.integrations.services.slack import SlackService, is_slack_url
 from firetower.slack_app.handlers.utils import get_incident_from_channel
 
@@ -76,7 +75,7 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         # Notion API calls happen outside the transaction to avoid holding the
         # SELECT FOR UPDATE lock while making slow external requests.
         if not db_record_created and existing_url:
-            page_id = _extract_notion_page_id(existing_url)
+            page_id = extract_notion_page_id(existing_url)
             if not page_id:
                 try:
                     client.chat_postMessage(
@@ -151,6 +150,23 @@ def _trigger_slack_dump(client: Any, channel_id: str, incident: Any) -> None:
         return
 
     action = "Created" if notion_page_created else "Updated"
+
+    if update_slack:
+        try:
+            notion.update_postmortem_page(
+                page_id=page_id,
+                incident_number=incident.incident_number,
+                incident_title=incident.title,
+                incident_url=f"{settings.FIRETOWER_BASE_URL}/{incident.incident_number}",
+                incident_date=incident.created_at,
+                severity=incident.severity,
+                captain_email=incident.captain.email if incident.captain else None,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to sync Notion metadata for incident %s",
+                incident.incident_number,
+            )
 
     slack_service = SlackService()
     messages = _get_channel_messages(slack_service, channel_id)
@@ -479,14 +495,3 @@ def _download_image(url: str, slack_token: str) -> tuple[bytes, str] | None:
         sentry_sdk.capture_exception(exc)
         logger.exception("Failed to download image from %s", url)
         return None
-
-
-def _extract_notion_page_id(notion_url: str) -> str | None:
-    match = re.search(
-        r"([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})(?:[/?]|$)",
-        notion_url.lower(),
-    )
-    if not match:
-        return None
-    raw = match.group(1).replace("-", "")
-    return f"{raw[:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:]}"

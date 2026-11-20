@@ -18,6 +18,7 @@ from firetower.incidents.hooks import (
     _page_if_needed,
     _resolve_linear_user_id,
     _schedule_statuspage_reminder,
+    _sync_notion_metadata,
     build_channel_name,
     build_channel_topic,
     cancel_statuspage_followup_reminder,
@@ -3671,6 +3672,104 @@ class TestCreateLinearParentIssueBookmark:
         create_linear_parent_issue(incident, channel_id="C99999")
 
         mock_slack.add_bookmark.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestNotionMetadataSync:
+    @pytest.fixture
+    def notion(self, settings):
+        settings.NOTION = {"INTEGRATION_TOKEN": "test-token", "DATABASE_ID": "db-id"}
+        settings.FIRETOWER_BASE_URL = "https://firetower.example.com"
+        with patch("firetower.incidents.hooks.NotionService.from_settings") as factory:
+            yield factory.return_value
+
+    @pytest.fixture
+    def incident(self):
+        incident = Incident.objects.create(
+            title="Updated title", severity=IncidentSeverity.P2
+        )
+        ExternalLink.objects.create(
+            incident=incident,
+            type=ExternalLinkType.NOTION,
+            url="https://notion.so/Title-abc123def456abc123def456abc123de",
+        )
+        return incident
+
+    @pytest.mark.parametrize("has_captain", [False, True])
+    def test_refreshes_existing_metadata(self, notion, incident, has_captain):
+        if has_captain:
+            incident.captain = User.objects.create_user(
+                username="captain@sentry.io",
+                email="captain@sentry.io",
+            )
+        _sync_notion_metadata(incident)
+
+        notion.update_postmortem_page.assert_called_once_with(
+            page_id="abc123de-f456-abc1-23de-f456abc123de",
+            incident_number=incident.incident_number,
+            incident_title="Updated title",
+            incident_url=f"https://firetower.example.com/{incident.incident_number}",
+            incident_date=incident.created_at,
+            severity="P2",
+            captain_email="captain@sentry.io" if has_captain else None,
+        )
+        notion.create_postmortem_page.assert_not_called()
+
+    def test_skips_private_incidents(self, notion, incident):
+        incident.is_private = True
+        _sync_notion_metadata(incident)
+        notion.update_postmortem_page.assert_not_called()
+
+    def test_skips_when_not_configured(self, notion, incident, settings):
+        settings.NOTION = None
+        _sync_notion_metadata(incident)
+        notion.update_postmortem_page.assert_not_called()
+
+    @pytest.mark.parametrize("url", [None, "", "https://notion.so/invalid"])
+    def test_skips_missing_or_invalid_postmortem(self, notion, incident, url):
+        if url is None:
+            incident.external_links.all().delete()
+        else:
+            incident.external_links.update(url=url)
+        _sync_notion_metadata(incident)
+        notion.update_postmortem_page.assert_not_called()
+        notion.create_postmortem_page.assert_not_called()
+
+    def test_notion_failure_does_not_break_update(self, notion, incident, caplog):
+        notion.update_postmortem_page.side_effect = RuntimeError("Notion unavailable")
+        with patch("firetower.incidents.hooks._slack_service"):
+            on_incident_updated(incident, old_title="Old title")
+        assert "Failed to sync Notion metadata" in caplog.text
+
+    @pytest.mark.parametrize(
+        "changes,should_sync",
+        [
+            ({"old_title": "Old title"}, True),
+            ({"old_severity": IncidentSeverity.P1}, True),
+            ({"captain_changed": True}, True),
+            (
+                {
+                    "old_title": "Old",
+                    "old_severity": IncidentSeverity.P1,
+                    "captain_changed": True,
+                },
+                True,
+            ),
+            ({}, False),
+            ({"old_status": IncidentStatus.ACTIVE}, False),
+            ({"visibility_changed": True}, False),
+        ],
+    )
+    def test_syncs_once_for_relevant_changes(self, incident, changes, should_sync):
+        with (
+            patch("firetower.incidents.hooks._slack_service"),
+            patch("firetower.incidents.hooks._sync_notion_metadata") as sync,
+        ):
+            on_incident_updated(incident, **changes)
+        if should_sync:
+            sync.assert_called_once_with(incident)
+        else:
+            sync.assert_not_called()
 
 
 @pytest.mark.django_db

@@ -7,6 +7,7 @@ from firetower.integrations.services.notion import (
     NotionService,
     _message_to_bullet,
     _users_cache,
+    extract_notion_page_id,
 )
 
 
@@ -32,6 +33,90 @@ def notion_with_troubleshooting():
     )
     svc.client = MagicMock()
     return svc
+
+
+class TestExtractNotionPageId:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://www.notion.so/sentry/Title-abc123def456abc123def456abc123de",
+            "https://www.notion.so/abc123de-f456-abc1-23de-f456abc123de",
+            "https://www.notion.so/sentry/Title-abc123def456abc123def456abc123de/",
+            "https://www.notion.so/sentry/Title-ABC123DEF456ABC123DEF456ABC123DE?pvs=4",
+        ],
+    )
+    def test_extracts_page_id(self, url):
+        assert extract_notion_page_id(url) == "abc123de-f456-abc1-23de-f456abc123de"
+
+    def test_returns_none_for_invalid_url(self):
+        assert extract_notion_page_id("https://notion.so/no-id-here") is None
+
+
+class TestPostmortemMetadata:
+    @pytest.mark.parametrize("update", [False, True])
+    def test_sets_metadata_on_create_and_update(self, notion, update):
+        with patch.object(
+            notion,
+            "get_users",
+            return_value={
+                "captain@sentry.io": {"name": "Captain", "id": "user-id"},
+            },
+        ):
+            kwargs = {
+                "incident_number": "INC-2000",
+                "incident_title": "Database unavailable",
+                "incident_url": "https://firetower.example.com/INC-2000",
+                "incident_date": datetime(2026, 1, 2, 15, 30, tzinfo=UTC),
+                "severity": "P1",
+                "captain_email": "captain@sentry.io",
+            }
+            if update:
+                notion.update_postmortem_page(page_id="page-id", **kwargs)
+                call = notion.client.pages.update
+            else:
+                notion.create_postmortem_page(**kwargs)
+                call = notion.client.pages.create
+
+        expected = {
+            "properties": {
+                "Name": {
+                    "title": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": "[INC-2000] Database unavailable",
+                            },
+                        }
+                    ]
+                },
+                "Incident": {"url": "https://firetower.example.com/INC-2000"},
+                "Inc Date": {"date": {"start": "2026-01-02"}},
+                "Severity": {"select": {"name": "P1"}},
+                "Incident Captain": {"people": [{"object": "user", "id": "user-id"}]},
+            },
+        }
+        if update:
+            expected["page_id"] = "page-id"
+        else:
+            expected["parent"] = {"database_id": "db-id"}
+        call.assert_called_once_with(**expected)
+        notion.client.blocks.children.append.assert_not_called()
+
+    @pytest.mark.parametrize("captain_email", [None, "unknown@sentry.io"])
+    def test_clears_stale_captain_and_severity(self, notion, captain_email):
+        with patch.object(notion, "get_users", return_value={}):
+            notion.update_postmortem_page(
+                page_id="page-id",
+                incident_number="INC-2000",
+                incident_title="Updated title",
+                incident_url="https://firetower.example.com/INC-2000",
+                incident_date=datetime(2026, 1, 2, tzinfo=UTC),
+                captain_email=captain_email,
+            )
+
+        properties = notion.client.pages.update.call_args.kwargs["properties"]
+        assert properties["Incident Captain"] == {"people": []}
+        assert properties["Severity"] == {"select": None}
 
 
 class TestGetUsers:
