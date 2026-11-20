@@ -147,6 +147,26 @@ def _remind_misfiled_action_item_creators(linear: dict) -> None:
 
 
 @datadog_log
+def refresh_action_item_dashboard() -> None:
+    """Refresh all linked incidents, including old and completed incidents."""
+    if not settings.LINEAR:
+        return
+    incidents = (
+        Incident.objects.filter(linear_parent_issue_id__isnull=False)
+        .exclude(status=IncidentStatus.CANCELED)
+        .exclude(linear_parent_issue_id="")
+        .order_by("-created_at")
+    )
+    for incident in incidents.iterator():
+        try:
+            stats = sync_action_items_from_linear(incident)
+            if stats.errors:
+                logger.warning("Dashboard sync failed for incident %s", incident.id)
+        except Exception:
+            logger.exception("Dashboard sync failed for incident %s", incident.id)
+
+
+@datadog_log
 def send_action_item_reminder() -> None:
     linear = settings.LINEAR or {}
     nag_tiers = _build_nag_tiers(linear)

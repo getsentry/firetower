@@ -10,17 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AvailabilityIndexRouteImport } from './routes/availability/index'
 import { Route as IncidentIdIndexRouteImport } from './routes/$incidentId/index'
+import { Route as ActionItemsIndexRouteImport } from './routes/action-items/index'
+import { Route as AvailabilityIndexRouteImport } from './routes/availability/index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AvailabilityIndexRoute = AvailabilityIndexRouteImport.update({
-  id: '/availability/',
-  path: '/availability/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IncidentIdIndexRoute = IncidentIdIndexRouteImport.update({
@@ -28,34 +24,48 @@ const IncidentIdIndexRoute = IncidentIdIndexRouteImport.update({
   path: '/$incidentId/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ActionItemsIndexRoute = ActionItemsIndexRouteImport.update({
+  id: '/action-items/',
+  path: '/action-items/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AvailabilityIndexRoute = AvailabilityIndexRouteImport.update({
+  id: '/availability/',
+  path: '/availability/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$incidentId/': typeof IncidentIdIndexRoute
+  '/action-items/': typeof ActionItemsIndexRoute
   '/availability/': typeof AvailabilityIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$incidentId': typeof IncidentIdIndexRoute
+  '/action-items': typeof ActionItemsIndexRoute
   '/availability': typeof AvailabilityIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$incidentId/': typeof IncidentIdIndexRoute
+  '/action-items/': typeof ActionItemsIndexRoute
   '/availability/': typeof AvailabilityIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$incidentId/' | '/availability/'
+  fullPaths: '/' | '/$incidentId/' | '/action-items/' | '/availability/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$incidentId' | '/availability'
-  id: '__root__' | '/' | '/$incidentId/' | '/availability/'
+  to: '/' | '/$incidentId' | '/action-items' | '/availability'
+  id: '__root__' | '/' | '/$incidentId/' | '/action-items/' | '/availability/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   IncidentIdIndexRoute: typeof IncidentIdIndexRoute
+  ActionItemsIndexRoute: typeof ActionItemsIndexRoute
   AvailabilityIndexRoute: typeof AvailabilityIndexRoute
 }
 
@@ -68,18 +78,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/availability/': {
-      id: '/availability/'
-      path: '/availability'
-      fullPath: '/availability/'
-      preLoaderRoute: typeof AvailabilityIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/$incidentId/': {
       id: '/$incidentId/'
       path: '/$incidentId'
       fullPath: '/$incidentId/'
       preLoaderRoute: typeof IncidentIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/action-items/': {
+      id: '/action-items/'
+      path: '/action-items'
+      fullPath: '/action-items/'
+      preLoaderRoute: typeof ActionItemsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/availability/': {
+      id: '/availability/'
+      path: '/availability'
+      fullPath: '/availability/'
+      preLoaderRoute: typeof AvailabilityIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   IncidentIdIndexRoute: IncidentIdIndexRoute,
+  ActionItemsIndexRoute: ActionItemsIndexRoute,
   AvailabilityIndexRoute: AvailabilityIndexRoute,
 }
 export const routeTree = rootRouteImport
