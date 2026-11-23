@@ -101,8 +101,7 @@ repos:
       - id: check-github-workflows
         args: [--verbose]
 
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+  - repo: builtin
     hooks:
       - id: check-case-conflict
       - id: check-executables-have-shebangs
@@ -115,6 +114,10 @@ repos:
       - id: trailing-whitespace
         exclude_types: [svg]
         exclude: ^(fixtures/|scripts/patches/)
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
       - id: debug-statements
       - id: name-tests-test
         args: [--pytest-test-first]
