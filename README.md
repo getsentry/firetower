@@ -99,10 +99,10 @@ pnpm test
 
 ### Linting & Formatting
 
-Pre-commit is set up to handle all linting and formatting automatically. Install the hooks with:
+Prek is set up to handle all linting and formatting automatically. Install the hooks with:
 
 ```sh
-uv run pre-commit install
+uv run prek install --prepare-hooks -f
 ```
 
 This runs ruff, mypy, eslint, and prettier on commit, with knip on push.
