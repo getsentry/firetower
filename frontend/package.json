@@ -33,7 +33,7 @@
     "@tanstack/react-router": "^1.170.46",
     "@tanstack/zod-adapter": "^1.167.0",
     "date-fns": "^4.4.0",
-    "lucide-react": "^1.61.0",
+    "lucide-react": "^1.77.0",
     "react": "^19.3.1",
     "react-day-picker": "^10.0.2",
     "react-dom": "^19.3.1",
