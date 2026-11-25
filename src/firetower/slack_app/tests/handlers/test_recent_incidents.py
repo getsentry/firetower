@@ -1,12 +1,14 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from threading import Event
+from time import monotonic
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import InterfaceError, OperationalError
+from django.db import InterfaceError, OperationalError, connection
 from django.utils import timezone
-from slack_sdk.errors import SlackApiError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.incidents.models import Incident, IncidentSeverity, IncidentStatus
@@ -14,6 +16,7 @@ from firetower.slack_app.bolt import _register_views
 from firetower.slack_app.handlers.new_incident import (
     _build_new_incident_modal,
     _build_recent_incident_blocks,
+    _lookup_recent_incidents,
     handle_new_incident_submission,
     handle_severity_action,
 )
@@ -173,7 +176,7 @@ class TestRecentIncidentBlocks:
                 title=f"Incident {i}", severity="P1", captain=captain
             )
 
-        with django_assert_num_queries(2):
+        with django_assert_num_queries(1):
             blocks = _build_recent_incident_blocks()
 
         assert len(blocks) == 4
@@ -215,7 +218,7 @@ class TestRecentIncidentBlocks:
         assert "<!channel>" not in str(blocks)
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestRecentIncidentConfirmation:
     @patch("firetower.slack_app.handlers.new_incident._create_incident_via_db")
     def test_prompts_before_creating(self, create, recent_incident, submitted_view):
@@ -228,32 +231,23 @@ class TestRecentIncidentConfirmation:
 
         create.assert_not_called()
         client.chat_postMessage.assert_not_called()
+        client.views_update.assert_not_called()
         assert Incident.objects.count() == 1
         ack.assert_called_once()
         assert ack.call_args.kwargs["response_action"] == "update"
-        checking = ack.call_args.kwargs["view"]
-        assert checking["callback_id"] == "new_incident_confirmation_modal"
-        assert checking["submit"]["text"] == "Create anyway"
-        assert (
-            "Checking for recently opened incidents"
-            in checking["blocks"][0]["text"]["text"]
-        )
-        client.views_update.assert_called_once()
-        assert client.views_update.call_args.kwargs["view_id"] == "V_TEST"
-        confirmation = client.views_update.call_args.kwargs["view"]
+        confirmation = ack.call_args.kwargs["view"]
         assert confirmation["callback_id"] == "new_incident_confirmation_modal"
         assert confirmation["submit"]["text"] == "Create anyway"
         assert confirmation["private_metadata"] == "C_INVOKE"
         assert confirmation["blocks"][0]["block_id"] == "recent_incidents_warning"
         original_inputs = [b for b in submitted_view["blocks"] if b["type"] == "input"]
-        for modal in (checking, confirmation):
-            inputs = [b for b in modal["blocks"] if b["type"] == "input"]
-            assert [b["block_id"] for b in inputs] == [
-                b["block_id"] for b in original_inputs
-            ]
-            assert [b["element"]["action_id"] for b in inputs] == [
-                b["element"]["action_id"] for b in original_inputs
-            ]
+        inputs = [b for b in confirmation["blocks"] if b["type"] == "input"]
+        assert [b["block_id"] for b in inputs] == [
+            b["block_id"] for b in original_inputs
+        ]
+        assert [b["element"]["action_id"] for b in inputs] == [
+            b["element"]["action_id"] for b in original_inputs
+        ]
         options = next(
             b for b in confirmation["blocks"] if b.get("block_id") == "options_block"
         )
@@ -273,14 +267,14 @@ class TestRecentIncidentConfirmation:
         body = {"user": {"id": "U_REPORTER"}}
         client = MagicMock()
         handle_new_incident_submission(ack, body, submitted_view, client)
-        confirmation = client.views_update.call_args.kwargs["view"]
+        confirmation = ack.call_args.kwargs["view"]
         confirmation["state"] = submitted_view["state"]
         ack.reset_mock()
 
         with patch(
-            "firetower.slack_app.handlers.new_incident._build_recent_incident_blocks"
+            "firetower.slack_app.handlers.new_incident._check_recent_incidents"
         ) as lookup:
-            handle_new_incident_submission(ack, body, confirmation, MagicMock())
+            handle_new_incident_submission(ack, body, confirmation, client)
 
         lookup.assert_not_called()
         ack.assert_called_once_with()
@@ -300,65 +294,131 @@ class TestRecentIncidentConfirmation:
         "firetower.slack_app.handlers.new_incident._create_incident_via_db",
         return_value=None,
     )
-    def test_no_recent_incidents_shows_create_confirmation(
-        self, create, submitted_view
-    ):
+    def test_no_recent_incidents_creates_immediately(self, create, submitted_view):
         ack = MagicMock()
         client = MagicMock()
-        body = {"user": {"id": "U_REPORTER"}}
 
-        handle_new_incident_submission(ack, body, submitted_view, client)
-
-        ack.assert_called_once()
-        assert ack.call_args.kwargs["response_action"] == "update"
-        create.assert_not_called()
-        confirmation = client.views_update.call_args.kwargs["view"]
-        assert confirmation["callback_id"] == "new_incident_confirmation_modal"
-        assert confirmation["submit"]["text"] == "Create"
-        assert [b["block_id"] for b in confirmation["blocks"]] == [
-            b["block_id"] for b in submitted_view["blocks"]
-        ]
-        confirmation["state"] = submitted_view["state"]
-        ack.reset_mock()
-
-        handle_new_incident_submission(ack, body, confirmation, client)
+        handle_new_incident_submission(
+            ack, {"user": {"id": "U_REPORTER"}}, submitted_view, client
+        )
 
         ack.assert_called_once_with()
+        client.views_update.assert_not_called()
         create.assert_called_once()
 
-    @pytest.mark.parametrize("error", [OperationalError, InterfaceError])
+    @pytest.mark.parametrize("error", [OperationalError, InterfaceError, ValueError])
     @patch(
         "firetower.slack_app.handlers.new_incident._create_incident_via_db",
         return_value=None,
     )
     def test_lookup_failure_does_not_block_creation(
-        self, create, error, submitted_view
+        self, create, error, submitted_view, caplog
     ):
         ack = MagicMock()
         client = MagicMock()
-        body = {"user": {"id": "U_REPORTER"}}
-
-        def failed_lookup():
-            ack.assert_called_once()
-            raise error("Database unavailable")
-
-        with patch(
-            "firetower.slack_app.handlers.new_incident._build_recent_incident_blocks",
-            side_effect=failed_lookup,
+        with (
+            caplog.at_level("INFO"),
+            patch(
+                "firetower.slack_app.handlers.new_incident._lookup_recent_incidents",
+                side_effect=error("Lookup unavailable"),
+            ),
         ):
-            handle_new_incident_submission(ack, body, submitted_view, client)
+            handle_new_incident_submission(
+                ack, {"user": {"id": "U_REPORTER"}}, submitted_view, client
+            )
 
-        create.assert_not_called()
-        confirmation = client.views_update.call_args.kwargs["view"]
-        assert confirmation["submit"]["text"] == "Create anyway"
-        assert "Could not check" in confirmation["blocks"][0]["text"]["text"]
-        confirmation["state"] = submitted_view["state"]
-        ack.reset_mock()
+        ack.assert_called_once_with()
+        client.views_update.assert_not_called()
+        create.assert_called_once()
+        assert "Recent-incident check failed" in caplog.text
 
-        handle_new_incident_submission(ack, body, confirmation, client)
+    @patch("firetower.slack_app.handlers.new_incident._recent_incident_executor")
+    @patch(
+        "firetower.slack_app.handlers.new_incident._create_incident_via_db",
+        return_value=None,
+    )
+    def test_timeout_creates_immediately(
+        self, create, executor, submitted_view, caplog
+    ):
+        ack = MagicMock()
+        client = MagicMock()
+        future = executor.submit.return_value
+        future.result.side_effect = TimeoutError
+
+        with caplog.at_level("INFO"):
+            handle_new_incident_submission(
+                ack, {"user": {"id": "U_REPORTER"}}, submitted_view, client
+            )
+
+        future.result.assert_called_once_with(timeout=0.5)
+        future.cancel.assert_called_once_with()
+        ack.assert_called_once_with()
+        client.views_update.assert_not_called()
+        create.assert_called_once()
+        assert "exceeded 500 ms" in caplog.text
+
+    @patch("firetower.slack_app.handlers.new_incident._recent_incident_executor")
+    @patch(
+        "firetower.slack_app.handlers.new_incident._create_incident_via_db",
+        return_value=None,
+    )
+    def test_worker_submission_failure_creates_immediately(
+        self, create, executor, submitted_view
+    ):
+        executor.submit.side_effect = RuntimeError("Executor unavailable")
+        ack = MagicMock()
+
+        handle_new_incident_submission(
+            ack, {"user": {"id": "U_REPORTER"}}, submitted_view, MagicMock()
+        )
 
         ack.assert_called_once_with()
         create.assert_called_once()
+
+    @patch(
+        "firetower.slack_app.handlers.new_incident._create_incident_via_db",
+        return_value=None,
+    )
+    def test_does_not_wait_for_worker_or_apply_late_results(
+        self, create, submitted_view
+    ):
+        release = Event()
+        ack = MagicMock()
+        client = MagicMock()
+
+        def slow_lookup():
+            release.wait()
+            return [{"block_id": "recent_incidents_warning"}]
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            try:
+                with (
+                    patch(
+                        "firetower.slack_app.handlers.new_incident._recent_incident_executor",
+                        executor,
+                    ),
+                    patch(
+                        "firetower.slack_app.handlers.new_incident._lookup_recent_incidents",
+                        side_effect=slow_lookup,
+                    ),
+                    patch(
+                        "firetower.slack_app.handlers.new_incident._RECENT_INCIDENT_TIMEOUT_SECONDS",
+                        0.02,
+                    ),
+                ):
+                    started = monotonic()
+                    handle_new_incident_submission(
+                        ack, {"user": {"id": "U_REPORTER"}}, submitted_view, client
+                    )
+                    assert monotonic() - started < 1
+                    ack.assert_called_once_with()
+                    create.assert_called_once()
+            finally:
+                release.set()
+
+        ack.assert_called_once_with()
+        create.assert_called_once()
+        client.views_update.assert_not_called()
 
     @patch("firetower.slack_app.handlers.new_incident._create_fallback_channel")
     @patch(
@@ -366,7 +426,7 @@ class TestRecentIncidentConfirmation:
         side_effect=OperationalError,
     )
     @patch(
-        "firetower.slack_app.handlers.new_incident._build_recent_incident_blocks",
+        "firetower.slack_app.handlers.new_incident._lookup_recent_incidents",
         side_effect=OperationalError,
     )
     def test_db_outage_still_creates_fallback(
@@ -375,14 +435,9 @@ class TestRecentIncidentConfirmation:
         ack = MagicMock()
         client = MagicMock()
 
-        body = {"user": {"id": "U_REPORTER"}}
-        handle_new_incident_submission(ack, body, submitted_view, client)
-        fallback.assert_not_called()
-        confirmation = client.views_update.call_args.kwargs["view"]
-        confirmation["state"] = submitted_view["state"]
-        ack.reset_mock()
-
-        handle_new_incident_submission(ack, body, confirmation, client)
+        handle_new_incident_submission(
+            ack, {"user": {"id": "U_REPORTER"}}, submitted_view, client
+        )
 
         ack.assert_called_once_with()
         fallback.assert_called_once()
@@ -398,9 +453,8 @@ class TestRecentIncidentConfirmation:
     ):
         ack = MagicMock()
         body = {"user": {"id": "U_REPORTER"}}
-        check_client = MagicMock()
-        handle_new_incident_submission(ack, body, submitted_view, check_client)
-        confirmation = check_client.views_update.call_args.kwargs["view"]
+        handle_new_incident_submission(ack, body, submitted_view, MagicMock())
+        confirmation = ack.call_args.kwargs["view"]
         confirmation["id"] = "V_TEST"
         confirmation["state"] = submitted_view["state"]
         confirmation["state"]["values"]["severity_block"]["severity"][
@@ -425,91 +479,80 @@ class TestRecentIncidentConfirmation:
             "private"
         }
 
-    def test_details_step_uses_continue(self, submitted_view):
-        assert submitted_view["submit"]["text"] == "Continue"
+    def test_initial_form_uses_create(self, submitted_view):
+        assert submitted_view["submit"]["text"] == "Create"
 
-    @patch("firetower.slack_app.handlers.new_incident._create_incident_via_db")
-    def test_closed_modal_does_not_create_incident(self, create, submitted_view):
-        client = MagicMock()
-        client.views_update.side_effect = SlackApiError(
-            "Modal closed", response={"ok": False, "error": "not_found"}
-        )
-
-        handle_new_incident_submission(
-            MagicMock(), {"user": {"id": "U_REPORTER"}}, submitted_view, client
-        )
-
-        create.assert_not_called()
-        client.chat_postMessage.assert_not_called()
-
-    @patch("firetower.slack_app.handlers.new_incident._build_recent_incident_blocks")
-    @patch("firetower.slack_app.handlers.new_incident._create_incident_via_db")
-    def test_acknowledges_before_lookup(self, create, lookup, submitted_view):
-        ack = MagicMock()
-        client = MagicMock()
-
-        def delayed_lookup():
-            ack.assert_called_once()
-            assert ack.call_args.kwargs["response_action"] == "update"
-            client.views_update.assert_not_called()
-            create.assert_not_called()
-            return []
-
-        lookup.side_effect = delayed_lookup
-
-        handle_new_incident_submission(
-            ack, {"user": {"id": "U_REPORTER"}}, submitted_view, client
-        )
-
-        lookup.assert_called_once_with()
-        client.views_update.assert_called_once()
-        create.assert_not_called()
-
-    @patch("firetower.slack_app.handlers.new_incident._build_recent_incident_blocks")
+    @patch("firetower.slack_app.handlers.new_incident._check_recent_incidents")
     @patch(
         "firetower.slack_app.handlers.new_incident._create_incident_via_db",
         return_value=None,
     )
-    def test_can_create_while_lookup_is_pending(self, create, lookup, submitted_view):
+    def test_acknowledges_after_lookup_before_creation(
+        self, create, lookup, submitted_view
+    ):
         ack = MagicMock()
-        confirm_ack = MagicMock()
-        client = MagicMock()
-        client.views_update.side_effect = SlackApiError(
-            "Modal closed", response={"ok": False, "error": "not_found"}
-        )
-        body = {"user": {"id": "U_REPORTER"}}
 
-        def delayed_lookup():
-            ack.assert_called_once()
-            confirmation = ack.call_args.kwargs["view"]
-            assert confirmation["submit"]["text"] == "Create anyway"
-            confirmation["state"] = submitted_view["state"]
-            handle_new_incident_submission(confirm_ack, body, confirmation, client)
-            confirm_ack.assert_called_once_with()
-            create.assert_called_once()
+        def check():
+            ack.assert_not_called()
+            create.assert_not_called()
             return []
 
-        lookup.side_effect = delayed_lookup
+        def save(*args, **kwargs):
+            ack.assert_called_once_with()
 
-        handle_new_incident_submission(ack, body, submitted_view, client)
+        lookup.side_effect = check
+        create.side_effect = save
+
+        handle_new_incident_submission(
+            ack, {"user": {"id": "U_REPORTER"}}, submitted_view, MagicMock()
+        )
 
         lookup.assert_called_once_with()
         create.assert_called_once()
-        client.views_update.assert_called_once()
 
-    def test_severity_change_keeps_empty_confirmation(self, submitted_view):
-        view = {
-            **_build_new_incident_modal(confirmation=True),
-            "id": "V_TEST",
-            "state": submitted_view["state"],
-        }
-        client = MagicMock()
+    @patch("firetower.slack_app.handlers.new_incident._check_recent_incidents")
+    def test_invalid_title_does_not_check_recent_incidents(
+        self, lookup, submitted_view
+    ):
+        submitted_view["state"]["values"]["title_block"]["title"]["value"] = ""
+        ack = MagicMock()
 
-        handle_severity_action(MagicMock(), {"view": view}, client)
+        handle_new_incident_submission(
+            ack, {"user": {"id": "U_REPORTER"}}, submitted_view, MagicMock()
+        )
 
-        updated = client.views_update.call_args.kwargs["view"]
-        assert updated["callback_id"] == "new_incident_confirmation_modal"
-        assert updated["submit"]["text"] == "Create"
+        ack.assert_called_once_with(
+            response_action="errors",
+            errors={"title_block": "This field is required."},
+        )
+        lookup.assert_not_called()
+
+
+@pytest.mark.django_db(transaction=True)
+class TestRecentIncidentQueryTimeout:
+    def test_slow_query_is_canceled_and_connection_recovers(self):
+        def slow_query():
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_sleep(5)")
+
+        started = monotonic()
+        with (
+            patch(
+                "firetower.slack_app.handlers.new_incident._build_recent_incident_blocks",
+                side_effect=slow_query,
+            ),
+            pytest.raises(OperationalError, match="statement timeout"),
+        ):
+            _lookup_recent_incidents()
+
+        assert monotonic() - started < 2
+        with connection.cursor() as cursor:
+            cursor.execute("SHOW statement_timeout")
+            assert cursor.fetchone()[0] == "0"
+
+    def test_success_closes_worker_connection(self, recent_incident):
+        assert _lookup_recent_incidents()
+        assert connection.connection is None
 
 
 def test_confirmation_handler_is_registered():
