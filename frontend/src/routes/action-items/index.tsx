@@ -70,7 +70,7 @@ function ActionItemsDashboard() {
 
   return (
     <div {...stylex.props(styles.page)}>
-      <header {...stylex.props(styles.header)}>
+      <header>
         <div>
           <h1 {...stylex.props(styles.title)}>Action items</h1>
           <p {...stylex.props(styles.muted)}>
@@ -79,7 +79,14 @@ function ActionItemsDashboard() {
             contribute to this page if there's something you want to see.
           </p>
         </div>
-        <div {...stylex.props(styles.controls)}>
+      </header>
+      <div
+        role="group"
+        aria-label="Dashboard filters"
+        aria-describedby="action-item-scope"
+        {...stylex.props(styles.filterRow)}
+      >
+        <div {...stylex.props(styles.controls, styles.filterControls)}>
           <SearchableSelect
             label="Time range"
             value={search.time_range ?? 'all'}
@@ -125,26 +132,26 @@ function ActionItemsDashboard() {
             {isFetching ? 'Refreshing…' : 'Refresh dashboard'}
           </Button>
         </div>
-      </header>
-      <p {...stylex.props(styles.muted)}>
-        Scope: follow-ups created in Linear{' '}
-        {data.time_range.start ? (
-          <>
-            since{' '}
-            <time dateTime={data.time_range.start}>
-              {new Date(data.time_range.start).toLocaleString(undefined, {
-                timeZone: 'UTC',
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              })}
-            </time>{' '}
-            UTC. Older open and overdue work is excluded; choose All time for the full
-            backlog.
-          </>
-        ) : (
-          'across all time, including the full open backlog.'
-        )}
-      </p>
+        <p id="action-item-scope" {...stylex.props(styles.muted, styles.scope)}>
+          Scope: follow-ups created in Linear{' '}
+          {data.time_range.start ? (
+            <>
+              since{' '}
+              <time dateTime={data.time_range.start}>
+                {new Date(data.time_range.start).toLocaleString(undefined, {
+                  timeZone: 'UTC',
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                })}
+              </time>{' '}
+              UTC. Older open and overdue work is excluded; choose All time for the full
+              backlog.
+            </>
+          ) : (
+            'across all time, including the full open backlog.'
+          )}
+        </p>
+      </div>
       {isRefetchError ? (
         <p role="alert" {...stylex.props(styles.warningBox)}>
           Refresh failed. Showing the previous snapshot; try again.

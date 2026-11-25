@@ -270,6 +270,25 @@ describe('Action item dashboard', () => {
     expect(screen.getByText('75%')).toBeInTheDocument();
   });
 
+  it('groups the left-leading filters and their scope description below the introduction', async () => {
+    await renderRoute();
+    const filters = screen.getByRole('group', {name: 'Dashboard filters'});
+    const timeRange = within(filters).getByRole('combobox', {name: 'Time range'});
+    const scope = within(filters).getByText(/^Scope:/);
+    expect(filters).toHaveAccessibleDescription(scope.textContent);
+    expect(
+      within(filters).getByRole('group', {name: 'Incident severity'})
+    ).toBeInTheDocument();
+    expect(
+      within(filters).getByRole('button', {name: 'Refresh dashboard'})
+    ).toBeInTheDocument();
+    expect(filters.firstElementChild).toContainElement(timeRange);
+    expect(filters.lastElementChild).toBe(scope);
+    expect(
+      screen.getByRole('heading', {name: 'Action items'}).closest('header')
+    ).not.toContainElement(filters);
+  });
+
   it('links directly to Linear and incident details and explains risk signals', async () => {
     await renderRoute();
     expect(

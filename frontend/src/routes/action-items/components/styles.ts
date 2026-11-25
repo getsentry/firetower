@@ -11,13 +11,14 @@ import {
 
 export const styles = stylex.create({
   page: {display: 'flex', flexDirection: 'column', gap: space.xl, lineHeight: 1.5},
-  header: {
+  filterRow: {
     display: 'flex',
     flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'baseline',
     gap: space.xl,
   },
+  filterControls: {flexShrink: 0, maxWidth: '100%'},
+  scope: {flex: '1 1 24rem', minWidth: 0},
   title: {fontSize: fontSize['2xl'], fontWeight: 600, color: content.headings},
   muted: {color: content.secondary, fontSize: fontSize.sm},
   controls: {display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: space.md},
