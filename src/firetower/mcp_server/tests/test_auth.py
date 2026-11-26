@@ -1,7 +1,9 @@
 """Tests for the @sentry.io Workspace gate (Hop 1), incl. signature verification."""
 
 import asyncio
+import json
 import time
+import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -9,11 +11,18 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastmcp.exceptions import FastMCPError
+from fastmcp.server.auth import IdentityAssertion
+from fastmcp.server.auth.identity_assertion import IdentityAssertionError
+from jwt.algorithms import RSAAlgorithm
 
 from firetower.mcp_server import auth
 from firetower.mcp_server.auth import (
     ACCESS_GROUP,
+    CooldownIdentityAssertionValidator,
+    CooldownJWTVerifier,
     SentryGoogleProvider,
+    requester_email,
+    requester_subject,
     require_sentry_account,
 )
 
@@ -342,8 +351,9 @@ def test_init_requires_client_id():
 
 
 class _FakeToken:
-    def __init__(self, claims: dict):
+    def __init__(self, claims: dict, subject: str | None = None):
         self.claims = claims
+        self.subject = subject
 
 
 def test_fallback_admits_sentry(monkeypatch):
@@ -409,3 +419,203 @@ def test_fallback_rejects_when_no_token(monkeypatch):
     monkeypatch.setattr(auth, "get_access_token", lambda: None)
     with pytest.raises(FastMCPError):
         require_sentry_account()
+
+
+@pytest.mark.parametrize(
+    ("subject", "audit_subject"),
+    [
+        ("user:user-123", "bot:user:user-123"),
+        ("system:scheduled-automation", "bot:system:scheduled-automation"),
+    ],
+)
+def test_fallback_admits_bot_grant_and_audits_attributed_subject(
+    monkeypatch, subject, audit_subject
+):
+    monkeypatch.setattr(
+        auth,
+        "get_access_token",
+        lambda: _FakeToken({"fastmcp_grant": "id_jag"}, subject=subject),
+    )
+    require_sentry_account()  # no raise
+    assert requester_subject() == audit_subject
+    assert requester_email() is None
+
+
+BOT_ISSUER = "https://junior.example"
+BOT_AUDIENCE = "https://mcp.example/"
+BOT_CLIENT_ID = "bot-client"
+BOT_RESOURCE = "https://mcp.example/mcp"
+
+
+def _jwk(key: rsa.RSAPrivateKey, kid: str) -> dict:
+    return json.loads(RSAAlgorithm.to_jwk(key.public_key())) | {
+        "kid": kid,
+        "alg": "RS256",
+        "use": "sig",
+    }
+
+
+def _bot_assertion(
+    key: rsa.RSAPrivateKey, kid: str, subject: str = "user:user-123"
+) -> str:
+    now = int(time.time())
+    return jwt.encode(
+        {
+            "iss": BOT_ISSUER,
+            "sub": subject,
+            "aud": BOT_AUDIENCE,
+            "iat": now,
+            "exp": now + 300,
+            "jti": str(uuid.uuid4()),
+            "client_id": BOT_CLIENT_ID,
+            "resource": BOT_RESOURCE,
+        },
+        key,
+        algorithm="RS256",
+        headers={"kid": kid, "typ": "oauth-id-jag+jwt"},
+    )
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+class _JWKS:
+    """Counts JWKS fetches; ``delay`` lets concurrent callers overlap."""
+
+    def __init__(self, *jwks: dict, delay: float = 0) -> None:
+        self.keys = list(jwks)
+        self.delay = delay
+        self.fetches = 0
+
+    async def __call__(self) -> dict:
+        self.fetches += 1
+        if self.delay:
+            await asyncio.sleep(self.delay)
+        return {"keys": list(self.keys)}
+
+
+def _cooldown_verifier(jwks: _JWKS, clock: _Clock) -> CooldownJWTVerifier:
+    verifier = CooldownJWTVerifier(
+        jwks_uri=f"{BOT_ISSUER}/jwks.json",
+        issuer=BOT_ISSUER,
+        audience=BOT_AUDIENCE,
+        algorithm="RS256",
+        refresh_cooldown_seconds=30,
+        clock=clock,
+    )
+    verifier._fetch_jwks = jwks  # type: ignore[method-assign]
+    return verifier
+
+
+def _identity_assertion_validator(jwks: _JWKS) -> CooldownIdentityAssertionValidator:
+    validator = CooldownIdentityAssertionValidator(
+        config=IdentityAssertion(
+            trusted_issuers=[BOT_ISSUER],
+            jwks_uris={BOT_ISSUER: f"{BOT_ISSUER}/jwks.json"},
+        ),
+        audience=BOT_AUDIENCE,
+    )
+    validator._verifiers[BOT_ISSUER] = _cooldown_verifier(jwks, _Clock())
+    return validator
+
+
+@pytest.mark.parametrize("subject", ["user:user-123", "system:scheduled-automation"])
+def test_identity_assertion_validator_admits_attributed_subjects(subject):
+    validator = _identity_assertion_validator(_JWKS(_jwk(_KEY, "current")))
+
+    claims = asyncio.run(
+        validator.validate(
+            _bot_assertion(_KEY, "current", subject),
+            client_id=BOT_CLIENT_ID,
+            resource_url=BOT_RESOURCE,
+        )
+    )
+
+    assert claims["sub"] == subject
+
+
+@pytest.mark.parametrize(
+    "subject",
+    [
+        "firetower",
+        "user:",
+        "bot:user-123",
+        "user:user-123\nforged-log-line",
+        f"user:{'a' * 201}",
+    ],
+)
+def test_identity_assertion_validator_rejects_unattributed_subjects(subject):
+    validator = _identity_assertion_validator(_JWKS(_jwk(_KEY, "current")))
+
+    with pytest.raises(IdentityAssertionError, match="Junior user or system actor"):
+        asyncio.run(
+            validator.validate(
+                _bot_assertion(_KEY, "current", subject),
+                client_id=BOT_CLIENT_ID,
+                resource_url=BOT_RESOURCE,
+            )
+        )
+
+
+def test_cooldown_verifier_limits_unknown_kid_refreshes_and_keeps_known_keys_fast():
+    jwks = _JWKS(_jwk(_KEY, "current"))
+    verifier = _cooldown_verifier(jwks, _Clock())
+
+    async def run() -> list:
+        known = await verifier.load_access_token(_bot_assertion(_KEY, "current"))
+        unknown = [
+            await verifier.load_access_token(_bot_assertion(_OTHER_KEY, f"random-{i}"))
+            for i in range(5)
+        ]
+        known_again = await verifier.load_access_token(_bot_assertion(_KEY, "current"))
+        return [known, *unknown, known_again]
+
+    known, *unknown, known_again = asyncio.run(run())
+
+    assert known is not None and known.claims["sub"] == "user:user-123"
+    assert unknown == [None] * 5
+    assert known_again is not None
+    assert jwks.fetches == 1
+
+
+def test_cooldown_verifier_loads_rotated_key_after_cooldown():
+    clock = _Clock()
+    jwks = _JWKS(_jwk(_KEY, "old"))
+    verifier = _cooldown_verifier(jwks, clock)
+    rotated = _bot_assertion(_OTHER_KEY, "new")
+
+    async def run() -> tuple:
+        await verifier.load_access_token(_bot_assertion(_KEY, "old"))
+        jwks.keys = [_jwk(_KEY, "old"), _jwk(_OTHER_KEY, "new")]
+        clock.now += 10
+        during_cooldown = await verifier.load_access_token(rotated)
+        clock.now += 21
+        after_cooldown = await verifier.load_access_token(rotated)
+        return during_cooldown, after_cooldown
+
+    during_cooldown, after_cooldown = asyncio.run(run())
+
+    assert during_cooldown is None
+    assert after_cooldown is not None
+    assert jwks.fetches == 2
+
+
+def test_cooldown_verifier_serializes_concurrent_unknown_kid_refreshes():
+    jwks = _JWKS(_jwk(_KEY, "current"), delay=0.05)
+    verifier = _cooldown_verifier(jwks, _Clock())
+
+    async def run() -> list:
+        return await asyncio.gather(
+            *(
+                verifier.load_access_token(_bot_assertion(_OTHER_KEY, f"random-{i}"))
+                for i in range(10)
+            )
+        )
+
+    assert asyncio.run(run()) == [None] * 10
+    assert jwks.fetches == 1
