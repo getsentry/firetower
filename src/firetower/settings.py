@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -51,18 +52,43 @@ config: ConfigFile = (
 
 if not env_is_dev():
     import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
 
     sentry_sdk.init(
         dsn=config.sentry_dsn,
-        send_default_pii=False,
+        data_collection={
+            "user_info": False,
+            "http_bodies": ["incoming_request"],
+            "graphql": {"document": False, "variables": False},
+            "gen_ai": {"inputs": False, "outputs": False},
+            "mcp": {"inputs": False, "outputs": False},
+            "database_query_data": False,
+            "queues": False,
+            "http_headers": {
+                "request": {
+                    "mode": "denylist",
+                    "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+                },
+            },
+            "cookies": {
+                "mode": "denylist",
+                "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+            },
+            "url_query_params": {
+                "mode": "denylist",
+                "terms": ["forwarded", "-ip", "remote-", "via", "-user"],
+            },
+            "stack_frame_variables": {"mode": "denylist"},
+        },
+        attach_stacktrace=False,
         environment=os.environ.get("DJANGO_ENV", "unknown"),
         traces_sample_rate=1.0,
-        profiles_sample_rate=0.25,
-        enable_logs=True,
         trace_propagation_targets=[],
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        integrations=[
+            DjangoIntegration(cache_spans=False),
+            LoggingIntegration(event_level=logging.ERROR),
+        ],
     )
 
     # Tag every event/log with the deployment's incident key. Environments share
