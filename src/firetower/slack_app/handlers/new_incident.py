@@ -1,12 +1,19 @@
 import logging
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
-from django.db import InterfaceError, OperationalError, close_old_connections
+from django.db import (
+    InterfaceError,
+    OperationalError,
+    close_old_connections,
+    connection,
+    transaction,
+)
+from django.db.models import OuterRef, Subquery
 from django.utils import timezone
-from slack_sdk.errors import SlackApiError
 
 from firetower.auth.models import ExternalProfile, ExternalProfileType
 from firetower.auth.services import get_or_create_user_from_slack_id
@@ -33,6 +40,10 @@ from firetower.slack_app.handlers.utils import (
 
 logger = logging.getLogger(__name__)
 _slack_service = SlackService()
+_RECENT_INCIDENT_TIMEOUT_SECONDS = 0.5
+_recent_incident_executor = ThreadPoolExecutor(
+    max_workers=2, thread_name_prefix="recent-incidents"
+)
 
 
 def _create_fallback_channel(
@@ -218,7 +229,7 @@ def _build_new_incident_modal(
 
     blocks.append(_build_options_block(severity, selected_values=selected_options))
 
-    submit_text = "Create" if confirmation else "Continue"
+    submit_text = "Create"
     if recent_incident_blocks:
         blocks = recent_incident_blocks + blocks
         confirmation = True
@@ -248,6 +259,13 @@ def _build_recent_incident_blocks() -> list[dict[str, Any]]:
             is_private=False,
         )
         .select_related("captain")
+        .annotate(
+            captain_slack_id=Subquery(
+                ExternalProfile.objects.filter(
+                    user_id=OuterRef("captain_id"), type=ExternalProfileType.SLACK
+                ).values("external_id")[:1]
+            )
+        )
         .only(
             "id",
             "title",
@@ -260,15 +278,6 @@ def _build_recent_incident_blocks() -> list[dict[str, Any]]:
     )
     if not incidents:
         return []
-
-    captain_slack_ids = dict(
-        ExternalProfile.objects.filter(
-            user_id__in={
-                incident.captain_id for incident in incidents if incident.captain_id
-            },
-            type=ExternalProfileType.SLACK,
-        ).values_list("user_id", "external_id")
-    )
 
     unit = "minute" if window_minutes == 1 else "minutes"
     blocks: list[dict[str, Any]] = [
@@ -294,17 +303,40 @@ def _build_recent_incident_blocks() -> list[dict[str, Any]]:
                 "type": "mrkdwn",
                 "text": build_channel_topic(
                     incident,
-                    captain_slack_id=(
-                        captain_slack_ids.get(incident.captain_id, "")
-                        if incident.captain_id is not None
-                        else ""
-                    ),
+                    captain_slack_id=incident.captain_slack_id or "",
                 ),
             },
         }
         for incident in incidents
     )
     return blocks
+
+
+def _lookup_recent_incidents() -> list[dict[str, Any]]:
+    """Use a worker-owned connection and cancel slow queries on the server."""
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL statement_timeout = '500ms'")
+            return _build_recent_incident_blocks()
+    finally:
+        connection.close()
+
+
+def _check_recent_incidents() -> list[dict[str, Any]]:
+    future = None
+    try:
+        future = _recent_incident_executor.submit(_lookup_recent_incidents)
+        return future.result(timeout=_RECENT_INCIDENT_TIMEOUT_SECONDS)
+    except TimeoutError:
+        if future is not None:
+            future.cancel()
+        logger.info("Recent-incident check exceeded 500 ms; proceeding with creation")
+    except Exception:
+        logger.info(
+            "Recent-incident check failed; proceeding with creation", exc_info=True
+        )
+    return []
 
 
 ACTION_ID_TO_TAG_TYPE = {
@@ -518,73 +550,24 @@ def handle_new_incident_submission(
     slack_user_id = body.get("user", {}).get("id", "")
 
     if view.get("callback_id") == "new_incident_modal":
-        selected_severity = (
-            values.get("severity_block", {}).get("severity", {}).get("selected_option")
-        )
-        confirmation_view = _build_new_incident_modal(
-            channel_id=view.get("private_metadata", ""),
-            user_id=slack_user_id,
-            severity=selected_severity["value"] if selected_severity else "",
-            selected_options=selected_values,
-            confirmation=True,
-        )
-        check_notice: dict[str, Any] = {
-            "type": "section",
-            "block_id": "recent_incidents_check",
-            "text": {
-                "type": "mrkdwn",
-                "text": (
-                    "Checking for recently opened incidents. "
-                    "If this is urgent, choose *Create anyway* without waiting."
-                ),
-            },
-        }
-        ack(
-            response_action="update",
-            view={
-                **confirmation_view,
-                "submit": {"type": "plain_text", "text": "Create anyway"},
-                "blocks": [check_notice, *confirmation_view["blocks"]],
-            },
-        )
-
-        try:
-            recent_incident_blocks = _build_recent_incident_blocks()
-        except (OperationalError, InterfaceError):
-            logger.exception("Could not check for recent incidents before creation")
-            recent_incident_blocks = [
-                {
-                    **check_notice,
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": (
-                            "Could not check for recently opened incidents. "
-                            "You can still choose *Create anyway*."
-                        ),
-                    },
-                }
-            ]
-
-        try:
-            client.views_update(
-                view_id=view["id"],
-                view={
-                    **confirmation_view,
-                    "submit": {
-                        "type": "plain_text",
-                        "text": "Create anyway" if recent_incident_blocks else "Create",
-                    },
-                    "blocks": [*recent_incident_blocks, *confirmation_view["blocks"]],
-                },
+        recent_incident_blocks = _check_recent_incidents()
+        if recent_incident_blocks:
+            selected_severity = (
+                values.get("severity_block", {})
+                .get("severity", {})
+                .get("selected_option")
             )
-        except SlackApiError as exc:
-            if exc.response.get("error") == "not_found":
-                logger.info(
-                    "Incident modal closed before recent-incident check completed"
-                )
-            else:
-                logger.exception("Could not update recent-incident confirmation")
-        return
+            ack(
+                response_action="update",
+                view=_build_new_incident_modal(
+                    channel_id=view.get("private_metadata", ""),
+                    user_id=slack_user_id,
+                    severity=selected_severity["value"] if selected_severity else "",
+                    selected_options=selected_values,
+                    recent_incident_blocks=recent_incident_blocks,
+                ),
+            )
+            return
 
     ack()
 
