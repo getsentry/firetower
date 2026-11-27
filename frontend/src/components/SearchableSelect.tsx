@@ -2,9 +2,10 @@ import {useEffect, useId, useRef, useState} from 'react';
 import * as stylex from '@stylexjs/stylex';
 import {Check, ChevronDown} from 'lucide-react';
 
+import type {StyledProps} from '../styles/props';
 import {background, content, fontSize, radius, space} from '../styles/tokens.stylex';
 
-import {Button} from './Button';
+import {buttonStyles} from './buttonStyles';
 import {Input} from './Input';
 import {Popover, PopoverContent, PopoverTrigger} from './Popover';
 
@@ -14,7 +15,7 @@ export interface SelectOption<T extends string> {
   description?: string;
 }
 
-interface SearchableSelectProps<T extends string> {
+interface SearchableSelectProps<T extends string> extends StyledProps<object> {
   label: string;
   value: T;
   options: readonly SelectOption<T>[];
@@ -27,6 +28,7 @@ export function SearchableSelect<T extends string>({
   value,
   options,
   onChange,
+  style,
   placeholder = 'Select…',
 }: SearchableSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
@@ -64,9 +66,8 @@ export function SearchableSelect<T extends string>({
   return (
     <Popover open={isOpen} onOpenChange={openChange}>
       <PopoverTrigger asChild>
-        <Button
-          variant="secondary"
-          size="sm"
+        <button
+          type="button"
           role="combobox"
           aria-label={label}
           aria-expanded={isOpen}
@@ -78,11 +79,15 @@ export function SearchableSelect<T extends string>({
               openChange(true);
             }
           }}
-          style={styles.trigger}
+          {...stylex.props(
+            buttonStyles({variant: 'secondary', size: 'sm'}),
+            styles.trigger,
+            style
+          )}
         >
           <span {...stylex.props(styles.value)}>{selected?.label ?? placeholder}</span>
           <ChevronDown size={14} aria-hidden="true" {...stylex.props(styles.chevron)} />
-        </Button>
+        </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"

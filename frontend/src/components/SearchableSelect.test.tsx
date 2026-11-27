@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import * as stylex from '@stylexjs/stylex';
 import {render, screen} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {describe, expect, it, vi} from 'vitest';
@@ -10,6 +11,8 @@ const OPTIONS = [
   {value: 'eng', label: 'Engineering', description: 'ENG · 4 open'},
   {value: 'infra', label: 'Infrastructure', description: 'INFRA · 2 open'},
 ];
+
+const styles = stylex.create({height: (height: number) => ({height})});
 
 function Example({onChange}: {onChange: (value: string) => void}) {
   const [value, setValue] = useState('all');
@@ -33,6 +36,21 @@ function setup() {
 }
 
 describe('SearchableSelect', () => {
+  it('merges composed caller styles onto the trigger', () => {
+    render(
+      <SearchableSelect
+        label="Team"
+        value="all"
+        options={OPTIONS}
+        onChange={vi.fn()}
+        style={[styles.height(44)]}
+      />
+    );
+    expect(screen.getByRole('combobox', {name: 'Team'}).getAttribute('style')).toContain(
+      '44px'
+    );
+  });
+
   it('uses one button surface without an inset tag and focuses a searchable listbox', async () => {
     const {user} = setup();
     const trigger = screen.getByRole('combobox', {name: 'Team'});
