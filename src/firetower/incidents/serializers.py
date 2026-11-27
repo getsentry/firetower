@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Any
 
 from django.conf import settings
@@ -13,6 +12,7 @@ from rest_framework import serializers
 from firetower.auth.serializers import UserSerializer
 from firetower.auth.services import get_or_create_user_from_email
 
+from .action_item_periods import TIME_RANGES
 from .allocation import (
     AllocatedIdentity,
     adopt_on_create_enabled,
@@ -785,13 +785,6 @@ class TagCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(e.message_dict)
 
 
-def _get_action_item_slo_days() -> dict[int, int]:
-    linear = getattr(settings, "LINEAR", None) or {}
-    high = linear.get("ACTION_ITEM_SLO_DAYS_HIGH_PRIORITY", 0)
-    medium = linear.get("ACTION_ITEM_SLO_DAYS_MEDIUM_PRIORITY", 0)
-    return {1: high, 2: high, 3: medium}
-
-
 class ActionItemSerializer(serializers.ModelSerializer):
     assignee_name = serializers.SerializerMethodField()
     assignee_avatar_url = serializers.SerializerMethodField()
@@ -822,11 +815,65 @@ class ActionItemSerializer(serializers.ModelSerializer):
         return None
 
     def get_slo_deadline(self, obj: ActionItem) -> str | None:
-        slo_days = _get_action_item_slo_days().get(obj.priority)
-        if not slo_days:
-            return None
-        deadline = obj.created_at + timedelta(days=slo_days)
-        return deadline.isoformat()
+        deadline = obj.deadline
+        return deadline.isoformat() if deadline else None
+
+
+class ActionItemDashboardQuerySerializer(serializers.Serializer):
+    time_range = serializers.ChoiceField(choices=TIME_RANGES, default="all")
+    severity = serializers.ChoiceField(
+        choices=["P0", "P1", "P2", "P3", "P4"], required=False
+    )
+    view = serializers.ChoiceField(
+        choices=[
+            "attention",
+            "open",
+            "overdue",
+            "due_soon",
+            "stalled",
+            "unassigned",
+            "no_priority",
+        ],
+        default="attention",
+    )
+    team = serializers.CharField(max_length=36, required=False)
+    q = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    page = serializers.IntegerField(min_value=1, max_value=100000, default=1)
+
+    def validate_team(self, value: str) -> str:
+        if value == "unknown":
+            return value
+        return str(serializers.UUIDField().run_validation(value))
+
+
+class DashboardActionItemSerializer(ActionItemSerializer):
+    incident_id = serializers.CharField(source="incident.incident_number")
+    incident_title = serializers.CharField(source="incident.title")
+    incident_severity = serializers.CharField(source="incident.severity")
+    deadline_source = serializers.CharField(read_only=True, allow_null=True)
+    due_date = serializers.DateField(
+        source="linear_due_date", read_only=True, allow_null=True
+    )
+
+    class Meta(ActionItemSerializer.Meta):
+        fields = [
+            *[
+                field
+                for field in ActionItemSerializer.Meta.fields
+                if not field.startswith("assignee_")
+            ],
+            "id",
+            "incident_id",
+            "incident_title",
+            "incident_severity",
+            "linear_team_id",
+            "linear_team_key",
+            "linear_team_name",
+            "deadline_source",
+            "due_date",
+            "created_at",
+            "linear_updated_at",
+        ]
 
 
 class IncidentOrRedirectReadSerializer(serializers.Serializer):
