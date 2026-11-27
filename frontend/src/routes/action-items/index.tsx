@@ -86,6 +86,25 @@ function ActionItemsDashboard() {
         aria-describedby="action-item-scope"
         {...stylex.props(styles.filterRow)}
       >
+        <p id="action-item-scope" {...stylex.props(styles.muted, styles.scope)}>
+          Scope: follow-ups created in Linear{' '}
+          {data.time_range.start ? (
+            <>
+              since{' '}
+              <time dateTime={data.time_range.start}>
+                {new Date(data.time_range.start).toLocaleString(undefined, {
+                  timeZone: 'UTC',
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                })}
+              </time>{' '}
+              UTC. Older open and overdue work is excluded; choose All time for the full
+              backlog.
+            </>
+          ) : (
+            'across all time, including the full open backlog.'
+          )}
+        </p>
         <div {...stylex.props(styles.controls, styles.filterControls)}>
           <SearchableSelect
             label="Time range"
@@ -132,25 +151,6 @@ function ActionItemsDashboard() {
             {isFetching ? 'Refreshing…' : 'Refresh dashboard'}
           </Button>
         </div>
-        <p id="action-item-scope" {...stylex.props(styles.muted, styles.scope)}>
-          Scope: follow-ups created in Linear{' '}
-          {data.time_range.start ? (
-            <>
-              since{' '}
-              <time dateTime={data.time_range.start}>
-                {new Date(data.time_range.start).toLocaleString(undefined, {
-                  timeZone: 'UTC',
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })}
-              </time>{' '}
-              UTC. Older open and overdue work is excluded; choose All time for the full
-              backlog.
-            </>
-          ) : (
-            'across all time, including the full open backlog.'
-          )}
-        </p>
       </div>
       {isRefetchError ? (
         <p role="alert" {...stylex.props(styles.warningBox)}>

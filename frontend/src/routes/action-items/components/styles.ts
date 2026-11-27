@@ -17,7 +17,12 @@ export const styles = stylex.create({
     alignItems: 'baseline',
     gap: space.xl,
   },
-  filterControls: {flexShrink: 0, maxWidth: '100%'},
+  filterControls: {
+    flexShrink: 0,
+    maxWidth: '100%',
+    marginInlineStart: 'auto',
+    justifyContent: 'flex-end',
+  },
   scope: {flex: '1 1 24rem', minWidth: 0},
   title: {fontSize: fontSize['2xl'], fontWeight: 600, color: content.headings},
   muted: {color: content.secondary, fontSize: fontSize.sm},

@@ -270,7 +270,7 @@ describe('Action item dashboard', () => {
     expect(screen.getByText('75%')).toBeInTheDocument();
   });
 
-  it('groups the left-leading filters and their scope description below the introduction', async () => {
+  it('groups scope before the right-aligned filters below the introduction', async () => {
     await renderRoute();
     const filters = screen.getByRole('group', {name: 'Dashboard filters'});
     const timeRange = within(filters).getByRole('combobox', {name: 'Time range'});
@@ -282,8 +282,8 @@ describe('Action item dashboard', () => {
     expect(
       within(filters).getByRole('button', {name: 'Refresh dashboard'})
     ).toBeInTheDocument();
-    expect(filters.firstElementChild).toContainElement(timeRange);
-    expect(filters.lastElementChild).toBe(scope);
+    expect(filters.firstElementChild).toBe(scope);
+    expect(filters.lastElementChild).toContainElement(timeRange);
     expect(
       screen.getByRole('heading', {name: 'Action items'}).closest('header')
     ).not.toContainElement(filters);
