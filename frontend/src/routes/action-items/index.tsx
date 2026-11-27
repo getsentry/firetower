@@ -152,6 +152,24 @@ function ActionItemsDashboard() {
           </Button>
         </div>
       </div>
+      {data.freshness.outside_refresh_window_incidents > 0 ? (
+        <p {...stylex.props(styles.muted)}>
+          {data.freshness.outside_refresh_window_incidents} linked incident
+          {data.freshness.outside_refresh_window_incidents === 1 ? '' : 's'} created
+          before{' '}
+          <time dateTime={data.freshness.auto_refresh_cutoff}>
+            {new Date(data.freshness.auto_refresh_cutoff).toLocaleString(undefined, {
+              timeZone: 'UTC',
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+          </time>{' '}
+          UTC {data.freshness.outside_refresh_window_incidents === 1 ? 'is' : 'are'}{' '}
+          outside the {data.freshness.auto_refresh_months}-month automatic refresh window.
+          Older cached follow-ups remain available; use the incident's Sync action items
+          button to update them.
+        </p>
+      ) : null}
       {isRefetchError ? (
         <p role="alert" {...stylex.props(styles.warningBox)}>
           Refresh failed. Showing the previous snapshot; try again.
@@ -160,21 +178,26 @@ function ActionItemsDashboard() {
       {freshnessIssues > 0 ||
       data.summary.unknown_activity > 0 ||
       data.summary.unknown_team > 0 ? (
-        <p role="status" {...stylex.props(styles.warningBox)}>
-          Sync coverage across all visible incidents may be incomplete:{' '}
-          {data.freshness.unsynced_incidents} linked incidents have never synced,{' '}
-          {data.freshness.stale_incidents} have not synced in 24h, and{' '}
-          {data.summary.unknown_activity} open follow-ups have no activity timestamp.{' '}
-          {data.summary.unknown_team} open follow-ups have no Linear team metadata yet.
-          The hourly Linear sync fills these in. Open an incident to sync it individually.
+        <p
+          role="status"
+          aria-label="Action item data freshness"
+          {...stylex.props(styles.warningBox)}
+        >
+          Automatic sync coverage for incidents created in the last{' '}
+          {data.freshness.auto_refresh_months} months: {data.freshness.unsynced_incidents}{' '}
+          never synced; {data.freshness.stale_incidents} not synced in 24h. Selected open
+          follow-ups missing activity timestamps: {data.summary.unknown_activity}; missing
+          Linear team metadata: {data.summary.unknown_team}. Open an incident and use Sync
+          action items to update its cached data.
         </p>
       ) : null}
       {isEmpty ? (
         <Card style={styles.card}>
           <h2 {...stylex.props(styles.heading)}>No synced follow-ups yet</h2>
           <p {...stylex.props(styles.muted)}>
-            Create child issues under an incident's Linear ticket. They will appear after
-            the next sync.{' '}
+            Create child issues under an incident's Linear ticket, then use Sync action
+            items on the incident to load them here. Incidents created in the last{' '}
+            {data.freshness.auto_refresh_months} months are also refreshed hourly.{' '}
             <Link to="/" {...stylex.props(styles.incidentLink)}>
               Browse incidents
             </Link>
@@ -194,7 +217,8 @@ function ActionItemsDashboard() {
         Includes follow-ups from closed incidents. Time range and severity scope the
         entire dashboard; queue and team-progress controls filter independently.
         <br />
-        Cached Linear data · synced hourly · snapshot{' '}
+        Cached Linear data · hourly sync for incidents created in the last{' '}
+        {data.freshness.auto_refresh_months} months · snapshot{' '}
         <time dateTime={data.generated_at}>
           {new Date(data.generated_at).toLocaleString()}
         </time>
@@ -202,7 +226,7 @@ function ActionItemsDashboard() {
         {data.freshness.oldest_sync_at ? (
           <>
             {' '}
-            Oldest incident sync:{' '}
+            Oldest cached incident sync:{' '}
             <time dateTime={data.freshness.oldest_sync_at}>
               {new Date(data.freshness.oldest_sync_at).toLocaleString()}
             </time>

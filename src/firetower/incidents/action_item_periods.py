@@ -1,7 +1,9 @@
 import calendar
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from math import ceil
 from typing import Any
+
+AUTO_REFRESH_MONTHS = 6
 
 TIME_RANGES = {
     "7d": "Last 7 days",
@@ -23,6 +25,10 @@ def shift_months(value: datetime, months: int) -> datetime:
         month=month,
         day=min(value.day, calendar.monthrange(year, month)[1]),
     )
+
+
+def get_auto_refresh_cutoff(now: datetime) -> datetime:
+    return shift_months(now.astimezone(UTC), -AUTO_REFRESH_MONTHS)
 
 
 def get_range_start(key: str, now: datetime) -> datetime | None:

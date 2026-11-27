@@ -103,6 +103,9 @@ const mockData: DashboardData = {
   freshness: {
     linked_incidents: 5,
     unlinked_incidents: 0,
+    auto_refresh_months: 6,
+    auto_refresh_cutoff: '2026-05-17T12:00:00+00:00',
+    outside_refresh_window_incidents: 0,
     unsynced_incidents: 0,
     stale_incidents: 0,
     oldest_sync_at: '2026-11-17T11:00:00Z',
@@ -453,9 +456,7 @@ describe('Action item dashboard', () => {
       ],
     });
     await renderRoute();
-    expect(
-      screen.getByText(/1 open follow-ups have no Linear team metadata yet/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/missing Linear team metadata: 1/)).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('combobox', {name: 'Queue team'}));
     expect(
@@ -653,11 +654,51 @@ describe('Action item dashboard', () => {
       freshness: {...mockData.freshness, unsynced_incidents: 1, stale_incidents: 3},
     });
     await renderRoute();
+    expect(screen.getByText(/1 never synced; 3 not synced in 24h/)).toBeInTheDocument();
+  });
+
+  it('explains the six-month automatic refresh window without marking historical syncs as failures', async () => {
+    setupMocks({
+      ...mockData,
+      freshness: {
+        ...mockData.freshness,
+        outside_refresh_window_incidents: 2,
+        oldest_sync_at: '2025-01-01T12:00:00Z',
+      },
+    });
+    await renderRoute();
+    expect(screen.getByText(/2 linked incidents created before/)).toHaveTextContent(
+      'outside the 6-month automatic refresh window'
+    );
     expect(
-      screen.getByText(
-        /1 linked incidents have never synced, 3 have not synced in 24h, and 2 open follow-ups/
-      )
+      screen.getByText(/Older cached follow-ups remain available/)
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', {name: 'Action item data freshness'})
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', {name: 'Add connection pool alerts'})
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Oldest cached incident sync/)).toBeInTheDocument();
+  });
+
+  it('still warns about missing historical metadata without promising hourly backfill', async () => {
+    setupMocks({
+      ...mockData,
+      summary: {...mockData.summary, unknown_activity: 1, unknown_team: 1},
+      freshness: {...mockData.freshness, outside_refresh_window_incidents: 1},
+    });
+    await renderRoute();
+    const warning = screen.getByRole('status', {name: 'Action item data freshness'});
+    expect(warning).toHaveTextContent(
+      'Automatic sync coverage for incidents created in the last 6 months:'
+    );
+    expect(warning).toHaveTextContent('0 never synced; 0 not synced in 24h');
+    expect(warning).toHaveTextContent('missing activity timestamps: 1');
+    expect(warning).toHaveTextContent('missing Linear team metadata: 1');
+    expect(
+      screen.queryByText(/The hourly Linear sync fills these in/)
+    ).not.toBeInTheDocument();
   });
 
   it('handles an empty report without showing NaN, a fake completion rate, or pagination', async () => {

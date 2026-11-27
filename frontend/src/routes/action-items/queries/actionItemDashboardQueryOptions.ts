@@ -129,6 +129,9 @@ export const DashboardSchema = z.object({
   freshness: z.object({
     linked_incidents: z.number(),
     unlinked_incidents: z.number(),
+    auto_refresh_months: z.number(),
+    auto_refresh_cutoff: z.string(),
+    outside_refresh_window_incidents: z.number(),
     unsynced_incidents: z.number(),
     stale_incidents: z.number(),
     oldest_sync_at: z.string().nullable(),

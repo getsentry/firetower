@@ -8,6 +8,7 @@ from django.utils import timezone
 from jinja2 import Environment, TemplateError
 
 from firetower.auth.models import ExternalProfileType
+from firetower.incidents.action_item_periods import get_auto_refresh_cutoff
 from firetower.incidents.hooks import HIGH_SEVERITIES
 from firetower.incidents.models import (
     ActionItem,
@@ -148,11 +149,14 @@ def _remind_misfiled_action_item_creators(linear: dict) -> None:
 
 @datadog_log
 def refresh_action_item_dashboard() -> None:
-    """Refresh all linked incidents, including old and completed incidents."""
+    """Refresh linked incidents created within the last six calendar months."""
     if not settings.LINEAR:
         return
     incidents = (
-        Incident.objects.filter(linear_parent_issue_id__isnull=False)
+        Incident.objects.filter(
+            linear_parent_issue_id__isnull=False,
+            created_at__gte=get_auto_refresh_cutoff(timezone.now()),
+        )
         .exclude(status=IncidentStatus.CANCELED)
         .exclude(linear_parent_issue_id="")
         .order_by("-created_at")

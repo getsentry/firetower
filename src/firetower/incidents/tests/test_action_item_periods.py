@@ -1,9 +1,10 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
 from firetower.incidents.action_item_periods import (
     TIME_RANGES,
+    get_auto_refresh_cutoff,
     get_range_start,
     get_trend_periods,
 )
@@ -101,6 +102,27 @@ def test_empty_history_and_exact_midnight_still_have_a_current_bucket():
     _, periods = get_trend_periods(midnight - timedelta(days=7), midnight)
     assert periods[-1]["start"] == midnight
     assert periods[-2]["end"] == midnight
+
+
+@pytest.mark.parametrize(
+    "now,expected",
+    [
+        (NOW, datetime(2026, 5, 17, 12, tzinfo=UTC)),
+        (datetime(2026, 8, 31, 12, tzinfo=UTC), datetime(2026, 2, 28, 12, tzinfo=UTC)),
+        (datetime(2024, 8, 31, 12, tzinfo=UTC), datetime(2024, 2, 29, 12, tzinfo=UTC)),
+        (datetime(2026, 3, 31, 12, tzinfo=UTC), datetime(2025, 9, 30, 12, tzinfo=UTC)),
+        (
+            datetime(2026, 11, 17, 1, tzinfo=timezone(timedelta(hours=13))),
+            datetime(2026, 5, 16, 12, tzinfo=UTC),
+        ),
+        (
+            NOW.replace(microsecond=12345),
+            datetime(2026, 5, 17, 12, microsecond=12345, tzinfo=UTC),
+        ),
+    ],
+)
+def test_auto_refresh_cutoff_is_six_calendar_months_in_utc(now, expected):
+    assert get_auto_refresh_cutoff(now) == expected
 
 
 def test_invalid_ranges_are_rejected():

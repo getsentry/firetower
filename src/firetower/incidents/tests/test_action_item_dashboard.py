@@ -8,7 +8,11 @@ from django.contrib.auth.models import AnonymousUser, User
 from django_q.models import Schedule
 from rest_framework.test import APIClient
 
-from firetower.incidents.action_item_periods import TIME_RANGES, get_range_start
+from firetower.incidents.action_item_periods import (
+    TIME_RANGES,
+    get_auto_refresh_cutoff,
+    get_range_start,
+)
 from firetower.incidents.action_item_reporting import build_action_item_dashboard
 from firetower.incidents.models import ActionItem, Incident, filter_visible_to_user
 from firetower.incidents.services import (
@@ -736,10 +740,69 @@ class TestActionItemDashboard:
         assert data["freshness"] == {
             "linked_incidents": 3,
             "unlinked_incidents": 1,
+            "auto_refresh_months": 6,
+            "auto_refresh_cutoff": datetime(2026, 5, 17, 12, tzinfo=UTC).isoformat(),
+            "outside_refresh_window_incidents": 0,
             "unsynced_incidents": 1,
             "stale_incidents": 1,
             "oldest_sync_at": (NOW - timedelta(days=2)).isoformat(),
         }
+
+    def test_outside_window_syncs_are_not_failures_and_cached_followups_remain_visible(
+        self, dashboard
+    ):
+        client, _, _ = dashboard
+        cutoff = get_auto_refresh_cutoff(NOW)
+        old = Incident.objects.create(
+            title="Historical incident",
+            severity="P1",
+            status="Done",
+            linear_parent_issue_id="historical",
+            action_items_last_synced_at=NOW - timedelta(days=3),
+        )
+        never = Incident.objects.create(
+            title="Historical never synced",
+            severity="P1",
+            linear_parent_issue_id="historical-never",
+        )
+        boundary = Incident.objects.create(
+            title="At boundary",
+            severity="P1",
+            linear_parent_issue_id="boundary",
+            action_items_last_synced_at=NOW - timedelta(days=2),
+        )
+        Incident.objects.filter(pk__in=[old.pk, never.pk]).update(
+            created_at=cutoff - timedelta(microseconds=1)
+        )
+        Incident.objects.filter(pk=boundary.pk).update(created_at=cutoff)
+        item = make_item(
+            old, priority=2, linear_due_date=NOW.date() - timedelta(days=1)
+        )
+
+        data = client.get(URL, {"time_range": "7d", "view": "open"}).data
+        freshness = data["freshness"]
+        assert freshness["linked_incidents"] == 4
+        assert freshness["outside_refresh_window_incidents"] == 2
+        assert freshness["unsynced_incidents"] == 0
+        assert freshness["stale_incidents"] == 1
+        assert freshness["oldest_sync_at"] == (NOW - timedelta(days=3)).isoformat()
+        assert data["summary"]["open"] == data["summary"]["overdue"] == 1
+        assert [row["id"] for row in data["queue"]["results"]] == [item.id]
+
+    def test_outside_window_counts_respect_private_incident_visibility(self, dashboard):
+        client, _, _ = dashboard
+        private = Incident.objects.create(
+            title="Private old incident",
+            severity="P1",
+            is_private=True,
+            linear_parent_issue_id="private",
+        )
+        Incident.objects.filter(pk=private.pk).update(
+            created_at=NOW - timedelta(days=500)
+        )
+        data = client.get(URL).data
+        assert data["freshness"]["linked_incidents"] == 1
+        assert data["freshness"]["outside_refresh_window_incidents"] == 0
 
     def test_anonymous_access_denied(self):
         client = APIClient()
@@ -875,7 +938,7 @@ class TestDashboardSync:
         assert stats.errors
         assert incident.action_items_last_synced_at == old_sync
 
-    def test_hourly_sweep_includes_old_closed_low_severity_incidents_and_continues_after_failure(
+    def test_hourly_sweep_keeps_closed_incidents_within_six_months_and_continues_after_failure(
         self, dashboard
     ):
         _, _, recent = dashboard
@@ -885,7 +948,33 @@ class TestDashboardSync:
             severity="P4",
             linear_parent_issue_id="old",
         )
-        Incident.objects.filter(pk=old.pk).update(created_at=NOW - timedelta(days=500))
+        Incident.objects.filter(pk=old.pk).update(created_at=NOW - timedelta(days=150))
+        outside = Incident.objects.create(
+            title="Outside refresh window",
+            status="Done",
+            severity="P4",
+            linear_parent_issue_id="outside",
+        )
+        Incident.objects.filter(pk=outside.pk).update(
+            created_at=NOW - timedelta(days=500)
+        )
+        make_item(outside)
+        cutoff = get_auto_refresh_cutoff(NOW)
+        boundary = Incident.objects.create(
+            title="Six-month boundary",
+            status="Done",
+            severity="P4",
+            linear_parent_issue_id="boundary",
+        )
+        Incident.objects.filter(pk=boundary.pk).update(created_at=cutoff)
+        before = Incident.objects.create(
+            title="Before boundary",
+            severity="P1",
+            linear_parent_issue_id="before",
+        )
+        Incident.objects.filter(pk=before.pk).update(
+            created_at=cutoff - timedelta(microseconds=1)
+        )
         Incident.objects.create(
             title="Canceled",
             severity="P1",
@@ -898,10 +987,36 @@ class TestDashboardSync:
         )
         with patch(
             "firetower.incidents.tasks.action_items.sync_action_items_from_linear",
-            side_effect=[RuntimeError("upstream"), ActionItemsSyncStats()],
+            side_effect=[
+                RuntimeError("upstream"),
+                ActionItemsSyncStats(),
+                ActionItemsSyncStats(),
+            ],
         ) as sync:
             refresh_action_item_dashboard.__wrapped__()
-        assert {call.args[0].id for call in sync.call_args_list} == {recent.id, old.id}
+        assert {call.args[0].id for call in sync.call_args_list} == {
+            recent.id,
+            old.id,
+            boundary.id,
+        }
+
+    def test_manual_sync_still_refreshes_incidents_outside_the_window(self, dashboard):
+        client, _, incident = dashboard
+        Incident.objects.filter(pk=incident.pk).update(
+            created_at=NOW - timedelta(days=500),
+            action_items_last_synced_at=NOW - timedelta(days=2),
+        )
+        with patch("firetower.incidents.services._get_linear_service") as get_service:
+            get_service.return_value.get_child_issues.return_value = []
+            response = client.post(
+                f"/api/incidents/{incident.incident_number}/sync-action-items/"
+            )
+        assert response.status_code == 200
+        assert response.data["success"]
+        assert not response.data["stats"]["skipped"]
+        get_service.return_value.get_child_issues.assert_called_once_with("parent")
+        incident.refresh_from_db()
+        assert incident.action_items_last_synced_at == NOW
 
     def test_sweep_disabled_without_linear(self, settings):
         settings.LINEAR = None

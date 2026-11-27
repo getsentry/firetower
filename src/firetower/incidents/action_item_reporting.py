@@ -6,7 +6,13 @@ from typing import Any
 
 from django.db.models import QuerySet
 
-from .action_item_periods import TIME_RANGES, get_range_start, get_trend_periods
+from .action_item_periods import (
+    AUTO_REFRESH_MONTHS,
+    TIME_RANGES,
+    get_auto_refresh_cutoff,
+    get_range_start,
+    get_trend_periods,
+)
 from .models import ActionItem, ActionItemStatus, Incident
 from .serializers import DashboardActionItemSerializer
 
@@ -35,7 +41,9 @@ def build_action_item_dashboard(
         item_queryset = item_queryset.filter(created_at__gte=range_start)
     items = list(item_queryset.select_related("incident").order_by("created_at", "id"))
     incident_rows = list(
-        incidents.only("linear_parent_issue_id", "action_items_last_synced_at")
+        incidents.only(
+            "created_at", "linear_parent_issue_id", "action_items_last_synced_at"
+        )
     )
     open_items = [
         item
@@ -255,6 +263,15 @@ def build_action_item_dashboard(
         for item in page_items
     ]
     linked = [incident for incident in incident_rows if incident.linear_parent_issue_id]
+    refresh_cutoff = get_auto_refresh_cutoff(now)
+    refresh_eligible = [
+        incident for incident in linked if incident.created_at >= refresh_cutoff
+    ]
+    eligible_syncs = [
+        incident.action_items_last_synced_at
+        for incident in refresh_eligible
+        if incident.action_items_last_synced_at
+    ]
     syncs = [
         incident.action_items_last_synced_at
         for incident in linked
@@ -277,8 +294,13 @@ def build_action_item_dashboard(
         "freshness": {
             "linked_incidents": len(linked),
             "unlinked_incidents": len(incident_rows) - len(linked),
-            "unsynced_incidents": len(linked) - len(syncs),
-            "stale_incidents": sum(sync < now - timedelta(days=1) for sync in syncs),
+            "auto_refresh_months": AUTO_REFRESH_MONTHS,
+            "auto_refresh_cutoff": refresh_cutoff.isoformat(),
+            "outside_refresh_window_incidents": len(linked) - len(refresh_eligible),
+            "unsynced_incidents": len(refresh_eligible) - len(eligible_syncs),
+            "stale_incidents": sum(
+                sync < now - timedelta(days=1) for sync in eligible_syncs
+            ),
             "oldest_sync_at": min(syncs).isoformat() if syncs else None,
         },
         "queue": {"count": len(queue), "page": page, "pages": pages, "results": rows},

@@ -271,10 +271,12 @@ export function TeamHotspots({
               count toward open work, aging, and stalled work.
             </p>
             <p>
-              Edits and removals in Linear are picked up by the hourly sync. Use the
-              incident's Sync action items button to fetch them immediately, then refresh
-              this dashboard. Clearing a due date falls back to the remaining SLA or
-              priority target; Refresh dashboard alone only reloads cached data.
+              Incidents created in the last {data.freshness.auto_refresh_months} months
+              are synced hourly. Older incidents are refreshed on demand when viewing
+              their action items or syncing manually. Use the incident's Sync action items
+              button to fetch current data at any age, then refresh this dashboard.
+              Clearing a due date falls back to the remaining SLA or priority target;
+              Refresh dashboard alone only reloads cached data.
             </p>
             <p>
               Stalled means no issue update in Linear for {data.stalled_days} days, not
@@ -295,8 +297,10 @@ export function TeamHotspots({
               statuses in that same range, including completed-only teams. Total includes
               canceled items; completion rate is completed divided by completed plus open
               work, excluding canceled items. Delivery metrics additionally require a
-              valid completion timestamp. Sync coverage is reported across all visible
-              incidents, independent of the time range.
+              valid completion timestamp. Never-synced and stale-sync counts cover only
+              visible linked incidents within the automatic refresh window, independent of
+              the selected time range. Outside-window incidents are reported separately;
+              their cached follow-ups remain available.
             </p>
             <p>
               Totals in this range: {summary.done} completed, {summary.canceled} canceled.{' '}
